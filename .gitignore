@@ -1,5 +1,6 @@
 # sptrans files
-sptrans_gtfs
+gtfs_files
+live_data_files
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
