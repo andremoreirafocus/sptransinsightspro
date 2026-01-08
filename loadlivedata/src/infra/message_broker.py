@@ -1,8 +1,9 @@
 from kafka import KafkaConsumer
 import json
+from src.services.load_data_to_raw import load_data_to_raw
 
 
-def start_consumer(broker, topic):
+def start_consumer(broker, topic, bucket_name, app_folder):
     num_read_messages = 0
 
     print(f"[*] Connecting to {broker}...")
@@ -28,7 +29,6 @@ def start_consumer(broker, topic):
             payload = message.value
             print(f"--- New Message Received at {message.timestamp} ---")
 
-            # If your payload is the 'teste' string or the bus dict:
             data = json.loads(payload)
 
             if isinstance(data, dict):
@@ -39,6 +39,15 @@ def start_consumer(broker, topic):
                 print(
                     f"Received data for {total_qv} vehicles from {len(data.get('l', []))} bus lines."
                 )
+                load_data_to_raw(
+                    data=payload,
+                    raw_bucket_name=bucket_name,
+                    app_folder=app_folder,
+                    hour_minute=data.get("hr").replace(
+                        ":", ""
+                    ),  # e.g., "15:30" -> "1530"
+                )
+
             else:
                 print("Not a valid payload format.")
                 # print(f"Payload: {payload}")

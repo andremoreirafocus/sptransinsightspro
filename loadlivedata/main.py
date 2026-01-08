@@ -6,4 +6,9 @@ if __name__ == "__main__":
     broker = config.get("KAFKA_BROKER")
     topic = config.get("KAFKA_TOPIC")
 
-    start_consumer(broker, topic)
+    start_consumer(
+        broker=config.get("KAFKA_BROKER"),
+        topic=config.get("KAFKA_TOPIC"),
+        bucket_name=config.get("RAW_BUCKET_NAME"),
+        app_folder=config.get("APP_FOLDER"),
+    )
