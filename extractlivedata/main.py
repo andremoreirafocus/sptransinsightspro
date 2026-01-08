@@ -7,6 +7,7 @@ from src.services.buses_positions import (
 from src.infra.storage import save_data_to_json_file
 from src.infra.message_broker import sendKafka
 import json
+import time
 
 
 def main():
@@ -31,6 +32,9 @@ def main():
             message=json.dumps(buses_positions),
             broker=config.get("KAFKA_BROKER"),
         )
+        interval = int(config.get("EXTRACTION_INTERVAL_SECONDS"))
+        print(f"[*] Waiting for {interval} seconds until next extraction...\n")
+        time.sleep(interval)
 
 
 if __name__ == "__main__":
