@@ -26,10 +26,10 @@ def start_consumer(broker, topic, bucket_name, app_folder):
     try:
         for message in consumer:
             # 'message.value' is now a Python dictionary thanks to value_deserializer
-            payload = message.value
+            data_json = message.value
             print(f"--- New Message Received at {message.timestamp} ---")
 
-            data = json.loads(payload)
+            data = json.loads(data_json)
 
             if isinstance(data, dict):
                 total_qv = 0
@@ -40,12 +40,12 @@ def start_consumer(broker, topic, bucket_name, app_folder):
                     f"Received data for {total_qv} vehicles from {len(data.get('l', []))} bus lines."
                 )
                 load_data_to_raw(
-                    data=payload,
+                    data=data_json,
                     raw_bucket_name=bucket_name,
                     app_folder=app_folder,
-                    hour_minute=data.get("hr").replace(
-                        ":", ""
-                    ),  # e.g., "15:30" -> "1530"
+                    hour_minute=data.get("payload")
+                    .get("hr")
+                    .replace(":", ""),  # e.g., "15:30" -> "1530"
                 )
 
             else:
