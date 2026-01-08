@@ -2,9 +2,11 @@ import requests
 import time
 from datetime import datetime
 import json
+import os
 
 
-def monitorar_onibus(base_url, token, intervalo=120):
+def monitorar_onibus(base_url, token, intervalo, downloads_folder):
+    FILE_NAME = "posicoes_onibus.json"
     session = requests.Session()
 
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
@@ -31,13 +33,13 @@ def monitorar_onibus(base_url, token, intervalo=120):
 
             if response.status_code == 200:
                 dados = response.json()
-                file_path = "posicoes_onibus.json"
-                with open(file_path, "w") as file:
+                
+                file_with_path = os.path.join(downloads_folder, FILE_NAME)
+                with open(file_with_path, "w") as file:
                     file.write(json.dumps(dados))
 
-                print(f"Successfully written to {file_path}")
-                
-                
+                print(f"Successfully written to {file_with_path}")
+
                 # print(dados)
 
                 horario_ref = dados.get("hr", "N/A")

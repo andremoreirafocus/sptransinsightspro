@@ -1,3 +1,6 @@
+# sptrans files
+sptrans_gtfs
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -3,7 +3,7 @@ import zipfile
 import io
 
 
-def download_gtfs(url, login, password):
+def download_gtfs(url, login, password, downloads_folder):
     # url = "http://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS"
 
     response = requests.get(url, auth=(login, password))
@@ -14,4 +14,4 @@ def download_gtfs(url, login, password):
 
     with zipfile.ZipFile(io.BytesIO(response.content)) as z:
         print(z.namelist())  # List files: agency.txt, stops.txt, etc.
-        z.extractall("sptrans_gtfs")
+        z.extractall(downloads_folder)
