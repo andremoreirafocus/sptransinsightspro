@@ -19,16 +19,14 @@ def extract_buses_positions(base_url, token):
         return
 
     try:
-        # Endpoint /Posicao retorna todos os veículos com posição atualizada
-        # Para uma linha específica, use: /Posicao/Linha?codigoLinha={ID}
         posicao_url = f"{base_url}/Posicao"
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Carga iniciada!")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Download started!")
         response = session.get(posicao_url)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Carga finalizada!")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Download finished!")
 
         if response.status_code == 200:
-            dados = response.json()
-            return dados
+            data = response.json()
+            return data
 
         else:
             print(f"Error getting positions: {response.status_code}")
@@ -38,7 +36,7 @@ def extract_buses_positions(base_url, token):
 
 
 def get_buses_positions_summary(buses_positions):
-    horario_ref = buses_positions.get("hr", "N/A")
-    veiculos = buses_positions.get("l", [])  # 'l' contém a lista de linhas e veículos
-    total_veiculos = sum([len(linha.get("vs", [])) for linha in veiculos])
-    return horario_ref, total_veiculos
+    reference_time = buses_positions.get("hr", "N/A")
+    lines = buses_positions.get("l", [])  # 'l' contém a lista de lines e veículos
+    total_vehicles = sum([len(line.get("vs", [])) for line in lines])
+    return reference_time, total_vehicles
