@@ -1,6 +1,7 @@
 import requests
 import time
 from datetime import datetime
+import json
 
 
 def monitorar_onibus(base_url, token, intervalo=120):
@@ -30,6 +31,13 @@ def monitorar_onibus(base_url, token, intervalo=120):
 
             if response.status_code == 200:
                 dados = response.json()
+                file_path = "posicoes_onibus.json"
+                with open(file_path, "w") as file:
+                    file.write(json.dumps(dados))
+
+                print(f"Successfully written to {file_path}")
+                
+                
                 # print(dados)
 
                 horario_ref = dados.get("hr", "N/A")
