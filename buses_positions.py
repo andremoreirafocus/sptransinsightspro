@@ -2,20 +2,20 @@ import requests
 from datetime import datetime
 
 
-def get_buses_positions(base_url, token):
+def extract_buses_positions(base_url, token):
     session = requests.Session()
 
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
     try:
         response_auth = session.post(auth_url)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Autenticado com sucesso!")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!")
         else:
-            print("Erro na autenticação. Verifique seu Token.")
+            print("Authentication error. Verify your Token.")
             print(response_auth.status_code, response_auth.text)
             return
     except Exception as e:
-        print(f"Erro de conexão: {e}")
+        print(f"Error connecting: {e}")
         return
 
     try:
@@ -31,7 +31,14 @@ def get_buses_positions(base_url, token):
             return dados
 
         else:
-            print(f"Erro ao buscar posições: {response.status_code}")
+            print(f"Error getting positions: {response.status_code}")
 
     except Exception as e:
-        print(f"Erro durante a execução: {e}")
+        print(f"Error during execution: {e}")
+
+
+def get_buses_positions_summary(buses_positions):
+    horario_ref = buses_positions.get("hr", "N/A")
+    veiculos = buses_positions.get("l", [])  # 'l' contém a lista de linhas e veículos
+    total_veiculos = sum([len(linha.get("vs", [])) for linha in veiculos])
+    return horario_ref, total_veiculos
