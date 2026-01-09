@@ -1,5 +1,9 @@
 from minio import Minio
 import io
+import logging
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
 
 
 def list_objects_in_minio_bucket(
