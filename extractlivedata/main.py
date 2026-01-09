@@ -8,6 +8,22 @@ from src.infra.storage import save_data_to_json_file
 from src.infra.message_broker import sendKafka
 import json
 import time
+import logging
+from logging.handlers import RotatingFileHandler
+
+LOG_FILENAME = "extractlivedata.log"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        # Rotation: 5MB per file, keeping the last 5 files
+        RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
+        logging.StreamHandler(),  # Also keeps console output
+    ],
+)
+
+logger = logging.getLogger(__name__)
 
 
 def main():
@@ -28,7 +44,7 @@ def main():
             },
             "payload": buses_positions_payload,
         }
-        print(
+        logger.info(
             f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}"
         )
         save_data_to_json_file(
@@ -43,7 +59,7 @@ def main():
             broker=config.get("KAFKA_BROKER"),
         )
         interval = int(config.get("EXTRACTION_INTERVAL_SECONDS"))
-        print(f"[*] Waiting for {interval} seconds until next extraction...\n")
+        logger.info(f"[*] Waiting for {interval} seconds until next extraction...\n")
         time.sleep(interval)
 
 

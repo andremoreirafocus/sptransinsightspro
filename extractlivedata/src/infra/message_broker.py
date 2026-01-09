@@ -1,7 +1,11 @@
 from kafka import KafkaProducer
 import json
+import logging
 
-# This variable will store our producer so we don't reconnect every time
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
+
+# Stores our producer so we don't reconnect every time
 _producer = None
 
 
@@ -32,10 +36,12 @@ def sendKafka(topic, message, broker):
         future = producer.send(topic, message)
         record_metadata = future.get(timeout=10)
 
-        print(f"Successfully sent to {topic} [Partition: {record_metadata.partition}]")
+        logger.info(
+            f"Successfully sent to {topic} [Partition: {record_metadata.partition}]"
+        )
 
     except Exception as e:
-        print(f"--- KAFKA ERROR ---")
-        print(f"Failed to send message to topic {topic}.")
-        print(f"Error details: {e}")
-        print(f"-------------------")
+        logger.error(f"--- KAFKA ERROR ---")
+        logger.error(f"Failed to send message to topic {topic}.")
+        logger.error(f"Error details: {e}")
+        logger.error(f"-------------------")

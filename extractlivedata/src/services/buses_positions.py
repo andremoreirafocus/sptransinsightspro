@@ -1,5 +1,9 @@
 import requests
 from datetime import datetime
+import logging
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
 
 
 def extract_buses_positions(base_url, token):
@@ -9,36 +13,38 @@ def extract_buses_positions(base_url, token):
     try:
         response_auth = session.post(auth_url)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!")
+            logger.info(
+                f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!"
+            )
         else:
-            print("Authentication error. Verify your Token.")
-            print(response_auth.status_code, response_auth.text)
+            logger.error("Authentication error. Verify your Token.")
+            logger.error(response_auth.status_code, response_auth.text)
             return
     except Exception as e:
-        print(f"Error connecting: {e}")
+        logger.error(f"Error connecting: {e}")
         return None
 
     try:
         posicao_url = f"{base_url}/Posicao"
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Download started!")
+        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Download started!")
         response = session.get(posicao_url)
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Download finished!")
+        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Download finished!")
 
         if response.status_code == 200:
             data = response.json()
             return data
 
         else:
-            print(f"Error getting positions: {response.status_code}")
+            logger.error(f"Error getting positions: {response.status_code}")
 
     except Exception as e:
-        print(f"Error during execution: {e}")
+        logger.error(f"Error during execution: {e}")
         return None
 
 
 def get_buses_positions_summary(buses_positions):
     if not isinstance(buses_positions, dict):
-        print(f"Incorrect data type: {type(buses_positions)}")
+        logger.error(f"Incorrect data type: {type(buses_positions)}")
         return "NaN", "NaN"
     try:
         reference_time = buses_positions.get("hr", "NaN")
@@ -46,5 +52,5 @@ def get_buses_positions_summary(buses_positions):
         total_vehicles = sum([len(line.get("vs", [])) for line in lines])
         return reference_time, total_vehicles
     except Exception as e:
-        print(f"Error processing positions summary: {e}")
+        logger.error(f"Error processing positions summary: {e}")
         return "NaN", "NaN"
