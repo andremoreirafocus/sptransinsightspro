@@ -1,19 +1,23 @@
 import requests
 import zipfile
 import io
+import logging
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
 
 
 def extract_gtfs_files(url, login, password, downloads_folder):
     response = requests.get(url, auth=(login, password))
     if response.status_code == 404:
-        print("Check credentials or portal access")
+        logger.error("Check credentials or portal access")
         return
     response.raise_for_status()
 
     files_list = []
     with zipfile.ZipFile(io.BytesIO(response.content)) as z:
         files_list = z.namelist()
-        print(files_list)  # List files: agency.txt, stops.txt, etc.
+        logger.info(files_list)  # List files: agency.txt, stops.txt, etc.
         z.extractall(downloads_folder)
-    print(f"GTFS files extracted to {downloads_folder}")
+    logger.info(f"GTFS files extracted to {downloads_folder}")
     return files_list

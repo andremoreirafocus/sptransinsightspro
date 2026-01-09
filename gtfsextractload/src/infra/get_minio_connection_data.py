@@ -1,3 +1,8 @@
+import logging
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
+
 
 def get_minio_connection_data():
     """
