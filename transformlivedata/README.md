@@ -11,7 +11,8 @@ CREATE SCHEMA trusted;
 \dn
 CREATE TABLE trusted.posicoes (
     id BIGSERIAL PRIMARY KEY,
-    hora TEXT,                     -- Horário referência
+    timestamp_extracao TEXT,       -- metadata.extracted_at: horário extracao
+    veiculo_id INTEGER             -- p: id do veiculo
     linha_lt TEXT,                 -- c: Letreiro completo
     linha_code INTEGER,            -- cl: Código linha
     linha_sentido INTEGER,         -- sl: Sentido
