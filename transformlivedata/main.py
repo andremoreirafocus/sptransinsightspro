@@ -26,10 +26,7 @@ def main():
     logger.info("Starting transformation process...")
     print("Starting transformation process...")
     config = dotenv_values(".env")
-    source_bucket = config["SOURCE_BUCKET"]
-    app_folder = config["APP_FOLDER"]
-    table_name = config["TABLE_NAME"]
-    transform_position(source_bucket, app_folder, table_name)
+    transform_position(config)
 
 
 if __name__ == "__main__":

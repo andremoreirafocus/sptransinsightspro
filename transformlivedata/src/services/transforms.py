@@ -9,7 +9,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def transform_position(source_bucket, app_folder, table_name):
+def transform_position(config):
+    source_bucket = config["SOURCE_BUCKET"]
+    app_folder = config["APP_FOLDER"]
+    table_name = config["TABLE_NAME"]
+
     logger.info("Transforming position...")
     raw_positions = load_positions(source_bucket, app_folder)
     if not raw_positions:
@@ -20,7 +24,7 @@ def transform_position(source_bucket, app_folder, table_name):
         logger.error("No valid position records found after transformation.")
         return
     try:
-        save_positions_to_db(positions_table, table_name)
+        save_positions_to_db(config, positions_table, table_name)
     except Exception as e:
         logger.error(f"Error saving positions to DB: {e}")
         return
@@ -144,7 +148,7 @@ def data_structure_is_valid(data):
     return True
 
 
-def save_positions_to_db(positions_table, table_name):
+def save_positions_to_db(config, positions_table, table_name):
     """
     Insert 10k+ items from memory list.
     Assumes list format: (extracao_ts, veiculo_id, linha_lt, linha_code,
@@ -160,4 +164,4 @@ def save_positions_to_db(positions_table, table_name):
     ) VALUES %s
     """
 
-    bulk_insert_data_table(insert_sql, positions_table)
+    bulk_insert_data_table(config, insert_sql, positions_table)
