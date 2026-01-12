@@ -52,3 +52,47 @@ def bulk_insert_data_table(config, sql, data_table):
             cur.close()
             conn.close()
             print("Database connection closed.")
+
+
+def save_routes_to_db(config, schema, table_name, columns, buffer):
+    # BASE_TABLE_NAME = config["BASE_TABLE_NAME"]
+    # table_name = f"{BASE_TABLE_NAME}.{table_name}"
+    # table_name = "routes"
+    try:
+        # 1. Initialize connection and cursor
+        conn = get_db_connection(config)
+        cur = conn.cursor()
+        cur.execute(f"""
+            SELECT schemaname, tablename
+            FROM pg_tables
+            WHERE schemaname = '{schema}' AND tablename = '{table_name}';
+        """)
+        if not cur.fetchone():
+            raise ValueError(
+                f"Table {schema}.{table_name} does not exist. Create it first: CREATE TABLE {schema}.{table_name} (...);"
+            )
+        full_table_name = f"{schema}.{table_name}"
+        copy_sql = f"""
+        COPY {full_table_name} ({", ".join(columns)})
+        FROM STDIN WITH (FORMAT CSV, DELIMITER ',', NULL '')
+        """
+        cur.copy_expert(copy_sql, buffer)
+        # 3. Commit only if execution succeeds
+        conn.commit()
+        # print(f"Successfully inserted {len(data_table)} rows into table")
+    except (DatabaseError, InterfaceError) as db_err:
+        # Rollback the transaction if any database error occurs
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error during insert into table: {db_err}")
+        raise  # Re-raise so the orchestrator knows the pipeline failed
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Unexpected error during transformation: {e}")
+        raise
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+            print("Database connection closed.")
