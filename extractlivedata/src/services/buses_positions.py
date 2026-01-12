@@ -24,10 +24,10 @@ def extract_buses_positions(base_url, token):
         return None
     try:
         posicao_url = f"{base_url}/Posicao"
-        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Download started!")
+        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!")
         response = session.get(posicao_url)
-        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Download finished!")
         if response.status_code == 200:
+            logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!")
             data = response.json()
             return data
         else:

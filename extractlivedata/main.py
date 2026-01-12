@@ -50,10 +50,14 @@ def main():
             )
             if buses_positions_response_is_valid(buses_positions_payload):
                 download_successful = True
+                if retries > 0:
+                    logger.info(
+                        f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}."
+                    )
                 break
             retries += 1
             logger.warning(
-                "Invalid buses positions response structure! Retrying in {back_off} seconds..."
+                f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
             )
             time.sleep(back_off)
             back_off *= 2
