@@ -30,10 +30,15 @@ logger = logging.getLogger(__name__)
 
 def main():
     config = dotenv_values(".env")
+    TOKEN = config.get("TOKEN")
+    API_BASE_URL = config.get("API_BASE_URL")
+    KAFKA_TOPIC = config.get("KAFKA_TOPIC")
+    KAFKA_BROKER = config.get("KAFKA_BROKER")
+    DOWNLOADS_FOLDER = config.get("DOWNLOADS_FOLDER")
     while True:
         buses_positions_payload = extract_buses_positions(
-            token=config.get("TOKEN"),
-            base_url=config.get("API_BASE_URL"),
+            token=TOKEN,
+            base_url=API_BASE_URL,
         )
         if not buses_positions_response_is_valid(buses_positions_payload):
             logger.error("Invalid buses positions response structure. Skipping...")
@@ -54,14 +59,13 @@ def main():
         )
         save_data_to_json_file(
             buses_positions,
-            downloads_folder=config.get("DOWNLOADS_FOLDER"),
+            downloads_folder=DOWNLOADS_FOLDER,
             file_name=f"buses_positions_{reference_time}.json",
         )
         sendKafka(
-            topic=config.get("KAFKA_TOPIC"),
-            # message=buses_positions,
+            broker=KAFKA_BROKER,
+            topic=KAFKA_TOPIC,
             message=json.dumps(buses_positions),
-            broker=config.get("KAFKA_BROKER"),
         )
         interval = int(config.get("EXTRACTION_INTERVAL_SECONDS"))
         logger.info(f"[*] Waiting for {interval} seconds until next extraction...\n")
