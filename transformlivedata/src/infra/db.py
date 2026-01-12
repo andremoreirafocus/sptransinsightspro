@@ -13,12 +13,12 @@ def get_db_connection(config):
     The function does NOT know anything about business logic / transformations.
     """
     conn = psycopg2.connect(
-        host=config["PG_HOST"],
-        port=config["PG_PORT"],
-        dbname=config["PG_DATABASE"],
-        user=config["PG_USER"],
-        password=config["PG_PASSWORD"],
-        sslmode=config.get("PG_SSLMODE", "prefer"),
+        host=config["DB_HOST"],
+        port=config["DB_PORT"],
+        dbname=config["DB_DATABASE"],
+        user=config["DB_USER"],
+        password=config["DB_PASSWORD"],
+        sslmode=config.get("DB_SSLMODE", "prefer"),
     )  # psycopg2.connect supports keyword arguments for connection parameters.[web:5][web:8]
     return conn
 
