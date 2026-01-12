@@ -55,7 +55,12 @@ CREATE TABLE trusted.calendar (
     end_date       INTEGER
 );
 
-
+CREATE TABLE trusted.frequencies (
+    trip_id TEXT,
+    start_time TEXT,
+    end_time TEXT,
+    headway_secs INTEGER,
+)
 
 Para instalar os requisitos:
 pip install -r requirements.txt

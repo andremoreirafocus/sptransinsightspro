@@ -70,6 +70,12 @@ def transform_calendar(config):
 
 
 def transform_frequencies(config):
-    print("Transforming frequencies...")
-    # Add your logic to transform frequencies here
-    print("Frequencies transformed successfully.")
+    SOURCE_BUCKET = config["SOURCE_BUCKET"]
+    APP_FOLDER = config["APP_FOLDER"]
+    schema = "trusted"
+    table_name = "frequencies"
+    print(f"Transforming {table_name}...")
+    csv_bytes = load_raw_csv(SOURCE_BUCKET, APP_FOLDER, table_name)
+    buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
+    save_routes_to_db(config, schema, table_name, columns, buffer)
+    print("Transformation successful.")
