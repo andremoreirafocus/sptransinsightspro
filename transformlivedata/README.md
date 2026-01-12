@@ -1,9 +1,22 @@
 Este projeto faz:
-- lê cada um dos arquivos em um prefixo de uma pasta raw no minio
+- lê um arquivo que as posicoes dos onibus fornecidos pela sptrans em um determinado ano, mes, dia, hora e minuto.
+- Os dados são armazenados em um bucket no minio em uma subpasta (prefixo) seguindo uma estrutura de particionamento por ano, mes e dia
+- o nome do arquivo a ser recuperado corresponde à hora e ao minuto em que os dados foram extraídos da api da sptrans
+- transforma os dados em uma big table consolidada em memória
+- salva o conteúdo da tabela da memória para uma tabela especificada
 
 Configurações:
+SOURCE_BUCKET = <source_bucket> # the bucket for the app to load data from
+APP_FOLDER = <app_folder> # the subfolder for the app to load data from
+TABLE_NAME=<table_name> # where data will be written
+DB_HOST="localhost"
+DB_PORT=<PORT>
+DB_DATABASE=<dbname>
+DB_USER=<user>
+DB_PASSWORD=<password>
+DB_SSLMODE="prefer"
 
-Requisitos:
+Database commands:
 create database sptrans_insights;
 \l
 \c 
@@ -32,5 +45,4 @@ pip install -r requirements.txt
 Para executar: 
 python ./main.py
 
-PENDENCIAS:
-mover config de conexão do PG para a main
+
