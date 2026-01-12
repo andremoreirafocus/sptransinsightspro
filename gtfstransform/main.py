@@ -31,10 +31,11 @@ def main():
     config = dotenv_values(".env")
     transform_routes(config)
     transform_trips(config)
-    transform_stop_times(config)
     transform_stops(config)
-    transform_calendar(config)
+    transform_stop_times(config)
     transform_frequencies(config)
+    transform_calendar(config)
+
 
 if __name__ == "__main__":
     main()
