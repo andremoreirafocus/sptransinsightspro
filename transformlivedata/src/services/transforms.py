@@ -9,13 +9,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def transform_position(config):
+def transform_position(config, year, month, day, hour, minute):
     source_bucket = config["SOURCE_BUCKET"]
     app_folder = config["APP_FOLDER"]
     table_name = config["TABLE_NAME"]
 
     logger.info("Transforming position...")
-    raw_positions = load_positions(source_bucket, app_folder)
+    raw_positions = load_positions(
+        source_bucket, app_folder, year, month, day, hour, minute
+    )
     if not raw_positions:
         logger.error("No position data found to transform.")
         return
@@ -31,7 +33,7 @@ def transform_position(config):
     logger.info("Positions transformed successfully.")
 
 
-def load_positions(source_bucket, app_folder):
+def load_positions(source_bucket, app_folder, year, month, day, hour, minute):
     """
     Load position data from source bucket and app folder.
     :param source_bucket: Source bucket name
@@ -43,11 +45,8 @@ def load_positions(source_bucket, app_folder):
     )
     # Add your logic to load position data here
     # Example: read files from MinIO, parse them, and return as a list of records
-    year = 2026
-    month = "01"
-    day = "10"
+    hour_minute = f"{hour}{minute}"
     prefix = f"{app_folder}/year={year}/month={month}/day={day}/"
-    hour_minute = "0842"
     base_file_name = "posicoes_onibus"
     connection_data = get_minio_connection_data()
     object_name = f"{prefix}{base_file_name}-{year}{month}{day}{hour_minute}.json"

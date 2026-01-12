@@ -26,7 +26,13 @@ def main():
     logger.info("Starting transformation process...")
     print("Starting transformation process...")
     config = dotenv_values(".env")
-    transform_position(config)
+    year = "2026"
+    month = "01"
+    day = "10"
+    hour = "08"
+    minute = "42"
+
+    transform_position(config, year, month, day, hour, minute)
 
 
 if __name__ == "__main__":
