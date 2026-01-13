@@ -28,9 +28,14 @@ def main():
     config = dotenv_values(".env")
     year = "2026"
     month = "01"
-    day = "10"
-    hour = "08"
-    minute = "42"
+    day = "12"
+    hour = "16"
+    minute = "00"
+    # year = "2026"
+    # month = "01"
+    # day = "10"
+    # hour = "08"
+    # minute = "42"
 
     transform_position(config, year, month, day, hour, minute)
 
