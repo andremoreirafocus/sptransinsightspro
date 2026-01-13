@@ -6,7 +6,7 @@ from src.services.transforms import (
     transform_stops,
     transform_trips,
 )
-from dotenv import dotenv_values
+from src.config import get_config
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     print("Starting GTFS Transformations...")
-    config = dotenv_values(".env")
+    config = get_config()
     transform_routes(config)
     transform_trips(config)
     transform_stops(config)

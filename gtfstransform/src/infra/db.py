@@ -54,12 +54,14 @@ def bulk_insert_data_table(config, sql, data_table):
             print("Database connection closed.")
 
 
-def save_routes_to_db(config, schema, table_name, columns, buffer):
-    # BASE_TABLE_NAME = config["BASE_TABLE_NAME"]
-    # table_name = f"{BASE_TABLE_NAME}.{table_name}"
-    # table_name = "routes"
+def save_routes_to_db(config, table_name, columns, buffer):
+    def get_config(config):
+        schema = config["SCHEMA"]
+        return schema
+
     try:
         # 1. Initialize connection and cursor
+        schema = get_config(config)
         conn = get_db_connection(config)
         cur = conn.cursor()
         cur.execute(f"""

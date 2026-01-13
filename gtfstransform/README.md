@@ -4,7 +4,10 @@ Este projeto:
 Configurações:
 SOURCE_BUCKET = "raw"
 APP_FOLDER = "gtfs"
-BASE_TABLE_NAME="trusted"
+SCHEMA=<schema for trusted layer> 
+MINIO_ENDPOINT=<hostname:port>
+ACCESS_KEY=<key>
+SECRET_KEY=<secret>
 DB_HOST=<hostname>
 DB_PORT=<port>
 DB_DATABASE="sptrans_insights"
@@ -97,3 +100,39 @@ SELECT * FROM trusted.stop_times;
 SELECT * FROM trusted.frequencies;
 SELECT * FROM trusted.calendar;
 
+PESQUISAS:
+# LINHA CIRCULAR:
+SELECT * FROM trusted.routes
+where route_id = '1012-10';
+
+SELECT * FROM trusted.stop_times
+where trip_id = '1012-10-0';
+
+# primeira stop
+SELECT * FROM trusted.stops
+where stop_id = '301790';
+
+# ultima stop
+SELECT * FROM trusted.stops
+where stop_id = '30003051';
+
+# LINHA COM DOIS SENTIDOS:
+SELECT * FROM trusted.routes
+where route_id = '1016-10';
+
+SELECT * FROM trusted.stop_times
+where trip_id = '1016-10-0' union ALL
+SELECT * FROM trusted.stop_times
+where trip_id = '1016-10-1'
+order by 1,5;
+
+# primeira stop
+SELECT * FROM trusted.stops
+where stop_id = '301790';
+
+# ultima stop
+SELECT * FROM trusted.stops
+where stop_id = '30003051';
+
+SELECT * FROM trusted.frequencies
+where trip_id in ('1016-10-0','1016-10-1');
