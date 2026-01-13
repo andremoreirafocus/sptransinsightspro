@@ -8,8 +8,11 @@ Este projeto faz:
 Configurações:
 SOURCE_BUCKET = <source_bucket> # the bucket for the app to load data from
 APP_FOLDER = <app_folder> # the subfolder for the app to load data from
-TABLE_NAME=<table_name> # where data will be written
-DB_HOST="localhost"
+TABLE_NAME=<table_name_including_schema> # where data will be written
+MINIO_ENDPOINT=<hostname:port> # format 
+ACCESS_KEY=<key>
+SECRET_KEY=<secret>
+DB_HOST=<db_hostname>
 DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>

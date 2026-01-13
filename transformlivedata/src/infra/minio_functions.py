@@ -54,7 +54,7 @@ def read_file_from_minio(connection_data, bucket_name, object_name):
         response.release_conn()
         return content
     except Exception as e:
-        print(f"Error reading JSON from MinIO: {e}")
+        print(f"Error reading file from MinIO: {e}")
         return None
 
 

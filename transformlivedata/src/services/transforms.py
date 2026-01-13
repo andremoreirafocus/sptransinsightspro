@@ -14,7 +14,7 @@ def transform_position(config, year, month, day, hour, minute):
 
     logger.info("Transforming position...")
     raw_positions = load_positions(
-        source_bucket, app_folder, year, month, day, hour, minute
+        config, source_bucket, app_folder, year, month, day, hour, minute
     )
     if not raw_positions:
         logger.error("No position data found to transform.")
