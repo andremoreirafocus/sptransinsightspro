@@ -9,6 +9,10 @@ PASSWORD = <insira sua senha>
 LOCAL_DOWNLOADS_FOLDER = "gtfs_files"
 RAW_BUCKET_NAME = "raw"
 APP_FOLDER = "gtfs"
+MINIO_ENDPOINT=<hostname:port> # format 
+ACCESS_KEY=<key>
+SECRET_KEY=<secret>
+
 
 Para instalar os requisitos:
 - cd <diretorio deste subprojeto>

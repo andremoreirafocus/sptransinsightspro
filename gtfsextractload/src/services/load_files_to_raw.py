@@ -1,4 +1,3 @@
-from src.infra.get_minio_connection_data import get_minio_connection_data
 from src.infra.minio_functions import write_generic_bytes_to_minio
 import logging
 
@@ -6,9 +5,20 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_files_to_raw(folder, files_list, bucket_name, app_folder):
-    connection_data = get_minio_connection_data()
+def load_files_to_raw(config, files_list):
+    def get_config(config):
+        folder = config.get("LOCAL_DOWNLOADS_FOLDER")
+        bucket_name = config.get("RAW_BUCKET_NAME")
+        app_folder = config.get("APP_FOLDER")
+        connection_data = {
+            "minio_endpoint": config["MINIO_ENDPOINT"],
+            "access_key": config["ACCESS_KEY"],
+            "secret_key": config["SECRET_KEY"],
+            "secure": False,
+        }
+        return folder, bucket_name, app_folder, connection_data
 
+    folder, bucket_name, app_folder, connection_data = get_config(config)
     for file_name in files_list:
         local_file_path = f"{folder}/{file_name}"
         logger.info(f"Reading file: {local_file_path} ...")
