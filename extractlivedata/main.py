@@ -1,5 +1,3 @@
-from datetime import datetime
-from dotenv import dotenv_values
 from src.services.buses_positions import (
     extract_buses_positions,
     buses_positions_response_is_valid,
@@ -7,6 +5,8 @@ from src.services.buses_positions import (
 )
 from src.infra.storage import save_data_to_json_file
 from src.infra.message_broker import sendKafka
+from src.config import get_config
+from datetime import datetime
 import json
 import time
 import logging
@@ -25,24 +25,24 @@ logging.basicConfig(
     ],
 )
 
-logger = logging.getLogger(__name__)
-
 
 def main():
-    config = dotenv_values(".env")
-    TOKEN = config.get("TOKEN")
-    API_BASE_URL = config.get("API_BASE_URL")
-    KAFKA_TOPIC = config.get("KAFKA_TOPIC")
-    KAFKA_BROKER = config.get("KAFKA_BROKER")
-    DOWNLOADS_FOLDER = config.get("DOWNLOADS_FOLDER")
-    API_MAX_RETRIES = int(config.get("API_MAX_RETRIES"))
-    INTERVAL = int(config.get("EXTRACTION_INTERVAL_SECONDS"))
+    logger = logging.getLogger(__name__)
+    config = get_config()
+    TOKEN = config["TOKEN"]
+    API_BASE_URL = config["API_BASE_URL"]
+    KAFKA_TOPIC = config["KAFKA_TOPIC"]
+    KAFKA_BROKER = config["KAFKA_BROKER"]
+    DOWNLOADS_FOLDER = config["DOWNLOADS_FOLDER"]
+    API_MAX_RETRIES = int(config["API_MAX_RETRIES"])
+    INTERVAL = int(config["EXTRACTION_INTERVAL_SECONDS"])
 
     while True:
         retries = 0
         back_off = 1
         buses_positions_payload = None
         download_successful = False
+        previous_epoch_time = time.time()
         while not download_successful:
             buses_positions_payload = extract_buses_positions(
                 token=TOKEN,
@@ -92,8 +92,13 @@ def main():
                 topic=KAFKA_TOPIC,
                 message=json.dumps(buses_positions),
             )
-        logger.info(f"[*] Waiting for {INTERVAL} seconds until next extraction...\n")
-        time.sleep(INTERVAL)
+        current_epoch_time = time.time()
+        duration = current_epoch_time - previous_epoch_time
+        interval = INTERVAL - duration
+        logger.info(
+            f"[*] Waiting for {interval:.0f} seconds until next extraction due to duration {duration:.0f} second(s)...\n"
+        )
+        time.sleep(interval)
 
 
 if __name__ == "__main__":
