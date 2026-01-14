@@ -29,7 +29,14 @@ def sendKafka(topic, message, broker):
     """
     Sends a message to Kafka and catches errors (like message size limits).
     """
-    producer = get_producer(broker)
+    try:
+        producer = get_producer(broker)
+    except Exception as e:
+        logger.error(f"--- KAFKA CONNECTION ERROR ---")
+        logger.error(f"Failed to connect to Kafka broker at {broker}.")
+        logger.error(f"Error details: {e}")
+        logger.error(f"------------------------------")
+        return
     try:
         # .get(timeout=10) forces the code to wait for a success or failure
         # This prevents the 'silent failure' for large payloads
