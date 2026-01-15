@@ -1,3 +1,6 @@
+from src.services.create_save_trip_details import (
+    create_trip_details_table,
+)
 from src.services.transforms import (
     transform_calendar,
     transform_frequencies,
@@ -27,7 +30,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    print("Starting GTFS Transformations...")
+    logger.info("Starting GTFS Transformations...")
     config = get_config()
     transform_routes(config)
     transform_trips(config)
@@ -35,6 +38,8 @@ def main():
     transform_stop_times(config)
     transform_frequencies(config)
     transform_calendar(config)
+    create_trip_details_table(config)
+    logger.info("All transformations completed successfully.")
 
 
 if __name__ == "__main__":

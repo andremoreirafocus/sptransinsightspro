@@ -154,3 +154,38 @@ where stop_id = '30003051';
 
 SELECT * FROM trusted.frequencies
 where trip_id in ('1016-10-0','1016-10-1');
+
+# Criação da tabela trip_details
+CREATE TABLE IF NOT EXISTS trusted.trip_details AS
+WITH trip_extremes AS (
+    SELECT 
+        trip_id,
+        MAX(CASE WHEN start_rank = 1 THEN stop_id END) AS first_stop_id,
+        MAX(CASE WHEN end_rank = 1 THEN stop_id END) AS last_stop_id
+    FROM (
+        SELECT 
+            trip_id, stop_id, 
+            ROW_NUMBER() OVER (PARTITION BY trip_id ORDER BY stop_sequence ASC) as start_rank,
+            ROW_NUMBER() OVER (PARTITION BY trip_id ORDER BY stop_sequence DESC) as end_rank
+        FROM trusted.stop_times
+    ) ranked_data
+    GROUP BY trip_id
+),
+trip_metrics AS (
+    SELECT 
+        te.trip_id,
+        te.first_stop_id,
+        s1.stop_lat AS first_stop_lat,
+        s1.stop_lon AS first_stop_lon,
+        te.last_stop_id,
+        s2.stop_lat AS last_stop_lat,
+        s2.stop_lon AS last_stop_lon,
+        ROUND(SQRT(POW(s2.stop_lat - s1.stop_lat, 2) + POW(s2.stop_lon - s1.stop_lon, 2)) * 106428) AS trip_linear_distance
+    FROM trip_extremes te
+    JOIN trusted.stops s1 ON te.first_stop_id = s1.stop_id
+    JOIN trusted.stops s2 ON te.last_stop_id = s2.stop_id
+)
+SELECT 
+    *,
+    (trip_linear_distance = 0) AS is_circular
+FROM trip_metrics;
