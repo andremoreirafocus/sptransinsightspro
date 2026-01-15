@@ -20,5 +20,44 @@ docker compose up -d metabase
 
  Metabase:
  http://localhost:3000/
- 
- 
+
+
+# #############################################################
+TO DO:
+
+Em gtfstransform:
+    criar a tabela trusted.terminais com os campos e computar para consulta pelo livedatatransform:
+        trip_id
+        trip_distance
+        tp_stop_id
+        tp_lat
+        tp_lon
+        ts_stop_id
+        ts_lat
+        ts_lon
+
+
+Em livedatatransform:
+    Na trusted.positions incluir os campos e computar os campos
+        trip_id 
+        tp_distance
+        ts_distance
+
+
+Em um novo processo refinelivedata:
+Criar as tabelas refined.viagens-concluidas e viagens-em-andamento
+    trip_id
+    vehicle_id
+    trip_start_time
+    trip_end_time
+    duration
+    average_speed
+
+Quando a distancia ao tp for superior ao limite de tolerancia (exemplo 30 metros) a viagem começa
+Quando a distancia ao ts for inferior ao limite de tolerancia (exemplo 30 metros) a viagem termina
+
+Adicionar docker-compose.yaml e config de serviços
+Dockerizar algum processo que esteja sendo em Python sem airflow
+
+
+
