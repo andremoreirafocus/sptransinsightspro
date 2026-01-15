@@ -1,4 +1,4 @@
-from src.infra.db import save_routes_to_db
+from src.infra.db import save_table_to_db
 from src.services.load_raw_csv import load_raw_csv
 from src.infra.get_pandas_buffer_from_csv_buffer import (
     get_pandas_buffer_from_csv_buffer,
@@ -14,7 +14,7 @@ def transform_routes(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")
 
 
@@ -23,7 +23,7 @@ def transform_trips(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")
 
 
@@ -32,7 +32,7 @@ def transform_stop_times(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")
 
 
@@ -41,7 +41,7 @@ def transform_stops(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")
 
 
@@ -50,7 +50,7 @@ def transform_calendar(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")
 
 
@@ -59,5 +59,5 @@ def transform_frequencies(config):
     print(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv(config, table_name)
     buffer, columns = get_pandas_buffer_from_csv_buffer(csv_bytes)
-    save_routes_to_db(config, table_name, columns, buffer)
+    save_table_to_db(config, table_name, columns, buffer)
     print("Transformation successful.")

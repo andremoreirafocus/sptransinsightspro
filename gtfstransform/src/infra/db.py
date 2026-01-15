@@ -1,6 +1,5 @@
 import psycopg2
 from psycopg2 import DatabaseError, InterfaceError
-from psycopg2.extras import DictCursor, execute_values
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -23,38 +22,7 @@ def get_db_connection(config):
     return conn
 
 
-def bulk_insert_data_table(config, sql, data_table):
-    conn = None
-    try:
-        # 1. Initialize connection and cursor
-        conn = get_db_connection(config)
-        cur = conn.cursor()
-
-        # 2. Execute the batch insert
-        execute_values(cur, sql, data_table, page_size=1000)
-
-        # 3. Commit only if execution succeeds
-        conn.commit()
-        print(f"Successfully inserted {len(data_table)} rows into table")
-    except (DatabaseError, InterfaceError) as db_err:
-        # Rollback the transaction if any database error occurs
-        if conn:
-            conn.rollback()
-        logger.error(f"Database error during insert into table: {db_err}")
-        raise  # Re-raise so the orchestrator knows the pipeline failed
-    except Exception as e:
-        if conn:
-            conn.rollback()
-        logger.error(f"Unexpected error during transformation: {e}")
-        raise
-    finally:
-        if conn:
-            cur.close()
-            conn.close()
-            print("Database connection closed.")
-
-
-def save_routes_to_db(config, table_name, columns, buffer):
+def save_table_to_db(config, table_name, columns, buffer):
     def get_config(config):
         schema = config["SCHEMA"]
         return schema
