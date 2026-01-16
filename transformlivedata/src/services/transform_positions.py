@@ -1,6 +1,7 @@
 from src.infra.db import fetch_data_from_db_as_df
 from dateutil import parser
 import logging
+import pandas as pd
 
 ""
 # This logger inherits the configuration from the root logger in main.py
@@ -15,6 +16,9 @@ def load_trip_details_to_dataframe(config):
     table_name = config["TRIP_DETAILS_TABLE_NAME"]
     sql = f"SELECT * FROM {table_name};"
     logger.info("Loading trip_details table from database...")
+
+    # This is the standard way to check
+    print(f"Pandas version: {pd.__version__}")
     df = fetch_data_from_db_as_df(config, sql)
     logger.info(f"Loaded trip details for {df.shape[0]} trips")
     return df
@@ -48,11 +52,11 @@ def get_trip_details(df, linha, sentido):
         return {
             "is_circular": False,
             "first_stop_id": 0,
-            "first_stop_lat": 0,
-            "first_stop_lon": 0,
+            "first_stop_lat": 0.0,
+            "first_stop_lon": 0.0,
             "last_stop_id": 0,
-            "last_stop_lat": 0,
-            "last_stop_lon": 0,
+            "last_stop_lat": 0.0,
+            "last_stop_lon": 0.0,
             "invalid_trip": True,
         }
 
@@ -98,25 +102,25 @@ def transform_positions(config, raw_positions):
         # print(f"is_circular: {is_circular}")
         invalid_trip = trip_details.get("invalid_trip", False)
         if invalid_trip:
-            first_stop_distance = 0  # Avoid zero distance
-            last_stop_distance = 0
+            first_stop_distance = 0.0  # Avoid zero distance
+            last_stop_distance = 0.0
         else:
             # print("Calculating first_stop_distance...")
-            first_stop_distance = (
+            first_stop_distance = float(
                 calculate_distance(
                     float(vehicle.get("py")),
                     float(vehicle.get("px")),
-                    trip_details.get("first_stop_lat"),
-                    trip_details.get("first_stop_lon"),
+                    float(trip_details.get("first_stop_lat", 0.0)),
+                    float(trip_details.get("first_stop_lon", 0.0)),
                 ),
             )
             # print("Calculating last_stop_distance...")
-            last_stop_distance = (
+            last_stop_distance = float(
                 calculate_distance(
                     float(vehicle.get("py")),
                     float(vehicle.get("px")),
-                    trip_details.get("last_stop_lat"),
-                    trip_details.get("last_stop_lon"),
+                    float(trip_details.get("last_stop_lat", 0.0)),
+                    float(trip_details.get("last_stop_lon", 0.0)),
                 ),
             )
         vehicle_record = (

@@ -27,14 +27,14 @@ def main():
     config = get_config()
     year = "2026"
     month = "01"
-    day = "12"
+    day = "16"
     hour = "16"
-    minute = "00"
+    minute = "52"
     # year = "2026"
     # month = "01"
-    # day = "10"
-    # hour = "08"
-    # minute = "42"
+    # day = "12"
+    # hour = "16"
+    # minute = "00"
 
     load_transform_and_save_positions(config, year, month, day, hour, minute)
 

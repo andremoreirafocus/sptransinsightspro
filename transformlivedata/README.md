@@ -8,7 +8,9 @@ Este projeto faz:
 Configurações:
 SOURCE_BUCKET = <source_bucket> # the bucket for the app to load data from
 APP_FOLDER = <app_folder> # the subfolder for the app to load data from
-TABLE_NAME=<table_name_including_schema> # where data will be written
+# TABLE_NAME=<table_name_including_schema> # where data will be written
+POSITIONS_TABLE_NAME=<table_name_for_positions_including_schema>
+TRIP_DETAILS_TABLE_NAME=<table_name_for_trip_details_including_schema>
 MINIO_ENDPOINT=<hostname:port> # format 
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
@@ -51,7 +53,9 @@ CREATE TABLE trusted.posicoes (
     veiculo_long DOUBLE PRECISION  -- px: Longitude
 );
 
-CREATE TABLE trusted.posicoes_teste (
+
+# New enriched table format after transformation
+CREATE TABLE trusted.positions (
     id BIGSERIAL PRIMARY KEY,
     extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 
     veiculo_id INTEGER,            -- p: id do veiculo

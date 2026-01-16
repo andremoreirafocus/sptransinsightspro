@@ -36,7 +36,7 @@ def bulk_insert_data_table(config, sql, data_table):
 
         # 3. Commit only if execution succeeds
         conn.commit()
-        print(f"Successfully inserted {len(data_table)} rows into table")
+        logger.info(f"Successfully inserted {len(data_table)} rows into table")
     except (DatabaseError, InterfaceError) as db_err:
         # Rollback the transaction if any database error occurs
         if conn:
@@ -52,7 +52,7 @@ def bulk_insert_data_table(config, sql, data_table):
         if conn:
             cur.close()
             conn.close()
-            print("Database connection closed.")
+            logger.info("Database connection closed.")
 
 
 def fetch_data_from_db_as_df(config, sql):
