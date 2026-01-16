@@ -1,5 +1,6 @@
 from src.services.create_save_trip_details import (
     create_trip_details_table,
+    create_trip_details_table_and_fill_missing_data,
 )
 from src.services.transforms import (
     transform_calendar,
@@ -39,6 +40,8 @@ def main():
     transform_frequencies(config)
     transform_calendar(config)
     create_trip_details_table(config)
+    create_trip_details_table_and_fill_missing_data(config)
+
     logger.info("All transformations completed successfully.")
 
 

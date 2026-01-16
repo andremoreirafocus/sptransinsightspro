@@ -1,6 +1,5 @@
-from dotenv import dotenv_values
-from src.services.transforms import (
-    transform_position,
+from src.services.load_and_transform_positions import (
+    load_and_transform_positions,
 )
 import logging
 from logging.handlers import RotatingFileHandler
@@ -37,7 +36,7 @@ def main():
     # hour = "08"
     # minute = "42"
 
-    transform_position(config, year, month, day, hour, minute)
+    load_and_transform_positions(config, year, month, day, hour, minute)
 
 
 if __name__ == "__main__":

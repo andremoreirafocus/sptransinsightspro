@@ -1,6 +1,7 @@
+import pandas as pd
 import psycopg2
 from psycopg2 import DatabaseError, InterfaceError
-from psycopg2.extras import DictCursor, execute_values
+from psycopg2.extras import execute_values
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -52,3 +53,21 @@ def bulk_insert_data_table(config, sql, data_table):
             cur.close()
             conn.close()
             print("Database connection closed.")
+
+
+def fetch_data_from_db_as_df(config, sql):
+    """
+    Executes a SELECT query and returns the results as a Pandas DataFrame.
+    """
+    conn = None
+    try:
+        conn = get_db_connection(config)
+        # pd.read_sql_query handles the cursor and fetching automatically
+        df = pd.read_sql_query(sql, conn)
+        return df
+    except Exception as e:
+        logger.error(f"Error fetching data to DataFrame: {e}")
+        raise
+    finally:
+        if conn:
+            conn.close()

@@ -50,6 +50,33 @@ CREATE TABLE trusted.posicoes (
     veiculo_lat DOUBLE PRECISION,  -- py: Latitude
     veiculo_long DOUBLE PRECISION  -- px: Longitude
 );
+
+CREATE TABLE trusted.posicoes_teste (
+    id BIGSERIAL PRIMARY KEY,
+    extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 
+    veiculo_id INTEGER,            -- p: id do veiculo
+    linha_lt TEXT,                 -- c: Letreiro completo
+    linha_code INTEGER,            -- cl: Código linha
+    linha_sentido INTEGER,         -- sl: Sentido
+    lt_destino TEXT,               -- lt0: Destino
+    lt_origem TEXT,                -- lt1: Origem
+    veiculo_prefixo INTEGER,       -- p: Prefixo
+    veiculo_acessivel BOOLEAN,     -- a: Acessível
+    veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
+    veiculo_lat DOUBLE PRECISION,  -- py: Latitude
+    veiculo_long DOUBLE PRECISION,  -- px: Longitude
+    is_circular BOOLEAN,
+    first_stop_id INTEGER,
+    first_stop_lat DOUBLE PRECISION,
+    first_stop_lon DOUBLE PRECISION,
+    last_stop_id INTEGER,
+    last_stop_lat DOUBLE PRECISION,
+    last_stop_lon DOUBLE PRECISION,
+    distance_to_first_stop DOUBLE PRECISION,
+    distance_to_last_stop DOUBLE PRECISION
+);
+
+
 ----------------------------------------------------
 
 ########################### EXPLORACAO ############################
