@@ -80,6 +80,53 @@ CREATE TABLE trusted.positions (
     distance_to_last_stop DOUBLE PRECISION
 );
 
+####################  EXPLORACAO POSITIONS ################
+
+# exploracao para a camada refined
+select count(*) from  trusted.positions
+
+select linha_lt, count(1) from  trusted.positions as p
+group by p.linha_lt
+order by count(1) desc
+6000-10	6396
+2290-10	5272
+3459-10	5013
+5175-10	3973
+4310-10	3675
+
+-- '1015-10' é uma linha circular
+-- '6000-10' é uma linha regular
+select veiculo_id, count(1) from  trusted.positions as p
+--where linha_lt ='6000-10'
+--where linha_lt ='1015-10'
+where linha_lt ='2290-10'
+group by p.veiculo_id
+order by count(1) desc
+
+#melhor org das colunas
+select veiculo_ts, veiculo_id,
+       distance_to_first_stop, distance_to_last_stop,
+       is_circular, linha_sentido, 
+       veiculo_lat, veiculo_long, 
+       first_stop_lat, first_stop_lon,  last_stop_lat, last_stop_lon, first_stop_id, last_stop_id, lt_destino, lt_origem
+       from  trusted.positions
+--where linha_lt = '6000-10' and veiculo_id = '63541'
+--where linha_lt = '1015-10' and veiculo_id = '16450'
+where linha_lt = '2290-10' and veiculo_id = '41539'
+order by veiculo_ts 
+
+
+-- ordem original das colunas
+select extracao_ts, veiculo_id, linha_lt, linha_code, linha_sentido,
+        lt_destino, lt_origem, veiculo_prefixo, veiculo_acessivel, veiculo_ts,
+        veiculo_lat, veiculo_long, is_circular, first_stop_id, first_stop_lat,
+        first_stop_lon, last_stop_id, last_stop_lat, last_stop_lon,
+        distance_to_first_stop, distance_to_last_stop from trusted.positions as p
+where linha_lt = '6000-10'-- '1015-10'
+and veiculo_id = '63541'-- 16450
+
+select count(*) from trusted.positions
+order by veiculo_ts 
 
 ----------------------------------------------------
 
