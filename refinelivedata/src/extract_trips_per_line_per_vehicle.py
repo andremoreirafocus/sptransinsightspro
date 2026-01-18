@@ -1,8 +1,10 @@
 import logging
 
-from refinelivedata.src.services import load_positions_for_line_and_vehicle
-from refinelivedata.src.services import calculate_trips
-from refinelivedata.src.services import save_trips_to_db
+from src.services.load_positions_for_line_and_vehicle import (
+    load_positions_for_line_and_vehicle,
+)
+from src.services.calculate_trips import calculate_trips
+from src.services.save_trips_to_db import save_trips_to_db
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)

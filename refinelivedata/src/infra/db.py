@@ -64,6 +64,8 @@ def fetch_data_from_db_as_df(config, sql):
         conn = get_db_connection(config)
         # pd.read_sql_query handles the cursor and fetching automatically
         df = pd.read_sql_query(sql, conn)
+        print(df.head(5))
+        print(df.shape)
         return df
     except Exception as e:
         logger.error(f"Error fetching data to DataFrame: {e}")

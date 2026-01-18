@@ -22,6 +22,16 @@ Para instalar os requisitos:
 Para executar: 
 python ./main.py
 
+CREATE SCHEMA refined;
 
-
+CREATE TABLE refined.finished_trips (
+    id BIGSERIAL PRIMARY KEY,
+    trip_id TEXT,
+    vehicle_id INTEGER,
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION
+);
 
