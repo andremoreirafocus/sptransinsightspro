@@ -32,9 +32,11 @@ def create_trip_details_table(config):
         SELECT 
             te.trip_id,
             te.first_stop_id,
+            s1.stop_name AS first_stop_name,
             s1.stop_lat AS first_stop_lat,
             s1.stop_lon AS first_stop_lon,
             te.last_stop_id,
+            s2.stop_name AS last_stop_name,
             s2.stop_lat AS last_stop_lat,
             s2.stop_lon AS last_stop_lon,
             ROUND(SQRT(POW(s2.stop_lat - s1.stop_lat, 2) + POW(s2.stop_lon - s1.stop_lon, 2)) * 106428) AS trip_linear_distance
@@ -87,14 +89,16 @@ def create_trip_details_table_and_fill_missing_data(config):
         SELECT 
             trip_id,
             MAX(CASE WHEN start_rank = 1 THEN stop_id END) AS first_stop_id,
+            MAX(CASE WHEN start_rank = 1 THEN stop_name END) AS first_stop_name,
             MAX(CASE WHEN start_rank = 1 THEN stop_lat END) AS  first_stop_lat,
             MAX(CASE WHEN start_rank = 1 THEN stop_lon END) AS  first_stop_lon,
             MAX(CASE WHEN end_rank = 1 THEN stop_id END) AS last_stop_id,
+            MAX(CASE WHEN end_rank = 1 THEN stop_name END) AS last_stop_name,
             MAX(CASE WHEN end_rank = 1 THEN stop_lat END) AS  last_stop_lat,
             MAX(CASE WHEN end_rank = 1 THEN stop_lon END) AS  last_stop_lon
         FROM (
             SELECT 
-                st.trip_id, st.stop_id, s.stop_lat, s.stop_lon,
+                st.trip_id, st.stop_id,  s.stop_name, s.stop_lat, s.stop_lon,
                 ROW_NUMBER() OVER (PARTITION BY st.trip_id ORDER BY st.stop_sequence ASC) as start_rank,
                 ROW_NUMBER() OVER (PARTITION BY st.trip_id ORDER BY st.stop_sequence DESC) as end_rank
             FROM trusted.stop_times st
@@ -114,9 +118,11 @@ def create_trip_details_table_and_fill_missing_data(config):
             REPLACE(t0.trip_id, '-0', '-1') AS trip_id,
             -- Logic: If circular, keep same. If not circular, swap.
             CASE WHEN t0.is_circular THEN t0.first_stop_id ELSE t0.last_stop_id END AS first_stop_id,
+            CASE WHEN t0.is_circular THEN t0.first_stop_name ELSE t0.last_stop_name END AS first_stop_name,
             CASE WHEN t0.is_circular THEN t0. first_stop_lat ELSE t0. last_stop_lat END AS  first_stop_lat,
             CASE WHEN t0.is_circular THEN t0. first_stop_lon ELSE t0. last_stop_lon END AS  first_stop_lon,
             CASE WHEN t0.is_circular THEN t0.last_stop_id ELSE t0.first_stop_id END AS last_stop_id,
+            CASE WHEN t0.is_circular THEN t0.last_stop_name ELSE t0.first_stop_name END AS last_stop_name,
             CASE WHEN t0.is_circular THEN t0. last_stop_lat ELSE t0. first_stop_lat END AS  last_stop_lat,
             CASE WHEN t0.is_circular THEN t0. last_stop_lon ELSE t0. first_stop_lon END AS  last_stop_lon,
             t0.trip_linear_distance,
