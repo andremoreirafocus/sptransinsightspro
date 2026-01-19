@@ -35,3 +35,27 @@ CREATE TABLE refined.finished_trips (
     average_speed DOUBLE PRECISION
 );
 
+CREATE TABLE refined.latest_positions AS
+WITH latest_snapshot AS (
+    -- 1. Captura o timestamp exato do último lote de extração
+    SELECT MAX(extracao_ts) AS max_ts
+    FROM trusted.positions
+)
+-- 2. Projeta os dados e calcula o trip_id com o mapeamento 1->0 e 2->1
+SELECT 
+    p.veiculo_id, 
+    p.veiculo_lat,  
+    p.veiculo_long, 
+    p.linha_lt, 
+    p.linha_sentido,
+    -- Concatenação da linha com o sentido mapeado
+    p.linha_lt || '-' || (
+        CASE 
+            WHEN p.linha_sentido = 1 THEN '0' 
+            WHEN p.linha_sentido = 2 THEN '1' 
+            ELSE NULL -- Garante integridade para valores inesperados
+        END
+    ) AS trip_id
+FROM trusted.positions p
+JOIN latest_snapshot ls ON p.extracao_ts = ls.max_ts;
+

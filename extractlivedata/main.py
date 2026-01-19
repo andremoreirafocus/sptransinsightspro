@@ -5,6 +5,8 @@ from src.services.buses_positions import (
 )
 from src.infra.storage import save_data_to_json_file
 from src.infra.message_broker import sendKafka
+from src.infra.check_disk_space import is_disk_space_ok
+from src.infra.adjust_interval import adjust_time
 from src.config import get_config
 from datetime import datetime
 import json
@@ -36,8 +38,13 @@ def main():
     DOWNLOADS_FOLDER = config["DOWNLOADS_FOLDER"]
     API_MAX_RETRIES = int(config["API_MAX_RETRIES"])
     INTERVAL = int(config["EXTRACTION_INTERVAL_SECONDS"])
-
+    adjust_time()
     while True:
+        if not is_disk_space_ok():
+            logger.error("Disk space critical: skipping execution")
+            print("Disk space critical: skipping execution")
+            time.sleep(INTERVAL)
+            continue
         retries = 0
         back_off = 1
         buses_positions_payload = None
@@ -95,10 +102,10 @@ def main():
         current_epoch_time = time.time()
         duration = current_epoch_time - previous_epoch_time
         interval = INTERVAL - duration
+        time.sleep(interval)
         logger.info(
             f"[*] Waiting for {interval:.0f} seconds until next extraction due to duration {duration:.0f} second(s)...\n"
         )
-        time.sleep(interval)
 
 
 if __name__ == "__main__":
