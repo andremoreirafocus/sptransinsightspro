@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    logger.info("Starting transformation process...")
-    print("Starting transformation process...")
+    logger.info("Starting Refinement process...")
+    print("Starting Refinement process...")
     config = get_config()
     year = "2026"
     month = "01"
