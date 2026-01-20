@@ -5,7 +5,9 @@ Este projeto faz:
 
 Configurações:
 # TABLE_NAME=<table_name_including_schema> # where data will be written
-FINISHED_TRIPS_TABLE_NAME=<table_name_for_finished_trips_including_schema>
+FINISHED_TRIPS_TABLE_NAME=<table_name_for_finished_trips_including_schema_in_refined>
+POSITIONS_TABLE_NAME=<table_name_for_positions_in_trusted>
+LATEST_POSITIONS_TABLE_NAME=<table_name_for_positions_in_refined>
 DB_HOST=<db_hostname>
 DB_PORT=<PORT>
 DB_DATABASE=<dbname>
