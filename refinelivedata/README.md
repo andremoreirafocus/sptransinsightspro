@@ -61,3 +61,24 @@ SELECT
 FROM trusted.positions p
 JOIN latest_snapshot ls ON p.extracao_ts = ls.max_ts;
 
+CREATE TABLE trusted.finished_trips (
+    id BIGSERIAL PRIMARY KEY,
+    trip_id TEXT,
+    vehicle_id INTEGER,
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION
+);
+
+CREATE TABLE trusted.ongoing_trips (
+    id BIGSERIAL PRIMARY KEY,
+    trip_id TEXT,
+    vehicle_id INTEGER,
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION
+);

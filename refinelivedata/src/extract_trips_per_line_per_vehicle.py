@@ -1,5 +1,6 @@
 from src.services.load_positions_for_line_and_vehicle import (
     load_positions_for_line_and_vehicle,
+    load_positions_for_line_and_vehicle_last_3_hous,
 )
 from src.services.extract_trips_from_positions import (
     extract_raw_trips_metadata,
@@ -15,7 +16,8 @@ logger = logging.getLogger(__name__)
 
 def extract_trips_per_line_per_vehicle(config, year, month, day, linha_lt, veiculo_id):
     try:
-        position_records = load_positions_for_line_and_vehicle(
+        # position_records = load_positions_for_line_and_vehicle(
+        position_records = load_positions_for_line_and_vehicle_last_3_hous(
             config, year, month, day, linha_lt, veiculo_id
         )
         if not position_records:

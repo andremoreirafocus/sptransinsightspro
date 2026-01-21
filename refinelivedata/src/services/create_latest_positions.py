@@ -1,5 +1,5 @@
 import logging
-from src.infra.db import get_db_connection
+from updatelatestpositions.infra.db import get_db_connection
 from psycopg2 import DatabaseError, InterfaceError
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,7 @@ def create_latest_positions_table(config):
     lastest_positions_table_name = config["LATEST_POSITIONS_TABLE_NAME"]
     positions_table_name = config["POSITIONS_TABLE_NAME"]
     conn = None
+    logger.info(f"Creating and populating table {lastest_positions_table_name}...")
     # We use a CTE to define the base math, then a UNION to patch the missing trips
     sql_command = f"""
         DROP TABLE IF EXISTS {lastest_positions_table_name};
@@ -57,3 +58,134 @@ def create_latest_positions_table(config):
         if conn:
             cur.close()
             conn.close()
+
+
+def create_filtered_positions_table_by_minute(config, year, month, day, hour, minute):
+    """
+    Creates a table by filtering the source data based on specific
+    time components: Year, Month, Day, Hour, and Minute.
+    """
+    latest_table = config["LATEST_POSITIONS_TABLE_NAME"]
+    source_table = config["POSITIONS_TABLE_NAME"]
+
+    conn = None
+
+    # SQL query using individual parameters for each time component
+    sql_command = f"""
+        DROP TABLE IF EXISTS {latest_table};
+        
+        CREATE TABLE {latest_table} AS
+        SELECT 
+            p.veiculo_ts,
+            p.veiculo_id, 
+            p.veiculo_lat,  
+            p.veiculo_long, 
+            p.linha_lt, 
+            p.linha_sentido,
+            p.extracao_ts,
+            -- Mapping trip_id: 1 -> 0, 2 -> 1
+            p.linha_lt || '-' || (
+                CASE 
+                    WHEN p.linha_sentido = 1 THEN '0' 
+                    WHEN p.linha_sentido = 2 THEN '1' 
+                    ELSE NULL 
+                END
+            ) AS trip_id
+        FROM {source_table} p
+        WHERE 
+            EXTRACT(YEAR FROM p.extracao_ts) = %s AND
+            EXTRACT(MONTH FROM p.extracao_ts) = %s AND
+            EXTRACT(DAY FROM p.extracao_ts) = %s AND
+            EXTRACT(HOUR FROM p.extracao_ts) = %s AND
+            EXTRACT(MINUTE FROM p.extracao_ts) = %s;
+    """
+
+    try:
+        conn = get_db_connection(config)
+        cur = conn.cursor()
+
+        # Explicitly passing the five time parameters to the query
+        query_params = (year, month, day, hour, minute)
+
+        logger.info(
+            f"Creating table {latest_table} for: {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}"
+        )
+
+        cur.execute(sql_command, query_params)
+
+        conn.commit()
+        logger.info("Table created successfully with filtered time parameters.")
+
+    except (DatabaseError, InterfaceError) as db_err:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error during table creation: {db_err}")
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Unexpected error: {e}")
+        raise
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+            logger.info("Database connection closed.")
+
+
+def create_positions_table_by_minute(config, year, month, day, hour, minute):
+    """
+    Creates a table by filtering the source data based on specific
+    time components: Year, Month, Day, Hour, and Minute.
+    """
+    latest_table = config["LATEST_POSITIONS_TABLE_NAME"]
+    source_table = config["POSITIONS_TABLE_NAME"]
+
+    conn = None
+
+    # SQL query using individual parameters for each time component
+    sql_command = f"""
+        DROP TABLE IF EXISTS {latest_table};
+        
+        CREATE TABLE {latest_table} AS
+        SELECT *
+        FROM {source_table} p
+        WHERE 
+            EXTRACT(YEAR FROM p.extracao_ts) = %s AND
+            EXTRACT(MONTH FROM p.extracao_ts) = %s AND
+            EXTRACT(DAY FROM p.extracao_ts) = %s AND
+            EXTRACT(HOUR FROM p.extracao_ts) = %s AND
+            EXTRACT(MINUTE FROM p.extracao_ts) = %s;
+    """
+
+    try:
+        conn = get_db_connection(config)
+        cur = conn.cursor()
+
+        # Explicitly passing the five time parameters to the query
+        query_params = (year, month, day, hour, minute)
+
+        logger.info(
+            f"Creating table {latest_table} for: {year}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}"
+        )
+
+        cur.execute(sql_command, query_params)
+
+        conn.commit()
+        logger.info("Table created successfully with filtered time parameters.")
+
+    except (DatabaseError, InterfaceError) as db_err:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error during table creation: {db_err}")
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Unexpected error: {e}")
+        raise
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+            logger.info("Database connection closed.")

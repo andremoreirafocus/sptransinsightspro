@@ -103,18 +103,16 @@ SELECT * FROM trusted.calendar;
 # o comando abaixo não é necessario porque a implementacao faz um CTAS
 CREATE TABLE trusted.trip_details (
         trip_id (from trips)
-        is_circular (from trips)
-        tp_stop_id (from stop_times)
-        tp_stop_name (from stops)
-        tp_lat (from stops)
-        tp_lon (from stops)
-        ts_stop_id (from stop_times) (null quando is_circular)
-        tp_stop_name (from stops)
-        ts_lat (from stops) (null quando is_circular)
-        ts_lon (from stops) (null quando is_circular)
-        <!-- trip_distance_tp_ts (from  )
-        trip_distance_ts_tp (null quando is_circular) -->
+        first_stop_id (from stop_times)
+        first_stop_name (from stops)
+        first_stop_lat  (from stops)
+        first_stop_lon  (from stops)
+        last_stop_id (from stop_times) (null quando is_circular)
+        last_stop_name (from stops)
+        last_stop_lat (from stops) (null quando is_circular)
+        last_stop_lon (from stops) (null quando is_circular)
         trip_linear_distance (calculated from tp_lat, tp_lon, ts_lat, ts_lon in this table)
+        is_circular (from trips)
 )
 
 

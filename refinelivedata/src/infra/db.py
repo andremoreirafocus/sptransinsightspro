@@ -75,3 +75,39 @@ def fetch_data_from_db_as_df(config, sql):
         if conn:
             conn.close()
             logger.info("Database connection closed.")
+
+
+def execute_sql_command(config, sqls):
+    """
+    Executa um comando SQL simples (ex: TRUNCATE, DROP, DELETE)
+    que não requer inserção de dados em massa ou retorno de DataFrame.
+    """
+    conn = None
+    try:
+        # 1. Inicializa conexão e cursor
+        conn = get_db_connection(config)
+        cur = conn.cursor()
+
+        # 2. Executa o comando
+        for sql in sqls:
+            cur.execute(sql)
+
+        # 3. Commit para persistir as alterações
+        conn.commit()
+        logger.info("SQL command executed successfully.")
+
+    except (DatabaseError, InterfaceError) as db_err:
+        if conn:
+            conn.rollback()
+        logger.error(f"Database error during SQL command execution: {db_err}")
+        raise
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        logger.error(f"Unexpected error executing SQL command: {e}")
+        raise
+    finally:
+        if conn:
+            cur.close()
+            conn.close()
+            logger.info("Database connection closed.")

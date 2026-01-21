@@ -21,7 +21,8 @@ def extract_trips_for_all_Lines_and_vehicles(config):
     month = "01"
     day = "15"
     logger.info("Loading all lines and vehicles...")
-    all_lines_and_vehicles = load_all_lines_and_vehicles(config)
+    # all_lines_and_vehicles = load_all_lines_and_vehicles(config)
+    all_lines_and_vehicles = load_all_lines_and_vehicles_last_3_hours(config)
     total_records = len(all_lines_and_vehicles)
     logger.info(f"Loaded {total_records} records for lines and vehicles")
     num_processed = 0
@@ -35,6 +36,33 @@ def extract_trips_for_all_Lines_and_vehicles(config):
         )
         num_processed += 1
         print(f"Record {num_processed}/{total_records} processed.")
+
+
+def load_all_lines_and_vehicles_last_3_hours(config):
+    """
+    Retrieves a distinct list of all line/vehicle combinations
+    that have reported positions within the last 3 hours.
+    """
+    table_name = config["POSITIONS_TABLE_NAME"]
+
+    # SQL query with a 3-hour time filter and group by logic
+    sql = f"""
+        SELECT 
+            linha_lt, 
+            veiculo_id 
+        FROM {table_name}
+        WHERE veiculo_ts >= NOW() - INTERVAL '3 hours'
+        GROUP BY linha_lt, veiculo_id
+        ORDER BY linha_lt, veiculo_id;
+    """
+
+    # Fetch data using the existing utility function
+    df_raw = fetch_data_from_db_as_df(config, sql)
+
+    # Convert the unique combinations into a list of dictionaries
+    position_records = df_raw.to_dict("records")
+
+    return position_records
 
 
 def load_all_lines_and_vehicles(config):
