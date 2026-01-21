@@ -41,7 +41,6 @@ def get_raw_file():
         raise ValueError("No position data found to transform.")
     return raw_positions
 
-
 def convert_positions_to_in_memory_table(ti):
     raw_positions = ti.xcom_pull(task_ids="get_raw_file")
     positions_table = get_positions_table_from_raw(raw_positions)
@@ -50,12 +49,10 @@ def convert_positions_to_in_memory_table(ti):
         raise ValueError("No valid position records found.")
     return positions_table
 
-
 def save_to_db(ti):
     config = get_config()
     positions_table = ti.xcom_pull(task_ids="convert_in_memory")
     save_positions_to_db(config, positions_table)
-
 
 # Criando o DAG
 with DAG(

@@ -47,13 +47,6 @@ def generate_trips(ti):
     generate_trips_for_all_Lines_and_vehicles(config, all_lines_and_vehicles)
 
 
-# def save_to_db(ti):
-#     config = get_config()
-#     positions_table = ti.xcom_pull(task_ids="convert_in_memory")
-#     save_positions_to_db(config, positions_table)
-
-
-# Criando o DAG
 with DAG(
     "refinefinishedtrips-v1",
     default_args=default_args,
@@ -69,10 +62,5 @@ with DAG(
         task_id="generate_trips",
         python_callable=generate_trips,
     )
-
-    # save_to_db_task = PythonOperator(
-    #     task_id="save_to_db",
-    #     python_callable=save_to_db,
-    # )
 
     get_lines_and_vehicles_task >> generate_trips_task
