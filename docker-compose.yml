@@ -203,7 +203,7 @@ extractlivedata:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
     networks:
       - rede_fia
-    restart: on-failure
+    restart: always
 
 loadlivedata:
     build:
@@ -216,4 +216,4 @@ loadlivedata:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
     networks:
       - rede_fia
-    restart: on-failure
+    restart: always
