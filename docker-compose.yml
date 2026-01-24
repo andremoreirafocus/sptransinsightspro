@@ -192,7 +192,7 @@ services:
     networks:
       rede_fia:
 
-extractlivedata:
+  extractlivedata:
     build:
       context: .
       dockerfile: extractlivedata/Dockerfile
@@ -205,15 +205,23 @@ extractlivedata:
       - rede_fia
     restart: always
 
-loadlivedata:
+  loadlivedata:
     build:
       context: .
       dockerfile: loadlivedata/Dockerfile
     container_name: loadlivedata
     depends_on:
-      - kafka-broker minio
+      - kafka-broker 
+      - minio
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
     networks:
       - rede_fia
     restart: always
+
+networks:
+  rede_fia:
+    driver: bridge
+
+volumes:
+  minio_storage: {}

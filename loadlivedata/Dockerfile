@@ -11,7 +11,7 @@ WORKDIR /app
 # 1. Copy only the requirements first to leverage Docker cache
 # (Path is relative to the root of the repo where we run the build command)
 # COPY extractlivedata/requirements.txt .
-COPY ./requirements.txt .
+COPY ./loadlivedata/requirements.txt .
 
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
@@ -22,7 +22,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY ./ .
 
 # COPY extractlivedata/.env-docker ./.env 
-COPY ./.env-docker ./.env 
+COPY ./loadlivedata/.env-docker ./.env 
 
 # Set the entry point. 
 # (Replace 'main.py' with your actual script name, e.g., 'extract.py')
