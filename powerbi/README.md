@@ -5,7 +5,7 @@ Este diretório contém o relatório do Power BI que visualiza os dados processa
 ---
 
 ### 🖼️ Visualização do Dashboard
-![Screenshot do Dashboard](./dashboard-view.png)
+![Screenshot do Dashboard](./dashboardview.png)
 ---
 ### 🎯 Conteúdo e Dados do Dashboard
 
