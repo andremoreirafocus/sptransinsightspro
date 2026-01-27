@@ -3,10 +3,6 @@
 Este diretório contém o relatório do Power BI que visualiza os dados processados pelo pipeline de engenharia. O dashboard utiliza diretamente as tabelas geradas pelas funções de refinamento de dados.
 
 ---
-
-### 🖼️ Visualização do Dashboard
-![Screenshot do Dashboard](./dashboardview.png)
----
 ### 🎯 Conteúdo e Dados do Dashboard
 
 O dashboard consome os dados gerados no diretório `refinelivedata`, especificamente os resultados de:
@@ -20,6 +16,9 @@ O dashboard consome os dados gerados no diretório `refinelivedata`, especificam
     * **Mapa de Posição**: Identificação de posição dos ônibus no momento da consulta
 
 ---
+
+### 🖼️ Visualização do Dashboard
+![Screenshot do Dashboard](./dashboardview.png)
 
 ### 🛠️ Como Utilizar
 1.  Certifique-se de que as tabelas no banco de dados PostgreSQL foram criadas e populadas pelo serviço `refinelivedata`.
