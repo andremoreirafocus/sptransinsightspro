@@ -1,5 +1,6 @@
 from src.infra.minio_functions import write_generic_bytes_to_minio
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import json
 import logging
 
@@ -21,7 +22,8 @@ def load_data_to_raw(config, data, hour_minute):
 
     raw_bucket_name, app_folder, connection_data = get_config(config)
     iso_timestamp_str = json.loads(data).get("metadata").get("extracted_at")
-    dt_object = datetime.fromisoformat(iso_timestamp_str)
+    dt_utc = datetime.fromisoformat(iso_timestamp_str)
+    dt_object = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
     year = dt_object.year
     month = f"{dt_object.month:02d}"
     day = f"{dt_object.day:02d}"
