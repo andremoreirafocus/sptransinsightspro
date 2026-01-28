@@ -1,4 +1,6 @@
-Este projeto consome dados de um tópico Kafka e salva em um bucket no Minio 
+Este projeto:
+- consome de um tópico Kafka as posiçõesdos onibus produzidas pelo processo extractlivedata obtidas da API de posicao da SPTrans
+- salva os dados consumidos em um bucket no Minio com particionamento por ano,mes e dia para processamento pelo transformlivedata
 
 Configurações necessárias no arquivo .env do projeto:
 INTERVALO = 120  # 2 minutos em segundos

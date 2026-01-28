@@ -1,4 +1,7 @@
-Este projeto extrai a informação de posição dos ônibus a partir da API da SPTRANS e envia o payload comprimido para um tópico Kafka.
+Este projeto:
+- extrai a informação de posição dos ônibus a partir da API da SPTRANS periodicamente em um intervalo previamente definido, fazendo uso de exponential backoff em caso de falha na obtenção de dados válidos
+- cria em memória um objeto JSON contendo o payload e metadados sobre a extração do dados, como o timestamp da operação e a origem do dado 
+- posta uma mensagem em um tópico Kafka contendo o objeto gerado a cada extração de dados da API
 
 Configurações necessárias no arquivo .env do projeto:
 API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"

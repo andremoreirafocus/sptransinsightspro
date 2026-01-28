@@ -1,5 +1,7 @@
 Este projeto:
-- lê cada um dos arquivos extraidos gtfs do portal do desenvolvedor e que se encontarm em uma subpasta gtfs no bucker "raw" e salva no db em um schema trusted, para cada arquivo relevante, uma tabela com o mesmo nome que o arquivo ainda sem nenhuma transformação.
+- lê cada um dos arquivos extraidos gtfs do portal do desenvolvedor da SPTrans e que se encontram em uma subpasta gtfs no bucker "raw" 
+- salva no banco de dados, em um schema trusted, para cada arquivo relevante, uma tabela com o mesmo nome que o arquivo, ainda sem nenhuma transformação.
+- a partir das tabelas base, gera uma tabela de detalhes das viagens (trip_details), utilizada para enriquecer os dados de posição dos veículos, visando as análises de dados efetuadas no projeto refinelivedata
 
 Configurações:
 SOURCE_BUCKET = "raw"

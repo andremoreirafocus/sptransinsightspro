@@ -1,6 +1,6 @@
 Este projeto faz:
-- download de arquivos GTFS do portal do desenvolvedor
-- salva cada um dos arquivos em um prefixo de uma pasta raw no minio
+- download de arquivos GTFS do portal do desenvolvedor da SPTrans utilizados para enriquecer dados das posicoes dos onibus obtidas via API
+- salva cada um dos arquivos no prefixo gtfs da pasta raw no minio
 
 Configurações:
 GTFS_URL = "http://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS"
