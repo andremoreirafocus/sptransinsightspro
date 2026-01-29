@@ -1,5 +1,5 @@
-from src.services.create_latest_positions import (
-    create_latest_positions_table,
+from src.services.latest_positions.create_latest_positions import (
+    # create_latest_positions_table,
     create_positions_table_by_minute,
 )
 import logging
@@ -16,5 +16,3 @@ def update_latest_positions(config):
     minute = 40
     hour = 15
     create_positions_table_by_minute(config, year, month, day, hour, minute)
-    
-    

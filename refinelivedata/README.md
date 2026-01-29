@@ -49,8 +49,19 @@ CREATE TABLE refined.finished_trips (
     is_circular BOOLEAN,
     average_speed DOUBLE PRECISION
 );
+```
+Para as consultas de construção das trips terem melhor performance:
+```sql
+CREATE INDEX idx_positions_linha_veiculo_ts
+ON trusted.positions (
+    linha_lt,
+    veiculo_id,
+    veiculo_ts ASC
+);
+```
 
 ## A consulta abaixo cria a tabela refined.latest_positions a cada execução
+```sql
 CREATE TABLE refined.latest_positions AS
 WITH latest_snapshot AS (
     -- 1. Captura o timestamp exato do último lote de extração
@@ -74,8 +85,10 @@ SELECT
     ) AS trip_id
 FROM trusted.positions p
 JOIN latest_snapshot ls ON p.extracao_ts = ls.max_ts;
+```
 
 # A tabela abaixo nao precisa ser criada, pois é criada via CTAS
+```sql
 CREATE TABLE refined.latest_positions (
     id BIGSERIAL PRIMARY KEY,
     extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 
@@ -100,9 +113,10 @@ CREATE TABLE refined.latest_positions (
     distance_to_first_stop DOUBLE PRECISION,
     distance_to_last_stop DOUBLE PRECISION
 );
-
+```
 
 #Tabela usada apenas em testes de algoritmo experimental
+```sql
 CREATE TABLE trusted.ongoing_trips (
     id BIGSERIAL PRIMARY KEY,
     trip_id TEXT,

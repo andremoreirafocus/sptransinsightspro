@@ -1,24 +1,24 @@
-from src.services.load_positions_for_line_and_vehicle import (
-    load_positions_for_line_and_vehicle,
-    load_positions_for_line_and_vehicle_last_3_hous,
+from src.services.trips.db.load_positions_for_line_and_vehicle_db import (
+    # load_positions_for_line_and_vehicle,
+    load_positions_for_line_and_vehicle_last_3_hous_db,
 )
-from src.services.extract_trips_from_positions import (
+from src.services.trips.extract_trips_from_positions import (
     extract_raw_trips_metadata,
     filter_healthy_trips,
     generate_trips_table,
 )
-from src.services.save_trips_to_db import save_trips_to_db
+from src.services.trips.save_trips_to_db import save_trips_to_db
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_per_line_per_vehicle(config, year, month, day, linha_lt, veiculo_id):
+def extract_trips_per_line_per_vehicle_db(config, linha_lt, veiculo_id):
     try:
         # position_records = load_positions_for_line_and_vehicle(
-        position_records = load_positions_for_line_and_vehicle_last_3_hous(
-            config, year, month, day, linha_lt, veiculo_id
+        position_records = load_positions_for_line_and_vehicle_last_3_hous_db(
+            config, linha_lt, veiculo_id
         )
         if not position_records:
             logger.error(

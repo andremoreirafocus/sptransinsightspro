@@ -1,4 +1,6 @@
-from src.extract_trips_per_line_per_vehicle_db import extract_trips_per_line_per_vehicle
+from src.tasks.trips.db.extract_trips_per_line_per_vehicle_db import (
+    extract_trips_per_line_per_vehicle_db,
+)
 from src.infra.db import fetch_data_from_db_as_df
 import logging
 
@@ -6,31 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def generate_trips_for_all_Lines_and_vehicles(config, all_lines_and_vehicles):
-    year = "2026"
-    month = "01"
-    day = "15"
-
-    total_records = len(all_lines_and_vehicles)
-    num_processed = 0
-    for record in all_lines_and_vehicles:
-        logger.info(f"{record}")
-        linha_lt = record["linha_lt"]
-        veiculo_id = record["veiculo_id"]
-        logger.info(f"Line: {linha_lt}, vehicle: {veiculo_id}")
-        extract_trips_per_line_per_vehicle(
-            config, year, month, day, linha_lt, veiculo_id
-        )
-        num_processed += 1
-        logger.info(f"Record {num_processed}/{total_records} processed.")
-    return total_records
-
-
-def extract_trips_for_all_Lines_and_vehicles(config):
-    # # date params below kept for compatibility during development
-    # year = "2026"
-    # month = "01"
-    # day = "15"
+def extract_trips_for_all_Lines_and_vehicles_db(config):
     logger.info("Loading all lines and vehicles...")
     # all_lines_and_vehicles = load_all_lines_and_vehicles(config)
     all_lines_and_vehicles = load_all_lines_and_vehicles_last_3_hours(config)
@@ -74,23 +52,23 @@ def load_all_lines_and_vehicles_last_3_hours(config):
     df_raw = fetch_data_from_db_as_df(config, sql)
 
     # Convert the unique combinations into a list of dictionaries
-    position_records = df_raw.to_dict("records")
+    lines_and_vehicles = df_raw.to_dict("records")
 
-    return position_records
+    return lines_and_vehicles
 
 
-def load_all_lines_and_vehicles(config):
-    table_name = config["POSITIONS_TABLE_NAME"]
-    sql = f"""
-        select linha_lt, veiculo_id from {table_name}
-	    group by linha_lt, veiculo_id
-	    order by linha_lt, veiculo_id
-    """
-
-    df_raw = fetch_data_from_db_as_df(config, sql)
-    position_records = df_raw.to_dict("records")
-
-    return position_records
+def generate_trips_for_all_Lines_and_vehicles(config, all_lines_and_vehicles):
+    total_records = len(all_lines_and_vehicles)
+    num_processed = 0
+    for record in all_lines_and_vehicles:
+        logger.info(f"{record}")
+        linha_lt = record["linha_lt"]
+        veiculo_id = record["veiculo_id"]
+        logger.info(f"Line: {linha_lt}, vehicle: {veiculo_id}")
+        extract_trips_per_line_per_vehicle_db(config, linha_lt, veiculo_id)
+        num_processed += 1
+        logger.info(f"Record {num_processed}/{total_records} processed.")
+    return total_records
 
 
 def extract_trips_for_a_test_Line_and_vehicle(config):
@@ -99,4 +77,6 @@ def extract_trips_for_a_test_Line_and_vehicle(config):
     day = "15"
     linha_lt = "2290-10"
     veiculo_id = "41539"
-    extract_trips_per_line_per_vehicle(config, year, month, day, linha_lt, veiculo_id)
+    extract_trips_per_line_per_vehicle_db(
+        config, year, month, day, linha_lt, veiculo_id
+    )

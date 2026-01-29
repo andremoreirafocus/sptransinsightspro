@@ -1,11 +1,10 @@
-from src.extract_trips_for_all_Lines_and_vehicles_db import (
-    extract_trips_for_all_Lines_and_vehicles,
-)
-
-# from src.extract_trips_for_all_Lines_and_vehicles_pandas import (
-#     extract_trips_for_all_Lines_and_vehicles,
+# from src.tasks.trips.db.extract_trips_for_all_Lines_and_vehicles_db import (
+#     extract_trips_for_all_Lines_and_vehicles_db,
 # )
-# from src.generate_trips_info_incrementally import generate_trips_info_incrementally
+
+from src.tasks.trips.pandas.extract_trips_for_all_Lines_and_vehicles_pandas import (
+    extract_trips_for_all_Lines_and_vehicles_pandas,
+)
 
 # from src.update_latest_positions import update_latest_positions
 import logging
@@ -32,7 +31,8 @@ def main():
     logger.info("Starting Refinement process...")
     print("Starting Refinement process...")
     config = get_config()
-    extract_trips_for_all_Lines_and_vehicles(config)
+    # extract_trips_for_all_Lines_and_vehicles_db(config)
+    extract_trips_for_all_Lines_and_vehicles_pandas(config)
     # update_latest_positions(config)
 
     # generate_trips_info_incrementally(config)
