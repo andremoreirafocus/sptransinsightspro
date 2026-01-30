@@ -1,20 +1,19 @@
-from refinelivedata.src.services.trips.db.load_positions_for_line_and_vehicle_db import (
-    # load_positions_for_line_and_vehicle,
-    load_positions_for_line_and_vehicle_last_3_hous,
-)
 from src.services.trips.extract_trips_from_positions import (
     extract_raw_trips_metadata,
     filter_healthy_trips,
     generate_trips_table,
 )
-from src.services.trips.save_trips_to_db import save_trips_to_db
+
+# from src.services.trips.save_trips_to_db import save_trips_to_db
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_per_line_per_vehicle(config, linha_lt, veiculo_id, df_preloaded=None):
+def extract_trips_per_line_per_vehicle_pandas(
+    linha_lt, veiculo_id, df_preloaded=None
+):
     try:
         if df_preloaded is not None:
             # df_preloaded is already filtered by the caller, just convert to dicts
@@ -43,38 +42,47 @@ def extract_trips_per_line_per_vehicle(config, linha_lt, veiculo_id, df_preloade
         finished_trips = generate_trips_table(
             position_records, clean_trips_metadata, linha_lt, veiculo_id
         )
-        if finished_trips:
-            # 4. DATA ADAPTATION: Convert to Tuples for Psycopg2
-            # We perform the conversion here into a separate variable
-            processed_trips_tuples = []
+        return finished_trips
+        # print(f"{type(finished_trips)}:{finished_trips}")
 
-            for trip in finished_trips:
-                # trip is still a DICT here, so ['key'] works perfectly
-                vehicle_id = int(trip["vehicle_id"].item())
-                print(vehicle_id, type(vehicle_id))
-                row = (
-                    str(trip["trip_id"]),
-                    vehicle_id,
-                    trip["trip_start_time"].to_pydatetime()
-                    if hasattr(trip["trip_start_time"], "to_pydatetime")
-                    else trip["trip_start_time"],
-                    trip["trip_end_time"].to_pydatetime()
-                    if hasattr(trip["trip_end_time"], "to_pydatetime")
-                    else trip["trip_end_time"],
-                    str(trip["duration"]),  # Fix Timedelta to string
-                    bool(trip["is_circular"]),  # Fix numpy.bool
-                    float(trip["average_speed"]),  # Fix numpy.float64
-                )
-                print(f"row: {row}")
-                processed_trips_tuples.append(row)
+        if not isinstance(finished_trips, list):
+            raise TypeError(f"Error processing {linha_lt}/{veiculo_id}: not a list")
 
-            # 5. Database Save
-            # Pass the TUPLES to the DB function
-            logger.info(
-                f"Saving {len(processed_trips_tuples)} trips for {linha_lt}/{veiculo_id}..."
-            )
-            save_trips_to_db(config, processed_trips_tuples)
-            # save_trips_to_db(config, finished_trips)
+        # raise TypeError(f"Error processing {linha_lt}/{veiculo_id}:")
+        # if finished_trips:
+        #     # 4. DATA ADAPTATION: Convert to Tuples for Psycopg2
+        #     # We perform the conversion here into a separate variable
+        #     processed_trips_tuples = []
+
+        #     for trip in finished_trips:
+        #         # trip is still a DICT here, so ['key'] works perfectly
+        #         vehicle_id = int(trip["vehicle_id"].item())
+        #         print(vehicle_id, type(vehicle_id))
+        #         row = (
+        #             str(trip["trip_id"]),
+        #             vehicle_id,
+        #             trip["trip_start_time"].to_pydatetime(),
+        #             # if hasattr(trip["trip_start_time"], "to_pydatetime")
+        #             # else trip["trip_start_time"],
+        #             trip["trip_end_time"].to_pydatetime(),
+        #             # if hasattr(trip["trip_end_time"], "to_pydatetime")
+        #             # else trip["trip_end_time"],
+        #             str(trip["duration"]),  # Fix Timedelta to string
+        #             bool(trip["is_circular"]),  # Fix numpy.bool
+        #             float(trip["average_speed"]),  # Fix numpy.float64
+        #         )
+        #         print(f"row: {row}")
+        #         processed_trips_tuples.append(row)
+
+        #     # 5. Database Save
+        #     # Pass the TUPLES to the DB function
+        #     logger.info(
+        #         f"Saving {len(processed_trips_tuples)} trips for {linha_lt}/{veiculo_id}..."
+        #     )
+        #     # save_trips_to_db(config, processed_trips_tuples)
+        # save_trips_to_db(config, finished_trips)
 
     except Exception as e:
         logger.error(f"Error processing {linha_lt}/{veiculo_id}: {e}")
+        print(f"Error processing {linha_lt}/{veiculo_id}: {e}")
+        raise TypeError(f"Error processing {linha_lt}/{veiculo_id}:")

@@ -33,7 +33,7 @@ def extract_trips_per_line_per_vehicle_db(config, linha_lt, veiculo_id):
             logger.warning(
                 f"No trips found for line {linha_lt} and vehicle {veiculo_id}."
             )
-            return
+            return 0
         clean_trips_metadata = filter_healthy_trips(
             raw_trips_metadata, position_records
         )
@@ -41,7 +41,7 @@ def extract_trips_per_line_per_vehicle_db(config, linha_lt, veiculo_id):
             logger.warning(
                 f"No clean trips found for line {linha_lt} and vehicle {veiculo_id}."
             )
-            return
+            return 0
         logger.info("Generating records for trips...")
         finished_trips = generate_trips_table(
             position_records, clean_trips_metadata, linha_lt, veiculo_id
@@ -51,5 +51,6 @@ def extract_trips_per_line_per_vehicle_db(config, linha_lt, veiculo_id):
         logger.info(f"Saving {len(finished_trips)} trips to database...")
         save_trips_to_db(config, finished_trips)
         logger.info("Saved trips to database.")
+        return len(finished_trips)
     except Exception as e:
         logger.error(f"An error occurred: {e}")

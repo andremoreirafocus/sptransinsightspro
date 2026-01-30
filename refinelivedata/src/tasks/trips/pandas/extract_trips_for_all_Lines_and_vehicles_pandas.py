@@ -1,7 +1,8 @@
 from src.tasks.trips.pandas.extract_trips_per_line_per_vehicle_pandas import (
-    extract_trips_per_line_per_vehicle,
+    extract_trips_per_line_per_vehicle_pandas,
 )
 from src.infra.db import fetch_data_from_db_as_df
+from src.services.trips.save_trips_to_db import save_trips_to_db
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -36,10 +37,17 @@ def extract_trips_for_all_Lines_and_vehicles_pandas(config):
     )
 
     num_processed = 0
+    all_finished_trips = []
     for (linha_lt, veiculo_id), df_group in grouped:
         # 3. Call the modified extraction function passing the pre-loaded data
-        extract_trips_per_line_per_vehicle(config, linha_lt, veiculo_id, df_group)
-
+        finished_trips = extract_trips_per_line_per_vehicle_pandas(
+            linha_lt, veiculo_id, df_group
+        )
+        if finished_trips:
+            for finished_trip in finished_trips:
+                all_finished_trips.append(finished_trip)
         num_processed += 1
         if num_processed % 500 == 0:
             logger.info(f"Progress: {num_processed}/{total_groups} processed.")
+    logger.info(f"Total finished trips: {len(all_finished_trips)}")
+    save_trips_to_db(config, all_finished_trips)
