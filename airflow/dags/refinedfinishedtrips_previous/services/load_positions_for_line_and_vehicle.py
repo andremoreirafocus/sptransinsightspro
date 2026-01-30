@@ -1,4 +1,4 @@
-from refinedfinishedtrips.infra.db import fetch_data_from_db_as_df
+from refinedfinishedtrips_previous.infra.db import fetch_data_from_db_as_df
 import logging
 
 # This logger inherits the configuration from the root logger in main.py

@@ -1,7 +1,7 @@
-from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle_db import (
+from refinedfinishedtrips_previous.services.extract_trips_per_line_per_vehicle_db import (
     extract_trips_per_line_per_vehicle,
 )
-from refinedfinishedtrips.infra.db import fetch_data_from_db_as_df
+from refinedfinishedtrips_previous.infra.db import fetch_data_from_db_as_df
 import logging
 
 # This logger inherits the configuration from the root logger in main.py

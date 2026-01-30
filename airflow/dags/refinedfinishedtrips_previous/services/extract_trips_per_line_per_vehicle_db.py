@@ -1,13 +1,13 @@
-from refinedfinishedtrips.services.load_positions_for_line_and_vehicle import (
+from refinedfinishedtrips_previous.services.load_positions_for_line_and_vehicle import (
     # load_positions_for_line_and_vehicle,
     load_positions_for_line_and_vehicle_last_3_hous,
 )
-from refinedfinishedtrips.services.extract_trips_from_positions import (
+from refinedfinishedtrips_previous.services.extract_trips_from_positions import (
     extract_raw_trips_metadata,
     filter_healthy_trips,
     generate_trips_table,
 )
-from refinedfinishedtrips.services.save_trips_to_db import save_trips_to_db
+from refinedfinishedtrips_previous.services.save_trips_to_db import save_trips_to_db
 import logging
 
 # This logger inherits the configuration from the root logger in main.py

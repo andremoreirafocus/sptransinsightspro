@@ -1,11 +1,11 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_db import (
+from refinedfinishedtrips_previous.services.extract_trips_for_all_Lines_and_vehicles_db import (
     load_all_lines_and_vehicles_last_3_hours,
     generate_trips_for_all_Lines_and_vehicles,
 )
-from refinedfinishedtrips.config import get_config
+from refinedfinishedtrips_previous.config import get_config
 
 import logging
 
