@@ -1,9 +1,20 @@
-Este projeto:
+## Objetivo deste subprojeto
+Fazer a extração dos arquivos GTFS do portal do desenvolvedor da SPTrans para enriquecimento dos dados extraídos da API. 
+A implementação final é feita via a DAG gtfs do Airflow
+
+## O que este subprojeto faz
 - lê cada um dos arquivos extraidos gtfs do portal do desenvolvedor da SPTrans e que se encontram em uma subpasta gtfs no bucker "raw" 
 - salva no banco de dados, em um schema trusted, para cada arquivo relevante, uma tabela com o mesmo nome que o arquivo, ainda sem nenhuma transformação.
 - a partir das tabelas base, gera uma tabela de detalhes das viagens (trip_details), utilizada para enriquecer os dados de posição dos veículos, visando as análises de dados efetuadas no projeto refinelivedata
 
-Configurações:
+## Pré-requisitos
+- Disponibilidade de um bucket da camada raw previamente criado no serviço de storage, atualmente o Minio e contendo dados GTFS extraídos da SPTrans
+- Criação de uma chave de acesso ao Minio cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw
+- Disponibilidade do serviço de banco de dados, atualmente o PostgreSQL, para armazenamento dos dados em tabelas na camada trusted
+- Criação das tabelas na camada trusted, no serviço de banco de dados, atualmente o PostgreSQL, conforme procedimento informado abaixo
+- Criação do arquivo de configurações
+
+## Configurações
 SOURCE_BUCKET = "raw"
 APP_FOLDER = "gtfs"
 SCHEMA=<schema for trusted layer> 
@@ -17,29 +28,33 @@ DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
 
-Para instalar os requisitos:
+## Para instalar os requisitos
 - cd <diretorio deste subprojeto>
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-## Para executar: 
-    Criar tabelas conforme instruções abaixo
-    python ./main.py
+## Para executar
+Criar tabelas conforme instruções abaixo
+python ./main.py
 
-    Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima.
 
-## Instruções adicionais:
+## Para criar as tabelas necessárias ao subprojeto:
+
 docker exec -it postgres bash
 psql -U postgres -W
 
 Database commands:
+```sql
 create database sptrans_insights;
+```
+
 \l
 \c sptrans_insights
-CREATE SCHEMA trusted;
-\dn
 
+```sql
+CREATE SCHEMA trusted;
 
 CREATE TABLE trusted.routes (
     route_id TEXT,
@@ -98,8 +113,9 @@ CREATE TABLE trusted.calendar (
     start_date     INTEGER,
     end_date       INTEGER
 );
-
+```
 ## Helper commands
+```sql
 SELECT * FROM trusted.routes;
 SELECT * FROM trusted.trips;
 SELECT * FROM trusted.stops;
@@ -113,8 +129,8 @@ DROP TABLE trusted.stops;
 DROP TABLE trusted.stop_times;
 DROP TABLE trusted.frequencies;
 DROP TABLE trusted.calendar;
-
-# o comando abaixo não é necessario porque a implementacao faz um CTAS
+```
+# o comando abaixo não é necessario porque a implementacao faz um CTAS mas representa a estrutura da tabela "trusted.trip_details"
 CREATE TABLE trusted.trip_details (
         trip_id --(from trips)
         first_stop_id, --(from stop_times)

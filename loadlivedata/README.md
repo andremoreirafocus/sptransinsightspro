@@ -1,8 +1,19 @@
-Este projeto:
+## Objetivo deste subprojeto
+Salvar os dados de posição dos ônibus extraídos periodicamente através da API da SPTRANS 
+A implementação final é feita via um microserviço que é executado via um container Docker orquestrado pelo Docker Compose
+
+## O que este subprojeto faz
 - consome de um tópico Kafka as posiçõesdos onibus produzidas pelo processo extractlivedata obtidas da API de posicao da SPTrans
 - salva os dados consumidos em um bucket no Minio com particionamento por ano,mes e dia para processamento pelo transformlivedata
 
-Configurações necessárias no arquivo .env do projeto:
+## Pré-requisitos
+- Disponibilidade do serviço Kafka e um tópico para consumo dos dados extraídos da API da SPTrans pelo subprojeto extractlivedata
+- Disponibilidade de um bucket da camada raw previamente criado no serviço de storage, atualmente o Minio
+- Criação de uma chave de acesso ao Minio cadastrada no arquivo de configurações com acesso de escrita no bucket da camada raw
+- Disponibilidade do microserviço extractlivedata para extração dos dados da API e publicação dos dados extraídos em um tópico Kafka para consumo pelo laodlivedata
+- Criação do arquivo de configurações
+
+## Configurações
 INTERVALO = 120  # 2 minutos em segundos
 KAFKA_BROKER = <kafka_broker>
 KAFKA_TOPIC = <kafka_topic>
@@ -12,38 +23,40 @@ SECRET_KEY= <secret>
 RAW_BUCKET_NAME = <bucket_name>
 APP_FOLDER = <folder>
 
-Para instalar os requisitos:
+## Para instalar os requisitos:
 - cd <diretorio deste subprojeto>
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-Para executar: 
-python ./main.py
+## Para executar: 
+Localmente:
+    python ./main.py
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+    Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
 Para buildar o container
 cd ./loadlivedata
 docker build -t sptrans-loadlivedata -f Dockerfile .
 
-in docker compose:
-docker compose up -d loadlivedata
+Para buildar e rodar o container em standalone:
+    copie o arquivo .env para .env-docker e ajuste hostname e porta adequadamente
+    cd ./loadlivedata
+    docker build -t sptrans-loadlivedata -f Dockerfile .
+    docker run --name loadlivedata sptrans-extractlivedat
+    Para comunicação com os outros containers
+    docker run --name loadlivedata --network engenharia-dados_rede_fia sptrans-loadlivedata
 
-in standalone mode:
-docker run --name loadlivedata --network engenharia-dados_rede_fia sptrans-loadlivedata
+No docker compose:
+    Para buildar o container
+        docker compose build --no-cache loadlivedata
+    Para iniciar o container 
+        docker compose up -d loadlivedata
 
-docker run --name loadlivedata sptrans-extractlivedat
-
-Instruções adicionais:
-Kafka:
-    Foi necessário mudar a porta do akhq para 28080 no docker-compose-yaml para parar de conflitar com outros componentes
+## Para criar o tópico Kafka necessário ao subprojeto:
+Para iniciar o Kafka:
     docker compose up -d kafka-broker zookeeper akhq
 
-    Para criar o tópico:
+Para criar o tópico:
     docker exec -it kafka-broker /bin/bash
     kafka-topics --bootstrap-server localhost:9092 --create --partitions 1 --replication-factor 1 --topic sptrans-positions;
-
-Minio:
-    Criar o bucket raw
-    Criar o access key e informar access key e secret key no .env do projeto

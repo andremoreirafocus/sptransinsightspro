@@ -1,11 +1,23 @@
-Este projeto faz:
+## Objetivo deste subprojeto
+Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans e já disponibilizados na camada raw pelo microserviço loadlivedata enriquecendo-os com os dados extraídos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
+A implementação final é feita via a DAG transformlivedata do Airflow
+
+## O que este subprojeto faz
+
 - lê um arquivo que as posicoes dos onibus fornecidos pela sptrans em um determinado ano, mes, dia, hora e minuto.
 - Os dados são armazenados em um bucket no minio em uma subpasta (prefixo) seguindo uma estrutura de particionamento por ano, mes e dia
 - o nome do arquivo a ser recuperado corresponde à hora e ao minuto em que os dados foram extraídos da api da sptrans
 - transforma os dados em uma big table consolidada em memória
 - salva o conteúdo da tabela da memória para uma tabela especificada
 
-Configurações:
+## Pré-requisitos
+- Disponibilidade de um bucket da camada raw previamente criado no serviço de storage, atualmente o Minio e contendo os dados extraídos da API da SPTrans
+- Criação de uma chave de acesso ao Minio cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw
+- Disponibilidade do serviço de banco de dados, atualmente o PostgreSQL, para armazenamento dos dados em tabelas na camada trusted
+- Criação das tabelas na camada trusted, no serviço de banco de dados, atualmente o PostgreSQL, conforme procedimento informado abaixo
+- Criação do arquivo de configurações
+
+## Configurações
 SOURCE_BUCKET = <source_bucket> # the bucket for the app to load data from
 APP_FOLDER = <app_folder> # the subfolder for the app to load data from
 # TABLE_NAME=<table_name_including_schema> # where data will be written
@@ -21,19 +33,19 @@ DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
 
-Para instalar os requisitos:
+## Para instalar os requisitos
 - cd <diretorio deste subprojeto>
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-Para executar: 
+## Para executar
 Criar tabelas conforme instruções abaixo
 python ./main.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
-Instruções adicionais:
+## Para criar as tabelas necessárias ao subprojeto:
 
 docker exec -it postgres bash
 psql -U postgres -W
@@ -45,12 +57,7 @@ create database sptrans_insights;
 CREATE SCHEMA trusted;
 \dn
 
-## Helper commands
-SELECT * FROM trusted.positions;
-DROP TABLE trusted.positions;
-
-
-# New enriched table format after transformation
+```sql
 CREATE TABLE trusted.positions (
     id BIGSERIAL PRIMARY KEY,
     extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 
@@ -75,7 +82,7 @@ CREATE TABLE trusted.positions (
     distance_to_first_stop DOUBLE PRECISION,
     distance_to_last_stop DOUBLE PRECISION
 );
-
+```
 
 ## Deprecated 
 CREATE TABLE trusted.positions (

@@ -1,24 +1,21 @@
+## Objetivo deste subprojeto
 ### Este projeto é responsável por gerar os dados da camada refined através de duas funções:
+Fazer a transformação dos dados extraídos de posição dos ônibus da API da SPTrans enriquecidos da camada trusted pelo processo transformlivedata em dados na camada refined
+A implementação final é feita via a DAGs refinedlivedata e updatelatestpositions do Airflow
 
-* **`extract_trips_for_all_Lines_and_vehicles(config)`**: Mapeia cada veículo ativo a uma jornada específica (`trip_id`), cruzando dados em tempo real com o planejamento estático (GTFS).
-* **`update_latest_positions(config)`**: Mantém o estado mais recente de cada veículo na frota para monitoramento imediato.
+## O que este subprojeto faz
 
-### 🗄️ Definições de Tabelas (Schema `refined`)
-
-#### A. Viagens Finalizadas (`refined.finished_trips`)
+Viagens Finalizadas (`refined.finished_trips`)
 Armazena o histórico consolidado de jornadas concluídas para análise de eficiência e performance usando como fonte a tabela de viagens finalizadas
 
-#### B. Últimas posições (`refined.latest_positions`)
+Últimas posições (`refined.latest_positions`)
 Alimenta via CTAS a tabela que é fonte dp mapa de frota utilizando latitude e longitude para exibir a posição exata de cada ônibus no momento da consulta.
 
+## Pré-requisitos
+- Disponibilidade do serviço de banco de dados, atualmente o PostgreSQL, para armazenamento dos dados para consulta nas tabelas na camada trusted e escrita e consulta em tabelas na camada refined
+- Criação do arquivo de configurações
 
-## Para instalar os requisitos:
-- cd <diretorio deste subprojeto>
-- python3 -m venv .env
-- source .venv/bin/activate
-- pip install -r requirements.txt
-
-## Configurações do .env:
+## Configurações
 FINISHED_TRIPS_TABLE_NAME=<table_name_for_finished_trips_including_schema_in_refined>
 POSITIONS_TABLE_NAME=<table_name_for_positions_in_trusted>
 LATEST_POSITIONS_TABLE_NAME=<table_name_for_positions_in_refined>
@@ -29,7 +26,13 @@ DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
 
-## Para executar: 
+## Para instalar os requisitos
+- cd <diretorio deste subprojeto>
+- python3 -m venv .env
+- source .venv/bin/activate
+- pip install -r requirements.txt
+
+## Para executar
 Criar tabelas conforme instruções abaixo
 python ./main.py
 
