@@ -63,11 +63,11 @@ def save_to_db(ti):
 
 # Criando o DAG
 with DAG(
-    "transformdatatotrusted-backfill-20261501",
+    "transformdatatotrusted-backfill-20260204",
     default_args=default_args,
     description="Load raw data from MinIO, process it, and store it in PG",
-    start_date=datetime(2026, 1, 15, 3, 0),
-    end_date=datetime(2026, 1, 16, 2, 58),
+    start_date=datetime(2026, 2, 4, 14, 24),
+    end_date=datetime(2026, 2, 4, 15, 38),
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
     catchup=True,
 ) as dag:
