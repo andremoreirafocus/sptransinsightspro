@@ -2,7 +2,6 @@ from minio import Minio
 import io
 import logging
 
-
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,6 @@ def list_objects_in_minio_bucket(
         print(f"Error listing files in MinIO folder: {e}")
         return []
 
-
 def read_file_from_minio_to_str(connection_data, bucket_name, object_name):
     """
     Reads a file from MinIO and returns its contents as a string.
@@ -57,6 +55,7 @@ def read_file_from_minio_to_str(connection_data, bucket_name, object_name):
     except Exception as e:
         print(f"Error reading JSON from MinIO: {e}")
         return None
+
 
 def read_file_from_minio_to_BytesIO(connection_data, bucket_name, object_name):
     """
