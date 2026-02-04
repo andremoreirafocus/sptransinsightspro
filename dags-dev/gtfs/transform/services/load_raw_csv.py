@@ -1,4 +1,4 @@
-from src.infra.minio_functions import read_file_from_minio_to_BytesIO
+from infra.minio_functions import read_file_from_minio_to_BytesIO
 
 import logging
 

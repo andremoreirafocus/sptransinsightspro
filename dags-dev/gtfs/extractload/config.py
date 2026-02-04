@@ -7,4 +7,5 @@ def get_config():
     Returns a dictionary with configuration values.
     """
 
-    return dotenv_values(".env")
+    # return dotenv_values(dotenv_path=".env")
+    return dotenv_values("gtfs/extractload/.env")

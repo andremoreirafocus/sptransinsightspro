@@ -1,5 +1,5 @@
 import logging
-from src.infra.db import get_db_connection
+from infra.db import get_db_connection
 from psycopg2 import DatabaseError, InterfaceError
 
 logger = logging.getLogger(__name__)

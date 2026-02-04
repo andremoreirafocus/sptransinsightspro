@@ -1,4 +1,4 @@
-from src.infra.minio_functions import write_generic_bytes_to_minio
+from infra.minio_functions import write_generic_bytes_to_minio
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
