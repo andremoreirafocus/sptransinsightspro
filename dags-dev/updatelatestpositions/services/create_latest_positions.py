@@ -33,7 +33,7 @@ def create_latest_positions_table(config):
 
         # We execute the query directly into a DataFrame
         # No 'CREATE TABLE' here - we just want the result set
-        logger.info("Executing analytical query in DuckDB over MinIO...")
+        logger.info("Getting latest positions...")
 
         refined_df = con.execute(f"""
             WITH latest_snapshot AS (
@@ -63,7 +63,7 @@ def create_latest_positions_table(config):
             return
 
         # 3. Save result to Postgres for PowerBI (Low Latency Layer)
-        logger.info(f"Transferring {len(refined_df)} rows to Postgres...")
+        logger.info(f"Saving {len(refined_df)} records to Postgres...")
 
         db_uri = f"postgresql://{config['DB_USER']}:{config['DB_PASSWORD']}@{config['DB_HOST']}:{config['DB_PORT']}/{config['DB_DATABASE']}"
         engine = create_engine(db_uri)
