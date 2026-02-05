@@ -1,4 +1,4 @@
-from gtfs.transform.services.load_raw_csv_to_buffer import (
+from gtfs.transform.services.load_raw_csv_to_buffer_from_storage import (
     load_raw_csv_to_buffer_from_storage,
 )
 from infra.buffer_manipulation_functions import (

@@ -15,7 +15,7 @@ A implementação final é feita via a DAG gtfs do Airflow
 - Criação do arquivo de configurações
 
 ## Configurações
-SOURCE_BUCKET = "raw"
+RAW_BUCKET = "raw"
 APP_FOLDER = "gtfs"
 SCHEMA=<schema for trusted layer> 
 MINIO_ENDPOINT=<hostname:port>

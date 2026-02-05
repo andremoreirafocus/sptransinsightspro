@@ -6,7 +6,7 @@ from gtfs.extractload.config import get_config as get_config_extractload
 
 from gtfs.transform.services.create_save_trip_details import (
     create_trip_details_table,
-    create_trip_details_table_and_fill_missing_data,
+    # create_trip_details_table_and_fill_missing_data,
 )
 from gtfs.transform.services.transforms import (
     transform_calendar,
@@ -45,14 +45,14 @@ def extract_load_files():
 def transform():
     logging.info("Starting GTFS Transformations...")
     config = get_config_transform()
-    transform_routes(config)
-    transform_trips(config)
-    transform_stops(config)
-    transform_stop_times(config)
-    transform_frequencies(config)
-    transform_calendar(config)
+    # transform_routes(config)
+    # transform_trips(config)
+    # transform_stops(config)
+    # transform_stop_times(config)
+    # transform_frequencies(config)
+    # transform_calendar(config)
     create_trip_details_table(config)
-    create_trip_details_table_and_fill_missing_data(config)
+    # create_trip_details_table_and_fill_missing_data(config)
     logger.info("All transformations completed successfully.")
 
 

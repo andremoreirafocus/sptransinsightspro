@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 def save_buffer_to_storage(config, file_name, buffer):
     def get_config(config):
-        destination_bucket = config["DESTINATION_BUCKET"]
+        destination_bucket = config["TRUSTED_BUCKET"]
         app_folder = config["APP_FOLDER"]
         connection_data = {
             "minio_endpoint": config["MINIO_ENDPOINT"],

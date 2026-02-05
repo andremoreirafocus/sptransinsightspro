@@ -4,6 +4,7 @@ certifi==2026.1.4
 cffi==2.0.0
 charset-normalizer==3.4.4
 dotenv==0.9.9
+duckdb==1.4.4
 idna==3.11
 minio==7.2.20
 numpy==2.2.6

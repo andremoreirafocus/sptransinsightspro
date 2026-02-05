@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 def load_files_to_raw_storage(config, files_list):
     def get_config(config):
         folder = config.get("LOCAL_DOWNLOADS_FOLDER")
-        bucket_name = config.get("RAW_BUCKET_NAME")
+        bucket_name = config.get("RAW_BUCKET")
         app_folder = config.get("APP_FOLDER")
         connection_data = {
             "minio_endpoint": config["MINIO_ENDPOINT"],
