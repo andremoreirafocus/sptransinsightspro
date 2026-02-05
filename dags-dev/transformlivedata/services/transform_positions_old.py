@@ -1,12 +1,27 @@
-from transformlivedata.services.load_trip_details_from_storage_to_dataframe import (
-    load_trip_details_from_storage_to_dataframe,
-)
+from infra.db import fetch_data_from_db_as_df
 from dateutil import parser
 import logging
+import pandas as pd
 
 ""
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+
+
+def load_trip_details_to_dataframe(config):
+    """
+    Loads the trusted.trip_details table from the database
+    and returns a Pandas DataFrame for analysis.
+    """
+    table_name = config["TRIP_DETAILS_TABLE_NAME"]
+    sql = f"SELECT * FROM {table_name};"
+    logger.info("Loading trip_details table from database...")
+
+    # This is the standard way to check
+    print(f"Pandas version: {pd.__version__}")
+    df = fetch_data_from_db_as_df(config, sql)
+    logger.info(f"Loaded trip details for {df.shape[0]} trips")
+    return df
 
 
 def get_trip_id(linha, sentido):
@@ -159,7 +174,7 @@ def transform_positions(config, raw_positions):
         logger.error("No 'l' field found in raw positions data.")
         return None
     logger.info("Preloading trip details from database...")
-    df_trip_details = load_trip_details_from_storage_to_dataframe(config)
+    df_trip_details = load_trip_details_to_dataframe(config)
     # print(df_trip_details)
     logger.info("Starting transformation of position data...")
     total_number_of_vehicles = 0

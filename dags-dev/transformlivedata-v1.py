@@ -1,8 +1,6 @@
 from transformlivedata.services.load_positions import load_positions
-from transformlivedata.services.transform_positions import transform_positions
-from transformlivedata.services.save_positions_to_storage import (
-    save_positions_to_storage,
-)
+from transformlivedata.services.transform_positions_old import transform_positions
+from transformlivedata.services.save_positions_to_db import save_positions_to_db
 from transformlivedata.config import get_config
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -60,17 +58,17 @@ def transform_positions_to_in_memory_table(raw_positions):
     return positions_table
 
 
-def save_to_storage(positions_table):
+def save_to_db(positions_table):
     # def save_to_db(ti):
     #    positions_table = ti.xcom_pull(task_ids="transform_positions_to_in_memory_table")
     config = get_config()
-    save_positions_to_storage(config, positions_table)
+    save_positions_to_db(config, positions_table)
 
 
 def main():
     raw_positions = load_positions_from_raw()
     positions_table = transform_positions_to_in_memory_table(raw_positions)
-    save_to_storage(positions_table)
+    save_to_db(positions_table)
 
 
 if __name__ == "__main__":
