@@ -4,11 +4,11 @@ from gtfs.extractload.services.load_files_to_raw_storage import (
 )
 from gtfs.extractload.config import get_config as get_config_extractload
 
-from gtfs.transform.services.create_save_trip_details import (
+from gtfs.transform.services.create_save_trip_details_old import (
     # create_trip_details_table,
     create_trip_details_table_and_fill_missing_data,
 )
-from gtfs.transform.services.transforms import (
+from gtfs.transform.services.transforms_old import (
     transform_calendar,
     transform_frequencies,
     transform_routes,
