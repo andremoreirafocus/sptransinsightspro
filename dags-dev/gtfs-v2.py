@@ -5,8 +5,8 @@ from gtfs.extractload.services.load_files_to_raw_storage import (
 from gtfs.extractload.config import get_config as get_config_extractload
 
 from gtfs.transform.services.create_save_trip_details import (
-    create_trip_details_table,
-    # create_trip_details_table_and_fill_missing_data,
+    # create_trip_details_table,
+    create_trip_details_table_and_fill_missing_data,
 )
 from gtfs.transform.services.transforms import (
     transform_calendar,
@@ -51,15 +51,20 @@ def transform():
     # transform_stop_times(config)
     # transform_frequencies(config)
     # transform_calendar(config)
-    create_trip_details_table(config)
-    # create_trip_details_table_and_fill_missing_data(config)
     logger.info("All transformations completed successfully.")
 
 
+def create_trip_details():
+    logger.info("Creating trip details...")
+    logger.info("Trip details transformation completed successfully.")
+    config = get_config_transform()
+    create_trip_details_table_and_fill_missing_data(config)
+
+
 def main():
-    #
     extract_load_files()
     transform()
+    create_trip_details()
 
 
 if __name__ == "__main__":
