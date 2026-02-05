@@ -19,13 +19,10 @@ def save_buffer_to_storage(config, file_name, buffer):
 
     destination_bucket, app_folder, connection_data = get_config(config)
     logger.info(
-        f"Saving data to file {file_name} at bucket: {destination_bucket}, folder: {app_folder}"
+        f"Saving data to file {file_name} to bucket: {destination_bucket}, folder: {app_folder}"
     )
     prefix = f"{app_folder}/{file_name.split('.')[0]}"
     destination_object_name = f"{prefix}/{file_name}"
-    print(
-        f"Saving object: {destination_object_name} to bucket: {destination_bucket} ..."
-    )
     try:
         write_generic_bytes_to_minio(
             connection_data,
@@ -39,3 +36,4 @@ def save_buffer_to_storage(config, file_name, buffer):
             f"'{destination_bucket}' with object name '{destination_object_name}'."
         )
         logger.error(f"Exception details: {e}")
+    logger.info("Save data successful!")

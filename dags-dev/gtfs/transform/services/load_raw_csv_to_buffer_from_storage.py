@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_raw_csv(config, file_name):
+def load_raw_csv_to_buffer_from_storage(config, file_name):
     """
     Load position data from source bucket and app folder.
     :param source_bucket: Source bucket name
