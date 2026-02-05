@@ -1,4 +1,4 @@
-from updatelatestpositions.services.create_latest_positions_old import (
+from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
 from updatelatestpositions.config import get_config
