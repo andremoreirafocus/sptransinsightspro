@@ -7,14 +7,17 @@ logger = logging.getLogger(__name__)
 
 def save_positions_to_storage(config, positions_table):
     """
-    Saves the positions list to MinIO in Parquet format,
-    partitioned by year, month, and day.
+    Trusted Layer:
+    Saves a list of position tuples to MinIO in Parquet format.
+    - Partitioning: year/month/day/hour (Hive style)
+    - Filename: positions_HHMM.parquet (based on extraction_ts)
+    - Prevents overwriting within the same hour by using unique minute-based names.
     """
     if not positions_table:
-        logger.warning("No positions to save.")
+        logger.warning("No positions to save. Table is empty.")
         return
 
-    # Define column names (must match your list of tuples order)
+    # 1. Define schema (Must match the order of your list of tuples)
     columns = [
         "extracao_ts",
         "veiculo_id",
@@ -40,20 +43,27 @@ def save_positions_to_storage(config, positions_table):
     ]
 
     try:
-        # 1. Convert list of tuples to DataFrame
+        # 2. Convert to DataFrame and prepare time metadata
         df = pd.DataFrame(positions_table, columns=columns)
 
-        # 2. Extract partition columns from the timestamp
-        # Ensure extracao_ts is a datetime object
+        # Ensure extracao_ts is datetime to extract components
         df["extracao_ts"] = pd.to_datetime(df["extracao_ts"])
+
+        # Determine the filename based on the actual extraction time (HHMM)
+        # Assuming one extraction per run, we take the timestamp of the first row
+        batch_ts = df["extracao_ts"].iloc[0]
+        file_name = batch_ts.strftime("positions_%H%M.parquet")
+
+        # Create Partition Strings (Zero-padded for correct sorting)
         df["year"] = df["extracao_ts"].dt.strftime("%Y")
         df["month"] = df["extracao_ts"].dt.strftime("%m")
         df["day"] = df["extracao_ts"].dt.strftime("%d")
+        df["hour"] = df["extracao_ts"].dt.strftime("%H")
 
-        # 3. Connect to DuckDB
+        # 3. Initialize DuckDB for the S3 transfer
         con = duckdb.connect(":memory:")
 
-        # 4. Configure MinIO
+        # Setup MinIO credentials and S3 settings
         con.execute(f"""
             INSTALL httpfs;
             LOAD httpfs;
@@ -64,26 +74,45 @@ def save_positions_to_storage(config, positions_table):
             SET s3_url_style='path';
         """)
 
-        # 5. Export to MinIO with Hive Partitioning
-        output_path = (
+        # 4. Export to MinIO
+        # The base path is the folder; PARTITION_BY adds the year/month/day/hour folders;
+        # file_name ensures we don't overwrite previous runs in the same hour.
+        output_base_path = (
             f"s3://{config['TRUSTED_BUCKET']}/{config['APP_FOLDER']}/positions"
         )
 
         logger.info(
-            f"Exporting {len(df)} rows to partitioned parquet at {output_path}..."
+            f"Exporting {len(df)} rows to {output_base_path} partitioned by hour..."
         )
 
-        # DuckDB can query the Pandas 'df' directly in the same session
+        # con.execute(f"""
+        #     COPY (SELECT * FROM df)
+        #     TO '{output_base_path}/{file_name}'
+        #     (FORMAT PARQUET, PARTITION_BY (year, month, day, hour), OVERWRITE_OR_IGNORE 1);
+        # """)
+
+        # The base path should only go up to 'positions'
+        output_base_path = (
+            f"s3://{config['TRUSTED_BUCKET']}/{config['APP_FOLDER']}/positions"
+        )
+
+        # We use {filename} as a template so DuckDB knows exactly what to call the file
+        # inside the partition folders.
         con.execute(f"""
             COPY (SELECT * FROM df) 
-            TO '{output_path}' 
-            (FORMAT PARQUET, PARTITION_BY (year, month, day), OVERWRITE_OR_IGNORE 1);
+            TO '{output_base_path}' 
+            (
+                FORMAT PARQUET, 
+                PARTITION_BY (year, month, day, hour), 
+                FILENAME_PATTERN 'positions_{batch_ts.strftime("%H%M")}_',
+                OVERWRITE_OR_IGNORE 1
+            );
         """)
 
-        logger.info("Successfully saved partitioned Parquet to MinIO.")
+        logger.info(f"Successfully saved {file_name} to Trusted Layer.")
 
     except Exception as e:
-        logger.error(f"Error saving positions to MinIO: {e}")
+        logger.error(f"Failed to save positions to Trusted Layer: {e}")
         raise
     finally:
         if "con" in locals():
