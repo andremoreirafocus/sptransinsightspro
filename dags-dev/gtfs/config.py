@@ -18,6 +18,7 @@ def get_config():
             "APP_FOLDER": "sptrans",
             "RAW_BUCKET": "raw",
             "TRUSTED_BUCKET": "trusted",
+            "TRIP_DETAILS_TABLE_NAME": "trip_details",
             "MINIO_ENDPOINT": "minio:9000",
             "ACCESS_KEY": "datalake",
             "SECRET_KEY": "datalake",

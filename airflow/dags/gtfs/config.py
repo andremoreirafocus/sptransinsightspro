@@ -18,13 +18,14 @@ def get_config():
             "APP_FOLDER": "sptrans",
             "RAW_BUCKET": "raw",
             "TRUSTED_BUCKET": "trusted",
+            "TRIP_DETAILS_TABLE_NAME": "trip_details",
             "MINIO_ENDPOINT": "minio:9000",
             "ACCESS_KEY": "datalake",
             "SECRET_KEY": "datalake",
         }
         logger.info("Configuration retrieved for Airflow!")
     else:
-        # Pulling from local .env or hardcoded defaults for testing
+        # Pulling from local .env
         from dotenv import dotenv_values
 
         config = dotenv_values("gtfs/.env")

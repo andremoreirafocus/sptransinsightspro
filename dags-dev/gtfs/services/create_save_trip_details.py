@@ -9,29 +9,27 @@ def create_trip_details_table_and_fill_missing_data(config):
         try:
             bucket_name = config["TRUSTED_BUCKET"]
             app_folder = config["APP_FOLDER"]
-            return bucket_name, app_folder
+            trip_details = config["TRIP_DETAILS_TABLE_NAME"]
+            return bucket_name, app_folder, trip_details
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
             raise
 
     try:
-        bucket_name, app_folder = get_config(config)
+        bucket_name, app_folder, trip_details = get_config(config)
         con = get_duckdb_connection(config)
-        con.execute("CREATE SCHEMA IF NOT EXISTS trusted;")
         stop_times_table_path = f"{bucket_name}/{app_folder}/stop_times"
         stops_table_path = f"{bucket_name}/{app_folder}/stops"
         con.execute(f"""
-            CREATE OR REPLACE VIEW trusted.stop_times AS 
+            CREATE OR REPLACE VIEW stop_times AS 
             SELECT * FROM read_parquet('s3://{stop_times_table_path}/*.parquet');
         """)
         con.execute(f"""
-            CREATE OR REPLACE VIEW trusted.stops AS 
+            CREATE OR REPLACE VIEW stops AS 
             SELECT * FROM read_parquet('s3://{stops_table_path}/*.parquet');
         """)
-        sql_command = """
-        DROP TABLE IF EXISTS trusted.trip_details;
-        
-        CREATE TABLE trusted.trip_details AS
+        sql_command = f"""
+        CREATE TABLE {trip_details} AS
         WITH base_metrics AS (
             SELECT 
                 trip_id,
@@ -48,8 +46,8 @@ def create_trip_details_table_and_fill_missing_data(config):
                     st.trip_id, st.stop_id,  s.stop_name, s.stop_lat, s.stop_lon,
                     ROW_NUMBER() OVER (PARTITION BY st.trip_id ORDER BY st.stop_sequence ASC) as start_rank,
                     ROW_NUMBER() OVER (PARTITION BY st.trip_id ORDER BY st.stop_sequence DESC) as end_rank
-                FROM trusted.stop_times st
-                JOIN trusted.stops s ON st.stop_id = s.stop_id
+                FROM stop_times st
+                JOIN stops s ON st.stop_id = s.stop_id
             ) ranked_data
             GROUP BY trip_id
         ),
@@ -84,12 +82,12 @@ def create_trip_details_table_and_fill_missing_data(config):
         """
         logger.info("Generating trip_details...")
         con.execute(sql_command)
-        count = con.execute("SELECT COUNT(*) FROM trusted.trip_details").fetchone()[0]
+        count = con.execute(f"SELECT COUNT(*) FROM {trip_details}").fetchone()[0]
         logger.info(f"Table created successfully with {count} records!")
-        trip_details_table_path = f"{bucket_name}/{app_folder}/trip_details"
+        trip_details_table_path = f"{bucket_name}/{app_folder}/{trip_details}"
         export_query = f"""
-            COPY trusted.trip_details 
-            TO 's3://{trip_details_table_path}/trip_details.parquet' (FORMAT PARQUET);
+            COPY {trip_details} 
+            TO 's3://{trip_details_table_path}/{trip_details}.parquet' (FORMAT PARQUET);
         """
         con.execute(export_query)
         logger.info(f"Table successfully exported to s3://{trip_details_table_path}/")
