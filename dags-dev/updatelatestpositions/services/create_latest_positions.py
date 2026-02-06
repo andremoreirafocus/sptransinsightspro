@@ -55,6 +55,7 @@ def get_latest_path(config):
             [obj.object_name for obj in objects if obj.object_name.endswith(".parquet")]
         )
         if found_files:
+            print(f"found_files: {found_files}")
             latest_file_path = f"s3://{bucket}/{found_files[-1]}"
             break
     print(latest_file_path)
@@ -96,7 +97,6 @@ def create_latest_positions_table(config):
     - Explicitly checks the current and previous hour prefixes.
     - If the pipeline was delayed, it will find the most recent processed data.
     """
-
     def get_config(config):
         try:
             latest_positions_table_name = config["LATEST_POSITIONS_TABLE_NAME"]
