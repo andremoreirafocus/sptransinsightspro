@@ -10,7 +10,6 @@ def get_config():
             "RAW_BUCKET": "raw",
             "TRUSTED_BUCKET": "trusted",
             "APP_FOLDER": "sptrans",
-            "POSITIONS_TABLE_NAME": "positions",
             "MINIO_ENDPOINT": "minio:9000",
             "ACCESS_KEY": "datalake",
             "SECRET_KEY": "datalake",

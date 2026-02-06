@@ -1,6 +1,6 @@
 from gtfs.extractload.services.extract_gtfs_files import extract_gtfs_files
-from gtfs.extractload.services.load_files_to_raw_storage import (
-    load_files_to_raw_storage,
+from gtfs.extractload.services.load_files_to_raw import (
+    load_files_to_raw,
 )
 from gtfs.extractload.config import get_config as get_config_extractload
 
@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 def extract_load_files():
     config = get_config_extractload()
     files_list = extract_gtfs_files(config)
-    load_files_to_raw_storage(config, files_list)
+    load_files_to_raw(config, files_list)
 
 
 def transform():
