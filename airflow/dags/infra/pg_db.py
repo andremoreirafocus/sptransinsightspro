@@ -77,9 +77,6 @@ def fetch_data_from_db_as_df(config, sql):
             logger.info("Database connection closed.")
 
 
-
-
-
 def save_table_to_db(config, table_name, columns, buffer):
     def get_config(config):
         schema = config["SCHEMA"]
@@ -160,4 +157,3 @@ def execute_sql_command(config, sqls):
             cur.close()
             conn.close()
             logger.info("Database connection closed.")
-

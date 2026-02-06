@@ -1,4 +1,4 @@
-from infra.db import bulk_insert_data_table
+from infra.pg_db import bulk_insert_data_table
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
