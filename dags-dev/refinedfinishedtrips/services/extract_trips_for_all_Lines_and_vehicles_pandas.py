@@ -67,7 +67,6 @@ def extract_trips_for_all_Lines_and_vehicles_pandas(config):
     if df_all_positions.empty:
         logger.warning("No position data found for the last 3 hours.")
         return
-    return
     grouped = df_all_positions.groupby(["linha_lt", "veiculo_id"])
     total_groups = len(grouped)
     logger.info(
