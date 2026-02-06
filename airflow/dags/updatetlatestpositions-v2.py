@@ -25,7 +25,7 @@ def update_latest_positions_table():
 
 # Criando o DAG
 with DAG(
-    "updatelatestposition-v1",
+    "updatelatestposition-v2",
     default_args=default_args,
     description="Load latest positions to refined.latest_positions table",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
