@@ -7,6 +7,7 @@ def get_config():
         # Pulling from Airflow Variables
         # from airflow.models import Variable
         config = {
+            "ANALYSIS_HOURS_WINDOW": 3,
             "TRUSTED_BUCKET": "trusted",
             "APP_FOLDER": "sptrans",
             "MINIO_ENDPOINT": "minio:9000",
