@@ -26,11 +26,14 @@ def list_objects_in_minio_bucket(
             secret_key=connection_data["secret_key"],
             secure=connection_data["secure"],
         )
-        objects = client.list_objects(bucket_name, prefix=prefix, recursive=True)
-        return [obj.object_name for obj in objects]
+        objects = client.list_objects(
+            bucket_name=bucket_name, prefix=prefix, recursive=True
+        )
+        return objects
     except Exception as e:
-        print(f"Error listing files in MinIO folder: {e}")
+        logger.error(f"Error listing files in MinIO folder: {e}")
         return []
+
 
 def read_file_from_minio_to_str(connection_data, bucket_name, object_name):
     """
@@ -80,6 +83,7 @@ def read_file_from_minio_to_BytesIO(connection_data, bucket_name, object_name):
     except Exception as e:
         print(f"Error reading JSON from MinIO: {e}")
         return None
+
 
 def write_generic_bytes_to_minio(connection_data, buffer, bucket_name, object_name):
     """
