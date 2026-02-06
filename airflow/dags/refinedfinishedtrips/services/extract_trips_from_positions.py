@@ -108,5 +108,5 @@ def generate_trips_table(position_records, trips_metadata, linha_lt, veiculo_id)
             average_speed,
         )
         trips.append(trip_record)
-        print(trip_record)
+        # print(trip_record)
     return trips
