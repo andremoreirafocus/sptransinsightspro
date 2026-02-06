@@ -1,14 +1,14 @@
-from gtfs.extractload.infra.minio_functions import write_generic_bytes_to_minio
+from infra.minio_functions import write_generic_bytes_to_minio
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def load_files_to_raw(config, files_list):
+def save_files_to_raw_storage(config, files_list):
     def get_config(config):
         folder = config.get("LOCAL_DOWNLOADS_FOLDER")
-        bucket_name = config.get("RAW_BUCKET_NAME")
+        bucket_name = config.get("RAW_BUCKET")
         app_folder = config.get("APP_FOLDER")
         connection_data = {
             "minio_endpoint": config["MINIO_ENDPOINT"],

@@ -1,4 +1,8 @@
 import os
+import logging
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
 
 
 def get_config():
@@ -18,9 +22,11 @@ def get_config():
             "ACCESS_KEY": "datalake",
             "SECRET_KEY": "datalake",
         }
-        return config
+        logger.info("Configuration retrieved for Airflow!")
     else:
-        # Pulling from local .env or hardcoded defaults for testing
+        # Pulling from local .env
         from dotenv import dotenv_values
 
-    return dotenv_values("gtfs/.env")
+        config = dotenv_values("gtfs/.env")
+        logger.info("Configuration retrieved locally!")
+    return config

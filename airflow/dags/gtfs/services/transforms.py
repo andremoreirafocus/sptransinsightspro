@@ -1,10 +1,10 @@
-from gtfs.transform.services.load_raw_csv_to_buffer_from_storage import (
+from gtfs.services.load_raw_csv_to_buffer_from_storage import (
     load_raw_csv_to_buffer_from_storage,
 )
 from infra.buffer_manipulation_functions import (
     convert_buffer_from_csv_to_parquet,
 )
-from gtfs.transform.services.save_buffer_to_storage import save_buffer_to_storage
+from gtfs.services.save_buffer_to_storage import save_buffer_to_storage
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
