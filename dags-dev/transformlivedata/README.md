@@ -1,61 +1,43 @@
 ## Objetivo deste subprojeto
 Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans e já disponibilizados na camada raw pelo microserviço loadlivedata enriquecendo-os com os dados extraídos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
-A implementação final é feita via a DAG transformlivedata do Airflow
+A implementação final é feita via a DAG transformlivedata do Airflow.
+O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
+As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
+
 
 ## O que este subprojeto faz
-
-- lê um arquivo que as posicoes dos onibus fornecidos pela sptrans em um determinado ano, mes, dia, hora e minuto.
-- Os dados são armazenados em um bucket no minio em uma subpasta (prefixo) seguindo uma estrutura de particionamento por ano, mes e dia
-- o nome do arquivo a ser recuperado corresponde à hora e ao minuto em que os dados foram extraídos da api da sptrans
-- transforma os dados em uma big table consolidada em memória
-- salva o conteúdo da tabela da memória para uma tabela especificada
+- lê um arquivo JSON com as posicoes instantâneas dos onibus fornecidos pela sptrans armazenado no bucket da camada raw no serviço de object storage particionados por ano, mes e dia
+- transforma os dados em uma big table consolidada em memória enriquecendo-os com dados da tabela de detalhes das viagens gerada pelo subprocesso gtfs
+- salva os dados de posição instantânea transformados e enriquecidos da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
 
 ## Pré-requisitos
-- Disponibilidade de um bucket da camada raw previamente criado no serviço de storage, atualmente o Minio e contendo os dados extraídos da API da SPTrans
-- Criação de uma chave de acesso ao Minio cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw
-- Disponibilidade do serviço de banco de dados, atualmente o PostgreSQL, para armazenamento dos dados em tabelas na camada trusted
-- Criação das tabelas na camada trusted, no serviço de banco de dados, atualmente o PostgreSQL, conforme procedimento informado abaixo
+- Disponibilidade de dois buckets: uma para a camada raw e outro para a camada trusted, previamente criados no serviço de object storage
+- Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw e leitura e escrita na camada trusted
 - Criação do arquivo de configurações
 
 ## Configurações
-SOURCE_BUCKET = <source_bucket> # the bucket for the app to load data from
-APP_FOLDER = <app_folder> # the subfolder for the app to load data from
-# TABLE_NAME=<table_name_including_schema> # where data will be written
-POSITIONS_TABLE_NAME=<table_name_for_positions_including_schema>
-TRIP_DETAILS_TABLE_NAME=<table_name_for_trip_details_including_schema>
-MINIO_ENDPOINT=<hostname:port> # format 
+RAW_BUCKET = <raw_bucket> 
+APP_FOLDER = "sptrans"
+GTFS_FOLDER = "gtfs"
+POSITIONS_TABLE_NAME="positions"
+TRIP_DETAILS_TABLE_NAME="trip_details"
+MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
-DB_HOST=<db_hostname>
-DB_PORT=<PORT>
-DB_DATABASE=<dbname>
-DB_USER=<user>
-DB_PASSWORD=<password>
-DB_SSLMODE="prefer"
 
-## Para instalar os requisitos
-- cd <diretorio deste subprojeto>
+## Instruções para instalação
+Para instalar os requisitos:
+- cd dags-dev
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-## Para executar
-Criar tabelas conforme instruções abaixo
-python ./main.py
+## Instruções para execução em modo local
+python transformlivedata-v2.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
-## Para criar as tabelas necessárias ao subprojeto:
-
-docker exec -it postgres bash
-psql -U postgres -W
-
-Database commands:
-create database sptrans_insights;
-\l
-\c sptrans_insights
-CREATE SCHEMA trusted;
-\dn
+## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
 
 ```sql
 CREATE TABLE trusted.positions (
@@ -84,7 +66,7 @@ CREATE TABLE trusted.positions (
 );
 ```
 
-## Deprecated 
+## Estrutura da tabela antes do enriquecimento por trip_details
 CREATE TABLE trusted.positions (
     id BIGSERIAL PRIMARY KEY,
     extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 

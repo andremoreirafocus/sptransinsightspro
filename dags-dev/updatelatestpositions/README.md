@@ -1,24 +1,27 @@
 ## Objetivo deste subprojeto
-### Este projeto é responsável por gerar os dados da camada refined através de duas funções:
-Fazer a transformação dos dados extraídos de posição dos ônibus da API da SPTrans enriquecidos da camada trusted pelo processo transformlivedata em dados na camada refined
-A implementação final é feita via a DAGs refinedlivedata e updatelatestpositions do Airflow
+Disponibilizar as posições instantâneas mais recentes dos ônibus na camada refined para consumo pelo dashboard.
+A implementação final é feita via a DAGs refinedlivedata e updatelatestpositions do Airflow.
+O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
+As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
 
 ## O que este subprojeto faz
-
-Viagens Finalizadas (`refined.finished_trips`)
-Armazena o histórico consolidado de jornadas concluídas para análise de eficiência e performance usando como fonte a tabela de viagens finalizadas
-
-Últimas posições (`refined.latest_positions`)
-Alimenta via CTAS a tabela que é fonte dp mapa de frota utilizando latitude e longitude para exibir a posição exata de cada ônibus no momento da consulta.
+- lê as masis recentes posições instantâneas armazenadas na tabela de posições armazendas sptrans no bucket da camada trusted no serviço de object storage
+- salva estes dados na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 
 ## Pré-requisitos
-- Disponibilidade do serviço de banco de dados, atualmente o PostgreSQL, para armazenamento dos dados para consulta nas tabelas na camada trusted e escrita e consulta em tabelas na camada refined
+- Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
+- Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket na camada trusted
+- Disponibilidade do serviço de banco de dados analítico, atualmente o PostgreSQL, para armazenamento dos dados na camada refined
 - Criação do arquivo de configurações
 
 ## Configurações
-FINISHED_TRIPS_TABLE_NAME=<table_name_for_finished_trips_including_schema_in_refined>
-POSITIONS_TABLE_NAME=<table_name_for_positions_in_trusted>
-LATEST_POSITIONS_TABLE_NAME=<table_name_for_positions_in_refined>
+TRUSTED_BUCKET = "trusted"
+APP_FOLDER = "sptrans"
+MINIO_ENDPOINT=<hostname:port>
+ACCESS_KEY=<key>
+SECRET_KEY=<secret>
+POSITIONS_TABLE_NAME="positions"
+LATEST_POSITIONS_TABLE_NAME="refined.latest_positions"
 DB_HOST=<db_hostname>
 DB_PORT=<PORT>
 DB_DATABASE=<dbname>
@@ -26,50 +29,17 @@ DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
 
-## Para instalar os requisitos
-- cd <diretorio deste subprojeto>
+## Instruções para instalação
+Para instalar os requisitos:
+- cd dags-dev
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-## Para executar
-Criar tabelas conforme instruções abaixo
-python ./main.py
+## Instruções para execução em modo local
+python ./refinedfinishedtrips-v2.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
-
-## Configurações de Banco de dados que devem ser feitas antes da execução:
-## Para criar as tabelas necessárias ao subprojeto:
-
-docker exec -it postgres bash
-psql -U postgres -W
-
-Database commands:
-\c sptrans_insights
-
-```sql
-CREATE SCHEMA refined;
-
-CREATE TABLE refined.finished_trips (
-    id BIGSERIAL PRIMARY KEY,
-    trip_id TEXT,
-    vehicle_id INTEGER,
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION
-);
-```
-Para as consultas de construção das trips terem melhor performance:
-```sql
-CREATE INDEX idx_positions_linha_veiculo_ts
-ON trusted.positions (
-    linha_lt,
-    veiculo_id,
-    veiculo_ts ASC
-);
-```
 
 ## A consulta abaixo cria a tabela refined.latest_positions a cada execução
 ```sql
@@ -125,16 +95,3 @@ CREATE TABLE refined.latest_positions (
     distance_to_last_stop DOUBLE PRECISION
 );
 ```
-
-#Tabela usada apenas em testes de algoritmo experimental
-```sql
-CREATE TABLE trusted.ongoing_trips (
-    id BIGSERIAL PRIMARY KEY,
-    trip_id TEXT,
-    vehicle_id INTEGER,
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION
-);
