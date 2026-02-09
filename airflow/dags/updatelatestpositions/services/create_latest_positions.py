@@ -1,5 +1,5 @@
 from infra.duck_db import get_duckdb_connection
-from infra.sql_db import save_dataframe_to_db
+from infra.sql_db import update_db_table_with_dataframe
 from updatelatestpositions.services.get_latest_path_for_query import (
     get_latest_path_for_query,
 )
@@ -34,8 +34,12 @@ def create_latest_positions_table(config):
             FROM read_parquet('{latest_path_for_query}')
         """).df()
         total_records = refined_df.shape[0]
-        logger.info(f"Saving {total_records} at table {latest_positions_table_name}...")
-        save_dataframe_to_db(config, refined_df)
+        logger.info(
+            f"Updating table {latest_positions_table_name} with {total_records} records..."
+        )
+        update_db_table_with_dataframe(config, refined_df)
+        logger.info(f"Updated table {latest_positions_table_name} successfully!")
+
     except Exception as e:
         logger.error(f"Update failed: {e}")
         raise
