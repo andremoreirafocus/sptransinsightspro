@@ -61,3 +61,5 @@ def update_db_table_with_dataframe(config, latest_positions_df):
             if_exists="append",
             index=False,
         )
+        # Update statistics so query stays fast
+        conn.execute(text(f'ANALYZE refined."{latest_positions_table_name}"'))
