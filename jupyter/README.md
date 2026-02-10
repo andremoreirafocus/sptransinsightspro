@@ -24,6 +24,8 @@ Caso se deseje iniciar apenas este serviço, basta executar:
 ## Instruções para acessar o jupyter:
 Basta acessar o link http://localhost:8888
 
+O notebook  ![positions_for_line_and_vehicle_and_day.ipynb](./notebooks/positions_for_line_and_vehicle_and_day.ipynb) contem funções exemplo para acesso ao DuckDB para análise exploratória.
+
 
 
 

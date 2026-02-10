@@ -28,9 +28,10 @@ Para implementar a solução foram adotados os componentes:
 ## Para executar o Sptransinsights
 Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, executar alguns comandos de inicialização que estão discriminados em cada subprojeto, especialmente:
 - ![Airflow](./airflow/README.md)
-- ![gtfsextractload](./airflow/README.md)
+- ![gtfs](./gtfs/README.md)
 - ![transformlivedata](./transformlivedata/README.md)
 - ![refinelivedata](./refinelivedata/README.md)
+- ![updatelatestpositions](./updatelatestpositions/README.md)
 
 Para iniciar o projeto:
  Se o arquivo .env não existir na raiz do projeto, crie-o com o seguinte conteúdo:
@@ -48,6 +49,7 @@ Para iniciar o projeto:
   docker compose up -d postgres
   docker compose up -d postgres_airflow webserver scheduler
   docker compose up -d extraclivedata loadlivedata
+  docker compose up -d jupyter
 
 Para monitorar os serviços ou efetuar configurações:
  AKHQ (Kafka): 
@@ -59,6 +61,9 @@ Para monitorar os serviços ou efetuar configurações:
  Airflow:
  http://localhost:8080/
 
+ Jupyter:
+ http://localhost:8888/
 
+ 
 
 
