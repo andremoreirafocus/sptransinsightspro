@@ -2,15 +2,13 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
-Este projeto faz uso de um monorepo com diferentes subprojetos que compõe o SPTransInsights.
-
-Cada subprojeto possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
+A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
 ## Arquitetura
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
-- Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. ![Para mais informações:](./airflow/README.md)
+- Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. ![Para mais informações:](./airflow/README.md). O enquanto o ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informações:](./dags-dev/README.md)
     - DAG gtfs: processo composto de 3 etapas principais.   
         - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS e salva na camada raw. 
         - transformação: cria tabelas na camada trusted, a partir dos dados brutos extraído do GTFS da SPTRANS e armazenados na camada raw
@@ -18,12 +16,12 @@ Para implementar a solução foram adotados os componentes:
     - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. ![Para mais informações:](./transformlivedata/README.md)
     - DAG refinelivedata: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./refinelivedata/README.md)
     - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./refinelivedata/README.md)
-- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
-- Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
-- Kafka: para desacoplar o processo de ingestão dos dados das camadas de storage e transformação
 - extractlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na exeução impactariam a precisão dos intervalos entre execuções da extração de dados, publicando o dado bruto em um tópico do Kafka. ![Para mais informações:](./extractlivedata/README.md)
 - loadlivedata: microserviço que consome de um tópico no Kafka os dados brutos extraídos da API pelo extractlivedata e salva na camada raw, implementada usando o Minio. ![Para mais informações:](./loadlivedata/README.md)
+- Kafka: para desacoplar o processo de ingestão dos dados das camadas de storage e transformação
 - Minio: utilizado para implementar as camadas raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para os dados da camada trusted
+- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
+- Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
 - PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
 - PowerBI: utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL. ![Para mais informações:](./powerbi/README.md)
 
