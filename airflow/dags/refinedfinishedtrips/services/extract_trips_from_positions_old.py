@@ -12,7 +12,6 @@ def extract_raw_trips_metadata(records):
         current_trip_start_index = 0
         current_trip_end_index = 0
         previous_trip_end_index = -1
-        first_direction_change = True
         for i in range(1, len(records)):
             # print(records[i]["veiculo_ts"].astimezone(ZoneInfo("America/Sao_Paulo")))
             previous_index, current_index = i - 1, i
@@ -28,14 +27,7 @@ def extract_raw_trips_metadata(records):
                     "sentido": records[previous_index]["linha_sentido"],
                 }
                 previous_trip_end_index = current_trip_end_index
-                if first_direction_change:
-                    first_direction_change = False
-                    logger.debug(
-                        f"Discarding first potential incomplete trip due to direction change at index {i} for {records[0]['linha_lt']}, {records[0]['veiculo_id']}"
-                    )
-                else:
-                    trips_metadata.append(discovered_trip)
-                    logger.debug(f"Trip added: {discovered_trip}")
+                trips_metadata.append(discovered_trip)
                 # start = records[discovered_trip["start_position_index"]]["veiculo_ts"]
                 # end = records[discovered_trip["end_position_index"]]["veiculo_ts"]
                 # print(
@@ -46,10 +38,7 @@ def extract_raw_trips_metadata(records):
             "end_position_index": current_index,
             "sentido": records[current_index]["linha_sentido"],
         }
-        logger.debug(f"Discarding last trip: {discovered_trip}")
-
-        # Discarding last trip as it may be incomplete
-        # trips_metadata.append(discovered_trip)
+        trips_metadata.append(discovered_trip)
         # start = records[discovered_trip["start_position_index"]]["veiculo_ts"]
         # end = records[discovered_trip["end_position_index"]]["veiculo_ts"]
         # print(
