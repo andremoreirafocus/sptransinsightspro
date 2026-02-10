@@ -3,11 +3,7 @@ from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle_pandas imp
 )
 
 from refinedfinishedtrips.services.get_recent_positions import get_recent_positions
-
-# from refinedfinishedtrips.services.save_trips_to_db import save_trips_to_db
-from refinedfinishedtrips.services.save_finished_trips_to_db import (
-    save_finished_trips_to_db,
-)
+from refinedfinishedtrips.services.save_trips_to_db import save_trips_to_db
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -17,7 +13,7 @@ logger = logging.getLogger(__name__)
 def extract_trips_for_all_Lines_and_vehicles_pandas(config):
     df_recent_positions = get_recent_positions(config)
     if df_recent_positions.empty:
-        logger.warning("No position data found for the period.")
+        logger.warning("No position data found for the last 3 hours.")
         return
     grouped = df_recent_positions.groupby(["linha_lt", "veiculo_id"])
     total_groups = len(grouped)
@@ -38,5 +34,4 @@ def extract_trips_for_all_Lines_and_vehicles_pandas(config):
             logger.info(f"Progress: {num_processed}/{total_groups} processed.")
     logger.info(f"Progress: {num_processed}/{total_groups} processed.")
     logger.info(f"Total finished trips: {len(all_finished_trips)}")
-    # save_trips_to_db(config, all_finished_trips)
-    save_finished_trips_to_db(config, all_finished_trips)
+    save_trips_to_db(config, all_finished_trips)

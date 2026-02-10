@@ -70,6 +70,25 @@ CREATE TABLE refined.finished_trips (
 );
 ```
 
+CREATE TABLE refined.finished_trips (
+    trip_id TEXT,             -- e.g., '101A_0'
+    vehicle_id INTEGER,       -- e.g., 505
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION,
+    -- This combination is guaranteed unique by your bus logic
+    PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
+);
+
+-- Optimized Search Index for PowerBI
+-- This supports searching for a specific route/direction 
+-- and narrowing it down by bus.
+CREATE INDEX idx_trip_lookup 
+ON refined.finished_trips (trip_id, vehicle_id);
+
+
 #Tabela usada apenas em testes de algoritmo experimental
 ```sql
 CREATE TABLE trusted.ongoing_trips (
