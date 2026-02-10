@@ -219,6 +219,21 @@ services:
       - rede_fia
     restart: always
 
+  jupyter:
+    build: 
+      context: jupyter
+      dockerfile: Dockerfile    
+    container_name: jupyter_exploration
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+      - JUPYTER_TOKEN=bus_analytics  # Use a secure token in production
+    volumes:
+      - ./jupyter/notebooks:/home/jovyan/work
+    networks:
+      - rede_fia
+
 networks:
   rede_fia:
     driver: bridge
