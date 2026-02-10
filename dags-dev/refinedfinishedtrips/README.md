@@ -47,7 +47,7 @@ python ./refinedfinishedtrips-v2.py
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-## Para criar as tabelas necessárias ao subprojeto:
+## Para criar as tabelas e índices necessários ao subprojeto:
 
 docker exec -it postgres bash
 psql -U postgres -W
@@ -57,18 +57,6 @@ Database commands:
 
 ```sql
 CREATE SCHEMA refined;
-
-CREATE TABLE refined.finished_trips (
-    id BIGSERIAL PRIMARY KEY,
-    trip_id TEXT,
-    vehicle_id INTEGER,
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION
-);
-```
 
 CREATE TABLE refined.finished_trips (
     trip_id TEXT,             -- e.g., '101A_0'
@@ -87,6 +75,20 @@ CREATE TABLE refined.finished_trips (
 -- and narrowing it down by bus.
 CREATE INDEX idx_trip_lookup 
 ON refined.finished_trips (trip_id, vehicle_id);
+
+```
+
+#Deprecated table creation command
+CREATE TABLE refined.finished_trips (
+    id BIGSERIAL PRIMARY KEY,
+    trip_id TEXT,
+    vehicle_id INTEGER,
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION
+);
 
 
 #Tabela usada apenas em testes de algoritmo experimental
