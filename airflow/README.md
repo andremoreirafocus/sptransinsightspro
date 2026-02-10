@@ -10,7 +10,7 @@ Neste projeto estão contemplados os seguintes fluxos de acordo com o nome das p
 Para inicializar os serviços específicos do Airflow, utilize o comando:
 
 ```shell
-docker-compose up -d postgres_airflow webserver scheduler
+docker compose up -d postgres_airflow webserver scheduler
 ```
 
 ## Criar o Usuário para Fazer Login no Airflow

@@ -31,32 +31,45 @@ APP_FOLDER = <folder>
 
 ## Para executar: 
 Localmente:
+```shell
     python ./main.py
+```
 
     Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
 Para buildar o container
-cd ./loadlivedata
-docker build -t sptrans-loadlivedata -f Dockerfile .
+```shell
+    cd ./loadlivedata
+    docker build -t sptrans-loadlivedata -f Dockerfile .
 
 Para buildar e rodar o container em standalone:
     copie o arquivo .env para .env-docker e ajuste hostname e porta adequadamente
+```shell
     cd ./loadlivedata
     docker build -t sptrans-loadlivedata -f Dockerfile .
     docker run --name loadlivedata sptrans-extractlivedat
     Para comunicação com os outros containers
     docker run --name loadlivedata --network engenharia-dados_rede_fia sptrans-loadlivedata
+```
 
 No docker compose:
     Para buildar o container
+```shell
         docker compose build --no-cache loadlivedata
+```
     Para iniciar o container 
+```shell
         docker compose up -d loadlivedata
+```
 
 ## Para criar o tópico Kafka necessário ao subprojeto:
 Para iniciar o Kafka:
+```shell
     docker compose up -d kafka-broker zookeeper akhq
+```
 
 Para criar o tópico:
+```shell
     docker exec -it kafka-broker /bin/bash
     kafka-topics --bootstrap-server localhost:9092 --create --partitions 1 --replication-factor 1 --topic sptrans-positions;
+```

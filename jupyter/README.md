@@ -16,10 +16,14 @@ Conceder permissão de escrita na subpasta notebooks utilizada para armazenar no
 
 ## Instruções para execução
 O Jupyter é iniciado via docker compose ao iniciar todos os serviços através do comando:
+```shell
     docker compose up -d
+```
 
 Caso se deseje iniciar apenas este serviço, basta executar:
+```shell
     docker compose up -d jupyter
+```
 
 ## Instruções para acessar o jupyter:
 Basta acessar o link http://localhost:8888

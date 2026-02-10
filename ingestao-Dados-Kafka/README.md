@@ -18,7 +18,7 @@
 ## Criando o ambiente Kafka com o docker compose
 
 
-```
+```shell
 docker compose up -d grafana prometheus jmx-kafka-broker zookeeper kafka-broker zoonavigator akhq
 
 ```
