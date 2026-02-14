@@ -11,7 +11,6 @@ services:
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: minioadmin
       MINIO_NOTIFY_KAFKA_ENABLE_EventKafka: "on"
-      MINIO_NOTIFY_KAFKA_BROKERS_EventKafka: "kafka-broker:29092"
       MINIO_NOTIFY_KAFKA_TOPIC_EventKafka: "sink-products"
       MINIO_NOTIFY_KAFKA_QUEUE_LIMIT_EventKafka: "10000"
       MINIO_NOTIFY_KAFKA_TLS_EventKafka: "off"
@@ -71,116 +70,6 @@ services:
     networks:
       - rede_fia
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:${CONFLUENT_VERSION}
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
-      ZOOKEEPER_INIT_LIMIT: 5
-      ZOOKEEPER_SYNC_LIMIT: 2
-    ports:
-     - "2181:2181"
-    container_name: zookeeper
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    networks:
-      rede_fia:
-
-  kafka-broker:
-    image: confluentinc/cp-kafka:${CONFLUENT_VERSION}
-    depends_on:
-      - zookeeper
-    ports:
-      - "9092:9092"
-      - "9991:9991"
-    container_name: kafka-broker
-    environment:
-      KAFKA_BROKER_ID: 101
-      KAFKA_JMX_PORT: 9991
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://localhost:9092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
-      CONFLUENT_METRICS_REPORTER_BOOTSTRAP_SERVERS: kafka-broker:29092
-      CONFLUENT_METRICS_REPORTER_ZOOKEEPER_CONNECT: zookeeper:2181
-      CONFLUENT_METRICS_REPORTER_TOPIC_REPLICAS: 1
-      CONFLUENT_METRICS_ENABLE: 'false'
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    networks:
-      rede_fia:
-
-  connect:
-        image: fernandos/kafka-connet-debezium-lab:v215
-        container_name: kafkaConect
-        ports:
-        - 8083:8083
-        depends_on:
-         - kafka-broker
-        volumes:
-          - "./ingestao-Dados-Kafka-Connect/conectores:/conectores"
-        environment:
-        - KAFKA_LOG4J_OPTS=-Dlog4j.configuration=file:/opt/kafka/config/connect-log4j.properties
-        - KAFKA_CONNECT_BOOTSTRAP_SERVERS=kafka-broker:29092
-        - |
-            KAFKA_CONNECT_CONFIGURATION=
-            key.converter=org.apache.kafka.connect.json.JsonConverter
-            value.converter=org.apache.kafka.connect.json.JsonConverter
-            key.converter.schemas.enable=false
-            value.converter.schemas.enable=false
-            group.id=connect
-            offset.storage.topic=connect-offsets
-            offset.storage.replication.factor=1
-            config.storage.topic=connect-configs
-            config.storage.replication.factor=1
-            status.storage.topic=connect-status
-            status.storage.replication.factor=1  
-            CONNECT_REST_ADVERTISED_HOST_NAME: 'connect'  
-            producer.interceptor.classes=io.debezium.tracing.DebeziumTracingProducerInterceptor
-        - OTEL_SERVICE_NAME=kafka-connect
-        - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
-        - OTEL_TRACES_SAMPLER=always_on
-        - OTEL_TRACES_EXPORTER=otlp
-        - OTEL_METRICS_EXPORTER=none
-        - STRIMZI_TRACING=opentelemetry
-        command: /opt/kafka/kafka_connect_run.sh
-        networks:
-          rede_fia:
-
-  akhq:
-    image: tchiotludo/akhq:${AKHQ_VERSION}
-    container_name: akhq
-    environment:
-      AKHQ_CONFIGURATION: |
-        akhq:
-          connections:
-            docker-kafka-server:
-              properties:
-                bootstrap.servers: "kafka-broker:29092"       
-              connect:
-                - name: "connect"
-                  url: "http://connect:8083"
-            docker-kafka-server-prd:
-              properties:
-                bootstrap.servers: "kafka-broker:29092"       
-              connect:
-                - name: "connect"
-                  url: "http://connect:8083"
-    ports:
-      - "28080:8080"
-    depends_on:
-      - kafka-broker
-      - connect
-    networks:
-      rede_fia:
-
   postgres:
     image: quay.io/debezium/example-postgres:${POSTGRES_DEBEZIUM}
     container_name: postgres
@@ -192,26 +81,12 @@ services:
     networks:
       rede_fia:
 
-  extractlivedata:
+  extractloadlivedata:
     build:
-      context: extractlivedata
+      context: extractloadlivedata
       dockerfile: Dockerfile
     container_name: extractlivedata
     depends_on:
-      - kafka-broker
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
-    networks:
-      - rede_fia
-    restart: always
-
-  loadlivedata:
-    build:
-      context: loadlivedata
-      dockerfile: Dockerfile
-    container_name: loadlivedata
-    depends_on:
-      - kafka-broker 
       - minio
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
