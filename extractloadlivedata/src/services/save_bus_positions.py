@@ -9,15 +9,15 @@ logger = logging.getLogger(__name__)
 
 def save_bus_positions_to_local_volume(config, data):
     def get_config(config):
-        downloads_folder = config["DOWNLOADS_FOLDER"]
-        return downloads_folder
+        ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
+        return ingest_buffer_folder
 
-    downloads_folder = get_config(config)
+    ingest_buffer_folder = get_config(config)
     hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
     save_data_to_json_file(
         data_json,
-        downloads_folder,
+        ingest_buffer_folder,
         file_name=f"buses_positions_{hour_minute}.json",
     )
 

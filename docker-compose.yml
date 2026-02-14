@@ -85,11 +85,11 @@ services:
     build:
       context: extractloadlivedata
       dockerfile: Dockerfile
-    container_name: extractlivedata
+    container_name: extractloadlivedata
     depends_on:
       - minio
-    environment:
-      - KAFKA_BOOTSTRAP_SERVERS=kafka-broker:29092
+    volumes:
+      - ./ingest_buffer:/app/data/staging
     networks:
       - rede_fia
     restart: always
