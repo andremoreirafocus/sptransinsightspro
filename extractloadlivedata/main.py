@@ -31,7 +31,7 @@ def main():
     logger = logging.getLogger(__name__)
     config = get_config()
     INTERVAL = int(config["EXTRACTION_INTERVAL_SECONDS"])
-    adjust_start_time()
+    # adjust_start_time()
     while True:
         delta = interval_adjustment_needed()
         previous_epoch_time = time.time()

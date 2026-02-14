@@ -18,9 +18,7 @@ def save_bus_positions_to_local_volume(config, data):
     hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
     save_data_to_json_file(
-        data_json,
-        ingest_buffer_folder,
-        file_name=f"buses_positions_{hour_minute}.json",
+        data_json, ingest_buffer_folder, f"buses_positions_{hour_minute}.json", True
     )
 
 
