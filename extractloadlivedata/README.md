@@ -5,9 +5,9 @@ A implementação final é feita via um microserviço que é executado via um co
 ## O que este subprojeto faz
 - extrai a informação de posição dos ônibus a partir da API da SPTRANS periodicamente em um intervalo previamente definido, fazendo uso de exponential backoff em caso de falha na obtenção de dados válidos
 - cria em memória um objeto JSON contendo o payload e metadados sobre a extração do dados, como o timestamp da operação e a origem do dado 
-- salva este objeto em uma pasta local
+- salva este objeto em uma pasta em um volume local
 - salva este mesmo objeto em uma pasta no Minio
-- remove o arquivo local apos o salvamento no Minio
+
 
 ## Pré-requisitos
 - Disponibilidade do serviço de object storage para salvamento dos dados extraídos da API da SPTrans 

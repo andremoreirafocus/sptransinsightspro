@@ -16,9 +16,7 @@ Para implementar a solução foram adotados os componentes:
     - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. ![Para mais informações:](./transformlivedata/README.md)
     - DAG refinelivedata: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./refinelivedata/README.md)
     - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./refinelivedata/README.md)
-- extractlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na exeução impactariam a precisão dos intervalos entre execuções da extração de dados, publicando o dado bruto em um tópico do Kafka. ![Para mais informações:](./extractlivedata/README.md)
-- loadlivedata: microserviço que consome de um tópico no Kafka os dados brutos extraídos da API pelo extractlivedata e salva na camada raw, implementada usando o Minio. ![Para mais informações:](./loadlivedata/README.md)
-- Kafka: para desacoplar o processo de ingestão dos dados das camadas de storage e transformação
+- extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na exeução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
 - Minio: utilizado para implementar as camadas raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para os dados da camada trusted
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
 - Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
@@ -36,9 +34,6 @@ Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, execut
 Para iniciar o projeto:
  Se o arquivo .env não existir na raiz do projeto, crie-o com o seguinte conteúdo:
   MINIO_VERSION=RELEASE.2025-02-28T09-55-16Z
-  POSTGRES_DEBEZIUM=3.0
-  CONFLUENT_VERSION=7.6.1
-  AKHQ_VERSION=0.20.0
  
  Execute:
   docker compose up -d 
