@@ -1,8 +1,11 @@
-from src.services.buses_positions import (
+from src.services.extract_buses_positions import (
     extract_buses_positions_with_retries,
     get_buses_positions_with_metadata,
 )
-from src.infra.storage import save_data_to_json_file
+from src.services.save_bus_positions import (
+    save_bus_positions_to_storage,
+    save_bus_positions_to_local_volume,
+)
 
 from src.infra.timing_functions import adjust_start_time, interval_adjustment_needed
 from src.config import get_config
@@ -27,7 +30,6 @@ logging.basicConfig(
 def main():
     logger = logging.getLogger(__name__)
     config = get_config()
-    DOWNLOADS_FOLDER = config["DOWNLOADS_FOLDER"]
     INTERVAL = int(config["EXTRACTION_INTERVAL_SECONDS"])
     adjust_start_time()
     while True:
@@ -36,19 +38,11 @@ def main():
         buses_positions_payload = extract_buses_positions_with_retries(config)
         download_successful = buses_positions_payload is not None
         if download_successful:
-            buses_positions, reference_time = get_buses_positions_with_metadata(
+            buses_positions, _ = get_buses_positions_with_metadata(
                 buses_positions_payload
             )
-            save_data_to_json_file(
-                buses_positions,
-                downloads_folder=DOWNLOADS_FOLDER,
-                file_name=f"buses_positions_{reference_time}.json",
-            )
-            # save_data_to_minio(
-            #     buses_positions,
-            #     downloads_folder=DOWNLOADS_FOLDER,
-            #     file_name=f"buses_positions_{reference_time}.json",
-            # )
+            save_bus_positions_to_local_volume(config, buses_positions)
+            save_bus_positions_to_storage(config, buses_positions)
         current_epoch_time = time.time()
         duration = current_epoch_time - previous_epoch_time
         interval = INTERVAL - duration + delta
