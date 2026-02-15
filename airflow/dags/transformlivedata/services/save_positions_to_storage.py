@@ -1,3 +1,5 @@
+from datetime import datetime
+from zoneinfo import ZoneInfo
 import duckdb
 import pandas as pd
 import logging
@@ -65,13 +67,23 @@ def save_positions_to_storage(config, positions_table):
         df["extracao_ts"] = pd.to_datetime(df["extracao_ts"])
         # Determine the filename based on the actual extraction time (HHMM)
         # Assuming one extraction per run, we take the timestamp of the first row
-        batch_ts = df["extracao_ts"].iloc[0]
+        batch_ts = (
+            # df["extracao_ts"].iloc[0].replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+            df["extracao_ts"]
+            .iloc[0]
+            .tz_localize("UTC")
+            .astimezone(ZoneInfo("America/Sao_Paulo"))
+        )
         file_name = batch_ts.strftime("positions_%H%M.parquet")
         # Create Partition Strings (Zero-padded for correct sorting)
-        df["year"] = df["extracao_ts"].dt.strftime("%Y")
-        df["month"] = df["extracao_ts"].dt.strftime("%m")
-        df["day"] = df["extracao_ts"].dt.strftime("%d")
-        df["hour"] = df["extracao_ts"].dt.strftime("%H")
+        df["year"] = batch_ts.strftime("%Y")
+        df["month"] = batch_ts.strftime("%m")
+        df["day"] = batch_ts.strftime("%d")
+        df["hour"] = batch_ts.strftime("%H")
+        # df["year"] = df["extracao_ts"].dt.strftime("%Y")
+        # df["month"] = df["extracao_ts"].dt.strftime("%m")
+        # df["day"] = df["extracao_ts"].dt.strftime("%d")
+        # df["hour"] = df["extracao_ts"].dt.strftime("%H")
         # 3. Initialize DuckDB for the S3 transfer
         con = duckdb.connect(":memory:")
         # Setup MinIO credentials and S3 settings

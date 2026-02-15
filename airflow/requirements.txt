@@ -3,3 +3,4 @@ psycopg2-binary==2.9.9
 apache-airflow-providers-jdbc==4.3.1
 minio==7.2.20
 duckdb==1.4.4
+zstandard==0.25.0

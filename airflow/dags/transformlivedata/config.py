@@ -16,6 +16,8 @@ def get_config():
             "MINIO_ENDPOINT": "minio:9000",
             "ACCESS_KEY": "datalake",
             "SECRET_KEY": "datalake",
+            "RAW_DATA_COMPRESSION": "true",
+            "RAW_DATA_COMPRESSION_EXTENSION": ".zst",
         }
         return config
     else:
