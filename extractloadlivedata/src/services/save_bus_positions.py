@@ -1,5 +1,6 @@
 from src.infra.storage import save_data_to_json_file
 from src.infra.minio_functions import write_generic_bytes_to_minio
+from src.infra.compression import compress_data
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
@@ -12,17 +13,26 @@ logger = logging.getLogger(__name__)
 def save_bus_positions_to_local_volume(config, data):
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
-        return ingest_buffer_folder
+        compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
+        return ingest_buffer_folder, compression
 
-    ingest_buffer_folder = get_config(config)
+    ingest_buffer_folder, compression = get_config(config)
     hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
     save_data_to_json_file(
-        data_json, ingest_buffer_folder, f"buses_positions_{hour_minute}.json", True
+        data_json,
+        ingest_buffer_folder,
+        f"buses_positions_{hour_minute}.json",
+        compression,
     )
 
 
 def save_bus_positions_to_storage(config, data):
+    def get_config(config):
+        compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
+        return compression
+
+    compression = get_config(config)
     if not data_structure_is_valid(data):
         logger.error("Data structure is invalid. Skipping processing.")
         raise ValueError("Data structure is invalid.")
@@ -32,10 +42,11 @@ def save_bus_positions_to_storage(config, data):
     )
     hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
-    load_data_to_raw(
+    save_data_to_raw_object_storage(
         config,
         data=data_json,
         hour_minute=hour_minute,
+        compression=compression,
     )
 
 
@@ -82,7 +93,7 @@ def data_structure_is_valid(data):
     return True
 
 
-def load_data_to_raw(config, data, hour_minute):
+def save_data_to_raw_object_storage(config, data, hour_minute, compression=False):
     def get_config(config):
         raw_bucket_name = config["SOURCE_BUCKET"]
         app_folder = config["APP_FOLDER"]
@@ -108,9 +119,16 @@ def load_data_to_raw(config, data, hour_minute):
             f"{prefix}{base_file_name}-{year}{month}{day}{hour_minute}.json"
         )
         try:
+            if compression:
+                logger.info("Compressing data with zstd...")
+                data, file_name_extension = compress_data(data)
+                destination_object_name += file_name_extension
+                logger.info("Data compressed successfully.")
+            else:
+                data = data.encode("utf-8")
             write_generic_bytes_to_minio(
                 connection_data,
-                buffer=data.encode("utf-8"),
+                buffer=data,
                 bucket_name=raw_bucket_name,
                 object_name=destination_object_name,
             )
