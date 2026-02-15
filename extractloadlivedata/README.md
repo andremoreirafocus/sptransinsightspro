@@ -7,6 +7,7 @@ A implementação final é feita via um microserviço que é executado via um co
 - cria em memória um objeto JSON contendo o payload e metadados sobre a extração do dados, como o timestamp da operação e a origem do dado 
 - salva este objeto em uma pasta em um volume local
 - salva este mesmo objeto em uma pasta no Minio
+- caso a compressão seja habilitada salva os arquivos json comprimidos no formato Zstandard
 
 
 ## Pré-requisitos
@@ -16,7 +17,14 @@ A implementação final é feita via um microserviço que é executado via um co
 ## Configurações
 API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
 TOKEN =  <insira o token de acesso à API, obtido após cadastro no site da SPTrans>
-INTERVALO = 120  # intervalo entre extrações subsequentes dos dados de posição de omibus em segundos 
+EXTRACTION_INTERVAL_SECONDS = 120  # intervalo entre extrações subsequentes dos dados de posição de omibus em segundos 
+MINIO_ENDPOINT="localhost:9000"
+ACCESS_KEY="datalake"
+SECRET_KEY="datalake"
+SOURCE_BUCKET = "raw"
+APP_FOLDER = "sptrans"
+INGEST_BUFFER_PATH = "../ingest_buffer"  # pasta aonde os arquivos são salvos no volume local
+DATA_COMPRESSION_ON_SAVE = "true"  # habilita a compressão de arquivos ao salvar local e na camda raw
 
 ## Para instalar os requisitos
 - cd <diretorio deste subprojeto>

@@ -10,6 +10,7 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - transforma os dados em uma big table consolidada em memória enriquecendo-os com dados da tabela de detalhes das viagens gerada pelo subprocesso gtfs
 - salva os dados de posição instantânea transformados e enriquecidos da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
 
+
 ## Pré-requisitos
 - Disponibilidade de dois buckets: uma para a camada raw e outro para a camada trusted, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw e leitura e escrita na camada trusted
@@ -24,6 +25,8 @@ TRIP_DETAILS_TABLE_NAME="trip_details"
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
+RAW_DATA_COMPRESSION = "true" # se desejar ativar a compressao ao salvar os arquivos 
+RAW_DATA_COMPRESSION_EXTENSION = ".zst" # define a extensao do arquivo comprimido a ser lido
 
 ## Instruções para instalação
 Para instalar os requisitos:

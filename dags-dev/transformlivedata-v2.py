@@ -36,11 +36,16 @@ def load_positions_from_raw():
     # hour = dt.strftime("%H")
     # minute = dt.strftime("%M")
     # logging.info(f"Transforming position for {dt}...")
+    # year = "2026"
+    # month = "02"
+    # day = "04"
+    # hour = "11"
+    # minute = "24"
     year = "2026"
     month = "02"
-    day = "04"
-    hour = "11"
-    minute = "24"
+    day = "15"
+    hour = "09"
+    minute = "54"
 
     raw_positions = load_positions(config, year, month, day, hour, minute)
     if not raw_positions:
