@@ -16,7 +16,7 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
 
     def get_config(config):
         source_bucket = config["RAW_BUCKET"]
-        app_folder = config["APP_FOLDER"]
+        app_folder = config["GTFS_FOLDER"]
         connection_data = {
             "minio_endpoint": config["MINIO_ENDPOINT"],
             "access_key": config["ACCESS_KEY"],

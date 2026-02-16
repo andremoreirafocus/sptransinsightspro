@@ -16,6 +16,7 @@ def get_config():
             "PASSWORD": "T3st3@p1",
             "LOCAL_DOWNLOADS_FOLDER": "gtfs_files",
             "APP_FOLDER": "sptrans",
+            "GTFS_FOLDER": "gtfs",
             "RAW_BUCKET": "raw",
             "TRUSTED_BUCKET": "trusted",
             "TRIP_DETAILS_TABLE_NAME": "trip_details",

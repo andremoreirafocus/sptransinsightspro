@@ -8,7 +8,7 @@ def create_trip_details_table_and_fill_missing_data(config):
     def get_config(config):
         try:
             bucket_name = config["TRUSTED_BUCKET"]
-            app_folder = config["APP_FOLDER"]
+            app_folder = config["GTFS_FOLDER"]
             trip_details = config["TRIP_DETAILS_TABLE_NAME"]
             return bucket_name, app_folder, trip_details
         except KeyError as e:
