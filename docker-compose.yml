@@ -67,17 +67,21 @@ services:
       POSTGRES_DB: airflow
     ports:
       - "5432:5432"
+    volumes:
+      - airflow_db_data:/var/lib/postgresql/data
     networks:
       - rede_fia
 
   postgres:
-    image: quay.io/debezium/example-postgres:${POSTGRES_DEBEZIUM}
+    image: postgres:16
     container_name: postgres
     ports:
      - 5532:5432
     environment:
      - POSTGRES_USER=postgres
      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
     networks:
       rede_fia:
 
@@ -115,3 +119,5 @@ networks:
 
 volumes:
   minio_storage: {}
+  postgres_data: {}
+  airflow_db_data: {}

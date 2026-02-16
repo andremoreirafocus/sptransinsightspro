@@ -49,10 +49,15 @@ Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enum
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
 ## Para criar as tabelas e índices necessários ao subprojeto:
 
+Database commands:
+
 docker exec -it postgres bash
 psql -U postgres -W
 
-Database commands:
+```sql
+CREATE DATABASE sptrans_insights;
+```
+
 \c sptrans_insights
 
 ```sql
