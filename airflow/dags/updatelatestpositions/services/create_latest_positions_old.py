@@ -12,7 +12,7 @@ def create_latest_positions_table(config):
     def get_config(config):
         try:
             latest_positions_table_name = config["LATEST_POSITIONS_TABLE_NAME"]
-            return latest_positions_table_name
+            return (latest_positions_table_name,)
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
             raise
@@ -22,7 +22,7 @@ def create_latest_positions_table(config):
         latest_path_for_query = get_latest_path_for_query(config)
         if not latest_path_for_query:
             logger.error(
-                "No recent data found in the last 2 hours. Scan aborted."
+                "No recent data found in the last 6 hours. Cost-saving scan aborted."
             )
             return
         logger.info(f"Discovery successful: {latest_path_for_query}")
@@ -37,7 +37,7 @@ def create_latest_positions_table(config):
         logger.info(
             f"Updating table {latest_positions_table_name} with {total_records} records..."
         )
-        update_db_table_with_dataframe(config, refined_df, latest_positions_table_name)
+        update_db_table_with_dataframe(config, refined_df)
         logger.info(f"Updated table {latest_positions_table_name} successfully!")
 
     except Exception as e:

@@ -41,57 +41,16 @@ python ./refinedfinishedtrips-v2.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
-## A consulta abaixo cria a tabela refined.latest_positions a cada execução
-```sql
-CREATE TABLE refined.latest_positions AS
-WITH latest_snapshot AS (
-    -- 1. Captura o timestamp exato do último lote de extração
-    SELECT MAX(extracao_ts) AS max_ts
-    FROM trusted.positions
-)
--- 2. Projeta os dados e calcula o trip_id com o mapeamento 1->0 e 2->1
-SELECT 
-    p.veiculo_id, 
-    p.veiculo_lat,  
-    p.veiculo_long, 
-    p.linha_lt, 
-    p.linha_sentido,
-    -- Concatenação da linha com o sentido mapeado
-    p.linha_lt || '-' || (
-        CASE 
-            WHEN p.linha_sentido = 1 THEN '0' 
-            WHEN p.linha_sentido = 2 THEN '1' 
-            ELSE NULL -- Garante integridade para valores inesperados
-        END
-    ) AS trip_id
-FROM trusted.positions p
-JOIN latest_snapshot ls ON p.extracao_ts = ls.max_ts;
-```
-
-# A tabela abaixo nao precisa ser criada, pois é criada via CTAS
+# A tabela abaixo precisa ser criada, pois é criada via CTAS
 ```sql
 CREATE TABLE refined.latest_positions (
     id BIGSERIAL PRIMARY KEY,
-    extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at: 
-    veiculo_id INTEGER,            -- p: id do veiculo
-    linha_lt TEXT,                 -- c: Letreiro completo
-    linha_code INTEGER,            -- cl: Código linha
-    linha_sentido INTEGER,         -- sl: Sentido
-    lt_destino TEXT,               -- lt0: Destino
-    lt_origem TEXT,                -- lt1: Origem
-    veiculo_prefixo INTEGER,       -- p: Prefixo
-    veiculo_acessivel BOOLEAN,     -- a: Acessível
     veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
+    veiculo_id INTEGER,            -- p: id do veiculo
     veiculo_lat DOUBLE PRECISION,  -- py: Latitude
     veiculo_long DOUBLE PRECISION,  -- px: Longitude
-    is_circular BOOLEAN,
-    first_stop_id INTEGER,
-    first_stop_lat DOUBLE PRECISION,
-    first_stop_lon DOUBLE PRECISION,
-    last_stop_id INTEGER,
-    last_stop_lat DOUBLE PRECISION,
-    last_stop_lon DOUBLE PRECISION,
-    distance_to_first_stop DOUBLE PRECISION,
-    distance_to_last_stop DOUBLE PRECISION
+    linha_lt TEXT,                 -- c: Letreiro completo
+    linha_sentido INTEGER,         -- sl: Sentido
+    trip_id TEXT
 );
 ```

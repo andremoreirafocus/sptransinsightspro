@@ -1,5 +1,6 @@
 from infra.minio_functions import list_objects_in_minio_bucket
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,7 +35,7 @@ def get_latest_path_for_query(config):
         connection_data,
     ) = get_config(config)
     latest_path_for_query = None
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
     for i in range(2):  # Look back window
         check_time = now - timedelta(hours=i)
         prefix = f"{app_folder}/{positions_table_name}/{check_time.strftime('year=%Y/month=%m/day=%d/hour=%H')}/"
