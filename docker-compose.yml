@@ -30,6 +30,8 @@ services:
       volumes:
         - ./airflow/dags:/opt/airflow/dags
         - ./airflow/requirements.txt:/requirements.txt
+        - ./airflow/connections.json:/opt/airflow/connections.json
+        - ./airflow/variables.json:/opt/airflow/variables.json
       ports:
         - "8080:8080"
       depends_on:
@@ -51,6 +53,8 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
+      - ./airflow/connections.json:/opt/airflow/connections.json
+      - ./airflow/variables.json:/opt/airflow/variables.json
     depends_on:
       - postgres_airflow
     networks:

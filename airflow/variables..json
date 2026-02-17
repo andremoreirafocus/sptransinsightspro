@@ -1,0 +1,12 @@
+{
+    "gtfs": {
+        "local_downloads_folder": "gtfs_files",
+        "app_folder": "sptrans",
+        "gtfs_folder": "gtfs",
+        "raw_bucket": "raw",
+        "trusted_bucket": "trusted",
+        "trip_details_table_name": "trip_details",
+        "description": "GTFS data used to extract bus position data from SPTrans"
+    }
+}
+

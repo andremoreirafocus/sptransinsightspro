@@ -29,6 +29,13 @@ docker compose exec webserver airflow users create \
     --password admin
 ```
 
+Para importar conexões e variáveis de ambiente usadas pelas DAGS
+```shell
+docker exec -it webserver bash
+airflow connections import connections.json 
+airflow variables import variables.json 
+```
+
  ## Para acessar o Airflow:
  http://localhost:8080/
 

@@ -1,0 +1,19 @@
+{
+    "minio_conn": {
+        "conn_type": "s3",
+        "host": "minio",
+        "port": "9000",
+        "login": "datalake",
+        "password": "datalake",
+        "description": "Object storage used long duration retention"
+    },
+    "gtfs_conn": {
+        "conn_type": "http",
+        "host": "www.sptrans.com.br",
+        "schema": "/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS",
+        "login": "andre.moreira.engineer",
+        "password": "T3st3@p1",
+        "description": "Used to download GTFS files to support SPTrans analysis and insights"
+    }
+}
+
