@@ -14,6 +14,15 @@
         "login": "andre.moreira.engineer",
         "password": "T3st3@p1",
         "description": "Used to download GTFS files to support SPTrans analysis and insights"
-    }
+    },
+    "postgres_conn": {
+        "conn_type": "postgres",
+        "host": "postgres",
+        "port": 5432,
+        "schema": "sptrans_insights",
+        "login": "postgres",
+        "password": "postgres",
+        "extra": "{\"sslmode\": \"prefer\"}"
+    }    
 }
 

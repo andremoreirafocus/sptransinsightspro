@@ -18,5 +18,12 @@
         "raw_data_compression": "true",
         "raw_data_compression_extension": ".zst",
         "description": "Configuration for transforming live data, including bucket names and table names."
+    },
+    "updatelatestpositions": {
+        "trusted_bucket": "trusted",
+        "app_folder": "sptrans",
+        "positions_table_name": "positions",
+        "latest_positions_table_name": "refined.latest_positions",
+        "description": "Configuration for updating latest positions, including bucket names and table names."
     }
 }
