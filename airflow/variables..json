@@ -25,5 +25,14 @@
         "positions_table_name": "positions",
         "latest_positions_table_name": "refined.latest_positions",
         "description": "Configuration for updating latest positions, including bucket names and table names."
+    },
+    "refinedfinishedtrips": {
+        "analysis_hours_window": 3,
+        "trusted_bucket": "trusted",
+        "app_folder": "sptrans",
+        "positions_table_name": "positions",
+        "finished_trips_table_name": "refined.finished_trips",
+        "description": "Configuration for updating latest positions, including bucket names and table names."
     }
+
 }
