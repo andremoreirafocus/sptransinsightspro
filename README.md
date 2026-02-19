@@ -12,10 +12,12 @@ Para implementar a solução foram adotados os componentes:
     - DAG gtfs: processo composto de 3 etapas principais.   
         - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS e salva na camada raw. 
         - transformação: cria tabelas na camada trusted, a partir dos dados brutos extraído do GTFS da SPTRANS e armazenados na camada raw
-        - criação de uma tabela de dados de viagens, a partir dos dados das diversas tabelas GTFS, utilizada para enriquecer os dados de posição extraídos da API SPTrans. ![Para mais informações:](./dags-dev/gtfs/README.md)
+        - criação de uma tabela de dados de viagens, a partir dos dados das diversas tabelas GTFS, utilizada para enriquecer os dados de posição extraídos da API SPTrans. 
+        - Esta DAG envia um sinal ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens seja iniciada automaticamente.
+        ![Para mais informações:](./dags-dev/gtfs/README.md)
     - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. ![Para mais informações:](./dags-dev/transformlivedata/README.md)
     - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
-    - DAG refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
+    - DAG refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
     - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
 - extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na exeução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)

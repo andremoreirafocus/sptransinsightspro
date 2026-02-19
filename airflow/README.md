@@ -3,6 +3,7 @@ Neste projeto estão contemplados os seguintes fluxos de acordo com o nome das p
 - transformdatatotrusted: transforma conjunto de posicoes de onibus correspondente ao endpoint GET /posicoes, gerando, para cada veiculo, um registro na tabela trusted.positions com sua posicao e metadados enriquecidos com o conteúdo da tabela trusted.trip_details
 - refinedfinishedtrips: identifica viagens dos veiculos nas ultimas horas baseado na sequencia temporal de posicoes de cada veiculo armazenada em trusted.positions
 - updatelatestpositions: captura a última posição de cada veículo a partir do timestamp de extração do dado e salva na tabela refined.latest_positions
+- refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso.
 
 
 ## Inicializndo o Ambiente
