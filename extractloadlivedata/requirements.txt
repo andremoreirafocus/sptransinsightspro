@@ -1,3 +1,4 @@
+APScheduler==3.11.2
 argon2-cffi==25.1.0
 argon2-cffi-bindings==25.1.0
 certifi==2026.1.4
@@ -11,5 +12,6 @@ pycryptodome==3.23.0
 python-dotenv==1.2.1
 requests==2.32.5
 typing_extensions==4.15.0
+tzlocal==5.3.1
 urllib3==2.6.3
 zstandard==0.25.0

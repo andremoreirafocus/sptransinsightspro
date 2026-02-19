@@ -1,15 +1,8 @@
-from src.services.extract_buses_positions import (
-    extract_buses_positions_with_retries,
-    get_buses_positions_with_metadata,
-)
-from src.services.save_bus_positions import (
-    save_bus_positions_to_storage,
-    save_bus_positions_to_local_volume,
-)
-
-from src.infra.timing_functions import adjust_start_time, interval_adjustment_needed
+from src.extractloadlivedata import extractloadlivedata
 from src.config import get_config
-import time
+from apscheduler.schedulers.blocking import BlockingScheduler
+from datetime import datetime
+
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -25,33 +18,69 @@ logging.basicConfig(
         logging.StreamHandler(),  # Also keeps console output
     ],
 )
+logger = logging.getLogger(__name__)
+
+
+def run_extractloadlivedata_task():
+    logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Task executing...")
+    extractloadlivedata()
+    logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Task executed!")
+
+
+def get_scheduling_config():
+    config = get_config()
+    interval = int(config["EXTRACTION_INTERVAL_SECONDS"])
+    if interval <= 0:
+        logger.error("EXTRACTION_INTERVAL_SECONDS must be a positive integer.")
+        raise ValueError("EXTRACTION_INTERVAL_SECONDS must be a positive integer.")
+
+    if interval > 60:
+        # 'cron' with minute='*/2' ensures it runs at :00, :02, :04...
+        # 'second=0' ensures it starts exactly at the start of the minute
+        minutes = interval // 60
+        seconds = 0
+        minutes_schedule = f"*/{minutes}"
+        seconds_schedule = 0
+        grace_time = 10
+        logger.info(
+            f"EXTRACTION_INTERVAL_SECONDS translated and set to {minutes} minutes with a grace period of {grace_time} seconds."
+        )
+    else:
+        minutes = 0
+        seconds = interval
+        minutes_schedule = "*"
+        seconds_schedule = f"*/{interval}"
+        grace_time = 5
+        logger.warning(
+            f"EXTRACTION_INTERVAL_SECONDS set to {interval} seconds with a grace period of {grace_time} seconds."
+        )
+    return minutes_schedule, seconds_schedule, grace_time, minutes, seconds
 
 
 def main():
-    logger = logging.getLogger(__name__)
-    config = get_config()
-    INTERVAL = int(config["EXTRACTION_INTERVAL_SECONDS"])
-    adjust_start_time()
-    while True:
-        delta = interval_adjustment_needed()
-        previous_epoch_time = time.time()
-        buses_positions_payload = extract_buses_positions_with_retries(config)
-        download_successful = buses_positions_payload is not None
-        if download_successful:
-            buses_positions, _ = get_buses_positions_with_metadata(
-                buses_positions_payload
-            )
-            save_bus_positions_to_local_volume(config, buses_positions)
-            save_bus_positions_to_storage(config, buses_positions)
-        current_epoch_time = time.time()
-        duration = current_epoch_time - previous_epoch_time
-        interval = INTERVAL - duration + delta
-        if delta != 0:
-            logger.info(f"Calculated interval adjusted by {delta} seconds.")
+    minutes_schedule, seconds_schedule, grace_time, minutes, seconds = (
+        get_scheduling_config()
+    )
+    scheduler = BlockingScheduler()
+    scheduler.add_job(
+        run_extractloadlivedata_task,
+        trigger="cron",
+        minute=minutes_schedule,
+        second=seconds_schedule,
+        misfire_grace_time=grace_time,  # Allows a 30s window to start if the system was bogged down
+    )
+    if minutes == 0:
         logger.info(
-            f"[*] Waiting for {interval:.0f} seconds until next extraction due to duration {duration:.0f} second(s)...\n"
+            f"Scheduler configured to run every {seconds} seconds with a grace period of {grace_time} seconds."
         )
-        time.sleep(interval)
+    else:
+        logger.info(
+            f"Scheduler configured to run every {minutes} minutes with a grace period of {grace_time} seconds."
+        )
+    try:
+        scheduler.start()
+    except (KeyboardInterrupt, SystemExit):
+        pass
 
 
 if __name__ == "__main__":
