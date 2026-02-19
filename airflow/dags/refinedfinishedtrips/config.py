@@ -14,7 +14,7 @@ def get_config():
         # Pulling from local .env or hardcoded defaults for testing
         from dotenv import dotenv_values
 
-        return dotenv_values("updatelatestpositions/.env")
+        return dotenv_values("refinedfinishedtrips/.env")
 
 
 def get_airflow_config():
