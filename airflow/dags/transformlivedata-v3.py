@@ -51,7 +51,7 @@ def load_transform_save_positions(logical_date_string, **kwargs):
 with DAG(
     "transformlivedata-v3",
     default_args=default_args,
-    description="Load raw data from MinIO, process it, and store it in PG",
+    description="Load data from raw layer, process it, and store it in trusted layer",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
     catchup=False,
 ) as dag:

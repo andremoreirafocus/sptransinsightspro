@@ -33,6 +33,11 @@
         "positions_table_name": "positions",
         "finished_trips_table_name": "refined.finished_trips",
         "description": "Configuration for updating latest positions, including bucket names and table names."
+    },
+    "refinedsynctripdetails": {
+        "trusted_bucket": "trusted",
+        "gtfs_folder": "gtfs",
+        "trip_details_table_name": "refined.trip_details",
+        "description": "Configuration for syncing trip details to refined, including bucket names and table names."
     }
-
 }

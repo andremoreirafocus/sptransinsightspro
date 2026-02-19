@@ -30,7 +30,7 @@ def extract_trips():
 with DAG(
     "refinefinishedtrips-v2",
     default_args=default_args,
-    description="Load raw data from MinIO, process it, and store it in PG",
+    description="Calculate finished trips for all lines and vehicles",
     schedule_interval="*/15 * * * *",  # Use cron expression for every minute
     catchup=False,
 ) as dag:
