@@ -14,11 +14,11 @@ with DAG(
     start_date=datetime(2024, 1, 1),
     schedule_interval="@hourly",  # Runs every hour
     catchup=False,
-    tags=["refined", "maintenance"],
+    tags=["sptrans", "maintenance"],
 ) as dag:
     # Trigger pg_partman to create new partitions and drop old ones
     run_partman_maintenance = SQLExecuteQueryOperator(
-        task_id="run_pg_partman_maintenance",
+        task_id="maintrainfinishedtrips",
         conn_id="postgres_conn",
         sql="SELECT partman.run_maintenance('refined.finished_trips');",
         autocommit=True,

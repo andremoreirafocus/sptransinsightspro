@@ -64,6 +64,7 @@ with DAG(
     description="Dowload data from GTFS, process it, and store it in PG",
     schedule_interval="1 0 * * *",  # Use cron expression for every minute
     catchup=False,
+    tags=["sptrans"],
 ) as dag:
     extract_load_files_task = PythonOperator(
         task_id="extract_load_files", python_callable=extract_load_files

@@ -70,6 +70,7 @@ with DAG(
     description="Load raw data from MinIO, process it, and store it in PG",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
     catchup=False,
+
 ) as dag:
     load_from_raw_task = PythonOperator(
         task_id="load_positions_from_raw",

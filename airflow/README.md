@@ -4,6 +4,7 @@ Neste projeto estão contemplados os seguintes fluxos de acordo com o nome das p
 - refinedfinishedtrips: identifica viagens dos veiculos nas ultimas horas baseado na sequencia temporal de posicoes de cada veiculo armazenada em trusted.positions
 - updatelatestpositions: captura a última posição de cada veículo a partir do timestamp de extração do dado e salva na tabela refined.latest_positions
 - refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso.
+- maintainfinishedtrips: processo de limpeza automática das partições antigas da tabela de viagens finalizadas, executada por intermédio do SQLExecuteQueryOperator do Airflow
 
 
 ## Inicializndo o Ambiente

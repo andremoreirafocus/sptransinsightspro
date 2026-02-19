@@ -54,6 +54,7 @@ with DAG(
     description="Load data from raw layer, process it, and store it in trusted layer",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
     catchup=False,
+    tags=["sptrans"],
 ) as dag:
     load_transform_save_positions_task = PythonOperator(
         task_id="transform_positions",

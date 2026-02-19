@@ -30,6 +30,7 @@ with DAG(
     description="Load latest positions to refined.latest_positions table",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
     catchup=False,
+    tags=["sptrans"],
 ) as dag:
     update_latest_positions_task = PythonOperator(
         task_id="update_to_db",

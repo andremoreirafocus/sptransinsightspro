@@ -33,6 +33,7 @@ with DAG(
     description="Calculate finished trips for all lines and vehicles",
     schedule_interval="*/15 * * * *",  # Use cron expression for every minute
     catchup=False,
+    tags=["sptrans"],
 ) as dag:
     extract_trips_task = PythonOperator(
         task_id="extract_trips", python_callable=extract_trips

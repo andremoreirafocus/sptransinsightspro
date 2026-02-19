@@ -86,7 +86,7 @@ ON refined.finished_trips (trip_id, vehicle_id);
 Com particonamemto:
 
 
-No container postgres
+No container postgres para instalar a extensão partman
 ```shell
 apt-get update && apt-get install -y \
     postgresql-16-partman \

@@ -38,6 +38,7 @@ with DAG(
     default_args=default_args,
     schedule=[TRIP_DATA_SIGNAL],
     catchup=False,
+    tags=["sptrans"],
 ) as dag:
     refined_sync_trip_details_task = PythonOperator(
         task_id="refined_sync_trip_details", python_callable=refined_sync_trip_details
