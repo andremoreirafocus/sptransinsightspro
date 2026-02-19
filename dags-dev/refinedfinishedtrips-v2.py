@@ -10,7 +10,8 @@ LOG_FILENAME = "refinedfinishedtrips.log"
 
 # In Airflow just remove this logging configuration block
 logging.basicConfig(
-    level=logging.DEBUG,
+    # level=logging.DEBUG,
+    level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         # Rotation: 5MB per file, keeping the last 5 files

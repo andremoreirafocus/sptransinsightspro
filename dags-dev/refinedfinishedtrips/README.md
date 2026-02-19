@@ -83,18 +83,61 @@ ON refined.finished_trips (trip_id, vehicle_id);
 
 ```
 
-#Deprecated table creation command
+Com particonamemto:
+
+
+No container postgres
+```shell
+apt-get update && apt-get install -y \
+    postgresql-16-partman \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+```sql
+CREATE SCHEMA partman;
+CREATE EXTENSION pg_partman SCHEMA partman;
 CREATE TABLE refined.finished_trips (
-    id BIGSERIAL PRIMARY KEY,
     trip_id TEXT,
     vehicle_id INTEGER,
-    trip_start_time TIMESTAMPTZ,
+    trip_start_time TIMESTAMPTZ NOT NULL,
     trip_end_time TIMESTAMPTZ,
     duration INTERVAL,
     is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION
+    average_speed DOUBLE PRECISION,
+    PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
+) PARTITION BY RANGE (trip_start_time);
+
+-- 2. Initialize partitioning
+-- This creates the first few partitions based on the current time
+SELECT partman.create_parent(
+    p_parent_table := 'refined.finished_trips',
+    p_control := 'trip_start_time',
+    p_interval := '1 hour',
+    p_premake := 4
 );
 
+-- 3. Set the 24-hour "Automatic Purge" policy
+UPDATE partman.part_config 
+SET retention = '24 hours', 
+    retention_keep_table = 'f' 
+WHERE parent_table = 'refined.finished_trips';
+
+-- This will create future partitions and check if any are > 24h old to drop
+SELECT partman.run_maintenance('refined.finished_trips');
+
+-- to verify
+SELECT 
+    parent_table, 
+    control, 
+    partition_interval, 
+    retention,
+    automatic_maintenance
+FROM partman.part_config
+WHERE parent_table = 'refined.finished_trips';
+
+-- To check existing partitions
+SELECT * FROM partman.show_partitions('refined.finished_trips');
+```
 
 #Tabela usada apenas em testes de algoritmo experimental
 ```sql

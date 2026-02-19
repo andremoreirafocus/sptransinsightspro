@@ -1,5 +1,6 @@
 from infra.duck_db import get_duckdb_connection
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -20,9 +21,11 @@ def get_recent_positions(config):
 
     hours_interval, bucket_name, app_folder, positions_table_name = get_config(config)
     logger.info(
-        "Bulk loading last {hours_interval} hours of positions for all vehicles..."
+        f"Bulk loading last {hours_interval} hours of positions for all vehicles..."
     )
-    now = datetime.now(timezone.utc)
+    # now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
+
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")
