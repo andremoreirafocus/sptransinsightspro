@@ -1,6 +1,7 @@
 from src.infra.storage import save_data_to_json_file
 from src.infra.minio_functions import write_generic_bytes_to_minio
 from src.infra.compression import compress_data
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
@@ -27,6 +28,45 @@ def save_bus_positions_to_local_volume(config, data):
     )
 
 
+def save_bus_positions_to_storage_with_retries(config, data):
+    def get_config(config):
+        # Usamos uma chave específica para retries de storage, 
+        # ou reaproveitamos a da API conforme sua preferência
+        storage_max_retries = int(config.get("STORAGE_MAX_RETRIES", 5))
+        return storage_max_retries
+
+    storage_max_retries = get_config(config)
+
+    retries = 0
+    back_off = 1
+    save_successful = False
+
+    while not save_successful:
+        try:
+            save_bus_positions_to_storage(config, data)
+            save_successful = True
+            
+            if retries > 0:
+                logger.info(f"Storage save successful after {retries} retries.")
+            return True
+
+        except Exception as e:
+            retries += 1
+            if retries >= storage_max_retries:
+                logger.error(
+                    f"Max retries reached for Storage. Persistence failed. "
+                    f"Error: {e}"
+                )
+                # Aqui você decide se levanta a exceção ou apenas retorna False
+                return False
+
+            logger.warning(
+                f"Storage save failed! Retrying in {back_off} seconds... Error: {e}"
+            )
+            time.sleep(back_off)
+            back_off *= 2
+
+    return False
 def save_bus_positions_to_storage(config, data):
     def get_config(config):
         compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
