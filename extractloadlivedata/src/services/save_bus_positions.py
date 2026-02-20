@@ -5,10 +5,24 @@ import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import json
+import os
+import glob
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+
+
+def get_file_name_from_data(data):
+    iso_timestamp_str = data.get("metadata").get("extracted_at")
+    dt_utc = datetime.fromisoformat(iso_timestamp_str)
+    dt_object = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+    year = dt_object.year
+    month = f"{dt_object.month:02d}"
+    day = f"{dt_object.day:02d}"
+    hour_minute, _, _ = get_payload_summary(data)
+    filename = f"posicoes_onibus-{year}{month}{day}{hour_minute}.json"
+    return filename
 
 
 def save_bus_positions_to_local_volume(config, data):
@@ -18,19 +32,60 @@ def save_bus_positions_to_local_volume(config, data):
         return ingest_buffer_folder, compression
 
     ingest_buffer_folder, compression = get_config(config)
-    hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
+    filename = get_file_name_from_data(data)
     save_data_to_json_file(
         data_json,
         ingest_buffer_folder,
-        f"buses_positions_{hour_minute}.json",
+        filename,
         compression,
     )
 
 
+def remove_local_file(config, data):
+    def get_config(config):
+        ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
+        return ingest_buffer_folder
+
+    ingest_buffer_folder = get_config(config)
+    filename = f"{ingest_buffer_folder}/{get_file_name_from_data(data)}*"
+    logging.info(
+        f"Attempting to remove local file(s) matching '{filename}' from '{ingest_buffer_folder}'"
+    )
+    matching_files = glob.glob(filename)
+    logger.debug(f"Matching files found: {matching_files}")
+    if not matching_files:
+        logger.error(f"No matching local file found for '{filename}' to remove.")
+        return
+    if len(matching_files) > 1:
+        logger.warning(
+            f"Multiple matching local files found for '{filename}'. Attempting to remove all matches."
+        )
+    for file in matching_files:
+        file_path = f"{ingest_buffer_folder}/{file}"
+        try:
+            os.remove(file_path)
+            logger.info(f"Local file '{file_path}' removed successfully.")
+        except Exception as e:
+            logger.error(f"Error removing local file '{file_path}': {e}")
+
+
+def get_pending_storage_save_list(config):
+    def get_config(config):
+        ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
+        return ingest_buffer_folder
+
+    ingest_buffer_folder = get_config(config)
+    pending_files = []
+    for file in os.listdir(ingest_buffer_folder):
+        if file.startswith("posicoes_onibus"):
+            pending_files.append(file)
+    return pending_files
+
+
 def save_bus_positions_to_storage_with_retries(config, data):
     def get_config(config):
-        # Usamos uma chave específica para retries de storage, 
+        # Usamos uma chave específica para retries de storage,
         # ou reaproveitamos a da API conforme sua preferência
         storage_max_retries = int(config.get("STORAGE_MAX_RETRIES", 5))
         return storage_max_retries
@@ -40,33 +95,29 @@ def save_bus_positions_to_storage_with_retries(config, data):
     retries = 0
     back_off = 1
     save_successful = False
-
     while not save_successful:
         try:
             save_bus_positions_to_storage(config, data)
             save_successful = True
-            
             if retries > 0:
                 logger.info(f"Storage save successful after {retries} retries.")
             return True
-
         except Exception as e:
             retries += 1
             if retries >= storage_max_retries:
                 logger.error(
-                    f"Max retries reached for Storage. Persistence failed. "
-                    f"Error: {e}"
+                    f"Max retries reached for Storage. Persistence failed. Error: {e}"
                 )
                 # Aqui você decide se levanta a exceção ou apenas retorna False
                 return False
-
             logger.warning(
                 f"Storage save failed! Retrying in {back_off} seconds... Error: {e}"
             )
             time.sleep(back_off)
             back_off *= 2
-
     return False
+
+
 def save_bus_positions_to_storage(config, data):
     def get_config(config):
         compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
@@ -158,6 +209,9 @@ def save_data_to_raw_object_storage(config, data, hour_minute, compression=False
         destination_object_name = (
             f"{prefix}{base_file_name}-{year}{month}{day}{hour_minute}.json"
         )
+        logger.info(
+            f"Saving data to storage with object name: {destination_object_name}"
+        )
         try:
             if compression:
                 logger.info("Compressing data with zstd...")
@@ -178,5 +232,6 @@ def save_data_to_raw_object_storage(config, data, hour_minute, compression=False
                 f"'{raw_bucket_name}' with object name '{destination_object_name}'."
             )
             logger.error(f"Exception details: {e}")
+            raise ValueError("Data structure is invalid.")
     else:
         logger.error("No records found to write to the destination bucket.")
