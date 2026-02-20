@@ -8,6 +8,7 @@ A implementação final é feita via um microserviço que é executado via um co
 - salva este objeto em uma pasta em um volume local
 - salva este mesmo objeto em uma pasta no Minio
 - caso a compressão seja habilitada salva os arquivos json comprimidos no formato Zstandard
+- caso o object storage esteja indisponível, o arquivo salvo localmente é mantido até que o serviço de storage esteja disponível e então o arquivo local seja removido
 
 
 ## Pré-requisitos
@@ -18,6 +19,8 @@ A implementação final é feita via um microserviço que é executado via um co
 API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
 TOKEN =  <insira o token de acesso à API, obtido após cadastro no site da SPTrans>
 EXTRACTION_INTERVAL_SECONDS = 120  # intervalo entre extrações subsequentes dos dados de posição de omibus em segundos 
+API_MAX_RETRIES = 4   # numero de retries do get na api com backoff exponencial 
+STORAGE_MAX_RETRIES = 0 # numero de retries da escrita no object storage com backoff exponencial alem do que a bblioteca implementa
 MINIO_ENDPOINT="localhost:9000"
 ACCESS_KEY="datalake"
 SECRET_KEY="datalake"

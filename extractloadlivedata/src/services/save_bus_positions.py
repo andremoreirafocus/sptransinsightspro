@@ -62,7 +62,8 @@ def remove_local_file(config, data):
             f"Multiple matching local files found for '{filename}'. Attempting to remove all matches."
         )
     for file in matching_files:
-        file_path = f"{ingest_buffer_folder}/{file}"
+        # file_path = f"{ingest_buffer_folder}/{file}"
+        file_path = file
         try:
             os.remove(file_path)
             logger.info(f"Local file '{file_path}' removed successfully.")
