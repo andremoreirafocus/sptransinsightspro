@@ -60,42 +60,22 @@ CREATE DATABASE sptrans_insights;
 
 \c sptrans_insights
 
-```sql
-CREATE SCHEMA refined;
 
-CREATE TABLE refined.finished_trips (
-    trip_id TEXT,             -- e.g., '101A_0'
-    vehicle_id INTEGER,       -- e.g., 505
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
-    -- This combination is guaranteed unique by your bus logic
-    PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
-);
 
--- Optimized Search Index for PowerBI
--- This supports searching for a specific route/direction 
--- and narrowing it down by bus.
-CREATE INDEX idx_trip_lookup 
-ON refined.finished_trips (trip_id, vehicle_id);
 
-```
+
 
 Com particonamemto:
 
 
-No container postgres para instalar a extensão partman
-```shell
-apt-get update && apt-get install -y \
-    postgresql-16-partman \
-    && rm -rf /var/lib/apt/lists/*
-```
-
 ```sql
 CREATE SCHEMA partman;
 CREATE EXTENSION pg_partman SCHEMA partman;
+
+CREATE SCHEMA refined;
+
+
+
 CREATE TABLE refined.finished_trips (
     trip_id TEXT,
     vehicle_id INTEGER,
@@ -121,6 +101,12 @@ UPDATE partman.part_config
 SET retention = '24 hours', 
     retention_keep_table = 'f' 
 WHERE parent_table = 'refined.finished_trips';
+
+-- Optimized Search Index for PowerBI
+-- This supports searching for a specific route/direction 
+-- and narrowing it down by bus.
+CREATE INDEX idx_trip_lookup 
+ON refined.finished_trips (trip_id, vehicle_id);
 
 -- This will create future partitions and check if any are > 24h old to drop
 SELECT partman.run_maintenance('refined.finished_trips');
@@ -153,6 +139,21 @@ JOIN pg_namespace nmsp_parent ON nmsp_parent.oid = parent.relnamespace
 WHERE parent.relname = 'finished_trips'
 ORDER BY child.relname DESC;
 ```
+
+Deprecated
+CREATE TABLE refined.finished_trips (
+    trip_id TEXT,             -- e.g., '101A_0'
+    vehicle_id INTEGER,       -- e.g., 505
+    trip_start_time TIMESTAMPTZ,
+    trip_end_time TIMESTAMPTZ,
+    duration INTERVAL,
+    is_circular BOOLEAN,
+    average_speed DOUBLE PRECISION,
+    -- This combination is guaranteed unique by your bus logic
+    PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
+);
+
+
 
 #Tabela usada apenas em testes de algoritmo experimental
 ```sql
