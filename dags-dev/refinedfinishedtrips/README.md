@@ -137,6 +137,21 @@ WHERE parent_table = 'refined.finished_trips';
 
 -- To check existing partitions
 SELECT * FROM partman.show_partitions('refined.finished_trips');
+
+
+-- to check partitions usage
+SELECT 
+    nmsp_parent.nspname AS parent_schema,
+    parent.relname AS parent_table,
+    child.relname AS partition_name,
+    pg_size_pretty(pg_total_relation_size(child.oid)) AS total_size,
+    child.reltuples::bigint AS estimated_row_count
+FROM pg_inherits
+JOIN pg_class parent ON pg_inherits.inhparent = parent.oid
+JOIN pg_class child ON pg_inherits.inhrelid = child.oid
+JOIN pg_namespace nmsp_parent ON nmsp_parent.oid = parent.relnamespace
+WHERE parent.relname = 'finished_trips'
+ORDER BY child.relname DESC;
 ```
 
 #Tabela usada apenas em testes de algoritmo experimental

@@ -17,9 +17,9 @@ services:
     command: server --console-address ":9001" /data
     networks:
        rede_fia:  
-  webserver:
+  airflow_webserver:
       image: apache/airflow:2.7.2-python3.11
-      container_name: webserver
+      container_name: airflow_webserver
       restart: always
       environment:
         AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -41,10 +41,10 @@ services:
       command: >
         bash -c "pip install -r /requirements.txt && airflow db init && airflow webserver"
 
-  scheduler:
+  airflow_scheduler:
     image: apache/airflow:2.7.2-python3.11
     restart: always
-    container_name: scheduler
+    container_name: airflow_scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
@@ -77,17 +77,20 @@ services:
       - rede_fia
 
   postgres:
-    image: postgres:16
+    build:
+      context: ./postgres
+      dockerfile: Dockerfile
     container_name: postgres
     ports:
-     - 5532:5432
+      - 5532:5432
     environment:
-     - POSTGRES_USER=postgres
-     - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    command: postgres -c shared_preload_libraries='pg_partman_bgw'
     networks:
-      rede_fia:
+      - rede_fia
 
   extractloadlivedata:
     build:
