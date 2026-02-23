@@ -9,6 +9,10 @@ from src.services.save_bus_positions import (
     remove_local_file,
     get_pending_storage_save_list,
 )
+from src.services.trigger_airflow import (
+    create_pending_invokation,
+    trigger_pending_invokations,
+)
 from src.infra.compression import decompress_data
 from src.config import get_config
 import json
@@ -31,35 +35,37 @@ def extractloadlivedata():
         logger.warning(
             f"There are {len(pending_storage_save_list)} pending files to be saved to storage: {pending_storage_save_list}"
         )
-        for pending_file in pending_storage_save_list:
-            logger.info(f"Attempting to save pending file '{pending_file}' to storage.")
-            pending_file_path = f"{ingest_buffer_folder}/{pending_file}"
-            if pending_file.split(".")[-1] != "json":
-                logger.info(f"Pending file '{pending_file}' is compressed.")
+        for pending_storage_save_file in pending_storage_save_list:
+            logger.info(f"Attempting to save pending file '{pending_storage_save_file}' to storage.")
+            pending_storage_save_file_path = f"{ingest_buffer_folder}/{pending_storage_save_file}"
+            if pending_storage_save_file.split(".")[-1] != "json":
+                logger.info(f"Pending file '{pending_storage_save_file}' is compressed.")
                 file_is_compressed = True
             else:
                 file_is_compressed = False
             save_on_storage_failure = False
             try:
                 if file_is_compressed:
-                    with open(pending_file_path, "rb") as f:
+                    with open(pending_storage_save_file_path, "rb") as f:
                         pending_data = f.read()
                         pending_data = json.loads(decompress_data(pending_data))
                 else:
-                    with open(pending_file_path, "r") as f:
+                    with open(pending_storage_save_file_path, "r") as f:
                         pending_data_json = f.read()
                         pending_data = json.loads(pending_data_json)
                 if save_bus_positions_to_storage_with_retries(config, pending_data):
                     remove_local_file(config, pending_data)
+                    create_pending_invokation(pending_storage_save_file)
                 else:
                     logger.error(
-                        f"Failed to save pending file '{pending_file}' to storage after retries."
+                        f"Failed to save pending file '{pending_storage_save_file}' to storage after retries."
                     )
                     save_on_storage_failure = True
                     break
             except Exception as e:
-                logger.error(f"Error processing pending file '{pending_file}': {e}")
+                logger.error(f"Error processing pending file '{pending_storage_save_file}': {e}")
         if save_on_storage_failure:
             logger.error(
                 "One or more pending files failed to save to storage. Waiting for the next execution to retry."
             )
+        trigger_pending_invokations()

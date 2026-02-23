@@ -26,11 +26,15 @@ default_args = {
 }
 
 
-def load_transform_save_positions(logical_date_string, **kwargs):
+# def load_transform_save_positions(logical_date_string, **kwargs):
+def load_transform_save_positions(**context):
+    # logical_date = context["logical_date"]
+    logical_date = context["dag_run"].logical_date
+    print("logical_date:", logical_date)
     config = get_config()
-    dt_utc = datetime.fromisoformat(logical_date_string)
-    print("logical_date_string:", logical_date_string)
-    dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+    # dt = logical_date.in_timezone("America/Sao_Paulo")
+    # dt = logical_date.astimezone(ZoneInfo("America/Sao_Paulo"))
+    dt = logical_date
     year = dt.strftime("%Y")
     month = dt.strftime("%m")
     day = dt.strftime("%d")
@@ -50,17 +54,17 @@ def load_transform_save_positions(logical_date_string, **kwargs):
 
 # Criando o DAG
 with DAG(
-    "transformlivedata-v3",
+    "transformlivedata-v5",
     default_args=default_args,
     description="Load data from raw layer, process it, and store it in trusted layer",
-    schedule_interval="*/2 * * * *",  # Use cron expression for every minute
+    schedule=None,
     catchup=False,
     tags=["sptrans"],
 ) as dag:
     load_transform_save_positions_task = PythonOperator(
         task_id="transform_positions",
         python_callable=load_transform_save_positions,
-        op_kwargs={"logical_date_string": "{{ ts }}"},
+        # op_kwargs={"logical_date_string": "{{ ts }}"},
     )
 
     load_transform_save_positions_task
