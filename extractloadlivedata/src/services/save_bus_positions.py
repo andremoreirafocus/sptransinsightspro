@@ -22,7 +22,8 @@ def get_file_name_from_data(data):
     day = f"{dt_object.day:02d}"
     hour_minute, _, _ = get_payload_summary(data)
     filename = f"posicoes_onibus-{year}{month}{day}{hour_minute}.json"
-    return filename
+    partition = f"year={year}/month={month}/day={day}/"
+    return filename, partition
 
 
 def save_bus_positions_to_local_volume(config, data):
@@ -33,7 +34,7 @@ def save_bus_positions_to_local_volume(config, data):
 
     ingest_buffer_folder, compression = get_config(config)
     data_json = json.dumps(data)
-    filename = get_file_name_from_data(data)
+    filename, _ = get_file_name_from_data(data)
     save_data_to_json_file(
         data_json,
         ingest_buffer_folder,
@@ -48,7 +49,8 @@ def remove_local_file(config, data):
         return ingest_buffer_folder
 
     ingest_buffer_folder = get_config(config)
-    filename = f"{ingest_buffer_folder}/{get_file_name_from_data(data)}*"
+    filename_without_path, _ = get_file_name_from_data(data)
+    filename = f"{ingest_buffer_folder}/{filename_without_path}*"
     logging.info(
         f"Attempting to remove local file(s) matching '{filename}' from '{ingest_buffer_folder}'"
     )
@@ -197,19 +199,12 @@ def save_data_to_raw_object_storage(config, data, hour_minute, compression=False
         }
         return raw_bucket_name, app_folder, connection_data
 
+    logger.info("Preparing to save data to storage...")
     raw_bucket_name, app_folder, connection_data = get_config(config)
-    iso_timestamp_str = json.loads(data).get("metadata").get("extracted_at")
-    dt_utc = datetime.fromisoformat(iso_timestamp_str)
-    dt_object = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
-    year = dt_object.year
-    month = f"{dt_object.month:02d}"
-    day = f"{dt_object.day:02d}"
     if data:
-        prefix = f"{app_folder}/year={year}/month={month}/day={day}/"
-        base_file_name = "posicoes_onibus"
-        destination_object_name = (
-            f"{prefix}{base_file_name}-{year}{month}{day}{hour_minute}.json"
-        )
+        filename, partition = get_file_name_from_data(json.loads(data))
+        prefix = f"{app_folder}/{partition}"
+        destination_object_name = f"{prefix}{filename}"
         logger.info(
             f"Saving data to storage with object name: {destination_object_name}"
         )
