@@ -18,7 +18,7 @@ services:
     networks:
        rede_fia:  
   airflow_webserver:
-      image: apache/airflow:2.7.2-python3.11
+      image: apache/airflow:2.8.4-python3.11
       container_name: airflow_webserver
       restart: always
       environment:
@@ -37,13 +37,13 @@ services:
         - "8080:8080"
       depends_on:
         - postgres_airflow
-      networks:
-        - rede_fia
+      networks: 
+        - rede_fia  
       command: >
         bash -c "pip install -r /requirements.txt && airflow db init && airflow webserver"
 
   airflow_scheduler:
-    image: apache/airflow:2.7.2-python3.11
+    image: apache/airflow:2.8.4-python3.11
     restart: always
     container_name: airflow_scheduler
     environment:
