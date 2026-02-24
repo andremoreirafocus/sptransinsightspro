@@ -9,25 +9,31 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Diskcache directory for pending invocations
-CACHE_DIR = "../.diskcache_pending_invocations"
+# CACHE_DIR = "../.diskcache_pending_invocations"
 
 # Initialize the cache
 _cache = None
 
 
-def get_cache():
+def get_cache(config):
     """Get or initialize the diskcache instance."""
+
+    def get_config(config):
+        CACHE_DIR = config["INVOKATIONS_CACHE_DIR"]
+        return CACHE_DIR
+
     global _cache
+    CACHE_DIR = get_config(config)
     if _cache is None:
         os.makedirs(CACHE_DIR, exist_ok=True)
         _cache = dc.Cache(CACHE_DIR)
     return _cache
 
 
-def create_pending_invokation(filename):
+def create_pending_invokation(config, filename):
     """Add a pending invocation to the cache."""
     logger.info(f"Creating pending invokation for file '{filename}'")
-    cache = get_cache()
+    cache = get_cache(config)
 
     # Use filename as key, storing the filename as value
     marker_name = f"{filename.split('.')[0]}.pending"
@@ -38,10 +44,10 @@ def create_pending_invokation(filename):
     )
 
 
-def remove_pending_invokation(marker_name):
+def remove_pending_invokation(config, marker_name):
     """Remove a pending invocation from the cache."""
     logger.info(f"Removing pending invokation marker '{marker_name}'")
-    cache = get_cache()
+    cache = get_cache(config)
     if marker_name in cache:
         del cache[marker_name]
         logger.info(f"Pending invokation marker '{marker_name}' removed successfully.")
@@ -49,10 +55,10 @@ def remove_pending_invokation(marker_name):
         logger.warning(f"Pending invokation marker '{marker_name}' not found in cache.")
 
 
-def get_pending_invokations():
+def get_pending_invokations(config):
     """Retrieve all pending invocations from the cache."""
     logger.info("Checking for pending invokations...")
-    cache = get_cache()
+    cache = get_cache(config)
     pending_markers = sorted(list(cache))
     logger.info(f"Found {len(pending_markers)} pending invokation(s).")
     return pending_markers
@@ -60,18 +66,22 @@ def get_pending_invokations():
 
 def trigger_pending_airflow_dag_invokations(config):
     """Trigger all pending invocations and remove them if successful."""
-    pending_markers = get_pending_invokations()
+    pending_markers = get_pending_invokations(
+        config,
+    )
     if pending_markers:
         for pending_marker in pending_markers:
             print(f"Pending invokation found: {pending_marker}")
             print(f"Found {len(pending_markers)} pending invokation(s). Processing...")
             if trigger_airflow_dag_run(config, pending_marker):
-                remove_pending_invokation(pending_marker)
+                remove_pending_invokation(config, pending_marker)
     else:
         print("No pending invokations found.")
 
 
 def get_utc_logical_date_from_file(pending_marker):
+    current_timezone_name = datetime.now(ZoneInfo("localtime")).tzname()
+    logger.info(f"Current timezone: {current_timezone_name}")
     timestamp = pending_marker.split("-")[1].split(".")[0]
     year = timestamp[0:4]
     month = timestamp[4:6]
@@ -79,6 +89,7 @@ def get_utc_logical_date_from_file(pending_marker):
     hour = timestamp[8:10]
     minute = timestamp[10:12]
     dt_obj = datetime(int(year), int(month), int(day), int(hour), int(minute))
+    dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
     dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
     logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     return logical_date
@@ -98,7 +109,7 @@ def trigger_airflow_dag_run(config, pending_marker):
         auth = (
             user,
             password,
-        )  # Default Airflow credentials (should be secured in production)
+        )
 
         return airflow_url, auth
 

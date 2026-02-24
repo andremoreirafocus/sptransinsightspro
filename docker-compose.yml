@@ -102,6 +102,7 @@ services:
       - minio
     volumes:
       - ./ingest_buffer:/app/data/staging
+      - ./.diskcache_pending_invocations:/app/data/.diskcache_pending_invocations
     networks:
       - rede_fia
     restart: always
@@ -129,3 +130,5 @@ volumes:
   minio_storage: {}
   postgres_data: {}
   airflow_db_data: {}
+  ingest_buffer: {}
+  diskcache_pending_invocations: {}

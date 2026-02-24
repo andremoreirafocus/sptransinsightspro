@@ -60,7 +60,7 @@ def extractloadlivedata():
                         pending_data = json.loads(pending_data_json)
                 if save_bus_positions_to_storage_with_retries(config, pending_data):
                     remove_local_file(config, pending_data)
-                    create_pending_invokation(pending_storage_save_file)
+                    create_pending_invokation(config, pending_storage_save_file)
                 else:
                     logger.error(
                         f"Failed to save pending file '{pending_storage_save_file}' to storage after retries."
