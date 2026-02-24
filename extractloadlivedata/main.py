@@ -67,7 +67,7 @@ def main():
         trigger="cron",
         minute=minutes_schedule,
         second=seconds_schedule,
-        misfire_grace_time=grace_time,  # Allows a 30s window to start if the system was bogged down
+        misfire_grace_time=grace_time,  # Allows a time window to start if the system was bogged down
     )
     if minutes == 0:
         logger.info(

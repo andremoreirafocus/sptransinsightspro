@@ -3,7 +3,6 @@ from src.services.extract_buses_positions import (
     get_buses_positions_with_metadata,
 )
 from src.services.save_bus_positions import (
-    # save_bus_positions_to_storage,
     save_bus_positions_to_local_volume,
     save_bus_positions_to_storage_with_retries,
     remove_local_file,
@@ -11,7 +10,7 @@ from src.services.save_bus_positions import (
 )
 from src.services.trigger_airflow import (
     create_pending_invokation,
-    trigger_pending_invokations,
+    trigger_pending_airflow_dag_invokations,
 )
 from src.infra.compression import decompress_data
 from src.config import get_config
@@ -36,10 +35,16 @@ def extractloadlivedata():
             f"There are {len(pending_storage_save_list)} pending files to be saved to storage: {pending_storage_save_list}"
         )
         for pending_storage_save_file in pending_storage_save_list:
-            logger.info(f"Attempting to save pending file '{pending_storage_save_file}' to storage.")
-            pending_storage_save_file_path = f"{ingest_buffer_folder}/{pending_storage_save_file}"
+            logger.info(
+                f"Attempting to save pending file '{pending_storage_save_file}' to storage."
+            )
+            pending_storage_save_file_path = (
+                f"{ingest_buffer_folder}/{pending_storage_save_file}"
+            )
             if pending_storage_save_file.split(".")[-1] != "json":
-                logger.info(f"Pending file '{pending_storage_save_file}' is compressed.")
+                logger.info(
+                    f"Pending file '{pending_storage_save_file}' is compressed."
+                )
                 file_is_compressed = True
             else:
                 file_is_compressed = False
@@ -63,9 +68,11 @@ def extractloadlivedata():
                     save_on_storage_failure = True
                     break
             except Exception as e:
-                logger.error(f"Error processing pending file '{pending_storage_save_file}': {e}")
+                logger.error(
+                    f"Error processing pending file '{pending_storage_save_file}': {e}"
+                )
         if save_on_storage_failure:
             logger.error(
                 "One or more pending files failed to save to storage. Waiting for the next execution to retry."
             )
-        trigger_pending_invokations()
+        trigger_pending_airflow_dag_invokations(config)

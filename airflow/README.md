@@ -38,6 +38,20 @@ airflow connections import connections.json
 airflow variables import variables.json 
 ```
 
+Para criar usuário do extractloadlivedata que invoca DAGs
+```shell
+airflow roles create API_Trigger
+airflow roles add-perms API_Trigger -a can_read -r "DAG Runs"
+airflow roles add-perms API_Trigger -a can_create -r "DAG Runs"
+airflow users create \
+    --username ingest_service \
+    --firstname Ingest \
+    --lastname Service \
+    --role API_Trigger \
+    --email ingest@example.com \
+    --password ingest_password
+```
+
  ## Para acessar o Airflow:
  http://localhost:8080/
 

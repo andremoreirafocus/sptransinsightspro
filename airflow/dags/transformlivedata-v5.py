@@ -32,9 +32,7 @@ def load_transform_save_positions(**context):
     logical_date = context["dag_run"].logical_date
     print("logical_date:", logical_date)
     config = get_config()
-    # dt = logical_date.in_timezone("America/Sao_Paulo")
-    # dt = logical_date.astimezone(ZoneInfo("America/Sao_Paulo"))
-    dt = logical_date
+    dt = logical_date.astimezone(ZoneInfo("America/Sao_Paulo"))
     year = dt.strftime("%Y")
     month = dt.strftime("%m")
     day = dt.strftime("%d")
@@ -59,6 +57,7 @@ with DAG(
     description="Load data from raw layer, process it, and store it in trusted layer",
     schedule=None,
     catchup=False,
+    max_active_runs=1,
     tags=["sptrans"],
 ) as dag:
     load_transform_save_positions_task = PythonOperator(

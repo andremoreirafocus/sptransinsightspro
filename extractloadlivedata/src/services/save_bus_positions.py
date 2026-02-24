@@ -15,8 +15,18 @@ logger = logging.getLogger(__name__)
 
 def get_file_name_from_data(data):
     iso_timestamp_str = data.get("metadata").get("extracted_at")
-    dt_utc = datetime.fromisoformat(iso_timestamp_str)
-    dt_object = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+
+    # Parse the timestamp
+    dt = datetime.fromisoformat(iso_timestamp_str)
+
+    # If naive (no timezone), assume UTC and make it aware
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=ZoneInfo("UTC"))
+        # Update metadata with timezone-aware ISO string for Airflow
+        data["metadata"]["extracted_at"] = dt.isoformat()
+
+    # Convert to São Paulo time for filename/partition
+    dt_object = dt.astimezone(ZoneInfo("America/Sao_Paulo"))
     year = dt_object.year
     month = f"{dt_object.month:02d}"
     day = f"{dt_object.day:02d}"

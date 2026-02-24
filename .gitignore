@@ -1,4 +1,5 @@
 # sptrans files
+cache.db*
 gtfs_files
 live_data_files
 ingest_buffer
