@@ -1,131 +1,16 @@
-from sqlalchemy import (
-    create_engine,
-    Column,
-    BigInteger,
-    String,
-    Boolean,
-    DateTime,
-)
-from sqlalchemy.orm import declarative_base, sessionmaker
-from sqlalchemy.exc import SQLAlchemyError
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import diskcache as dc
 import os
 import logging
 
+from src.infra.sql_db import save_row
+
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
-# Global engine and session factory
-_engine = None
-_SessionLocal = None
-
 # Global cache for pending processing requests
 _processing_requests_cache = None
-
-# Base class for declarative models
-Base = declarative_base()
-
-
-class ProcessingRequest(Base):
-    """Model for storing processing requests in the database."""
-
-    __tablename__ = "raw"
-    __table_args__ = {"schema": "to_be_processed"}
-
-    id = Column(BigInteger, primary_key=True, autoincrement=True)
-    filename = Column(String(255), nullable=False)
-    logical_date = Column(DateTime(timezone=True), nullable=False)
-    processed = Column(Boolean, default=False, nullable=False)
-    created_at = Column(DateTime(timezone=True), nullable=False)
-    updated_at = Column(DateTime(timezone=True), nullable=False)
-
-    @classmethod
-    def initialize_from_config(cls, config):
-        """
-        Initialize the model with schema and table name from config.
-        This must be called before using the model.
-
-        Args:
-            config: Configuration dictionary with RAW_EVENTS_TABLE_NAME
-
-        Raises:
-            KeyError: If RAW_EVENTS_TABLE_NAME is not set in config
-            ValueError: If RAW_EVENTS_TABLE_NAME is not in 'schema.table' format
-        """
-        if "RAW_EVENTS_TABLE_NAME" not in config:
-            raise KeyError(
-                "RAW_EVENTS_TABLE_NAME configuration is missing. "
-                "Please set RAW_EVENTS_TABLE_NAME in .env file in format 'schema.table' "
-                "(e.g., 'to_be_processed.raw')"
-            )
-
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
-
-        # Parse 'schema.table' format
-        if "." not in raw_events_table:
-            raise ValueError(
-                f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. "
-                f"Got: '{raw_events_table}'"
-            )
-
-        schema, tablename = raw_events_table.split(".", 1)
-
-        # Update the model class attributes dynamically
-        cls.__tablename__ = tablename
-        cls.__table_args__ = {"schema": schema}
-
-        logger.info(
-            f"ProcessingRequest model initialized with schema='{schema}', table='{tablename}'"
-        )
-
-
-def get_config(config):
-    """Extract database configuration from config object following trigger_airflow pattern."""
-    db_host = config["DB_HOST"]
-    db_port = config["DB_PORT"]
-    db_database = config["DB_DATABASE"]
-    db_user = config["DB_USER"]
-    db_password = config["DB_PASSWORD"]
-    db_sslmode = config["DB_SSLMODE"]
-
-    # Build connection string
-    database_url = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_database}?sslmode={db_sslmode}"
-
-    return database_url
-
-
-def get_engine(config):
-    """Get or initialize the database engine."""
-    global _engine
-    if _engine is None:
-        # Initialize model with config values before creating engine
-        ProcessingRequest.initialize_from_config(config)
-        database_url = get_config(config)
-        _engine = create_engine(database_url, echo=False)
-        logger.info("Database engine initialized successfully.")
-    return _engine
-
-
-def get_session(config):
-    """Get a new database session."""
-    global _SessionLocal
-    if _SessionLocal is None:
-        engine = get_engine(config)
-        _SessionLocal = sessionmaker(bind=engine)
-    return _SessionLocal()
-
-
-def create_tables(config):
-    """Create database tables if they don't exist."""
-    try:
-        engine = get_engine(config)
-        Base.metadata.create_all(engine)
-        logger.info("Database tables created successfully.")
-    except SQLAlchemyError as e:
-        logger.error(f"Error creating database tables: {e}", exc_info=True)
-        raise
 
 
 def get_processing_requests_cache(config):
@@ -227,9 +112,22 @@ def save_processing_request(config, pending_marker):
     Returns:
         bool: True if save was successful, False otherwise
     """
-    session = None
     try:
         logger.info(f"Saving processing request for marker '{pending_marker}'")
+
+        # Parse RAW_EVENTS_TABLE_NAME to get schema and table
+        if "RAW_EVENTS_TABLE_NAME" not in config:
+            logger.error("RAW_EVENTS_TABLE_NAME configuration is missing.")
+            return False
+
+        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        if "." not in raw_events_table:
+            logger.error(
+                f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
+            )
+            return False
+
+        schema, table = raw_events_table.split(".", 1)
 
         # Get logical date from filename
         logical_date = get_utc_logical_date_from_file(pending_marker)
@@ -237,44 +135,38 @@ def save_processing_request(config, pending_marker):
         # Get current UTC time for created_at and updated_at
         now_utc = datetime.now(timezone.utc)
 
-        # Create new processing request
-        processing_request = ProcessingRequest(
-            filename=pending_marker,
-            logical_date=logical_date,
-            processed=False,
-            created_at=now_utc,
-            updated_at=now_utc,
+        # Create tuple for the row: (filename, logical_date, processed, created_at, updated_at)
+        row_tuple = (
+            pending_marker,  # filename
+            logical_date,  # logical_date
+            False,  # processed (default: False)
+            now_utc,  # created_at
+            now_utc,  # updated_at
         )
 
-        # Save to database
-        session = get_session(config)
-        session.add(processing_request)
-        session.commit()
+        # Column names in the same order as row_tuple
+        columns = ["filename", "logical_date", "processed", "created_at", "updated_at"]
 
-        logger.info(
-            f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
-        )
-        return True
+        # Save to database using the generic function from sql_db module
+        success = save_row(config, schema, table, row_tuple, columns)
 
-    except SQLAlchemyError as e:
-        if session:
-            session.rollback()
-        logger.error(
-            f"Database error while saving processing request for marker '{pending_marker}': {e}",
-            exc_info=True,
-        )
-        return False
+        if success:
+            logger.info(
+                f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
+            )
+        else:
+            logger.error(
+                f"Failed to save processing request for marker '{pending_marker}'"
+            )
+
+        return success
+
     except Exception as e:
-        if session:
-            session.rollback()
         logger.error(
             f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
             exc_info=True,
         )
         return False
-    finally:
-        if session:
-            session.close()
 
 
 def trigger_pending_processing_requests(config):
