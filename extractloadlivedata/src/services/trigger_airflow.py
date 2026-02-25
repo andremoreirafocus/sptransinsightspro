@@ -82,6 +82,7 @@ def trigger_pending_airflow_dag_invokations(config):
 def get_utc_logical_date_from_file(pending_marker):
     current_timezone_name = datetime.now(ZoneInfo("localtime")).tzname()
     logger.info(f"Current timezone: {current_timezone_name}")
+    logger.info(f"pending_marker : {pending_marker}")
     timestamp = pending_marker.split("-")[1].split(".")[0]
     year = timestamp[0:4]
     month = timestamp[4:6]
@@ -89,8 +90,11 @@ def get_utc_logical_date_from_file(pending_marker):
     hour = timestamp[8:10]
     minute = timestamp[10:12]
     dt_obj = datetime(int(year), int(month), int(day), int(hour), int(minute))
+    print(dt_obj)
     dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+    print(dt_obj)
     dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
+    print(dt_utc)
     logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     return logical_date
 
@@ -147,3 +151,13 @@ def trigger_airflow_dag_run(config, pending_marker):
         )
         logger.error("Exception details:", e)
         return False
+
+def main():
+    
+    logical_date = get_utc_logical_date_from_file("posicoes_onibus-202602241926.json.zst")
+    print(
+        f"Logical_date: {logical_date}"
+    )
+
+if __name__ == "__main__":
+    main()

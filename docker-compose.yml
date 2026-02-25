@@ -23,7 +23,7 @@ services:
       restart: always
       environment:
         AIRFLOW__CORE__EXECUTOR: LocalExecutor
-        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
         AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
         AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
         AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
@@ -36,7 +36,7 @@ services:
       ports:
         - "8080:8080"
       depends_on:
-        - postgres_airflow
+        - airflow_postgres
       networks: 
         - rede_fia  
       command: >
@@ -48,7 +48,7 @@ services:
     container_name: airflow_scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@postgres_airflow/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
       AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
       AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
     volumes:
@@ -57,15 +57,15 @@ services:
       - ./airflow/connections.json:/opt/airflow/connections.json
       - ./airflow/variables.json:/opt/airflow/variables.json
     depends_on:
-      - postgres_airflow
+      - airflow_postgres
     networks:
       - rede_fia
     command: >
       bash -c "pip install -r /requirements.txt && airflow scheduler"
 
-  postgres_airflow:
+  airflow_postgres:
     image: postgres:13
-    container_name: postgres_airflow
+    container_name: airflow_postgres
     environment:
       POSTGRES_USER: airflow
       POSTGRES_PASSWORD: airflow

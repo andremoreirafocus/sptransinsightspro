@@ -2,6 +2,7 @@ from src.extractloadlivedata import extractloadlivedata
 from src.config import get_config
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
+import sys
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -80,9 +81,22 @@ def main():
     try:
         scheduler.start()
     except (KeyboardInterrupt, SystemExit):
-        pass
+        logger.info("Scheduler stopped by user.")
+        scheduler.shutdown()
+        logger.info("Scheduler shutdown complete.")
 
 
 if __name__ == "__main__":
-    main()
-    # run_extractloadlivedata_task()
+    if len(sys.argv) > 1:
+        if sys.argv[1] == "dev":
+            logger.info("Parameter detected. Running task directly...")
+            run_extractloadlivedata_task()
+        else:
+            logger.error("Invalid parameter. You have 2 ways of running:")
+            logger.error(
+                "1. Without parameters: Runs the scheduled task at the specified interval"
+            )
+            logger.error("2. With 'dev' parameter: Runs the task just once")
+            sys.exit(1)
+    else:
+        main()

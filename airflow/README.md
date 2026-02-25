@@ -12,7 +12,7 @@ Neste projeto estão contemplados os seguintes fluxos de acordo com o nome das p
 Para inicializar os serviços específicos do Airflow, utilize o comando:
 
 ```shell
-docker compose up -d postgres_airflow webserver scheduler
+docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 ```
 
 ## Criar o Usuário para Fazer Login no Airflow
@@ -22,7 +22,7 @@ Após inicializar o serviço, crie um usuário admin para acessar a interface do
 - Executar o comando abaixo no terminal
 
 ```shell
-docker compose exec webserver airflow users create \
+docker compose exec airflow_webserver airflow users create \
     --username admin \
     --firstname Firstname \
     --lastname Lastname \
@@ -33,7 +33,7 @@ docker compose exec webserver airflow users create \
 
 Para importar conexões e variáveis de ambiente usadas pelas DAGS
 ```shell
-docker exec -it webserver bash
+docker exec -it airflow_webserver bash
 airflow connections import connections.json 
 airflow variables import variables.json 
 ```
