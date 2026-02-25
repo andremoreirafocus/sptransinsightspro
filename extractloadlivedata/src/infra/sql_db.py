@@ -67,3 +67,92 @@ def save_row(config, schema, table, row_tuple, columns):
             exc_info=True,
         )
         return False
+
+
+def execute_select_query(config, query):
+    """
+    Execute a SELECT query and return results as a list of dictionaries.
+
+    Args:
+        config: Configuration dictionary with DB credentials
+        query: SQL SELECT query as a string
+
+    Returns:
+        list: List of rows as dictionaries, empty list if no results or error occurs
+    """
+
+    def get_config(config):
+        """Extract database configuration from config object."""
+        host = config["DB_HOST"]
+        port = config["DB_PORT"]
+        dbname = config["DB_DATABASE"]
+        dbuser = config["DB_USER"]
+        password = config["DB_PASSWORD"]
+        return host, port, dbname, dbuser, password
+
+    try:
+        # Get database configuration
+        host, port, dbname, dbuser, password = get_config(config)
+        # Build database URI
+        db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
+        # Create engine and connection for this specific operation
+        engine = create_engine(db_uri)
+
+        logger.info(f"Executing SELECT query: {query[:100]}...")
+        # Execute query and fetch results
+        with engine.begin() as conn:
+            result = conn.execute(text(query))
+            rows = result.fetchall()
+            # Convert rows to list of dictionaries
+            rows_as_dicts = [dict(row._mapping) for row in rows]
+        logger.info(f"Query returned {len(rows_as_dicts)} row(s)")
+        return rows_as_dicts
+    except Exception as e:
+        logger.error(f"Database error while executing SELECT query: {e}", exc_info=True)
+        return []
+
+
+def execute_update_query(config, query, params=None):
+    """
+    Execute an UPDATE, DELETE, or other DML query.
+
+    Args:
+        config: Configuration dictionary with DB credentials
+        query: SQL UPDATE/DELETE query as a string
+        params: Optional dictionary of named parameters for the query
+
+    Returns:
+        bool: True if update was successful, False otherwise
+    """
+
+    def get_config(config):
+        """Extract database configuration from config object."""
+        host = config["DB_HOST"]
+        port = config["DB_PORT"]
+        dbname = config["DB_DATABASE"]
+        dbuser = config["DB_USER"]
+        password = config["DB_PASSWORD"]
+        return host, port, dbname, dbuser, password
+
+    try:
+        # Get database configuration
+        host, port, dbname, dbuser, password = get_config(config)
+        # Build database URI
+        db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
+        # Create engine and connection for this specific operation
+        engine = create_engine(db_uri)
+
+        logger.info(f"Executing UPDATE query: {query[:100]}...")
+
+        # Execute query with transaction management
+        with engine.begin() as conn:
+            if params:
+                conn.execute(text(query), params)
+            else:
+                conn.execute(text(query))
+
+        logger.info("Update query executed successfully")
+        return True
+    except Exception as e:
+        logger.error(f"Database error while executing UPDATE query: {e}", exc_info=True)
+        return False
