@@ -149,7 +149,7 @@ def trigger_airflow_dag_run(config, pending_marker):
             f"Error triggering Airflow DAG for marker '{pending_marker}':",
             exc_info=True,
         )
-        logger.error("Exception details:", e)
+        logger.error(f"Exception details: {e}")
         return False
 
 def main():

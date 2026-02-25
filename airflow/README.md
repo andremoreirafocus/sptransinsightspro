@@ -41,8 +41,11 @@ airflow variables import variables.json
 Para criar usuário do extractloadlivedata que invoca DAGs
 ```shell
 airflow roles create API_Trigger
+airflow roles add-perms API_Trigger -a can_read -r "DAGs"
 airflow roles add-perms API_Trigger -a can_read -r "DAG Runs"
 airflow roles add-perms API_Trigger -a can_create -r "DAG Runs"
+airflow roles add-perms API_Trigger -a can_read -r "DAG:transformlivedata-v5"
+airflow roles add-perms API_Trigger -a can_edit -r "DAGs"
 airflow users create \
     --username ingest_service \
     --firstname Ingest \

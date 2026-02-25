@@ -103,6 +103,7 @@ services:
     volumes:
       - ./ingest_buffer:/app/data/staging
       - ./.diskcache_pending_invocations:/app/data/.diskcache_pending_invocations
+      - ./.diskcache_pending_processing_requests:/app/data/.diskcache_pending_processing_requests
     networks:
       - rede_fia
     restart: always
@@ -132,3 +133,4 @@ volumes:
   airflow_db_data: {}
   ingest_buffer: {}
   diskcache_pending_invocations: {}
+  diskcache_pending_processing_requests: {}

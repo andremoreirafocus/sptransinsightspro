@@ -8,9 +8,14 @@ from src.services.save_bus_positions import (
     remove_local_file,
     get_pending_storage_save_list,
 )
-from src.services.trigger_airflow import (
-    create_pending_invokation,
-    trigger_pending_airflow_dag_invokations,
+
+# from src.services.trigger_airflow import (
+#     create_pending_invokation,
+#     trigger_pending_airflow_dag_invokations,
+# )
+from src.services.save_processing_requests import (
+    create_pending_processing_request,
+    trigger_pending_processing_requests,
 )
 from src.infra.compression import decompress_data
 from src.config import get_config
@@ -60,7 +65,8 @@ def extractloadlivedata():
                         pending_data = json.loads(pending_data_json)
                 if save_bus_positions_to_storage_with_retries(config, pending_data):
                     remove_local_file(config, pending_data)
-                    create_pending_invokation(config, pending_storage_save_file)
+                    # create_pending_invokation(config, pending_storage_save_file)
+                    create_pending_processing_request(config, pending_storage_save_file)
                 else:
                     logger.error(
                         f"Failed to save pending file '{pending_storage_save_file}' to storage after retries."
@@ -75,4 +81,5 @@ def extractloadlivedata():
             logger.error(
                 "One or more pending files failed to save to storage. Waiting for the next execution to retry."
             )
-        trigger_pending_airflow_dag_invokations(config)
+        # trigger_pending_airflow_dag_invokations(config)
+        trigger_pending_processing_requests(config)
