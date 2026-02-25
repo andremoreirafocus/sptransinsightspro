@@ -41,6 +41,45 @@ class ProcessingRequest(Base):
     created_at = Column(DateTime(timezone=True), nullable=False)
     updated_at = Column(DateTime(timezone=True), nullable=False)
 
+    @classmethod
+    def initialize_from_config(cls, config):
+        """
+        Initialize the model with schema and table name from config.
+        This must be called before using the model.
+
+        Args:
+            config: Configuration dictionary with RAW_EVENTS_TABLE_NAME
+
+        Raises:
+            KeyError: If RAW_EVENTS_TABLE_NAME is not set in config
+            ValueError: If RAW_EVENTS_TABLE_NAME is not in 'schema.table' format
+        """
+        if "RAW_EVENTS_TABLE_NAME" not in config:
+            raise KeyError(
+                "RAW_EVENTS_TABLE_NAME configuration is missing. "
+                "Please set RAW_EVENTS_TABLE_NAME in .env file in format 'schema.table' "
+                "(e.g., 'to_be_processed.raw')"
+            )
+
+        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+
+        # Parse 'schema.table' format
+        if "." not in raw_events_table:
+            raise ValueError(
+                f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. "
+                f"Got: '{raw_events_table}'"
+            )
+
+        schema, tablename = raw_events_table.split(".", 1)
+
+        # Update the model class attributes dynamically
+        cls.__tablename__ = tablename
+        cls.__table_args__ = {"schema": schema}
+
+        logger.info(
+            f"ProcessingRequest model initialized with schema='{schema}', table='{tablename}'"
+        )
+
 
 def get_config(config):
     """Extract database configuration from config object following trigger_airflow pattern."""
@@ -61,6 +100,8 @@ def get_engine(config):
     """Get or initialize the database engine."""
     global _engine
     if _engine is None:
+        # Initialize model with config values before creating engine
+        ProcessingRequest.initialize_from_config(config)
         database_url = get_config(config)
         _engine = create_engine(database_url, echo=False)
         logger.info("Database engine initialized successfully.")
