@@ -28,13 +28,10 @@ def save_finished_trips_to_db(config, trips_tuples):
     # 1. Configuration & Engine Setup
     (table_name, host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-
     # Pure SQLAlchemy engine
     engine = create_engine(db_uri)
-
     staging_table = f"{table_name}_stg"
     print(f"Using staging table: {staging_table} for batch operations.")
-
     try:
         # 2. Prepare Staging Table
         with engine.begin() as conn:
@@ -46,7 +43,6 @@ def save_finished_trips_to_db(config, trips_tuples):
                 AS SELECT * FROM {table_name} WITH NO DATA;
             """)
             )
-
             if trips_tuples:
                 # Named parameters are the most robust for bulk execution
                 insert_stmt = text(f"""
@@ -55,7 +51,6 @@ def save_finished_trips_to_db(config, trips_tuples):
                         duration, is_circular, average_speed
                     ) VALUES (:t_id, :v_id, :t_start, :t_end, :dur, :circ, :spd)
                 """)
-
                 # Mapping tuples to keys for the staging insert
                 params = [
                     {
@@ -69,10 +64,8 @@ def save_finished_trips_to_db(config, trips_tuples):
                     }
                     for t in trips_tuples
                 ]
-
                 # SQLAlchemy automatically detects a list of dicts and performs a batch insert
                 conn.execute(insert_stmt, params)
-
         # 3. Atomic Upsert from Staging to Final Table
         with engine.begin() as conn:
             upsert_query = text(f"""
@@ -87,18 +80,14 @@ def save_finished_trips_to_db(config, trips_tuples):
                 ON CONFLICT (trip_start_time, vehicle_id, trip_id) 
                 DO NOTHING;
             """)
-
             execution_result = conn.execute(upsert_query)
             new_rows = execution_result.rowcount
             skipped_rows = len(trips_tuples) - new_rows
-
             # Update table stats for PowerBI
             conn.execute(text(f"ANALYZE {table_name};"))
-
             logger.info(
                 f"Sync complete: {new_rows} new trips added, {skipped_rows} duplicates skipped."
             )
-
     except Exception as e:
         logger.error(f"Persistence failed: {e}")
         raise

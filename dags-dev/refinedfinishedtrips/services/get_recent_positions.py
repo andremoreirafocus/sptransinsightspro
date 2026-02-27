@@ -25,7 +25,6 @@ def get_recent_positions(config):
     )
     # now = datetime.now(timezone.utc)
     now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
-
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")
@@ -49,17 +48,6 @@ def get_recent_positions(config):
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
             ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;
         """
-        # Original full select (kept for reference):
-        # sql = f"""
-        #     SELECT
-        #         veiculo_ts, linha_lt, veiculo_id, linha_sentido,
-        #         distance_to_first_stop, distance_to_last_stop,
-        #         is_circular, lt_origem, lt_destino
-        #     FROM read_parquet('{s3_path}', hive_partitioning = true)
-        #     WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
-        #     --WHERE veiculo_ts >= NOW() - INTERVAL '3 hours'
-        #     ORDER BY veiculo_ts ASC;
-        # """
         df_recent_positions = con.execute(sql).df()
         total_records = df_recent_positions.shape[0]
         logger.info(f"Retrieved {total_records} position records.")
