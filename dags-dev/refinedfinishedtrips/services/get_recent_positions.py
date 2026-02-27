@@ -41,12 +41,13 @@ def get_recent_positions(config):
             f"Retrieveing position records for the last {hours_interval} hours..."
         )
         # Optimized: Select only needed columns for trip detection
+        # Sorted by linha_lt, veiculo_id first for index-based grouping, then veiculo_ts for chronological order
         sql = f"""
             SELECT 
                 veiculo_ts, linha_lt, veiculo_id, linha_sentido, is_circular
             FROM read_parquet('{s3_path}', hive_partitioning = true)
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
-            ORDER BY veiculo_ts ASC;
+            ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;
         """
         # Original full select (kept for reference):
         # sql = f"""
