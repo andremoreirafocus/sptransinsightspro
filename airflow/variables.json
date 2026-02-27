@@ -8,6 +8,9 @@
         "trip_details_table_name": "trip_details",
         "description": "GTFS data used to extract bus position data from SPTrans"
     },
+    "orchestratetransform": {
+        "raw_events_table_name": "to_be_processed.raw"
+    },
     "transformlivedata": {
         "raw_bucket": "raw",
         "trusted_bucket": "trusted",
@@ -17,6 +20,7 @@
         "trip_details_table_name": "trip_details",
         "raw_data_compression": "true",
         "raw_data_compression_extension": ".zst",
+        "raw_events_table_name": "to_be_processed.raw",
         "description": "Configuration for transforming live data, including bucket names and table names."
     },
     "updatelatestpositions": {

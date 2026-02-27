@@ -23,6 +23,15 @@
         "login": "postgres",
         "password": "postgres",
         "extra": "{\"sslmode\": \"prefer\"}"
+    },
+    "airflow_postgres_conn": {
+        "conn_type": "postgres",
+        "host": "airflow_postgres",
+        "port": 5432,
+        "schema": "sptrans_insights",
+        "login": "airflow",
+        "password": "airflow",
+        "extra": "{\"sslmode\": \"prefer\"}"
     }    
 }
 
