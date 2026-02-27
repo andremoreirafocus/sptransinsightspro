@@ -40,16 +40,25 @@ def get_recent_positions(config):
         logger.info(
             f"Retrieveing position records for the last {hours_interval} hours..."
         )
+        # Optimized: Select only needed columns for trip detection
         sql = f"""
             SELECT 
-                veiculo_ts, linha_lt, veiculo_id, linha_sentido, 
-                distance_to_first_stop, distance_to_last_stop, 
-                is_circular, lt_origem, lt_destino
+                veiculo_ts, linha_lt, veiculo_id, linha_sentido, is_circular
             FROM read_parquet('{s3_path}', hive_partitioning = true)
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
-            --WHERE veiculo_ts >= NOW() - INTERVAL '3 hours'
             ORDER BY veiculo_ts ASC;
         """
+        # Original full select (kept for reference):
+        # sql = f"""
+        #     SELECT
+        #         veiculo_ts, linha_lt, veiculo_id, linha_sentido,
+        #         distance_to_first_stop, distance_to_last_stop,
+        #         is_circular, lt_origem, lt_destino
+        #     FROM read_parquet('{s3_path}', hive_partitioning = true)
+        #     WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
+        #     --WHERE veiculo_ts >= NOW() - INTERVAL '3 hours'
+        #     ORDER BY veiculo_ts ASC;
+        # """
         df_recent_positions = con.execute(sql).df()
         total_records = df_recent_positions.shape[0]
         logger.info(f"Retrieved {total_records} position records.")
