@@ -23,6 +23,12 @@ def get_airflow_config():
         "orchestratetransform", deserialize_json=True
     )
     raw_events_table_name = orchestrate_transform_vars["raw_events_table_name"]
+    orchestrate_target_dag = orchestrate_transform_vars.get(
+        "orchestrate_target_dag", "transformlivedata-v4"
+    )
+    orchestrate_wait_time_seconds = orchestrate_transform_vars.get(
+        "orchestrate_wait_time_seconds", 15
+    )
     postgres_conn = BaseHook.get_connection("airflow_postgres_conn")
     postgres_host = postgres_conn.host
     postgres_port = postgres_conn.port
@@ -32,6 +38,8 @@ def get_airflow_config():
     postgres_sslmode = postgres_conn.extra_dejson.get("sslmode", "prefer")
     config = {
         "RAW_EVENTS_TABLE_NAME": raw_events_table_name,
+        "ORCHESTRATE_TARGET_DAG": orchestrate_target_dag,
+        "ORCHESTRATE_WAIT_TIME_SECONDS": orchestrate_wait_time_seconds,
         "DB_HOST": postgres_host,
         "DB_PORT": postgres_port,
         "DB_DATABASE": postgres_database,

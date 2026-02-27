@@ -9,10 +9,11 @@ from orchestratetransform.services.processed_requests_helper import (
     get_unprocessed_requests,
 )
 from orchestratetransform.config import get_config
-import logging
 import uuid
 from datetime import datetime
 from sqlalchemy import and_
+import time
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +135,24 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
 
 def trigger_dag_for_unprocessed_requests():
     config = get_config()
-    dag_name = "transformlivedata-v4"
+
+    # Get configuration values from config (Airflow Variables)
+    def get_config_values(config):
+        try:
+            dag_name = config["ORCHESTRATE_TARGET_DAG"]
+            wait_time_seconds = int(config["ORCHESTRATE_WAIT_TIME_SECONDS"])
+            return dag_name, wait_time_seconds
+        except KeyError as e:
+            logger.error(f"Missing required configuration key: {e}")
+            raise
+
+    dag_name, wait_time_seconds = get_config_values(config)
+    # Wait for ingest service to complete file download, MinIO save, and database write
+    # The ingest service takes time to: download JSON, save to MinIO, and save pending request to DB
+    logger.info(
+        f"Waiting {wait_time_seconds} seconds for ingest service to complete file processing..."
+    )
+    time.sleep(wait_time_seconds)
     unprocessed_requests = get_unprocessed_requests(config)
     if unprocessed_requests:
         logger.info(f"Found {len(unprocessed_requests)} unprocessed requests.")
@@ -147,7 +165,6 @@ def trigger_dag_for_unprocessed_requests():
         logger.info("No unprocessed requests found.")
 
 
-# Criando o DAG
 with DAG(
     "orchestratetransform-v1",
     default_args=default_args,
