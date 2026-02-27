@@ -9,11 +9,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_per_line_per_vehicle_pandas(linha_lt, veiculo_id, df_preloaded=None):
+def extract_trips_per_line_per_vehicle_pandas(
+    positions_list, start_idx, end_idx, linha_lt, veiculo_id
+):
     try:
-        if df_preloaded is None:
+        if not positions_list or start_idx > end_idx:
             return
-        position_records = df_preloaded.to_dict("records")
+        # Extract positions for this vehicle using index-based slicing
+        position_records = positions_list[start_idx : end_idx + 1]
         if not position_records:
             logger.debug(f"No positions for line {linha_lt} vehicle {veiculo_id}")
             return
