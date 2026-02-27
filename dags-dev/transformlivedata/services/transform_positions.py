@@ -78,13 +78,12 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 
 
 def transform_positions(config, raw_positions):
-    def get_record_from_raw(vehicle, line, metadata, df_trip_details):
+    def get_record_from_raw(vehicle, line, metadata, trip_details):
+        # Use pre-computed trip_details instead of looking them up
         linha = line.get("c")
         sentido = line.get("sl")
-        trip_details = get_trip_details(df_trip_details, linha, sentido)
-        # print(f"Trip details: {trip_details}")
+        # trip_details is already computed and passed in
         is_circular = trip_details.get("is_circular")
-        # print(f"is_circular: {is_circular}")
         invalid_trip = trip_details.get("invalid_trip", False)
         if invalid_trip:
             first_stop_distance = 0.0  # Avoid zero distance
@@ -160,18 +159,46 @@ def transform_positions(config, raw_positions):
         return None
     logger.info("Preloading trip details from database...")
     df_trip_details = load_trip_details_from_storage_to_dataframe(config)
+
+    # Build trip_details lookup dictionary for O(1) access
+    trip_details_dict = {
+        row["trip_id"]: row.to_dict() for _, row in df_trip_details.iterrows()
+    }
+    logger.info(f"Built trip details cache with {len(trip_details_dict)} entries")
+
     # print(df_trip_details)
     logger.info("Starting transformation of position data...")
     total_number_of_vehicles = 0
     for line in payload["l"]:
+        # Pre-compute trip details once per line, not per vehicle
+        linha = line.get("c")
+        sentido = line.get("sl")
+        trip_id = get_trip_id(linha, sentido)
+
+        # Use cached lookup instead of dataframe filtering
+        if trip_id in trip_details_dict:
+            trip_details = trip_details_dict[trip_id]
+        else:
+            # Return default values if not found
+            logger.error(f"Trip details not found for trip_id: {trip_id}")
+            trip_details = {
+                "is_circular": False,
+                "first_stop_id": 0,
+                "first_stop_lat": 0.0,
+                "first_stop_lon": 0.0,
+                "last_stop_id": 0,
+                "last_stop_lat": 0.0,
+                "last_stop_lon": 0.0,
+                "invalid_trip": True,
+            }
+
         number_of_vehicles_per_line = 0
         for vehicle in line.get("vs", []):
+            # Pass pre-computed trip_details instead of df_trip_details
             vehicle_record, invalid_trip = get_record_from_raw(
-                vehicle, line, metadata, df_trip_details
+                vehicle, line, metadata, trip_details
             )
             if invalid_trip:
-                linha = line.get("c")
-                sentido = line.get("sl")
                 this_trip_id = get_trip_id(linha, sentido)
                 if this_trip_id not in list_of_invalid_trips:
                     list_of_invalid_trips.append(this_trip_id)
