@@ -1,0 +1,306 @@
+"""
+Great Expectations-based column-level lineage tracking for transformlivedata.
+
+Tracks input fields → transformations → output columns with full traceability.
+"""
+
+from typing import Dict, Any, List, Tuple
+import json
+import logging
+import os
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+
+class ColumnLineageTracker:
+    """Track column-level lineage from input API fields to output parquet columns."""
+
+    def __init__(self, execution_id: str):
+        """
+        Initialize column lineage tracker.
+
+        Args:
+            execution_id: Unique execution identifier
+        """
+        self.execution_id = execution_id
+        self.lineage_map: Dict[str, Dict[str, Any]] = {}
+        self.transformation_rules: Dict[str, List[str]] = {}
+
+    def add_field_mapping(
+        self,
+        output_column: str,
+        input_sources: List[str],
+        transformation_rule: str,
+        stage: str = "transform",
+    ):
+        """
+        Record a field mapping from input source(s) to output column.
+
+        Args:
+            output_column: Name of output column (e.g., 'veiculo_id')
+            input_sources: List of input fields (e.g., ['payload.l[i].p'])
+            transformation_rule: Description of transformation applied
+            stage: Pipeline stage (load, transform, save)
+        """
+        self.lineage_map[output_column] = {
+            "output_column": output_column,
+            "input_sources": input_sources,
+            "transformation_rule": transformation_rule,
+            "stage": stage,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+        }
+
+        # Track transformations by stage
+        if stage not in self.transformation_rules:
+            self.transformation_rules[stage] = []
+        if transformation_rule not in self.transformation_rules[stage]:
+            self.transformation_rules[stage].append(transformation_rule)
+
+        logger.debug(
+            f"Lineage: {output_column} ← {input_sources} ({transformation_rule})"
+        )
+
+    def get_output_schema(self) -> Dict[str, str]:
+        """Get all output columns with their transformations."""
+        return {
+            col: mapping["transformation_rule"]
+            for col, mapping in self.lineage_map.items()
+        }
+
+    def get_input_schema(self) -> List[str]:
+        """Get all input fields referenced in lineage."""
+        all_inputs = []
+        for mapping in self.lineage_map.values():
+            all_inputs.extend(mapping["input_sources"])
+        return sorted(list(set(all_inputs)))
+
+    def generate_lineage_report(self) -> str:
+        """Generate human-readable lineage report showing field mappings."""
+        lines = [
+            "=" * 80,
+            "COLUMN-LEVEL DATA LINEAGE REPORT",
+            "=" * 80,
+            f"Execution ID: {self.execution_id}",
+            f"Generated: {datetime.utcnow().isoformat()}Z",
+            "",
+            "INPUT SCHEMA (API payload fields):",
+            "-" * 80,
+        ]
+
+        input_fields = self.get_input_schema()
+        for field in input_fields:
+            lines.append(f"  • {field}")
+
+        lines.extend(
+            [
+                "",
+                "OUTPUT SCHEMA (Parquet columns):",
+                "-" * 80,
+            ]
+        )
+
+        output_schema = self.get_output_schema()
+        for col, rule in sorted(output_schema.items()):
+            lines.append(f"  • {col:25s} := {rule}")
+
+        lines.extend(
+            [
+                "",
+                "COLUMN-LEVEL LINEAGE MAPPING:",
+                "-" * 80,
+            ]
+        )
+
+        for col in sorted(self.lineage_map.keys()):
+            mapping = self.lineage_map[col]
+            inputs = ", ".join(mapping["input_sources"])
+            rule = mapping["transformation_rule"]
+            lines.append(f"{col}")
+            lines.append(f"  ← {inputs}")
+            lines.append(f"  ∘ {rule}")
+            lines.append("")
+
+        lines.append("=" * 80)
+        return "\n".join(lines)
+
+    def write_lineage_report(self, output_file: str = "column_lineage_report.txt"):
+        """Write lineage report to file."""
+        report = self.generate_lineage_report()
+        with open(output_file, "w") as f:
+            f.write(report)
+        logger.info(f"Column lineage report written to {output_file}")
+        return report
+
+    def to_json(self) -> str:
+        """Export lineage as JSON for machine consumption."""
+        return json.dumps(
+            {
+                "execution_id": self.execution_id,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "lineage_map": self.lineage_map,
+                "transformation_rules": self.transformation_rules,
+            },
+            indent=2,
+            default=str,
+        )
+
+
+# ============================================================================
+# CONFIGURATION LOADING
+# ============================================================================
+
+
+def load_lineage_config(config_path: str = None) -> Dict[str, Any]:
+    """
+    Load column lineage configuration from external JSON file.
+
+    Args:
+        config_path: Path to validation-schema.json. If None, uses default location.
+
+    Returns:
+        Dictionary with 'columns' key containing all column mappings
+
+    Raises:
+        FileNotFoundError: If config file not found
+        json.JSONDecodeError: If config file is invalid JSON
+    """
+    if config_path is None:
+        # Default location relative to this file
+        package_dir = os.path.dirname(os.path.dirname(__file__))
+        config_path = os.path.join(package_dir, "config", "validation-schema.json")
+
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            f"Lineage configuration not found at {config_path}\n"
+            f"Expected: transformlivedata/config/validation-schema.json"
+        )
+
+    logger.info(f"Loading lineage configuration from {config_path}")
+
+    with open(config_path, "r") as f:
+        config = json.load(f)
+
+    if not config or "columns" not in config:
+        raise ValueError(f"Invalid lineage configuration: missing 'columns' section")
+
+    logger.info(f"Loaded lineage configuration with {len(config['columns'])} columns")
+
+    return config
+
+
+def get_transformlivedata_column_lineage(
+    config_path: str = None,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Get column lineage configuration for transformlivedata pipeline.
+
+    Loads from external YAML file and converts to standard format.
+
+    Args:
+        config_path: Optional path to custom validation-schema.yml
+
+    Returns:
+        Dictionary mapping output_column → {input_sources, transformation}
+    """
+    config = load_lineage_config(config_path)
+
+    # Convert YAML format to lineage dict format
+    lineage = {}
+    for output_col, col_config in config["columns"].items():
+        lineage[output_col] = {
+            "input_sources": col_config.get("input_sources", []),
+            "transformation": col_config.get("transformation", ""),
+        }
+
+    return lineage
+
+
+def get_transformlivedata_expectations(
+    config_path: str = None,
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Get data quality expectations configuration for transformlivedata pipeline.
+
+    Loads from external YAML file.
+
+    Args:
+        config_path: Optional path to custom validation-schema.yml
+
+    Returns:
+        Dictionary mapping expectation_name → {enabled, type, params, ...}
+    """
+    config = load_lineage_config(config_path)
+
+    if "expectations" not in config:
+        logger.warning("No expectations found in lineage configuration")
+        return {}
+
+    expectations = config["expectations"]
+    logger.info(
+        f"Loaded {len(expectations)} expectations from configuration: "
+        f"{', '.join(e for e, v in expectations.items() if v.get('enabled', False))}"
+    )
+
+    return expectations
+
+
+def get_transformlivedata_output_columns(config_path: str = None) -> List[str]:
+    """
+    Get the ordered list of output column names from validation-schema.json.
+
+    This is the single source of truth for output column names and order.
+    Used by load_transform_save_positions to create DataFrames with correct schema.
+
+    Args:
+        config_path: Optional path to custom validation-schema.json
+
+    Returns:
+        List[str]: Column names in the order defined in validation-schema.json
+
+    Raises:
+        FileNotFoundError: If validation-schema.json not found
+        ValueError: If columns section missing from config
+    """
+    config = load_lineage_config(config_path)
+
+    if "columns" not in config:
+        raise ValueError("Missing 'columns' section in validation-schema.json")
+
+    columns = list(config["columns"].keys())
+
+    if not columns:
+        raise ValueError("No columns defined in validation-schema.json")
+
+    logger.debug(f"Loaded {len(columns)} output columns from configuration")
+
+    return columns
+
+
+def build_transformlivedata_lineage(
+    execution_id: str, config_path: str = None
+) -> "ColumnLineageTracker":
+    """
+    Build column lineage tracker for transformlivedata pipeline.
+
+    Loads configuration from external YAML file and builds tracker.
+
+    Args:
+        execution_id: Unique execution identifier
+        config_path: Optional path to custom lineage.yaml
+
+    Returns:
+        Configured ColumnLineageTracker with all field mappings.
+    """
+    lineage_config = get_transformlivedata_column_lineage(config_path)
+    tracker = ColumnLineageTracker(execution_id)
+
+    for output_col, lineage_info in lineage_config.items():
+        tracker.add_field_mapping(
+            output_column=output_col,
+            input_sources=lineage_info["input_sources"],
+            transformation_rule=lineage_info["transformation"],
+            stage="transform",
+        )
+
+    return tracker

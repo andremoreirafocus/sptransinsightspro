@@ -4,6 +4,8 @@ gtfs_files
 live_data_files
 ingest_buffer
 
+*.txt
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

@@ -31,7 +31,7 @@ with DAG(
     "refinefinishedtrips-v2",
     default_args=default_args,
     description="Calculate finished trips for all lines and vehicles",
-    schedule_interval="*/15 * * * *",  # Use cron expression for every minute
+    schedule_interval="*/5 * * * *",  # Use cron expression for every minute
     catchup=False,
     tags=["sptrans"],
 ) as dag:
