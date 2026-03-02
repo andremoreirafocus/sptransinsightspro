@@ -51,12 +51,9 @@ def load_transform_save_positions(logical_date_string):
     """
     # Create unique execution ID for tracking
     execution_id = str(uuid.uuid4())
-
     # Initialize Great Expectations framework
     lineage_tracker = build_transformlivedata_lineage(execution_id)
-
     logger.info(f"Starting execution {execution_id}")
-
     config = get_config()
     dt_utc = datetime.fromisoformat(logical_date_string)
     dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
@@ -65,60 +62,39 @@ def load_transform_save_positions(logical_date_string):
     day = dt.strftime("%d")
     hour = dt.strftime("%H")
     minute = dt.strftime("%M")
-
     logger.info(f"Transforming position for {dt}...")
-
     # ============================================================================
     # LOAD STAGE: Load raw positions from MinIO
     # ============================================================================
     logger.info("=== LOAD STAGE: load_positions ===")
     raw_positions = load_positions(config, year, month, day, hour, minute)
-
     if not raw_positions:
         logger.error("No position data found to transform.")
         raise ValueError("No position data found to transform.")
-
-    # Validate raw positions structure
     validate_raw_positions(raw_positions, execution_id)
-
     # ============================================================================
     # TRANSFORM STAGE: Transform positions with enrichment
     # ============================================================================
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
     positions_table = transform_positions(config, raw_positions)
-
     if not positions_table:
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
-
-    # Convert to DataFrame for validation (columns from validation-schema.json - single source of truth)
     columns = get_transformlivedata_output_columns()
     df = pd.DataFrame(positions_table, columns=columns)
-
     logger.info(f"Transformed {len(df)} records")
-
     # ============================================================================
     # VALIDATE STAGE: Run Great Expectations validations
     # ============================================================================
     validation_results, validation_report, _ = validate_transformed_positions(
         raw_positions, df, execution_id
     )
-
-    # ============================================================================
-    # SAVE STAGE: Save positions to storage
-    # ============================================================================
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)
     logger.info(f"Saved {len(positions_table)} records to trusted layer")
-
-    # ============================================================================
-    # LINEAGE REPORTING: Generate and save lineage report
-    # ============================================================================
     report_filename, validation_filename = generate_lineage_report(
         lineage_tracker, validation_report, execution_id
     )
-
-
     # ============================================================================
     # FINALIZE: Mark request as processed
     # ============================================================================
