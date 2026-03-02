@@ -18,10 +18,6 @@ from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
 )
 from transformlivedata.config import get_config
-from transformlivedata.quality.ge_column_lineage import (
-    build_transformlivedata_lineage,
-    get_transformlivedata_output_columns,
-)
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -51,8 +47,6 @@ def load_transform_save_positions(logical_date_string):
     """
     # Create unique execution ID for tracking
     execution_id = str(uuid.uuid4())
-    # Initialize Great Expectations framework
-    lineage_tracker = build_transformlivedata_lineage(execution_id)
     logger.info(f"Starting execution {execution_id}")
     config = get_config()
     dt_utc = datetime.fromisoformat(logical_date_string)
@@ -80,27 +74,24 @@ def load_transform_save_positions(logical_date_string):
     if not positions_table:
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
-    columns = get_transformlivedata_output_columns()
-    df = pd.DataFrame(positions_table, columns=columns)
-    logger.info(f"Transformed {len(df)} records")
     # ============================================================================
-    # VALIDATE STAGE: Run Great Expectations validations
+    # VALIDATE STAGE: Validate transformed positions
     # ============================================================================
-    validation_results, validation_report, _ = validate_transformed_positions(
-        raw_positions, df, execution_id
+    validation_results, validation_report, df = validate_transformed_positions(
+        raw_positions, positions_table, execution_id
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)
     logger.info(f"Saved {len(positions_table)} records to trusted layer")
+    # Initialize Great Expectations framework
     report_filename, validation_filename = generate_lineage_report(
-        lineage_tracker, validation_report, execution_id
+        validation_report, execution_id
     )
     # ============================================================================
     # FINALIZE: Mark request as processed
     # ============================================================================
     mark_request_as_processed(config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
-
     return {
         "execution_id": execution_id,
         "records_processed": len(df),

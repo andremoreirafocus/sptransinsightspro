@@ -5,11 +5,14 @@ Provides validation functions for raw and transformed position data,
 including generation of validation and lineage reports.
 """
 
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Tuple
 import logging
 import pandas as pd
 from transformlivedata.quality.ge_expectations import DataExpectations
-from transformlivedata.quality.ge_column_lineage import build_transformlivedata_lineage
+from transformlivedata.quality.ge_column_lineage import (
+    build_transformlivedata_lineage,
+    get_transformlivedata_output_columns,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -52,25 +55,32 @@ def validate_raw_positions(
 
 def validate_transformed_positions(
     raw_positions: Dict[str, Any],
-    df: pd.DataFrame,
+    positions_table: List[Dict[str, Any]],
     execution_id: str,
-) -> Tuple[Dict[str, Any], str, bool]:
+) -> Tuple[Dict[str, Any], str, pd.DataFrame]:
     """
-    Validate transformed positions data using Great Expectations framework.
+    Transform positions data to DataFrame and validate using Great Expectations framework.
 
-    Runs all configured data quality validations and generates a validation report.
+    Converts raw position list to DataFrame with schema from validation-schema.json,
+    then runs all configured data quality validations and generates a validation report.
 
     Args:
         raw_positions: Original raw API response (for reference validations)
-        df: Transformed DataFrame with position data
+        positions_table: List of position dictionaries from transform stage
         execution_id: Unique execution identifier for tracking
 
     Returns:
         Tuple of:
         - validation_results: Dictionary with detailed validation results
         - validation_report: Human-readable validation report string
-        - success: Boolean indicating if all validations passed
+        - df: Transformed DataFrame with validated data
+
+    Raises:
+        ValueError: If positions_table is empty or DataFrame creation fails
     """
+    columns = get_transformlivedata_output_columns()
+    df = pd.DataFrame(positions_table, columns=columns)
+    logger.info(f"Transformed {len(df)} records")
     logger.info("=== VALIDATE STAGE: Running expectations ===")
     expectations = DataExpectations(execution_id)
     validation_results = expectations.run_all_validations(
@@ -79,18 +89,16 @@ def validate_transformed_positions(
     # Log validation results
     validation_report = expectations.generate_validation_report(validation_results)
     logger.info(validation_report)
-
     if not validation_results["overall_success"]:
         logger.warning(
             f"Data quality validations failed: {validation_results['failure_count']} failures"
         )
     else:
         logger.info("✓ All data quality expectations passed")
-    return validation_results, validation_report, validation_results["overall_success"]
+    return validation_results, validation_report, df
 
 
 def generate_lineage_report(
-    lineage_tracker,
     validation_report: str,
     execution_id: str,
 ) -> Tuple[str, str]:
@@ -102,7 +110,6 @@ def generate_lineage_report(
     - Data quality validation results
 
     Args:
-        lineage_tracker: ColumnLineageTracker instance with lineage mappings
         validation_report: Pre-generated validation report string
         execution_id: Unique execution identifier (used for filenames)
 
@@ -112,6 +119,7 @@ def generate_lineage_report(
     logger.info("=== GENERATING LINEAGE REPORT ===")
     # Save lineage report to file
     lineage_report_filename = f"column_lineage_report_{execution_id}.txt"
+    lineage_tracker = build_transformlivedata_lineage(execution_id)
     lineage_tracker.write_lineage_report(lineage_report_filename)
     logger.info(f"Lineage report saved to {lineage_report_filename}")
     # Save validation report to file
