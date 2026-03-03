@@ -348,7 +348,7 @@ class DataExpectations:
         return results
 
     def generate_validation_report(self, results: Dict[str, Any]) -> str:
-        """Generate human-readable validation report."""
+        """Generate human-readable validation report including transformation metrics."""
         lines = [
             "=" * 80,
             "DATA EXPECTATIONS VALIDATION REPORT",
@@ -358,9 +358,10 @@ class DataExpectations:
             f"Overall Result: {'✓ PASSED' if results['overall_success'] else '✗ FAILED'}",
             f"Failures: {results['failure_count']}",
             "",
-            "DETAILED VALIDATION RESULTS:",
+            "DATA QUALITY VALIDATIONS:",
             "-" * 80,
         ]
+
         for check_name, check_result in results["validations"].items():
             status = "✓" if check_result.get("passed") else "✗"
             lines.append(f"{status} {check_name}")
@@ -371,5 +372,43 @@ class DataExpectations:
                 lines.append(f"    Count: {check_result['invalid_count']}")
             if "error_count" in check_result:
                 lines.append(f"    Errors: {check_result['error_count']}")
+
+        # Add transformation metrics if available
+        if "transformation_metrics" in results:
+            lines.extend(
+                [
+                    "",
+                    "TRANSFORMATION METRICS:",
+                    "-" * 80,
+                    f"Total Vehicles Processed: {results['transformation_metrics']['total_vehicles_processed']}",
+                    f"Valid Vehicles: {results['transformation_metrics']['valid_vehicles']}",
+                    f"Invalid Vehicles: {results['transformation_metrics']['invalid_vehicles']}",
+                    f"Lines Processed: {results['transformation_metrics']['total_lines_processed']}",
+                    f"Quality Score: {results['transformation_quality_score']}%",
+                ]
+            )
+
+            # Add transformation issues if any
+            issues = results["transformation_issues"]
+            if (
+                issues["invalid_trips"]
+                or issues["distance_calculation_errors"]
+                or issues["vehicle_count_discrepancies"]
+            ):
+                lines.append("")
+                lines.append("Issues Detected During Transformation:")
+                if issues["invalid_trips"]:
+                    lines.append(
+                        f"  • Invalid Trips: {len(issues['invalid_trips'])} - {issues['invalid_trips'][:5]}{'...' if len(issues['invalid_trips']) > 5 else ''}"
+                    )
+                if issues["distance_calculation_errors"]:
+                    lines.append(
+                        f"  • Distance Calculation Errors: {len(issues['distance_calculation_errors'])}"
+                    )
+                if issues["vehicle_count_discrepancies"]:
+                    lines.append(
+                        f"  • Vehicle Count Discrepancies: {len(issues['vehicle_count_discrepancies'])}"
+                    )
+
         lines.append("=" * 80)
         return "\n".join(lines)

@@ -105,17 +105,20 @@ def validate_transformed_positions(
     raw_positions: Dict[str, Any],
     positions_table: List[Dict[str, Any]],
     execution_id: str,
+    transformation_result: Dict[str, Any] = None,
 ) -> Tuple[Dict[str, Any], str, pd.DataFrame]:
     """
     Transform positions data to DataFrame and validate using Great Expectations framework.
 
     Converts raw position list to DataFrame with schema from validation-schema.json,
-    then runs all configured data quality validations and generates a validation report.
+    then runs all configured data quality validations and generates a validation report
+    that includes transformation metrics and issues.
 
     Args:
         raw_positions: Original raw API response (for reference validations)
         positions_table: List of position dictionaries from transform stage
         execution_id: Unique execution identifier for tracking
+        transformation_result: Optional dict containing transformation metrics and issues
 
     Returns:
         Tuple of:
@@ -135,6 +138,14 @@ def validate_transformed_positions(
     validation_results = expectations.run_all_validations(
         raw_data=raw_positions, output_df=df
     )
+    # Integrate transformation metrics into validation results if available
+    if transformation_result:
+        validation_results["transformation_metrics"] = transformation_result["metrics"]
+        validation_results["transformation_issues"] = transformation_result["issues"]
+        validation_results["transformation_quality_score"] = transformation_result[
+            "quality_score"
+        ]
+
     # Log validation results
     validation_report = expectations.generate_validation_report(validation_results)
     logger.info(validation_report)

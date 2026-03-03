@@ -3,10 +3,46 @@ from transformlivedata.services.load_trip_details_from_storage_to_dataframe impo
 )
 from dateutil import parser
 import logging
+from typing import Dict, Any, List, Tuple
 
 ""
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+
+
+def create_transformation_result() -> Dict[str, Any]:
+    """
+    Create a transformation result dictionary to encapsulate results of position
+    data transformation including the transformed data, metrics, and quality issues.
+    """
+    return {
+        "positions_table": [],
+        "metrics": {
+            "total_vehicles_processed": 0,
+            "valid_vehicles": 0,
+            "invalid_vehicles": 0,
+            "expected_vehicles": 0,
+            "total_lines_processed": 0,
+        },
+        "issues": {
+            "invalid_trips": [],
+            "distance_calculation_errors": [],
+            "vehicle_count_discrepancies": [],
+        },
+        "quality_score": 0.0,
+    }
+
+
+def calculate_quality_score(result: Dict[str, Any]) -> float:
+    """
+    Calculate quality score as percentage of valid vehicles.
+    Score is 0-100.
+    """
+    if result["metrics"]["total_vehicles_processed"] == 0:
+        return 0.0
+    valid = result["metrics"]["valid_vehicles"]
+    total = result["metrics"]["total_vehicles_processed"]
+    return round((valid / total) * 100, 2)
 
 
 def get_trip_id(linha, sentido):
@@ -46,14 +82,14 @@ def get_trip_details(df, linha, sentido):
         }
 
 
-def calculate_distance(lat1, lon1, lat2, lon2):
+def calculate_distance(lat1, lon1, lat2, lon2) -> Tuple[float, bool]:
     """
     Calculate the Haversine distance between two points on the Earth.
     :param lat1: Latitude of point 1
     :param lon1: Longitude of point 1
     :param lat2: Latitude of point 2
     :param lon2: Longitude of point 2
-    :return: Distance in meters
+    :return: Tuple of (distance in meters, success_flag)
     """
     from math import radians, sin, cos, sqrt, atan2
 
@@ -68,17 +104,15 @@ def calculate_distance(lat1, lon1, lat2, lon2):
         c = 2 * atan2(sqrt(a), sqrt(1 - a))
 
         distance = round(R * c)
-        return distance
+        return float(distance), True
     except Exception as e:
         logger.error(f"Error calculating distance: {e}")
-        # print(f"Error calculating distance: {e}")
         logger.error(f"lat1, lon1, lat2, lon2 = {lat1}, {lon1}, {lat2}, {lon2}")
-        # print(type(lat1), type(lon1), type(lat2), type(lon2))
-        return -1
+        return -1.0, False
 
 
 def transform_positions(config, raw_positions):
-    def get_record_from_raw(vehicle, line, metadata, trip_details):
+    def get_record_from_raw(vehicle, line, metadata, trip_details, result):
         # Use pre-computed trip_details instead of looking them up
         linha = line.get("c")
         sentido = line.get("sl")
@@ -89,24 +123,40 @@ def transform_positions(config, raw_positions):
             first_stop_distance = 0.0  # Avoid zero distance
             last_stop_distance = 0.0
         else:
-            # print("Calculating first_stop_distance...")
-            first_stop_distance = float(
-                calculate_distance(
-                    float(vehicle.get("py")),
-                    float(vehicle.get("px")),
-                    float(trip_details.get("first_stop_lat", 0.0)),
-                    float(trip_details.get("first_stop_lon", 0.0)),
-                ),
+            # Calculate first stop distance
+            first_stop_dist, first_dist_success = calculate_distance(
+                float(vehicle.get("py")),
+                float(vehicle.get("px")),
+                float(trip_details.get("first_stop_lat", 0.0)),
+                float(trip_details.get("first_stop_lon", 0.0)),
             )
-            # print("Calculating last_stop_distance...")
-            last_stop_distance = float(
-                calculate_distance(
-                    float(vehicle.get("py")),
-                    float(vehicle.get("px")),
-                    float(trip_details.get("last_stop_lat", 0.0)),
-                    float(trip_details.get("last_stop_lon", 0.0)),
-                ),
+            if not first_dist_success:
+                result["issues"]["distance_calculation_errors"].append(
+                    {
+                        "vehicle_id": vehicle.get("p"),
+                        "linha": linha,
+                        "error_type": "first_stop_distance",
+                    }
+                )
+            first_stop_distance = first_stop_dist
+
+            # Calculate last stop distance
+            last_stop_dist, last_dist_success = calculate_distance(
+                float(vehicle.get("py")),
+                float(vehicle.get("px")),
+                float(trip_details.get("last_stop_lat", 0.0)),
+                float(trip_details.get("last_stop_lon", 0.0)),
             )
+            if not last_dist_success:
+                result["issues"]["distance_calculation_errors"].append(
+                    {
+                        "vehicle_id": vehicle.get("p"),
+                        "linha": linha,
+                        "error_type": "last_stop_distance",
+                    }
+                )
+            last_stop_distance = last_stop_dist
+
         vehicle_record = (
             parser.parse(metadata.get("extracted_at")),  # extracao_ts
             int(vehicle.get("p")),  # veiculo_id
@@ -130,22 +180,12 @@ def transform_positions(config, raw_positions):
             first_stop_distance,
             last_stop_distance,
         )
-        if last_stop_distance == -1 or first_stop_distance == -1:
-            logger.error(
-                f"Invalid distance calculation for vehicle {vehicle.get('p')} on line {linha}"
-            )
-            # print(
-            #     f"Invalid distance calculation for vehicle {vehicle.get('p')} on line {linha}"
-            # )
-            # print(f"\nvehicle_record: {vehicle_record}\n")
-            # print(vehicle)
-            logger.info(f"Trip details: {trip_details}")
 
         return vehicle_record, invalid_trip
 
     logger.info("Converting raw positions to positions table...")
-    positions_table = []
-    list_of_invalid_trips = []
+    result = create_transformation_result()
+
     if not data_structure_is_valid(raw_positions):
         logger.error("Raw positions data structure is invalid.")
         return None
@@ -166,10 +206,12 @@ def transform_positions(config, raw_positions):
     }
     logger.info(f"Built trip details cache with {len(trip_details_dict)} entries")
 
-    # print(df_trip_details)
     logger.info("Starting transformation of position data...")
     total_number_of_vehicles = 0
+    invalid_vehicles = 0
+
     for line in payload["l"]:
+        result["metrics"]["total_lines_processed"] += 1
         # Pre-compute trip details once per line, not per vehicle
         linha = line.get("c")
         sentido = line.get("sl")
@@ -193,34 +235,61 @@ def transform_positions(config, raw_positions):
             }
 
         number_of_vehicles_per_line = 0
+        expected_vehicles_per_line = int(line.get("qv", 0))
+
         for vehicle in line.get("vs", []):
-            # Pass pre-computed trip_details instead of df_trip_details
+            # Pass result to collect issues
             vehicle_record, invalid_trip = get_record_from_raw(
-                vehicle, line, metadata, trip_details
+                vehicle, line, metadata, trip_details, result
             )
             if invalid_trip:
                 this_trip_id = get_trip_id(linha, sentido)
-                if this_trip_id not in list_of_invalid_trips:
-                    list_of_invalid_trips.append(this_trip_id)
+                if this_trip_id not in result["issues"]["invalid_trips"]:
+                    result["issues"]["invalid_trips"].append(this_trip_id)
                     logger.warning(
                         f"Skipping vehicle {vehicle.get('p')} on invalid trip {this_trip_id}"
                     )
+                invalid_vehicles += 1
                 continue
+
             number_of_vehicles_per_line += 1
             total_number_of_vehicles += 1
-            positions_table.append(vehicle_record)
+            result["positions_table"].append(vehicle_record)
+
             if total_number_of_vehicles % 1000 == 0:
                 logger.info(f"Processed {total_number_of_vehicles} vehicles.")
-        if number_of_vehicles_per_line != int(line.get("qv")):
-            logger.warning(
-                f"Expected {line.get('q', 0)} vehicles for line {line.get('qv')}, but found {number_of_vehicles_per_line}."
+
+        # Check for vehicle count discrepancies
+        if number_of_vehicles_per_line != expected_vehicles_per_line:
+            result["issues"]["vehicle_count_discrepancies"].append(
+                {
+                    "linha": linha,
+                    "expected": expected_vehicles_per_line,
+                    "actual": number_of_vehicles_per_line,
+                }
             )
-    logger.info(f"Processed {total_number_of_vehicles} vehicles.")
-    list_of_invalid_trips.sort()
-    logger.warning(
-        f"Total invalid trips skipped: {len(list_of_invalid_trips)} - {list_of_invalid_trips}"
+            logger.warning(
+                f"Expected {expected_vehicles_per_line} vehicles for line {linha}, but found {number_of_vehicles_per_line}."
+            )
+
+    # Update metrics
+    result["metrics"]["total_vehicles_processed"] = (
+        total_number_of_vehicles + invalid_vehicles
     )
-    return positions_table
+    result["metrics"]["valid_vehicles"] = total_number_of_vehicles
+    result["metrics"]["invalid_vehicles"] = invalid_vehicles
+    result["metrics"]["expected_vehicles"] = metadata.get("total_vehicles", 0)
+
+    # Calculate and set quality score
+    result["quality_score"] = calculate_quality_score(result)
+
+    logger.info(f"Processed {total_number_of_vehicles} valid vehicles.")
+    logger.info(f"Skipped {invalid_vehicles} invalid vehicles.")
+    logger.warning(
+        f"Total invalid trips: {len(result['issues']['invalid_trips'])} - {result['issues']['invalid_trips']}"
+    )
+
+    return result
 
 
 def data_structure_is_valid(data):

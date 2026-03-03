@@ -69,15 +69,22 @@ def load_transform_save_positions(logical_date_string):
     # TRANSFORM STAGE: Transform positions with enrichment
     # ============================================================================
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
-    positions_table = transform_positions(config, raw_positions)
-    if not positions_table:
+    transform_result = transform_positions(config, raw_positions)
+    if not transform_result or not transform_result.get("positions_table"):
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
+
+    positions_table = transform_result["positions_table"]
+    logger.info(f"Transformation metrics: {transform_result['metrics']}")
+    if transform_result["issues"]:
+        logger.warning(f"Transformation issues detected: {transform_result['issues']}")
+    logger.info(f"Quality score: {transform_result['quality_score']}%")
+
     # ============================================================================
     # VALIDATE STAGE: Validate transformed positions
     # ============================================================================
     validation_results, validation_report, df = validate_transformed_positions(
-        config, raw_positions, positions_table, execution_id
+        config, raw_positions, positions_table, execution_id, transform_result
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)
