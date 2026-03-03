@@ -12,7 +12,7 @@ from transformlivedata.services.save_positions_to_storage import (
 from transformlivedata.services.validate_positions import (
     validate_raw_positions,
     validate_transformed_positions,
-    generate_lineage_report,
+    create_lineage_report,
 )
 from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
@@ -22,7 +22,6 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
 from logging.handlers import RotatingFileHandler
-import pandas as pd
 import uuid
 
 LOG_FILENAME = "transformlivedata.log"
@@ -65,7 +64,7 @@ def load_transform_save_positions(logical_date_string):
     if not raw_positions:
         logger.error("No position data found to transform.")
         raise ValueError("No position data found to transform.")
-    validate_raw_positions(raw_positions, execution_id)
+    validate_raw_positions(config, raw_positions, execution_id)
     # ============================================================================
     # TRANSFORM STAGE: Transform positions with enrichment
     # ============================================================================
@@ -78,14 +77,14 @@ def load_transform_save_positions(logical_date_string):
     # VALIDATE STAGE: Validate transformed positions
     # ============================================================================
     validation_results, validation_report, df = validate_transformed_positions(
-        raw_positions, positions_table, execution_id
+        config, raw_positions, positions_table, execution_id
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)
     logger.info(f"Saved {len(positions_table)} records to trusted layer")
     # Initialize Great Expectations framework
-    report_filename, validation_filename = generate_lineage_report(
-        validation_report, execution_id
+    report_filename, validation_filename = create_lineage_report(
+        config, validation_report, execution_id
     )
     # ============================================================================
     # FINALIZE: Mark request as processed

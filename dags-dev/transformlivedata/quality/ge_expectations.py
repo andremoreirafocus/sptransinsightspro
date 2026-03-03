@@ -11,17 +11,42 @@ import pandas as pd
 from datetime import datetime
 from transformlivedata.quality.ge_column_lineage import (
     get_transformlivedata_column_lineage,
-    get_transformlivedata_expectations,
 )
 
 logger = logging.getLogger(__name__)
 
 
+def get_transformlivedata_expectations(
+    quality_config: Dict[str, Any],
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Get data quality expectations configuration for transformlivedata pipeline.
+
+    Loads from external YAML file.
+
+    Args:
+        quality_config: Dictionary with loaded quality configuration
+
+    Returns:
+        Dictionary mapping expectation_name → {enabled, type, params, ...}
+    """
+    if "expectations" not in quality_config:
+        logger.warning("No expectations found in data quality configuration file")
+        return {}
+    expectations = quality_config["expectations"]
+    logger.info(
+        f"Loaded {len(expectations)} expectations from data quality configuration file: "
+        f"{', '.join(e for e, v in expectations.items() if v.get('enabled', False))}"
+    )
+    return expectations
+
+
 class DataExpectations:
     """Define and validate data expectations for transformlivedata pipeline."""
 
-    def __init__(self, execution_id: str):
+    def __init__(self, config: Dict[str, Any], execution_id: str):
         """Initialize expectations tracker."""
+        self.config = config
         self.execution_id = execution_id
         self.expectations: Dict[str, Any] = {}
         self.validation_results: Dict[str, bool] = {}
@@ -33,7 +58,7 @@ class DataExpectations:
         """Validate raw positions API response structure.
         Configuration REQUIRED in validation-schema.yml expectations.raw_positions_structure
         """
-        expectations_config = get_transformlivedata_expectations()
+        expectations_config = get_transformlivedata_expectations(self.config)
         if "raw_positions_structure" not in expectations_config:
             raise ValueError(
                 "Configuration 'expectations.raw_positions_structure' not found in validation-schema.yml. "
@@ -69,7 +94,7 @@ class DataExpectations:
         Columns are sourced from lineage configuration (validation-schema.yml).
         """
         try:
-            lineage_config = get_transformlivedata_column_lineage()
+            lineage_config = get_transformlivedata_column_lineage(self.config)
             required_columns = list(lineage_config.keys())
         except (FileNotFoundError, ValueError) as e:
             logger.error(f"Failed to load lineage configuration: {e}")
@@ -79,7 +104,7 @@ class DataExpectations:
 
     def expect_column_data_types(self, df: pd.DataFrame) -> Tuple[bool, List[str]]:
         """Validate output column data types from configuration."""
-        expectations_config = get_transformlivedata_expectations()
+        expectations_config = get_transformlivedata_expectations(self.config)
         if "column_data_types" not in expectations_config:
             raise ValueError(
                 "Configuration 'expectations.column_data_types' not found in validation-schema.yml. "
@@ -103,7 +128,7 @@ class DataExpectations:
     # DATA QUALITY EXPECTATIONS
     def expect_vehicle_ids_not_null(self, df: pd.DataFrame) -> Tuple[bool, List[str]]:
         """Validate vehicle_id is never null."""
-        expectations_config = get_transformlivedata_expectations()
+        expectations_config = get_transformlivedata_expectations(self.config)
         vehicle_id_config = expectations_config.get("vehicle_ids_not_null", {})
         if "column" not in vehicle_id_config:
             raise ValueError(
@@ -122,7 +147,7 @@ class DataExpectations:
         """Validate coordinates are within RMSP (São Paulo metro region) with tolerance.
         Bounds and tolerance REQUIRED in validation-schema.yml expectations.coordinates_in_rmsp
         """
-        expectations_config = get_transformlivedata_expectations()
+        expectations_config = get_transformlivedata_expectations(self.config)
         coord_config = expectations_config.get("coordinates_in_rmsp", {})
         columns_config = coord_config.get("columns", {})
         if "latitude" not in columns_config or "longitude" not in columns_config:
@@ -182,7 +207,7 @@ class DataExpectations:
 
     def expect_distances_non_negative(self, df: pd.DataFrame) -> Tuple[bool, List[str]]:
         """Validate distance calculations are non-negative."""
-        expectations_config = get_transformlivedata_expectations()
+        expectations_config = get_transformlivedata_expectations(self.config)
         distances_config = expectations_config.get("distances_non_negative", {})
         if "columns" not in distances_config:
             raise ValueError(
@@ -208,7 +233,7 @@ class DataExpectations:
         Only runs validations marked as enabled: true in expectations section.
         """
         try:
-            expectations_config = get_transformlivedata_expectations()
+            expectations_config = get_transformlivedata_expectations(self.config)
         except Exception as e:
             logger.warning(
                 f"Could not load expectations config: {e}. Running all validations."

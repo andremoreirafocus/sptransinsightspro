@@ -8,7 +8,11 @@ including generation of validation and lineage reports.
 from typing import Dict, Any, List, Tuple
 import logging
 import pandas as pd
-from transformlivedata.quality.ge_expectations import DataExpectations
+import os
+import json
+from transformlivedata.quality.ge_expectations import (
+    DataExpectations,
+)
 from transformlivedata.quality.ge_column_lineage import (
     build_transformlivedata_lineage,
     get_transformlivedata_output_columns,
@@ -17,8 +21,49 @@ from transformlivedata.quality.ge_column_lineage import (
 logger = logging.getLogger(__name__)
 
 
+def load_quality_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Load column lineage configuration from external JSON file.
+
+    Args:
+        config: Dictionary with loaded configuration
+
+    Returns:
+        Dictionary with 'columns' key containing all column mappings
+
+    Raises:
+        FileNotFoundError: If config file not found
+        json.JSONDecodeError: If config file is invalid JSON
+    """
+
+    def get_config():
+        try:
+            config_path = config["DATA_QUALITY_CONFIG"]
+            print(f"Using data quality config from {config_path}")
+        except KeyError:
+            raise KeyError("Missing 'DATA_QUALITY_CONFIG' in configuration. ")
+        return config_path
+
+    config_path = get_config()
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(
+            f"Data quality configuration not found at {config_path}\n"
+        )
+    logger.info(f"Loading data quality configuration from {config_path}")
+    with open(config_path, "r") as f:
+        quality_config = json.load(f)
+    if not quality_config or "columns" not in quality_config:
+        raise ValueError(
+            "Invalid data quality configuration: missing 'columns' section"
+        )
+    logger.info(
+        f"Loaded data quality configuration with {len(quality_config['columns'])} columns"
+    )
+    return quality_config
+
+
 def validate_raw_positions(
-    raw_positions: Dict[str, Any], execution_id: str
+    config: Dict[str, Any], raw_positions: Dict[str, Any], execution_id: str
 ) -> Dict[str, Any]:
     """
     Validate raw positions API response structure.
@@ -27,6 +72,7 @@ def validate_raw_positions(
     Also extracts and logs metadata information.
 
     Args:
+        config: Configuration dictionary
         raw_positions: Raw API response dictionary with metadata and payload
         execution_id: Unique execution identifier for tracking
 
@@ -37,7 +83,8 @@ def validate_raw_positions(
         ValueError: If raw positions structure is invalid
     """
     logger.info("Validating raw positions structure...")
-    expectations = DataExpectations(execution_id)
+    quality_config = load_quality_config(config)
+    expectations = DataExpectations(quality_config, execution_id)
     is_valid, errors = expectations.expect_raw_positions_structure(raw_positions)
     if not is_valid:
         logger.error(f"Raw positions structure validation failed: {errors}")
@@ -54,6 +101,7 @@ def validate_raw_positions(
 
 
 def validate_transformed_positions(
+    config: Dict[str, Any],
     raw_positions: Dict[str, Any],
     positions_table: List[Dict[str, Any]],
     execution_id: str,
@@ -78,11 +126,12 @@ def validate_transformed_positions(
     Raises:
         ValueError: If positions_table is empty or DataFrame creation fails
     """
-    columns = get_transformlivedata_output_columns()
+    quality_config = load_quality_config(config)
+    columns = get_transformlivedata_output_columns(quality_config)
     df = pd.DataFrame(positions_table, columns=columns)
     logger.info(f"Transformed {len(df)} records")
     logger.info("=== VALIDATE STAGE: Running expectations ===")
-    expectations = DataExpectations(execution_id)
+    expectations = DataExpectations(quality_config, execution_id)
     validation_results = expectations.run_all_validations(
         raw_data=raw_positions, output_df=df
     )
@@ -98,7 +147,8 @@ def validate_transformed_positions(
     return validation_results, validation_report, df
 
 
-def generate_lineage_report(
+def create_lineage_report(
+    config: Dict[str, Any],
     validation_report: str,
     execution_id: str,
 ) -> Tuple[str, str]:
@@ -110,6 +160,7 @@ def generate_lineage_report(
     - Data quality validation results
 
     Args:
+        config: Dictionary with loaded configuration
         validation_report: Pre-generated validation report string
         execution_id: Unique execution identifier (used for filenames)
 
@@ -119,7 +170,8 @@ def generate_lineage_report(
     logger.info("=== GENERATING LINEAGE REPORT ===")
     # Save lineage report to file
     lineage_report_filename = f"column_lineage_report_{execution_id}.txt"
-    lineage_tracker = build_transformlivedata_lineage(execution_id)
+    quality_config = load_quality_config(config)
+    lineage_tracker = build_transformlivedata_lineage(quality_config, execution_id)
     lineage_tracker.write_lineage_report(lineage_report_filename)
     logger.info(f"Lineage report saved to {lineage_report_filename}")
     # Save validation report to file
