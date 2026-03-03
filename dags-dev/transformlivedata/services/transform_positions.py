@@ -26,6 +26,7 @@ def create_transformation_result() -> Dict[str, Any]:
         },
         "issues": {
             "invalid_trips": [],
+            "invalid_vehicle_ids": [],
             "distance_calculation_errors": [],
             "vehicle_count_discrepancies": [],
         },
@@ -56,30 +57,6 @@ def get_trip_id(linha, sentido):
 
     this_trip_id = f"{linha}-{sentido_convertido(sentido)}"
     return this_trip_id
-
-
-def get_trip_details(df, linha, sentido):
-    this_trip_id = get_trip_id(linha, sentido)
-    # print(f"Fetching trip details for trip_id: {this_trip_id}")
-    df_details = df[df["trip_id"] == this_trip_id]
-
-    if df_details.shape[0] > 0:
-        return df_details.to_dict(orient="records")[0]
-    else:
-        # print(f"Trip details not found for trip_id: {this_trip_id}")
-        logger.error(f"Trip details not found for trip_id: {this_trip_id}")
-        # print(df_details.head(5))
-        # exit()
-        return {
-            "is_circular": False,
-            "first_stop_id": 0,
-            "first_stop_lat": 0.0,
-            "first_stop_lon": 0.0,
-            "last_stop_id": 0,
-            "last_stop_lat": 0.0,
-            "last_stop_lon": 0.0,
-            "invalid_trip": True,
-        }
 
 
 def calculate_distance(lat1, lon1, lat2, lon2) -> Tuple[float, bool]:
@@ -117,13 +94,11 @@ def transform_positions(config, raw_positions):
         linha = line.get("c")
         sentido = line.get("sl")
         # trip_details is already computed and passed in
-        is_circular = trip_details.get("is_circular")
-        invalid_trip = trip_details.get("invalid_trip", False)
-        if invalid_trip:
-            first_stop_distance = 0.0  # Avoid zero distance
-            last_stop_distance = 0.0
+        if trip_details is None:
+            return None
         else:
             # Calculate first stop distance
+            is_circular = trip_details.get("is_circular")
             first_stop_dist, first_dist_success = calculate_distance(
                 float(vehicle.get("py")),
                 float(vehicle.get("px")),
@@ -139,7 +114,6 @@ def transform_positions(config, raw_positions):
                     }
                 )
             first_stop_distance = first_stop_dist
-
             # Calculate last stop distance
             last_stop_dist, last_dist_success = calculate_distance(
                 float(vehicle.get("py")),
@@ -156,7 +130,6 @@ def transform_positions(config, raw_positions):
                     }
                 )
             last_stop_distance = last_stop_dist
-
         vehicle_record = (
             parser.parse(metadata.get("extracted_at")),  # extracao_ts
             int(vehicle.get("p")),  # veiculo_id
@@ -181,7 +154,7 @@ def transform_positions(config, raw_positions):
             last_stop_distance,
         )
 
-        return vehicle_record, invalid_trip
+        return vehicle_record
 
     logger.info("Converting raw positions to positions table...")
     result = create_transformation_result()
@@ -201,10 +174,12 @@ def transform_positions(config, raw_positions):
     df_trip_details = load_trip_details_from_storage_to_dataframe(config)
 
     # Build trip_details lookup dictionary for O(1) access
-    trip_details_dict = {
+    trip_details_in_memory_table = {
         row["trip_id"]: row.to_dict() for _, row in df_trip_details.iterrows()
     }
-    logger.info(f"Built trip details cache with {len(trip_details_dict)} entries")
+    logger.info(
+        f"Built trip details cache with {len(trip_details_in_memory_table)} entries"
+    )
 
     logger.info("Starting transformation of position data...")
     total_number_of_vehicles = 0
@@ -216,42 +191,30 @@ def transform_positions(config, raw_positions):
         linha = line.get("c")
         sentido = line.get("sl")
         trip_id = get_trip_id(linha, sentido)
-
         # Use cached lookup instead of dataframe filtering
-        if trip_id in trip_details_dict:
-            trip_details = trip_details_dict[trip_id]
+        if trip_id in trip_details_in_memory_table:
+            trip_details = trip_details_in_memory_table[trip_id]
         else:
             # Return default values if not found
             logger.error(f"Trip details not found for trip_id: {trip_id}")
-            trip_details = {
-                "is_circular": False,
-                "first_stop_id": 0,
-                "first_stop_lat": 0.0,
-                "first_stop_lon": 0.0,
-                "last_stop_id": 0,
-                "last_stop_lat": 0.0,
-                "last_stop_lon": 0.0,
-                "invalid_trip": True,
-            }
-
+            trip_details = None
         number_of_vehicles_per_line = 0
         expected_vehicles_per_line = int(line.get("qv", 0))
-
         for vehicle in line.get("vs", []):
             # Pass result to collect issues
-            vehicle_record, invalid_trip = get_record_from_raw(
+            if trip_details is None:
+                vehicle_id = vehicle.get("p")
+                result["issues"]["invalid_vehicle_ids"].append(vehicle_id)
+                if trip_id not in result["issues"]["invalid_trips"]:
+                    result["issues"]["invalid_trips"].append(trip_id)
+                invalid_vehicles += 1
+                logger.warning(
+                    f"Skipping vehicle {vehicle_id} on invalid trip {trip_id}"
+                )
+                continue
+            vehicle_record = get_record_from_raw(
                 vehicle, line, metadata, trip_details, result
             )
-            if invalid_trip:
-                this_trip_id = get_trip_id(linha, sentido)
-                if this_trip_id not in result["issues"]["invalid_trips"]:
-                    result["issues"]["invalid_trips"].append(this_trip_id)
-                    logger.warning(
-                        f"Skipping vehicle {vehicle.get('p')} on invalid trip {this_trip_id}"
-                    )
-                invalid_vehicles += 1
-                continue
-
             number_of_vehicles_per_line += 1
             total_number_of_vehicles += 1
             result["positions_table"].append(vehicle_record)
@@ -287,6 +250,9 @@ def transform_positions(config, raw_positions):
     logger.info(f"Skipped {invalid_vehicles} invalid vehicles.")
     logger.warning(
         f"Total invalid trips: {len(result['issues']['invalid_trips'])} - {result['issues']['invalid_trips']}"
+    )
+    logger.warning(
+        f"Total invalid vehicles ids: {len(result['issues']['invalid_vehicle_ids'])} - {result['issues']['invalid_vehicle_ids']}"
     )
 
     return result

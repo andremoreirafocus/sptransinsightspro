@@ -415,6 +415,10 @@ class DataExpectations:
                     lines.append(
                         f"  • Invalid Trips: {len(issues['invalid_trips'])} - {issues['invalid_trips'][:5]}{'...' if len(issues['invalid_trips']) > 5 else ''}"
                     )
+                if issues["invalid_vehicle_ids"]:
+                    lines.append(
+                        f"  • Invalid Vehicles: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids'][:5]}{'...' if len(issues['invalid_vehicle_ids']) > 5 else ''}"
+                    )
                 if issues["distance_calculation_errors"]:
                     lines.append(
                         f"  • Distance Calculation Errors: {len(issues['distance_calculation_errors'])}"
