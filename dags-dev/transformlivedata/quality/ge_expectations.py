@@ -348,7 +348,7 @@ class DataExpectations:
         return results
 
     def generate_validation_report(self, results: Dict[str, Any]) -> str:
-        """Generate human-readable validation report including transformation metrics."""
+        """Generate comprehensive phased validation report with all three layers."""
         lines = [
             "=" * 80,
             "DATA EXPECTATIONS VALIDATION REPORT",
@@ -358,27 +358,41 @@ class DataExpectations:
             f"Overall Result: {'✓ PASSED' if results['overall_success'] else '✗ FAILED'}",
             f"Failures: {results['failure_count']}",
             "",
-            "DATA QUALITY VALIDATIONS:",
-            "-" * 80,
         ]
 
-        for check_name, check_result in results["validations"].items():
-            status = "✓" if check_result.get("passed") else "✗"
-            lines.append(f"{status} {check_name}")
-            if "errors" in check_result and check_result["errors"]:
-                for error in check_result["errors"]:
-                    lines.append(f"    → {error}")
-            if "invalid_count" in check_result:
-                lines.append(f"    Count: {check_result['invalid_count']}")
-            if "error_count" in check_result:
-                lines.append(f"    Errors: {check_result['error_count']}")
+        # PHASE 1: Raw Layer Validation
+        if "raw_schema_validation" in results:
+            lines.extend(
+                [
+                    "PHASE 1: RAW LAYER VALIDATION",
+                    "-" * 80,
+                    f"Schema Valid: {'✓ PASSED' if results['raw_schema_validation']['schema_valid'] else '✗ FAILED'}",
+                ]
+            )
 
-        # Add transformation metrics if available
+            if results["raw_schema_validation"]["critical_field_errors"]:
+                lines.append("Critical Errors:")
+                for error in results["raw_schema_validation"]["critical_field_errors"]:
+                    lines.append(f"  ✗ {error}")
+
+            if results["raw_schema_validation"]["optional_field_warnings"]:
+                lines.append("Optional Field Warnings:")
+                for warning in results["raw_schema_validation"][
+                    "optional_field_warnings"
+                ][:5]:
+                    lines.append(f"  ⚠ {warning}")
+                if len(results["raw_schema_validation"]["optional_field_warnings"]) > 5:
+                    lines.append(
+                        f"  ... and {len(results['raw_schema_validation']['optional_field_warnings']) - 5} more"
+                    )
+
+            lines.append("")
+
+        # PHASE 2: Transformation Validation
         if "transformation_metrics" in results:
             lines.extend(
                 [
-                    "",
-                    "TRANSFORMATION METRICS:",
+                    "PHASE 2: TRANSFORMATION METRICS QUALITY ASSESSMENT",
                     "-" * 80,
                     f"Total Vehicles Processed: {results['transformation_metrics']['total_vehicles_processed']}",
                     f"Valid Vehicles: {results['transformation_metrics']['valid_vehicles']}",
@@ -396,7 +410,7 @@ class DataExpectations:
                 or issues["vehicle_count_discrepancies"]
             ):
                 lines.append("")
-                lines.append("Issues Detected During Transformation:")
+                lines.append("Issues Detected:")
                 if issues["invalid_trips"]:
                     lines.append(
                         f"  • Invalid Trips: {len(issues['invalid_trips'])} - {issues['invalid_trips'][:5]}{'...' if len(issues['invalid_trips']) > 5 else ''}"
@@ -409,6 +423,27 @@ class DataExpectations:
                     lines.append(
                         f"  • Vehicle Count Discrepancies: {len(issues['vehicle_count_discrepancies'])}"
                     )
+
+            lines.append("")
+
+        # PHASE 3: Trusted Layer Validation
+        lines.extend(
+            [
+                "PHASE 3: TRUSTED LAYER VALIDATION",
+                "-" * 80,
+            ]
+        )
+
+        for check_name, check_result in results["validations"].items():
+            status = "✓" if check_result.get("passed") else "✗"
+            lines.append(f"{status} {check_name}")
+            if "errors" in check_result and check_result["errors"]:
+                for error in check_result["errors"]:
+                    lines.append(f"    → {error}")
+            if "invalid_count" in check_result:
+                lines.append(f"    Count: {check_result['invalid_count']}")
+            if "error_count" in check_result:
+                lines.append(f"    Errors: {check_result['error_count']}")
 
         lines.append("=" * 80)
         return "\n".join(lines)

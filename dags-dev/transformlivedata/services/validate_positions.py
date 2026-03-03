@@ -21,6 +21,168 @@ from transformlivedata.quality.ge_column_lineage import (
 logger = logging.getLogger(__name__)
 
 
+# Raw schema definition: critical vs optional fields
+RAW_SCHEMA = {
+    "metadata": {
+        "critical": {"extracted_at": str},
+        "optional": {"source": str, "total_vehicles": int},
+    },
+    "payload": {
+        "critical": {"hr": (int, list, str), "l": list},
+        "optional": {},
+    },
+    "line": {
+        "critical": {"c": str, "cl": int, "sl": int, "vs": list},
+        "optional": {"lt0": str, "lt1": str, "qv": int},
+    },
+    "vehicle": {
+        "critical": {
+            "p": int,
+            "a": bool,
+            "ta": str,
+            "py": (int, float),
+            "px": (int, float),
+        },
+        "optional": {},
+    },
+}
+
+
+def validate_field_type(value: Any, expected_type) -> bool:
+    """
+    Validate if value matches expected type.
+    Handles tuples of types (e.g., (int, float)).
+    """
+    if expected_type is None:
+        return value is None
+    if isinstance(expected_type, tuple):
+        return isinstance(value, expected_type)
+    return isinstance(value, expected_type)
+
+
+def validate_raw_schema(raw_positions: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Validate raw positions API response schema.
+
+    Checks critical fields (must exist and have correct type) and optional fields.
+    Raises exception only if critical fields fail.
+
+    Args:
+        raw_positions: Raw API response dictionary
+
+    Returns:
+        Dict with:
+        - schema_valid: bool (critical fields valid)
+        - critical_field_errors: [list of critical failures]
+        - optional_field_warnings: [list of optional field issues]
+
+    Raises:
+        ValueError: If critical fields are missing or have wrong type
+    """
+    critical_errors = []
+    optional_warnings = []
+
+    # Validate metadata critical fields
+    metadata = raw_positions.get("metadata")
+    if metadata is None:
+        critical_errors.append("Missing 'metadata' at root level")
+    else:
+        for field, expected_type in RAW_SCHEMA["metadata"]["critical"].items():
+            if field not in metadata:
+                critical_errors.append(f"Critical field 'metadata.{field}' is missing")
+            elif not validate_field_type(metadata.get(field), expected_type):
+                critical_errors.append(
+                    f"Critical field 'metadata.{field}' has wrong type: "
+                    f"expected {expected_type.__name__}, got {type(metadata.get(field)).__name__}"
+                )
+
+        # Check optional metadata fields
+        for field, expected_type in RAW_SCHEMA["metadata"]["optional"].items():
+            if field in metadata and not validate_field_type(
+                metadata.get(field), expected_type
+            ):
+                optional_warnings.append(
+                    f"Optional field 'metadata.{field}' has wrong type: "
+                    f"expected {expected_type.__name__}, got {type(metadata.get(field)).__name__}"
+                )
+
+    # Validate payload critical fields
+    payload = raw_positions.get("payload")
+    if payload is None:
+        critical_errors.append("Missing 'payload' at root level")
+    else:
+        for field, expected_type in RAW_SCHEMA["payload"]["critical"].items():
+            if field not in payload:
+                critical_errors.append(f"Critical field 'payload.{field}' is missing")
+            elif not validate_field_type(payload.get(field), expected_type):
+                critical_errors.append(
+                    f"Critical field 'payload.{field}' has wrong type: "
+                    f"expected {expected_type}, got {type(payload.get(field)).__name__}"
+                )
+
+    # Validate lines structure
+    if payload and "l" in payload and isinstance(payload["l"], list):
+        for line_idx, line in enumerate(payload["l"]):
+            for field, expected_type in RAW_SCHEMA["line"]["critical"].items():
+                if field not in line:
+                    critical_errors.append(
+                        f"Critical field 'line[{line_idx}].{field}' is missing"
+                    )
+                elif not validate_field_type(line.get(field), expected_type):
+                    critical_errors.append(
+                        f"Critical field 'line[{line_idx}].{field}' has wrong type: "
+                        f"expected {expected_type}, got {type(line.get(field)).__name__}"
+                    )
+
+            # Check optional line fields
+            for field, expected_type in RAW_SCHEMA["line"]["optional"].items():
+                if field in line and not validate_field_type(
+                    line.get(field), expected_type
+                ):
+                    optional_warnings.append(
+                        f"Optional field 'line[{line_idx}].{field}' has wrong type: "
+                        f"expected {expected_type.__name__}, got {type(line.get(field)).__name__}"
+                    )
+
+            # Validate vehicles structure
+            if "vs" in line and isinstance(line["vs"], list):
+                for vehicle_idx, vehicle in enumerate(line["vs"]):
+                    for field, expected_type in RAW_SCHEMA["vehicle"][
+                        "critical"
+                    ].items():
+                        if field not in vehicle:
+                            critical_errors.append(
+                                f"Critical field 'line[{line_idx}].vs[{vehicle_idx}].{field}' is missing"
+                            )
+                        elif not validate_field_type(vehicle.get(field), expected_type):
+                            critical_errors.append(
+                                f"Critical field 'line[{line_idx}].vs[{vehicle_idx}].{field}' has wrong type: "
+                                f"expected {expected_type}, got {type(vehicle.get(field)).__name__}"
+                            )
+
+    # Prepare result
+    schema_valid = len(critical_errors) == 0
+
+    if critical_errors:
+        logger.error(
+            f"Raw schema validation failed with {len(critical_errors)} critical errors"
+        )
+        for error in critical_errors:
+            logger.error(f"  ✗ {error}")
+        raise ValueError(f"Raw schema contract violation: {critical_errors[0]}")
+
+    if optional_warnings:
+        logger.warning(f"Raw schema has {len(optional_warnings)} optional field issues")
+        for warning in optional_warnings:
+            logger.warning(f"  ⚠ {warning}")
+
+    return {
+        "schema_valid": schema_valid,
+        "critical_field_errors": critical_errors,
+        "optional_field_warnings": optional_warnings,
+    }
+
+
 def load_quality_config(config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Load column lineage configuration from external JSON file.
@@ -64,12 +226,13 @@ def load_quality_config(config: Dict[str, Any]) -> Dict[str, Any]:
 
 def validate_raw_positions(
     config: Dict[str, Any], raw_positions: Dict[str, Any], execution_id: str
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Validate raw positions API response structure.
+    Validate raw positions API response (both schema and structure).
 
-    Checks that raw positions data has required fields and structure.
-    Also extracts and logs metadata information.
+    Phase 1 Validation:
+    - Raw schema validation: field existence and types
+    - Raw structure validation: payload organization
 
     Args:
         config: Configuration dictionary
@@ -77,11 +240,21 @@ def validate_raw_positions(
         execution_id: Unique execution identifier for tracking
 
     Returns:
-        Dictionary with metadata information (total_vehicles, source, extracted_at)
+        Tuple of:
+        - metadata: Dictionary with metadata information (total_vehicles, source, extracted_at)
+        - raw_schema_validation: Dictionary with schema validation results
 
     Raises:
-        ValueError: If raw positions structure is invalid
+        ValueError: If raw schema contract is violated
     """
+    logger.info("=== PHASE 1: RAW LAYER VALIDATION ===")
+
+    # Step 1: Validate schema (critical and optional fields)
+    logger.info("Validating raw schema (field existence and types)...")
+    raw_schema_validation = validate_raw_schema(raw_positions)
+    logger.info("✓ Raw schema validation passed")
+
+    # Step 2: Validate structure (organize check)
     logger.info("Validating raw positions structure...")
     quality_config = load_quality_config(config)
     expectations = DataExpectations(quality_config, execution_id)
@@ -90,14 +263,16 @@ def validate_raw_positions(
         logger.error(f"Raw positions structure validation failed: {errors}")
         raise ValueError(f"Invalid raw positions structure: {errors}")
     logger.info("✓ Raw positions structure valid")
-    # Record lineage inputs from metadata
+
+    # Extract metadata
     metadata = raw_positions.get("metadata", {})
     logger.info(
         f"Loaded {metadata.get('total_vehicles', 0)} vehicles "
         f"from {metadata.get('source', 'unknown')} "
         f"at {metadata.get('extracted_at', 'unknown')}"
     )
-    return metadata
+
+    return metadata, raw_schema_validation
 
 
 def validate_transformed_positions(
@@ -106,39 +281,49 @@ def validate_transformed_positions(
     positions_table: List[Dict[str, Any]],
     execution_id: str,
     transformation_result: Dict[str, Any] = None,
+    raw_schema_validation: Dict[str, Any] = None,
 ) -> Tuple[Dict[str, Any], str, pd.DataFrame]:
     """
     Transform positions data to DataFrame and validate using Great Expectations framework.
 
-    Converts raw position list to DataFrame with schema from validation-schema.json,
-    then runs all configured data quality validations and generates a validation report
-    that includes transformation metrics and issues.
+    Phase 3 Validation:
+    - Validates transformed output data quality
+    - Includes transformation metrics and issues from Phase 2
+    - Includes raw schema validation results from Phase 1
 
     Args:
         raw_positions: Original raw API response (for reference validations)
         positions_table: List of position dictionaries from transform stage
         execution_id: Unique execution identifier for tracking
-        transformation_result: Optional dict containing transformation metrics and issues
+        transformation_result: Optional dict with transformation metrics and issues (Phase 2)
+        raw_schema_validation: Optional dict with raw schema validation results (Phase 1)
 
     Returns:
         Tuple of:
-        - validation_results: Dictionary with detailed validation results
+        - validation_results: Dictionary with all validation phases results
         - validation_report: Human-readable validation report string
         - df: Transformed DataFrame with validated data
 
     Raises:
         ValueError: If positions_table is empty or DataFrame creation fails
     """
+    logger.info("=== PHASE 3: TRUSTED LAYER VALIDATION ===")
+
     quality_config = load_quality_config(config)
     columns = get_transformlivedata_output_columns(quality_config)
     df = pd.DataFrame(positions_table, columns=columns)
     logger.info(f"Transformed {len(df)} records")
-    logger.info("=== VALIDATE STAGE: Running expectations ===")
+    logger.info("Running data quality expectations...")
     expectations = DataExpectations(quality_config, execution_id)
     validation_results = expectations.run_all_validations(
         raw_data=raw_positions, output_df=df
     )
-    # Integrate transformation metrics into validation results if available
+
+    # Integrate Phase 1: Raw schema validation
+    if raw_schema_validation:
+        validation_results["raw_schema_validation"] = raw_schema_validation
+
+    # Integrate Phase 2: Transformation metrics
     if transformation_result:
         validation_results["transformation_metrics"] = transformation_result["metrics"]
         validation_results["transformation_issues"] = transformation_result["issues"]
@@ -146,7 +331,7 @@ def validate_transformed_positions(
             "quality_score"
         ]
 
-    # Log validation results
+    # Generate comprehensive validation report
     validation_report = expectations.generate_validation_report(validation_results)
     logger.info(validation_report)
     if not validation_results["overall_success"]:

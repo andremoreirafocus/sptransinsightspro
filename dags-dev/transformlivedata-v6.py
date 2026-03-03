@@ -64,7 +64,9 @@ def load_transform_save_positions(logical_date_string):
     if not raw_positions:
         logger.error("No position data found to transform.")
         raise ValueError("No position data found to transform.")
-    validate_raw_positions(config, raw_positions, execution_id)
+    metadata, raw_schema_validation = validate_raw_positions(
+        config, raw_positions, execution_id
+    )
     # ============================================================================
     # TRANSFORM STAGE: Transform positions with enrichment
     # ============================================================================
@@ -84,7 +86,12 @@ def load_transform_save_positions(logical_date_string):
     # VALIDATE STAGE: Validate transformed positions
     # ============================================================================
     validation_results, validation_report, df = validate_transformed_positions(
-        config, raw_positions, positions_table, execution_id, transform_result
+        config,
+        raw_positions,
+        positions_table,
+        execution_id,
+        transform_result,
+        raw_schema_validation,
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)
