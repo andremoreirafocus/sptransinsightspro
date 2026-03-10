@@ -3,7 +3,7 @@ cache.db*
 gtfs_files
 live_data_files
 ingest_buffer
-
+data_quality_report.html
 *.txt
 
 # Byte-compiled / optimized / DLL files
