@@ -14,7 +14,7 @@ from transformlivedata.quality.validate_expectations import (
 )
 from transformlivedata.services.lineage_report import create_lineage_report
 from transformlivedata.config import get_config
-from transformlivedata.quality.RawDataExpectations import RawDataExpectations
+from transformlivedata.quality.validate_raw_data import validate_raw_data
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -66,8 +66,9 @@ def load_transform_save_positions(logical_date_string):
     raw_expectations_config = os.path.join(
         script_dir, "transformlivedata", "config", "raw_expectations.json"
     )
-    raw_validator = RawDataExpectations(config_file=raw_expectations_config)
-    is_valid, validation_errors = raw_validator.validate(raw_positions)
+    is_valid, validation_errors = validate_raw_data(
+        raw_positions, raw_expectations_config
+    )
     if not is_valid:
         error_msg = f"Raw data validation failed: {validation_errors}"
         logger.error(error_msg)
