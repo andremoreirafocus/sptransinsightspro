@@ -1,7 +1,7 @@
-import pandas as pd
-import json
 import great_expectations as gx
 from great_expectations.core.expectation_suite import ExpectationSuite
+import pandas as pd
+import json
 import logging
 
 ""
@@ -18,7 +18,7 @@ lat_long_limits = {
 }
 
 
-def validate_transformed_positions(positions_table, transformed_expectations_config):
+def validate_expectations(tuples_table, transformed_expectations_config):
     def get_df_from_tuples_list(tuples_table):
         column_names = [
             "extracao_ts",
@@ -73,7 +73,7 @@ def validate_transformed_positions(positions_table, transformed_expectations_con
         logger.info(f"Amount of invalid records: {len(bad_indices)}")
         return bad_indices
 
-    positions_df = get_df_from_tuples_list(positions_table)
+    positions_df = get_df_from_tuples_list(tuples_table)
     gx_context = gx.get_context()
     with open(transformed_expectations_config, "r") as f:
         suite_dict = json.load(f)
@@ -105,10 +105,6 @@ def validate_transformed_positions(positions_table, transformed_expectations_con
     checkpoint_result = checkpoint.run(
         result_format="COMPLETE", evaluation_parameters=lat_long_limits
     )
-    # checkpoint_result = checkpoint.run(result_format="BOOLEAN_ONLY")
-    # checkpoint_result = checkpoint.run(result_format="BASIC")
-    # checkpoint_result = checkpoint.run(result_format="SUMMARY")
-    # checkpoint_result = checkpoint.run(result_format="COMPLETE")
     if checkpoint_result.success:
         logger.info("Validation successful!")
         valid_df = positions_df
@@ -123,7 +119,7 @@ def validate_transformed_positions(positions_table, transformed_expectations_con
         logger.info(f"Content of valid records:\n {valid_df.head()}")
         logger.info(f"Amount of invalid records: {invalid_df.shape[0]}")
         logger.info(f"Content of invalid records:\n {invalid_df.head()}")
-    return
+    return valid_df, invalid_df
     # --- DATA DOCS GENERATION ---
     gx_context.build_data_docs()
     # This finds the local path to the 'index.html' of your documentation
