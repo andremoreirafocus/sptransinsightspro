@@ -23,7 +23,6 @@ from transformlivedata.quality.raw_data_expectations import RawDataExpectations
 from transformlivedata.quality.transformed_data_expectations import (
     TransformedDataExpectations,
 )
-from transformlivedata.quality.gx_data_docs import GXDataDocsGenerator
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging

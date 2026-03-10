@@ -6,23 +6,22 @@ before any data transformation. Built on top of v6 with minimal integration poin
 """
 
 from transformlivedata.services.load_positions import load_positions
-from transformlivedata.services.transform_positions import transform_positions
+from transformlivedata.services.transform_positions import (
+    transform_positions,
+    get_transformation_metrics_and_issues_report,
+)
 from transformlivedata.services.save_positions_to_storage import (
     save_positions_to_storage,
 )
-
 from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
 )
-from transformlivedata.services.validate_positions_gx import (
-    validate_transformation_metrics,
-    validate_transformed_positions_gx,
-    create_lineage_report,
+from transformlivedata.services.validate_positions import (
+    validate_transformed_positions,
 )
+from transformlivedata.services.lineage_report import create_lineage_report
 from transformlivedata.config import get_config
-from transformlivedata.quality.raw_data_expectations import RawDataExpectations
-
-# from transformlivedata.quality.gx_data_docs import GXDataDocsGenerator
+from transformlivedata.quality.RawDataExpectations import RawDataExpectations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -91,37 +90,20 @@ def load_transform_save_positions(logical_date_string):
         logger.error(error_msg)
         raise ValueError(error_msg)
     logger.info("Raw data validation passed ✓")
-
-    # metadata, raw_schema_validation = validate_raw_positions(
-    #     config, raw_positions, execution_id
-    # )
-    # ============================================================================
-    # TRANSFORM STAGE: Transform positions with enrichment
-    # ============================================================================
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
     transform_result = transform_positions(config, raw_positions)
     if not transform_result or not transform_result.get("positions_table"):
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
-
     positions_table = transform_result["positions_table"]
-    logger.info(f"Transformation metrics: {transform_result['metrics']}")
-    if transform_result["issues"]:
-        logger.warning(f"Transformation issues detected: {transform_result['issues']}")
-    logger.info(f"Quality score: {transform_result['quality_score']}%")
-
-    # ============================================================================
-    # PHASE 5 INTEGRATION: Transformed Data Validation (TransformedDataExpectations)
-    # ============================================================================
-    logger.info("=== PHASE 5: TRANSFORMED DATA VALIDATION (GX) ===")
-    validation_report = validate_transformation_metrics(transform_result)
-    print(validation_report)
-    transformed_expectations_config = os.path.join(
+    validation_report = get_transformation_metrics_and_issues_report(transform_result)
+    logger.info(validation_report)
+    expectations_config = os.path.join(
         script_dir, "transformlivedata", "config", "expectations.json"
     )
-    validate_transformed_positions_gx(
+    validate_transformed_positions(
         positions_table,
-        transformed_expectations_config,
+        expectations_config,
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     save_positions_to_storage(config, positions_table)

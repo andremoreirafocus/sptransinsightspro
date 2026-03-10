@@ -2,8 +2,8 @@ from transformlivedata.services.load_trip_details_from_storage_to_dataframe impo
     load_trip_details_from_storage_to_dataframe,
 )
 from dateutil import parser
+from typing import Dict, Any, Tuple
 import logging
-from typing import Dict, Any, List, Tuple
 
 ""
 # This logger inherits the configuration from the root logger in main.py
@@ -293,3 +293,48 @@ def data_structure_is_valid(data):
             logger.error(f"Missing required payload field: {field}")
             return False
     return True
+
+
+def get_transformation_metrics_and_issues_report(results):
+    lines = []
+    if "metrics" in results:
+        lines.extend(
+            [
+                "PHASE 2: TRANSFORMATION METRICS QUALITY ASSESSMENT",
+                "-" * 80,
+                f"Total Vehicles Processed: {results['metrics']['total_vehicles_processed']}",
+                f"Valid Vehicles: {results['metrics']['valid_vehicles']}",
+                f"Invalid Vehicles: {results['metrics']['invalid_vehicles']}",
+                f"Bus lines identified: {results['metrics']['total_lines_processed']}",
+                f"Quality Score: {results['quality_score']}%",
+            ]
+        )
+    if "issues" in results:
+        issues = results["issues"]
+        if (
+            issues["invalid_trips"]
+            or issues["distance_calculation_errors"]
+            or issues["vehicle_count_discrepancies"]
+        ):
+            lines.append("")
+            lines.append("Issues Detected:")
+            if issues["invalid_trips"]:
+                lines.append(
+                    f"  • Invalid Trips: {len(issues['invalid_trips'])} - {issues['invalid_trips'][:5]}{'...' if len(issues['invalid_trips']) > 5 else ''}"
+                )
+            if issues["invalid_vehicle_ids"]:
+                lines.append(
+                    f"  • Invalid Vehicles: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids'][:5]}{'...' if len(issues['invalid_vehicle_ids']) > 5 else ''}"
+                )
+            if issues["distance_calculation_errors"]:
+                lines.append(
+                    f"  • Distance Calculation Errors: {len(issues['distance_calculation_errors'])}"
+                )
+            if issues["vehicle_count_discrepancies"]:
+                lines.append(
+                    f"  • Vehicle Count Discrepancies: {len(issues['vehicle_count_discrepancies'])}"
+                )
+        lines.append("")
+    if "quality_score" in results:
+        lines.append(f"Quality score: {results['quality_score']}%")
+    return "\n".join(lines)

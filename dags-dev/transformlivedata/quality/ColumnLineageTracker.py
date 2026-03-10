@@ -1,5 +1,5 @@
 """
-Great Expectations-based column-level lineage tracking for transformlivedata.
+Column-level lineage tracking for transformlivedata.
 
 Tracks input fields → transformations → output columns with full traceability.
 """
@@ -137,88 +137,3 @@ class ColumnLineageTracker:
             indent=2,
             default=str,
         )
-
-
-# ============================================================================
-# CONFIGURATION LOADING
-# ============================================================================
-
-
-def get_transformlivedata_column_lineage(
-    quality_config: Dict[str, Any],
-) -> Dict[str, Dict[str, Any]]:
-    """
-    Get column lineage configuration for transformlivedata pipeline.
-
-    Loads from external YAML file and converts to standard format.
-
-    Args:
-        quality_config: Dictionary with loaded quality configuration
-
-    Returns:
-        Dictionary mapping output_column → {input_sources, transformation}
-    """
-    # Convert YAML format to lineage dict format
-    lineage = {}
-    for output_col, col_config in quality_config["columns"].items():
-        lineage[output_col] = {
-            "input_sources": col_config.get("input_sources", []),
-            "transformation": col_config.get("transformation", ""),
-        }
-    return lineage
-
-
-def get_transformlivedata_output_columns(quality_config: Dict[str, Any]) -> List[str]:
-    """
-    Get the ordered list of output column names from data quality configuration file.
-
-    This is the single source of truth for output column names and order.
-    Used by load_transform_save_positions to create DataFrames with correct schema.
-
-    Args:
-        quality_config: Dictionary with loaded quality configuration
-
-    Returns:
-        List[str]: Column names in the order defined in data quality configuration file
-
-    Raises:
-        FileNotFoundError: If data quality configuration file not found
-        ValueError: If columns section missing from config
-    """
-
-    if "columns" not in quality_config:
-        raise ValueError(
-            "Missing 'columns' section in data quality configuration file."
-        )
-    columns = list(quality_config["columns"].keys())
-    if not columns:
-        raise ValueError("No columns defined in data quality configuration file")
-    logger.debug(f"Loaded {len(columns)} output columns from configuration")
-    return columns
-
-
-def build_transformlivedata_lineage(
-    quality_config: Dict[str, Any], execution_id: str
-) -> "ColumnLineageTracker":
-    """
-    Build column lineage tracker for transformlivedata pipeline.
-
-    Loads configuration from external YAML file and builds tracker.
-
-    Args:
-        quality_config: Dictionary with loaded quality configuration
-        execution_id: Unique execution identifier
-
-    Returns:
-        Configured ColumnLineageTracker with all field mappings.
-    """
-    lineage_config = get_transformlivedata_column_lineage(quality_config)
-    tracker = ColumnLineageTracker(execution_id)
-    for output_col, lineage_info in lineage_config.items():
-        tracker.add_field_mapping(
-            output_column=output_col,
-            input_sources=lineage_info["input_sources"],
-            transformation_rule=lineage_info["transformation"],
-            stage="transform",
-        )
-    return tracker
