@@ -5,7 +5,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_positions_to_storage(config, positions_table):
+def save_positions_to_storage(config, positions_df):
     """
     Trusted Layer:
     Saves a list of position tuples to MinIO in Parquet format.
@@ -28,50 +28,24 @@ def save_positions_to_storage(config, positions_table):
             return bucket_name, app_folder, positions_table_name, connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     bucket_name, app_folder, positions_table_name, connection_data = get_config(config)
-    if not positions_table:
-        logger.warning("No positions to save. Table is empty.")
+    if positions_df is None or positions_df.empty:
+        logger.warning("No positions to save. DataFrame is empty.")
         return
-    # 1. Define schema (Must match the order of your list of tuples)
-    columns = [
-        "extracao_ts",
-        "veiculo_id",
-        "linha_lt",
-        "linha_code",
-        "linha_sentido",
-        "lt_destino",
-        "lt_origem",
-        "veiculo_prefixo",
-        "veiculo_acessivel",
-        "veiculo_ts",
-        "veiculo_lat",
-        "veiculo_long",
-        "is_circular",
-        "first_stop_id",
-        "first_stop_lat",
-        "first_stop_lon",
-        "last_stop_id",
-        "last_stop_lat",
-        "last_stop_lon",
-        "distance_to_first_stop",
-        "distance_to_last_stop",
-    ]
     try:
-        # 2. Convert to DataFrame and prepare time metadata
-        df = pd.DataFrame(positions_table, columns=columns)
         # Ensure extracao_ts is datetime to extract components
-        df["extracao_ts"] = pd.to_datetime(df["extracao_ts"])
+        positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"])
         # Determine the filename based on the actual extraction time (HHMM)
         # Assuming one extraction per run, we take the timestamp of the first row
-        batch_ts = df["extracao_ts"].iloc[0]
+        batch_ts = positions_df["extracao_ts"].iloc[0]
         file_name = batch_ts.strftime("positions_%H%M.parquet")
         # Create Partition Strings (Zero-padded for correct sorting)
-        df["year"] = df["extracao_ts"].dt.strftime("%Y")
-        df["month"] = df["extracao_ts"].dt.strftime("%m")
-        df["day"] = df["extracao_ts"].dt.strftime("%d")
-        df["hour"] = df["extracao_ts"].dt.strftime("%H")
+        positions_df["year"] = positions_df["extracao_ts"].dt.strftime("%Y")
+        positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
+        positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
+        positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
         # 3. Initialize DuckDB for the S3 transfer
         con = duckdb.connect(":memory:")
         # Setup MinIO credentials and S3 settings
@@ -86,12 +60,12 @@ def save_positions_to_storage(config, positions_table):
         """)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         logger.info(
-            f"Exporting {len(df)} rows to {output_base_path} partitioned by hour..."
+            f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."
         )
         # We use {filename} as a template so DuckDB knows exactly what to call the file
         # inside the partition folders.
         con.execute(f"""
-            COPY (SELECT * FROM df) 
+            COPY (SELECT * FROM positions_df) 
             TO '{output_base_path}' 
             (
                 FORMAT PARQUET, 
@@ -103,7 +77,8 @@ def save_positions_to_storage(config, positions_table):
         logger.info(f"Successfully saved {file_name} to Trusted Layer.")
     except Exception as e:
         logger.error(f"Failed to save positions to Trusted Layer: {e}")
-        raise
+        raise ValueError(f"Failed to save positions to Trusted Layer: {e}")
     finally:
         if "con" in locals():
             con.close()
+            logger.info("DuckDB connection closed.")

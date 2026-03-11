@@ -61,7 +61,7 @@ def load_transform_save_positions(logical_date_string):
     if not raw_positions:
         logger.error("No position data found to transform.")
         raise ValueError("No position data found to transform.")
-    logger.info("=== PHASE 2: RAW DATA VALIDATION ===")
+    logger.info("=== RAW DATA VALIDATION STAGE ===")
     script_dir = os.path.dirname(os.path.abspath(__file__))
     raw_expectations_config = os.path.join(
         script_dir, "transformlivedata", "config", "raw_expectations.json"
@@ -76,22 +76,29 @@ def load_transform_save_positions(logical_date_string):
     logger.info("Raw data validation passed ✓")
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
     transform_result = transform_positions(config, raw_positions)
-    if not transform_result or not transform_result.get("positions_table"):
+    if (
+        not transform_result
+        or transform_result.get("positions") is None
+        or transform_result["positions"].empty
+    ):
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
-    positions_table = transform_result["positions_table"]
+    positions_df = transform_result["positions"]
     validation_report = get_transformation_metrics_and_issues_report(transform_result)
     logger.info(validation_report)
     expectations_config = os.path.join(
         script_dir, "transformlivedata", "config", "expectations.json"
     )
-    valid_df, invalid_df = validate_expectations(
-        positions_table,
+    logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
+    logger.info("Validating positions expectations...")
+    valid_postions_df, invalid_positions_df = validate_expectations(
+        positions_df,
         expectations_config,
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
-    save_positions_to_storage(config, positions_table)
-    logger.info(f"Saved {len(positions_table)} records to trusted layer")
+    logger.info("Saving valid positions to storage...")
+    save_positions_to_storage(config, valid_postions_df)
+    logger.info(f"Saved {positions_df.shape[0]} records to trusted layer")
     report_filename, validation_filename = create_lineage_report(
         config, validation_report, execution_id
     )
@@ -99,7 +106,7 @@ def load_transform_save_positions(logical_date_string):
     logger.info(f"Execution {execution_id} completed successfully")
     return {
         "execution_id": execution_id,
-        "records_processed": len(positions_table),
+        "records_processed": valid_postions_df.shape[0],
         # "validation_passed": validation_results["overall_success"],
         # "lineage_report": report_filename,
         # "validation_report": validation_filename,

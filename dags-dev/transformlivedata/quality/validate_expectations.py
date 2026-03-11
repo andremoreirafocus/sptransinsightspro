@@ -1,8 +1,9 @@
 import great_expectations as gx
 from great_expectations.core.expectation_suite import ExpectationSuite
-import pandas as pd
 import json
+import warnings
 import logging
+
 
 ""
 # This logger inherits the configuration from the root logger in main.py
@@ -18,36 +19,23 @@ lat_long_limits = {
 }
 
 
-def validate_expectations(tuples_table, transformed_expectations_config):
-    def get_df_from_tuples_list(tuples_table):
-        column_names = [
-            "extracao_ts",
-            "veiculo_id",
-            "linha_lt",
-            "linha_code",
-            "linha_sentido",
-            "lt_destino",
-            "lt_origem",
-            "veiculo_prefixo",
-            "veiculo_acessivel",
-            "veiculo_ts",
-            "veiculo_lat",
-            "veiculo_long",
-            "is_circular",
-            "first_stop_id",
-            "first_stop_lat",
-            "first_stop_lon",
-            "last_stop_id",
-            "last_stop_lat",
-            "last_stop_lon",
-            "distance_to_first_stop",
-            "distance_to_last_stop",
-        ]
-        if column_names:
-            df = pd.DataFrame(tuples_table, columns=column_names)
-        else:
-            df = pd.DataFrame(tuples_table)
-        return df
+def validate_expectations(df_to_be_validated, transformed_expectations_config):
+    def clear_internal_gx_warnings():
+        warnings.filterwarnings(
+            "ignore", category=UserWarning, module="great_expectations"
+        )
+        warnings.filterwarnings(
+            "ignore", category=DeprecationWarning, module=".*pyparsing.*"
+        )
+        logging.getLogger(
+            "great_expectations.data_context.data_context.context_factory"
+        ).setLevel(logging.WARNING)
+        logging.getLogger("great_expectations.data_context.types.base").setLevel(
+            logging.WARNING
+        )
+        logging.getLogger("great_expectations.datasource.fluent.config").setLevel(
+            logging.WARNING
+        )
 
     def extract_unmatched_expectations_details(checkpoint_result):
         bad_indices = set()
@@ -70,11 +58,11 @@ def validate_expectations(tuples_table, transformed_expectations_config):
                         + f" -> violations: {violation_count}"
                     )
                     bad_indices.update(result["unexpected_index_list"])
-        logger.info(f"Amount of invalid records: {len(bad_indices)}")
+        # logger.warning(f"Amount of invalid records: {len(bad_indices)}")
         return bad_indices
 
-    positions_df = get_df_from_tuples_list(tuples_table)
-    gx_context = gx.get_context()
+    clear_internal_gx_warnings()
+    gx_context = gx.get_context(mode="ephemeral")
     with open(transformed_expectations_config, "r") as f:
         suite_dict = json.load(f)
     suite = ExpectationSuite(**suite_dict)
@@ -82,7 +70,7 @@ def validate_expectations(tuples_table, transformed_expectations_config):
     datasource_name = "pandas_datasource"
     datasource = gx_context.sources.add_pandas(datasource_name)
     data_asset = datasource.add_dataframe_asset(name="positions_asset")
-    batch_request = data_asset.build_batch_request(dataframe=positions_df)
+    batch_request = data_asset.build_batch_request(dataframe=df_to_be_validated)
     checkpoint = gx_context.add_or_update_checkpoint(
         name="prod_checkpoint_with_alerts",
         validations=[
@@ -107,18 +95,18 @@ def validate_expectations(tuples_table, transformed_expectations_config):
     )
     if checkpoint_result.success:
         logger.info("Validation successful!")
-        valid_df = positions_df
+        valid_df = df_to_be_validated
         invalid_df = None
     else:
-        logger.info("Validation failures detected!")
+        logger.warning("Validation failures detected!")
         logger.info("Checking for unmatched expectations...")
         bad_indices = extract_unmatched_expectations_details(checkpoint_result)
-        valid_df = positions_df.drop(index=list(bad_indices))
-        invalid_df = positions_df.loc[list(bad_indices)]
+        valid_df = df_to_be_validated.drop(index=list(bad_indices))
+        invalid_df = df_to_be_validated.loc[list(bad_indices)]
         logger.info(f"Amount of valid records: {valid_df.shape[0]}")
-        logger.info(f"Content of valid records:\n {valid_df.head()}")
-        logger.info(f"Amount of invalid records: {invalid_df.shape[0]}")
-        logger.info(f"Content of invalid records:\n {invalid_df.head()}")
+        logger.debug(f"Content of valid records:\n {valid_df.head()}")
+        logger.warning(f"Amount of invalid records: {invalid_df.shape[0]}")
+        logger.warning(f"Content of invalid records:\n {invalid_df.head()}")
     return valid_df, invalid_df
     # --- DATA DOCS GENERATION ---
     gx_context.build_data_docs()
