@@ -14,7 +14,7 @@ import jsonschema
 logger = logging.getLogger(__name__)
 
 
-def validate_raw_data(data: Dict, config_file: str) -> Tuple[bool, List[str]]:
+def validate_json_data_schema(data: Dict, config_file: str) -> Tuple[bool, List[str]]:
     """Validate raw API response dict against JSON schema.
 
     Args:

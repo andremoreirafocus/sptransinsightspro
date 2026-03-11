@@ -14,7 +14,9 @@ from transformlivedata.quality.validate_expectations import (
 )
 from transformlivedata.services.lineage_report import create_lineage_report
 from transformlivedata.config import get_config
-from transformlivedata.quality.validate_raw_data import validate_raw_data
+from transformlivedata.quality.validate_json_data_schema import (
+    validate_json_data_schema,
+)
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -63,11 +65,11 @@ def load_transform_save_positions(logical_date_string):
         raise ValueError("No position data found to transform.")
     logger.info("=== RAW DATA VALIDATION STAGE ===")
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    raw_expectations_config = os.path.join(
-        script_dir, "transformlivedata", "config", "raw_expectations.json"
+    raw_data_schema_config = os.path.join(
+        script_dir, "transformlivedata", "config", "raw_data_schema_config.json"
     )
-    is_valid, validation_errors = validate_raw_data(
-        raw_positions, raw_expectations_config
+    is_valid, validation_errors = validate_json_data_schema(
+        raw_positions, raw_data_schema_config
     )
     if not is_valid:
         error_msg = f"Raw data validation failed: {validation_errors}"
@@ -87,7 +89,7 @@ def load_transform_save_positions(logical_date_string):
     validation_report = get_transformation_metrics_and_issues_report(transform_result)
     logger.info(validation_report)
     expectations_config = os.path.join(
-        script_dir, "transformlivedata", "config", "expectations.json"
+        script_dir, "transformlivedata", "config", "transformed_data_expectations.json"
     )
     logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
     logger.info("Validating positions expectations...")
