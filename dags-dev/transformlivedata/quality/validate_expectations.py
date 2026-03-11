@@ -39,6 +39,7 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
 
     def extract_unmatched_expectations_details(checkpoint_result):
         bad_indices = set()
+        reasons_by_index = {}
         for run_result in checkpoint_result.run_results.values():
             validation_results = run_result["validation_result"]["results"]
             for expectation_result in validation_results:
@@ -50,18 +51,22 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
                     )
                     expectation_type = expectation_config.get("expectation_type")
                     column = expectation_config.get("kwargs", {}).get("column")
-                    unexpected_indices = result["unexpected_index_list"]
                     violation_count = len(unexpected_indices)
                     logger.info(
                         f"{expectation_type}"
                         + (f" (column: {column})" if column else "")
                         + f" -> violations: {violation_count}"
                     )
-                    bad_indices.update(result["unexpected_index_list"])
-        # logger.warning(f"Amount of invalid records: {len(bad_indices)}")
-        return bad_indices
+                    reason = f"expectation_type:{expectation_type}" + (
+                        f"|column:{column}" if column else ""
+                    )
+                    for idx in unexpected_indices:
+                        bad_indices.add(idx)
+                        reasons_by_index[idx] = reasons_by_index.get(idx, []) + [reason]
+                        print(reason)
+        return bad_indices, reasons_by_index
 
-    clear_internal_gx_warnings()
+    # clear_internal_gx_warnings()
     gx_context = gx.get_context(mode="ephemeral")
     with open(transformed_expectations_config, "r") as f:
         suite_dict = json.load(f)
@@ -100,9 +105,17 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
     else:
         logger.warning("Validation failures detected!")
         logger.info("Checking for unmatched expectations...")
-        bad_indices = extract_unmatched_expectations_details(checkpoint_result)
-        valid_df = df_to_be_validated.drop(index=list(bad_indices))
-        invalid_df = df_to_be_validated.loc[list(bad_indices)]
+        bad_indices, reasons_by_index = extract_unmatched_expectations_details(
+            checkpoint_result
+        )
+        bad_indices_list = list(bad_indices)
+        valid_df = df_to_be_validated.drop(index=bad_indices_list)
+        invalid_df = df_to_be_validated.loc[bad_indices_list]
+        invalid_df = invalid_df.assign(
+            invalid_reason=invalid_df.index.map(
+                lambda idx: "; ".join(reasons_by_index.get(idx, []))
+            )
+        )
         logger.info(f"Amount of valid records: {valid_df.shape[0]}")
         logger.debug(f"Content of valid records:\n {valid_df.head()}")
         logger.warning(f"Amount of invalid records: {invalid_df.shape[0]}")

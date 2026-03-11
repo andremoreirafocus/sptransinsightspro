@@ -47,3 +47,111 @@ Scope: `dags-dev/transformlivedata` validation + lineage only. No code changes r
 1. What is the intended canonical source of lineage mappings: `lineage.json` or a section inside the data quality config?
 2. Do you want invalid rows written to a quarantine location (e.g., MinIO) instead of being dropped?
 3. Should raw schema validation be strict (fail run) or soft (log + continue)?
+
+## Unified Quality Result (UQR) Proposal
+
+Goal: produce one authoritative quality artifact per run that merges transformation metrics and expectation validation outcomes, and drives reporting, lineage, and quarantine routing.
+
+### UQR Schema (Draft)
+
+```json
+{
+  "execution_id": "uuid",
+  "logical_date_utc": "2026-02-15T12:36:00Z",
+  "source_file": "posicoes_onibus-202602150936.json",
+  "row_counts": {
+    "raw_records": 5251,
+    "transformed_records": 5200,
+    "accepted_records": 5150,
+    "rejected_records": 50
+  },
+  "transformation_metrics": {
+    "total_vehicles_processed": 5200,
+    "valid_vehicles": 5150,
+    "invalid_vehicles": 50,
+    "expected_vehicles": 5251,
+    "total_lines_processed": 120
+  },
+  "transformation_issues": {
+    "invalid_trips": ["2104-10-0", "3063-1-1"],
+    "invalid_vehicle_ids": [21300, 21303],
+    "distance_calculation_errors": 3,
+    "vehicle_count_discrepancies_per_line": 12
+  },
+  "expectations_summary": {
+    "total_checks": 18,
+    "checks_failed": 2,
+    "rows_failed": 50,
+    "top_failure_reasons": [
+      {"rule": "veiculo_lat_in_range", "count": 20},
+      {"rule": "veiculo_long_in_range", "count": 30}
+    ]
+  },
+  "outcome": {
+    "status": "WARN",
+    "acceptance_rate": 0.9904,
+    "policy_version": "v1"
+  },
+  "artifacts": {
+    "quality_report_path": "trusted/quality/reports/...",
+    "quarantine_path": "raw/quarantine/..."
+  }
+}
+```
+
+### Report Template (Human-Readable)
+
+```
+TRANSFORMLIVEDATA QUALITY REPORT
+Execution ID: <uuid>
+Logical Date (UTC): <timestamp>
+Source File: <filename>
+
+Record Counts
+- Raw records: <n>
+- Transformed records: <n>
+- Accepted records: <n>
+- Rejected records: <n>
+- Acceptance rate: <pct>
+
+Transformation Metrics
+- Total vehicles processed: <n>
+- Valid vehicles: <n>
+- Invalid vehicles: <n>
+- Expected vehicles: <n>
+- Lines processed: <n>
+
+Transformation Issues
+- Invalid trips: <n> (sample: <first 10>)
+- Invalid vehicle IDs: <n> (sample: <first 10>)
+- Distance calculation errors: <n>
+- Vehicle count discrepancies: <n>
+
+Expectation Validation
+- Total checks: <n>
+- Checks failed: <n>
+- Rows failed: <n>
+- Top failure reasons:
+  - <rule>: <count>
+  - <rule>: <count>
+
+Outcome
+- Status: PASS | WARN | FAIL
+- Policy version: <version>
+
+Artifacts
+- Quality report: <path>
+- Quarantine folder: <path>
+```
+
+### Policy (Draft)
+
+- PASS: acceptance_rate >= 0.995 and checks_failed == 0
+- WARN: acceptance_rate >= 0.980 and checks_failed > 0
+- FAIL: acceptance_rate < 0.980 or any critical check fails
+
+### Quarantine Handling (High Level Only)
+
+- All expectation-rejected records must be saved to a quarantined folder.
+- Each quarantined record should include failure reasons and execution_id for traceability.
+- No storage format or path details defined here (pending decision).
