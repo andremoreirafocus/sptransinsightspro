@@ -7,17 +7,25 @@
   "properties": {
     "metadata": {
       "type": "object",
-      "required": ["extracted_at"],
+      "required": ["extracted_at", "source", "total_vehicles"],
       "properties": {
         "extracted_at": {
           "type": "string",
           "description": "Timestamp of data extraction (ISO format expected)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source identifier"
+        },
+        "total_vehicles": {
+          "type": "integer",
+          "description": "Total number of vehicles reported in this payload"
         }
       }
     },
     "payload": {
       "type": "object",
-      "required": ["l"],
+      "required": ["hr", "l"],
       "properties": {
         "hr": {
           "oneOf": [

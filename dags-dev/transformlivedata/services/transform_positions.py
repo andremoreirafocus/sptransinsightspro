@@ -1,5 +1,3 @@
-from turtle import pd
-
 from transformlivedata.services.load_trip_details import (
     load_trip_details,
 )
@@ -198,9 +196,6 @@ def transform_positions(config, raw_positions):
     invalid_trips = set()
     distance_errors = []
     vehicle_count_discrepancies_per_line = []
-    if not raw_data_structure_is_valid(raw_positions):
-        logger.error("Raw positions data structure is invalid.")
-        return None
     payload = raw_positions.get("payload")
     metadata = raw_positions.get("metadata")
     if "hr" not in payload:
@@ -282,43 +277,6 @@ def transform_positions(config, raw_positions):
         f"Total invalid vehicles ids: {len(result['issues']['invalid_vehicle_ids'])} - {result['issues']['invalid_vehicle_ids']}"
     )
     return result
-
-
-def raw_data_structure_is_valid(data):
-    """
-    Validate the structure of the incoming data.
-    :param data: The data to validate
-    :return: True if valid, False otherwise
-    """
-    if not isinstance(data, dict):
-        logger.error("Data does not have a valid structure.")
-        return False
-    required_fields = ["payload", "metadata"]
-    for field in required_fields:
-        if field not in data:
-            logger.error(f"Missing required field: {field}")
-            logger.error(f"Data content: {data}")
-            return False
-    if not isinstance(data.get("metadata"), dict):
-        logger.error("Data metadata does not have a valid structure.")
-        return False
-    required_fields = ["source", "extracted_at", "total_vehicles"]
-    for field in required_fields:
-        if field not in data.get("metadata"):
-            logger.error(f"Missing required metadata field: {field}")
-            logger.error(f"Metadata content: {data.get('metadata')}")
-            return False
-    if not isinstance(data.get("payload"), dict):
-        logger.error("Data payload does not have a valid structure.")
-        logger.error(f"Payload content: {data.get('payload')}")
-        logger.error(f"Metadata content: {data.get('metadata')}")
-        return False
-    required_fields = ["hr", "l"]
-    for field in required_fields:
-        if field not in data.get("payload"):
-            logger.error(f"Missing required payload field: {field}")
-            return False
-    return True
 
 
 def get_transformation_metrics_and_issues_report(results):
