@@ -93,7 +93,7 @@ def load_transform_save_positions(logical_date_string):
     )
     logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
     logger.info("Validating positions expectations...")
-    valid_postions_df, invalid_positions_df = validate_expectations(
+    valid_postions_df, invalid_positions_df, expectations_summary = validate_expectations(
         positions_df,
         expectations_config,
     )

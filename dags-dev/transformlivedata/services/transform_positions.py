@@ -67,6 +67,7 @@ def calculate_distance(lat1, lon1, lat2, lon2) -> Tuple[float, bool]:
 
 def build_transformation_result(
     positions_tuple_list,
+    invalid_positions_tuple_list,
     invalid_vehicle_ids,
     invalid_trips,
     distance_errors,
@@ -104,6 +105,10 @@ def build_transformation_result(
         "distance_to_last_stop",
     ]
     positions_df = pd.DataFrame(positions_tuple_list, columns=columns)
+    invalid_columns = columns + ["invalid_reason"]
+    invalid_positions_df = pd.DataFrame(
+        invalid_positions_tuple_list, columns=invalid_columns
+    )
     metrics = {
         "total_vehicles_processed": total_vehicles_processeed + invalid_vehicles,
         "valid_vehicles": total_vehicles_processeed,
@@ -119,6 +124,7 @@ def build_transformation_result(
     }
     result = {
         "positions": positions_df,
+        "invalid_positions": invalid_positions_df,
         "metrics": metrics,
         "issues": issues,
         "quality_score": 0.0,
@@ -191,6 +197,33 @@ def transform_positions(config, raw_positions):
         )
         return vehicle_record
 
+    def get_invalid_record_from_raw(vehicle, line, metadata, reason):
+        vehicle_record = (
+            parser.parse(metadata.get("extracted_at")),  # extracao_ts
+            int(vehicle.get("p")),  # veiculo_id
+            line.get("c"),  # linha_lt
+            int(line.get("cl")),  # linha_code
+            int(line.get("sl")),  # linha_sentido
+            line.get("lt0"),  # lt_destino
+            line.get("lt1"),  # lt_origem
+            int(vehicle.get("p")),  # veiculo_prefixo
+            bool(vehicle.get("a")),  # veiculo_acessivel
+            parser.parse(vehicle.get("ta")),  # veiculo_ts
+            float(vehicle.get("py")),  # veiculo_lat
+            float(vehicle.get("px")),  # veiculo_long
+            None,  # is_circular
+            None,  # first_stop_id
+            None,  # first_stop_lat
+            None,  # first_stop_lon
+            None,  # last_stop_id
+            None,  # last_stop_lat
+            None,  # last_stop_lon
+            None,  # distance_to_first_stop
+            None,  # distance_to_last_stop
+            reason,
+        )
+        return vehicle_record
+
     logger.info("Converting raw positions to positions table...")
     invalid_vehicle_ids = []
     invalid_trips = set()
@@ -211,6 +244,7 @@ def transform_positions(config, raw_positions):
     )
     logger.info("Starting transformation of position data...")
     positions_table = []
+    invalid_positions_table = []
     total_vehicles_processeed = 0
     invalid_vehicles = 0
     total_lines_processed = 0
@@ -233,6 +267,14 @@ def transform_positions(config, raw_positions):
                 if trip_id not in invalid_trips:
                     invalid_trips.add(trip_id)
                 invalid_vehicles += 1
+                invalid_positions_table.append(
+                    get_invalid_record_from_raw(
+                        vehicle,
+                        line,
+                        metadata,
+                        "transform_error:trip_details_missing",
+                    )
+                )
                 logger.warning(
                     f"Skipping vehicle {vehicle_id} on invalid trip {trip_id}"
                 )
@@ -259,6 +301,7 @@ def transform_positions(config, raw_positions):
     total_vehicles_expected = metadata.get("total_vehicles", 0)
     result = build_transformation_result(
         positions_table,
+        invalid_positions_table,
         invalid_vehicle_ids,
         invalid_trips,
         distance_errors,

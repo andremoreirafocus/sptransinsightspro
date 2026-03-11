@@ -40,9 +40,14 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
     def extract_unmatched_expectations_details(checkpoint_result):
         bad_indices = set()
         reasons_by_index = {}
+        total_checks = 0
+        checks_failed = 0
         for run_result in checkpoint_result.run_results.values():
             validation_results = run_result["validation_result"]["results"]
+            total_checks += len(validation_results)
             for expectation_result in validation_results:
+                if not expectation_result.get("success", False):
+                    checks_failed += 1
                 result = expectation_result.get("result", {})
                 unexpected_indices = result.get("unexpected_index_list") or []
                 if len(unexpected_indices) > 0:
@@ -63,8 +68,7 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
                     for idx in unexpected_indices:
                         bad_indices.add(idx)
                         reasons_by_index[idx] = reasons_by_index.get(idx, []) + [reason]
-                        print(reason)
-        return bad_indices, reasons_by_index
+        return bad_indices, reasons_by_index, total_checks, checks_failed
 
     # clear_internal_gx_warnings()
     gx_context = gx.get_context(mode="ephemeral")
@@ -102,12 +106,21 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
         logger.info("Validation successful!")
         valid_df = df_to_be_validated
         invalid_df = None
+        expectations_summary = {
+            "total_checks": 0,
+            "checks_failed": 0,
+            "rows_failed": 0,
+            "top_failure_reasons": [],
+        }
     else:
         logger.warning("Validation failures detected!")
         logger.info("Checking for unmatched expectations...")
-        bad_indices, reasons_by_index = extract_unmatched_expectations_details(
-            checkpoint_result
-        )
+        (
+            bad_indices,
+            reasons_by_index,
+            total_checks,
+            checks_failed,
+        ) = extract_unmatched_expectations_details(checkpoint_result)
         bad_indices_list = list(bad_indices)
         valid_df = df_to_be_validated.drop(index=bad_indices_list)
         invalid_df = df_to_be_validated.loc[bad_indices_list]
@@ -120,7 +133,20 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
         logger.debug(f"Content of valid records:\n {valid_df.head()}")
         logger.warning(f"Amount of invalid records: {invalid_df.shape[0]}")
         logger.warning(f"Content of invalid records:\n {invalid_df.head()}")
-    return valid_df, invalid_df
+        reasons_list = [r for reasons in reasons_by_index.values() for r in reasons]
+        failure_counts = {}
+        for reason in reasons_list:
+            failure_counts[reason] = failure_counts.get(reason, 0) + 1
+        top_failure_reasons = [
+            {"rule": rule, "count": count} for rule, count in failure_counts.items()
+        ]
+        expectations_summary = {
+            "total_checks": total_checks,
+            "checks_failed": checks_failed,
+            "rows_failed": len(bad_indices),
+            "top_failure_reasons": top_failure_reasons,
+        }
+    return valid_df, invalid_df, expectations_summary
     # --- DATA DOCS GENERATION ---
     gx_context.build_data_docs()
     # This finds the local path to the 'index.html' of your documentation
