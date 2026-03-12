@@ -19,7 +19,7 @@ from transformlivedata.quality.validate_json_data_schema import (
 from transformlivedata.quality.uqr import (
     build_uqr,
     format_uqr_report,
-    write_uqr_json,
+    save_uqr_to_storage,
 )
 import pandas as pd
 from datetime import datetime
@@ -115,11 +115,7 @@ def load_transform_save_positions(logical_date_string):
     )
     validation_report = format_uqr_report(uqr)
     logger.info(validation_report)
-    uqr_suffix = (
-        logical_date_string.replace(":", "").replace("+", "").replace("-", "")
-    )
-    uqr_json_filename = f"uqr-{uqr_suffix}.json"
-    write_uqr_json(uqr, uqr_json_filename)
+    save_uqr_to_storage(config, uqr, positions_df["extracao_ts"].iloc[0])
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df, "trusted")

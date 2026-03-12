@@ -35,6 +35,8 @@ def get_airflow_config():
         "raw_data_compression_extension"
     ]
     raw_events_table_name = transformlivedata_vars["raw_events_table_name"]
+    metadata_bucket = transformlivedata_vars["metadata_bucket"]
+    quality_report_folder = transformlivedata_vars["quality_report_folder"]
     quarantined_bucket = transformlivedata_vars["quarantined_bucket"]
     postgres_conn = BaseHook.get_connection("airflow_postgres_conn")
     postgres_host = postgres_conn.host
@@ -56,6 +58,8 @@ def get_airflow_config():
         "RAW_DATA_COMPRESSION": raw_data_compression,
         "RAW_DATA_COMPRESSION_EXTENSION": raw_data_compression_extension,
         "RAW_EVENTS_TABLE_NAME": raw_events_table_name,
+        "METADATA_BUCKET": metadata_bucket,
+        "QUALITY_REPORT_FOLDER": quality_report_folder,
         "QUARANTINED_BUCKET": quarantined_bucket,
         "DB_HOST": postgres_host,
         "DB_PORT": postgres_port,

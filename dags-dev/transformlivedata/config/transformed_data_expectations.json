@@ -2,7 +2,13 @@
   "expectation_suite_name": "transformlivedata",
   "meta": {
     "great_expectations_version": "0.17.0",
-    "description": "Validation rules for TRANSFORMED output data (post-transformation via DataFrame)\nRaw validation is handled separately via raw_expectations.json with Pydantic"
+    "description": "Validation rules for TRANSFORMED output data. Decoupled from Python code via root-level evaluation_parameters."
+  },
+  "evaluation_parameters": {
+    "lat_min_value": -23.916334,
+    "lat_max_value": -23.189743,
+    "long_min_value": -46.792037,
+    "long_max_value": -46.184930
   },
   "expectations": [
     {
@@ -19,7 +25,7 @@
       },
       "meta": {
         "rule_type": "output_columns_exist",
-        "description": "Validate all required output columns exist in transformed data",
+        "description": "Validate all required output columns exist",
         "phase": "transformed"
       }
     },
@@ -31,7 +37,7 @@
       },
       "meta": {
         "rule_type": "column_data_types",
-        "description": "Vehicle ID must be integer type",
+        "description": "Vehicle ID must be integer",
         "phase": "transformed"
       }
     },
@@ -41,11 +47,7 @@
         "column": "linha_code",
         "type_": "int"
       },
-      "meta": {
-        "rule_type": "column_data_types",
-        "description": "Line code must be integer type",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "column_data_types", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_of_type",
@@ -53,11 +55,7 @@
         "column": "linha_sentido",
         "type_": "int"
       },
-      "meta": {
-        "rule_type": "column_data_types",
-        "description": "Direction must be integer type (0=outbound, 1=return)",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "column_data_types", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_of_type",
@@ -65,11 +63,7 @@
         "column": "veiculo_lat",
         "type_": "float"
       },
-      "meta": {
-        "rule_type": "column_data_types",
-        "description": "Latitude must be float type",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "column_data_types", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_of_type",
@@ -77,22 +71,14 @@
         "column": "veiculo_long",
         "type_": "float"
       },
-      "meta": {
-        "rule_type": "column_data_types",
-        "description": "Longitude must be float type",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "column_data_types", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_not_be_null",
       "kwargs": {
         "column": "veiculo_id"
       },
-      "meta": {
-        "rule_type": "vehicle_ids_not_null",
-        "description": "Vehicle ID is never null (required field)",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "vehicle_ids_not_null", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_between",
@@ -100,11 +86,7 @@
         "column": "distance_to_first_stop",
         "min_value": 0
       },
-      "meta": {
-        "rule_type": "distances_non_negative",
-        "description": "Distance to first stop is non-negative (Haversine result)",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "distances_non_negative", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_between",
@@ -112,22 +94,18 @@
         "column": "distance_to_last_stop",
         "min_value": 0
       },
-      "meta": {
-        "rule_type": "distances_non_negative",
-        "description": "Distance to last stop is non-negative (Haversine result)",
-        "phase": "transformed"
-      }
+      "meta": { "rule_type": "distances_non_negative", "phase": "transformed" }
     },
     {
       "expectation_type": "expect_column_values_to_be_between",
       "kwargs": {
         "column": "veiculo_lat",
-        "min_value": {"$PARAMETER": "lat_min_value"},
-        "max_value": {"$PARAMETER": "lat_max_value"}
+        "min_value": { "$PARAMETER": "lat_min_value" },
+        "max_value": { "$PARAMETER": "lat_max_value" }
       },
       "meta": {
         "rule_type": "coordinates_in_rmsp",
-        "description": "Latitude within RMSP (São Paulo metro) bounds with tolerance",
+        "description": "Latitude within RMSP bounds using suite-level defaults",
         "phase": "transformed"
       }
     },
@@ -135,12 +113,12 @@
       "expectation_type": "expect_column_values_to_be_between",
       "kwargs": {
         "column": "veiculo_long",
-        "min_value": {"$PARAMETER": "long_min_value"},
-        "max_value": {"$PARAMETER": "long_max_value"}
+        "min_value": { "$PARAMETER": "long_min_value" },
+        "max_value": { "$PARAMETER": "long_max_value" }
       },
       "meta": {
         "rule_type": "coordinates_in_rmsp",
-        "description": "Longitude within RMSP (São Paulo metro) bounds with tolerance",
+        "description": "Longitude within RMSP bounds using suite-level defaults",
         "phase": "transformed"
       }
     }

@@ -10,15 +10,6 @@ from datetime import datetime, timezone
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
-lat_long_limits = {
-    "lat_min_value": -23.916334,
-    "lat_max_value": -23.189743,
-    "long_min_value": -46.792037,  # wrong
-    # "long_min_value": -46.984037,  # corect
-    # "long_max_value": -46.184930,  # correct
-    "long_max_value": -46.184930,
-}
-
 
 def validate_expectations(df_to_be_validated, transformed_expectations_config):
     def clear_internal_gx_warnings():
@@ -100,9 +91,7 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
             },
         ],
     )
-    checkpoint_result = checkpoint.run(
-        result_format="COMPLETE", evaluation_parameters=lat_long_limits
-    )
+    checkpoint_result = checkpoint.run(result_format="COMPLETE")
     if checkpoint_result.success:
         logger.info("Validation successful!")
         valid_df = df_to_be_validated

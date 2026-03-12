@@ -1,5 +1,7 @@
 from typing import Dict, Any
 import json
+from datetime import datetime
+from infra.minio_functions import write_generic_bytes_to_minio
 
 
 def build_uqr(
@@ -128,3 +130,35 @@ def uqr_to_json(uqr: Dict[str, Any]) -> str:
 def write_uqr_json(uqr: Dict[str, Any], output_path: str) -> None:
     with open(output_path, "w") as f:
         f.write(uqr_to_json(uqr))
+
+
+def save_uqr_to_storage(config, uqr, batch_ts):
+    def get_config(config):
+        bucket_name = config["METADATA_BUCKET"]
+        report_folder = config["QUALITY_REPORT_FOLDER"]
+        app_folder = config["APP_FOLDER"]
+        connection_data = {
+            "minio_endpoint": config["MINIO_ENDPOINT"],
+            "access_key": config["ACCESS_KEY"],
+            "secret_key": config["SECRET_KEY"],
+            "secure": False,
+        }
+        return bucket_name, report_folder, app_folder, connection_data
+
+    bucket_name, report_folder, app_folder, connection_data = get_config(config)
+    batch_ts = datetime.fromisoformat(str(batch_ts))
+    year = batch_ts.strftime("%Y")
+    month = batch_ts.strftime("%m")
+    day = batch_ts.strftime("%d")
+    hour = batch_ts.strftime("%H")
+    hhmm = batch_ts.strftime("%H%M")
+    prefix = (
+        f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
+    )
+    object_name = f"{prefix}quality-report-positions_{hhmm}.json"
+    write_generic_bytes_to_minio(
+        connection_data,
+        buffer=uqr_to_json(uqr).encode("utf-8"),
+        bucket_name=bucket_name,
+        object_name=object_name,
+    )
