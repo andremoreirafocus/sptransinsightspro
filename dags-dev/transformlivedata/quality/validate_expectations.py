@@ -3,6 +3,7 @@ from great_expectations.core.expectation_suite import ExpectationSuite
 import json
 import warnings
 import logging
+from datetime import datetime, timezone
 
 
 ""
@@ -129,6 +130,7 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
                 lambda idx: "; ".join(reasons_by_index.get(idx, []))
             )
         )
+        invalid_df = invalid_df.assign(validation_failed_at=datetime.now(timezone.utc))
         logger.info(f"Amount of valid records: {valid_df.shape[0]}")
         logger.debug(f"Content of valid records:\n {valid_df.head()}")
         logger.warning(f"Amount of invalid records: {invalid_df.shape[0]}")

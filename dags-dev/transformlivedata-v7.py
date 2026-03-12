@@ -21,6 +21,7 @@ from transformlivedata.quality.uqr import (
     format_uqr_report,
     write_uqr_json,
 )
+import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -123,11 +124,20 @@ def load_transform_save_positions(logical_date_string):
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df, "trusted")
     logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
-    if invalid_positions_df is not None and not invalid_positions_df.empty:
+    transform_invalid_df = transform_result.get("invalid_positions")
+    invalid_frames = [
+        df for df in [transform_invalid_df, invalid_positions_df] if df is not None
+    ]
+    combined_invalid_df = (
+        pd.concat(invalid_frames, ignore_index=True)
+        if len(invalid_frames) > 0
+        else None
+    )
+    if combined_invalid_df is not None and not combined_invalid_df.empty:
         logger.info("Saving invalid positions to quarantine...")
-        save_positions_to_storage(config, invalid_positions_df, "quarantined")
+        save_positions_to_storage(config, combined_invalid_df, "quarantined")
         logger.info(
-            f"Saved {invalid_positions_df.shape[0]} records to quarantined layer"
+            f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
         )
     validation_filename = create_lineage_report(
         config, execution_id

@@ -2,6 +2,7 @@ from transformlivedata.services.load_trip_details import (
     load_trip_details,
 )
 from dateutil import parser
+from datetime import datetime, timezone
 from typing import Dict, Any, Tuple
 import pandas as pd
 import logging
@@ -105,7 +106,7 @@ def build_transformation_result(
         "distance_to_last_stop",
     ]
     positions_df = pd.DataFrame(positions_tuple_list, columns=columns)
-    invalid_columns = columns + ["invalid_reason"]
+    invalid_columns = columns + ["invalid_reason", "validation_failed_at"]
     invalid_positions_df = pd.DataFrame(
         invalid_positions_tuple_list, columns=invalid_columns
     )
@@ -221,6 +222,7 @@ def transform_positions(config, raw_positions):
             None,  # distance_to_first_stop
             None,  # distance_to_last_stop
             reason,
+            datetime.now(timezone.utc),
         )
         return vehicle_record
 
