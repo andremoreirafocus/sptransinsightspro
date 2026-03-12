@@ -1,4 +1,5 @@
 from typing import Dict, Any
+import json
 
 
 def build_uqr(
@@ -118,3 +119,12 @@ def format_uqr_report(uqr: Dict[str, Any]) -> str:
         f"- Policy version: {outcome.get('policy_version', 'v1')}",
     ]
     return "\n".join(lines)
+
+
+def uqr_to_json(uqr: Dict[str, Any]) -> str:
+    return json.dumps(uqr, ensure_ascii=False, indent=2, default=str)
+
+
+def write_uqr_json(uqr: Dict[str, Any], output_path: str) -> None:
+    with open(output_path, "w") as f:
+        f.write(uqr_to_json(uqr))
