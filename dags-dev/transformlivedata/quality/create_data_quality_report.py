@@ -67,6 +67,7 @@ def build_uqr(
             "rows_failed": expectations_summary.get("rows_failed", 0),
             "failure_reasons": expectations_summary.get("failure_reasons", []),
         },
+        "colum lineage": transform_result.get("lineage", {}),
         "outcome": {
             "status": status,
             "acceptance_rate": acceptance_rate,
@@ -151,6 +152,7 @@ def format_uqr_report(uqr: Dict[str, Any]) -> str:
         f"- Checks failed: {expectations_summary.get('checks_failed', 0)}",
         f"- Records failed: {expectations_summary.get('rows_failed', 0)}",
         f"- Failure reasons: {expectations_summary.get('failure_reasons', [])}",
+        f"- Colum lineage: {uqr.get('colum lineage', {})}",
         "",
         "Outcome",
         f"- Status: {outcome.get('status', 'WARN')}",

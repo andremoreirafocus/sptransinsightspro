@@ -38,11 +38,6 @@
       "transformation": "Extract origin from line info",
       "description": "Route origin (starting point)"
     },
-    "veiculo_prefixo": {
-      "input_sources": ["raw.payload.l[i].vs[j].p"],
-      "transformation": "Same as veiculo_id",
-      "description": "Vehicle prefix (same as vehicle ID)"
-    },
     "veiculo_acessivel": {
       "input_sources": ["raw.payload.l[i].vs[j].a"],
       "transformation": "CAST(accessibility_flag AS BOOLEAN)",

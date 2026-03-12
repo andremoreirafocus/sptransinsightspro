@@ -52,7 +52,6 @@ CREATE TABLE trusted.positions (
     linha_sentido INTEGER,         -- sl: Sentido
     lt_destino TEXT,               -- lt0: Destino
     lt_origem TEXT,                -- lt1: Origem
-    veiculo_prefixo INTEGER,       -- p: Prefixo
     veiculo_acessivel BOOLEAN,     -- a: Acessível
     veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
     veiculo_lat DOUBLE PRECISION,  -- py: Latitude
@@ -79,7 +78,6 @@ CREATE TABLE trusted.positions (
     linha_sentido INTEGER,         -- sl: Sentido
     lt_destino TEXT,               -- lt0: Destino
     lt_origem TEXT,                -- lt1: Origem
-    veiculo_prefixo INTEGER,       -- p: Prefixo
     veiculo_acessivel BOOLEAN,     -- a: Acessível
     veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
     veiculo_lat DOUBLE PRECISION,  -- py: Latitude
@@ -124,7 +122,7 @@ order by veiculo_ts
 
 -- ordem original das colunas
 select extracao_ts, veiculo_id, linha_lt, linha_code, linha_sentido,
-        lt_destino, lt_origem, veiculo_prefixo, veiculo_acessivel, veiculo_ts,
+        lt_destino, lt_origem, veiculo_acessivel, veiculo_ts,
         veiculo_lat, veiculo_long, is_circular, first_stop_id, first_stop_lat,
         first_stop_lon, last_stop_id, last_stop_lat, last_stop_lon,
         distance_to_first_stop, distance_to_last_stop from trusted.positions as p
@@ -426,6 +424,5 @@ WHERE
     AND p.veiculo_id = 41559 
 ORDER BY 
     distance_meters, veiculo_ts;
-
 
 

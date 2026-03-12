@@ -23,7 +23,10 @@ def load_trip_details(config):
         con = get_duckdb_connection(config)
         df = con.execute(f"SELECT * FROM read_parquet('{s3_path}')").df()
         logger.info(f"Successfully loaded {df.shape[0]} trips from storage.")
-        return df
+        trip_details_in_memory_table = {
+            row["trip_id"]: row.to_dict() for _, row in df.iterrows()
+        }
+        return trip_details_in_memory_table
     except Exception as e:
         logger.error(f"Error fetching trip_details from storage: {e}")
         raise RuntimeError(f"Error fetching trip_details from storage: {e}")

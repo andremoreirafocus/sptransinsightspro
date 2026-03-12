@@ -1,0 +1,56 @@
+{
+  "execution_id": "67f16cdb-6104-4432-ba4a-93e5c91ef3fe",
+  "logical_date_utc": "2026-02-26T20:36:00+00:00",
+  "source_file": "posicoes_onibus-202602261736.json",
+  "row_counts": {
+    "raw_records": 11109,
+    "transformed_records": 11101,
+    "accepted_records": 11013,
+    "rejected_records": 96
+  },
+  "transformation_metrics": {
+    "total_vehicles_processed": 11109,
+    "valid_vehicles": 11101,
+    "invalid_vehicles": 8,
+    "expected_vehicles": 11109,
+    "total_lines_processed": 2099
+  },
+  "transformation_issues": {
+    "invalid_trips": [
+      "695X-22-0",
+      "5362-41-0"
+    ],
+    "invalid_vehicle_ids": [
+      61453,
+      61556,
+      61283,
+      61558,
+      61532,
+      61458,
+      61270,
+      61545
+    ],
+    "distance_calculation_errors": 0,
+    "vehicle_count_discrepancies_per_line": 1023
+  },
+  "expectations_summary": {
+    "total_checks": 11,
+    "checks_failed": 1,
+    "rows_failed": 88,
+    "failure_reasons": [
+      {
+        "rule": "expectation_type:expect_column_values_to_be_between|column:veiculo_long",
+        "count": 88
+      }
+    ]
+  },
+  "outcome": {
+    "status": "WARN",
+    "acceptance_rate": 0.9920727862354742,
+    "policy_version": "v1"
+  },
+  "artifacts": {
+    "quality_report_path": "metadata/quality-reports/transformlivedata/year=2026/month=02/day=26/hour=20/quality-report-positions_2036.json",
+    "quarantine_path": "quarantined/sptrans/positions/year=2026/month=02/day=26/hour=20/positions_2036_*.parquet"
+  }
+}
