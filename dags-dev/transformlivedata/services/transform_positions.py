@@ -77,6 +77,7 @@ def build_transformation_result(
     invalid_vehicles,
     total_lines_processed,
     expected_vehicles,
+    batch_ts,
 ) -> Dict[str, Any]:
     """
     Build the final transformation result from raw components.
@@ -126,6 +127,7 @@ def build_transformation_result(
     result = {
         "positions": positions_df,
         "invalid_positions": invalid_positions_df,
+        "batch_ts": batch_ts,
         "metrics": metrics,
         "issues": issues,
         "quality_score": 0.0,
@@ -301,6 +303,7 @@ def transform_positions(config, raw_positions):
                 f"Expected {expected_vehicles_per_line} vehicles for line {linha}, but found {number_of_vehicles_per_line}."
             )
     total_vehicles_expected = metadata.get("total_vehicles", 0)
+    batch_ts = parser.parse(metadata.get("extracted_at"))
     result = build_transformation_result(
         positions_table,
         invalid_positions_table,
@@ -312,6 +315,7 @@ def transform_positions(config, raw_positions):
         invalid_vehicles,
         total_lines_processed,
         total_vehicles_expected,
+        batch_ts,
     )
     logger.info(f"Processed {total_vehicles_processeed} valid vehicles.")
     logger.info(f"Skipped {invalid_vehicles} invalid vehicles.")

@@ -5,6 +5,7 @@ from infra.minio_functions import write_generic_bytes_to_minio
 
 
 def build_uqr(
+    config,
     execution_id: str,
     logical_date_utc: str,
     source_file: str,
@@ -14,6 +15,7 @@ def build_uqr(
     expectations_summary: Dict[str, Any],
     pass_threshold: float,
     warn_threshold: float,
+    batch_ts,
 ) -> Dict[str, Any]:
     metrics = transform_result.get("metrics", {})
     issues = transform_result.get("issues", {})
@@ -71,10 +73,45 @@ def build_uqr(
             "policy_version": "v1",
         },
         "artifacts": {
-            "quality_report_path": None,
-            "quarantine_path": None,
+            "quality_report_path": build_quality_report_path(config, batch_ts),
+            "quarantine_path": build_quarantine_path(config, batch_ts),
         },
     }
+
+
+def build_quality_report_path(config, batch_ts):
+    def get_config(config):
+        bucket_name = config["METADATA_BUCKET"]
+        report_folder = config["QUALITY_REPORT_FOLDER"]
+        return bucket_name, report_folder
+
+    bucket_name, report_folder = get_config(config)
+    batch_ts = datetime.fromisoformat(str(batch_ts))
+    year = batch_ts.strftime("%Y")
+    month = batch_ts.strftime("%m")
+    day = batch_ts.strftime("%d")
+    hour = batch_ts.strftime("%H")
+    hhmm = batch_ts.strftime("%H%M")
+    prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
+    return f"{bucket_name}/{prefix}quality-report-positions_{hhmm}.json"
+
+
+def build_quarantine_path(config, batch_ts):
+    def get_config(config):
+        bucket_name = config["QUARANTINED_BUCKET"]
+        app_folder = config["APP_FOLDER"]
+        positions_table_name = config["POSITIONS_TABLE_NAME"]
+        return bucket_name, app_folder, positions_table_name
+
+    bucket_name, app_folder, positions_table_name = get_config(config)
+    batch_ts = datetime.fromisoformat(str(batch_ts))
+    year = batch_ts.strftime("%Y")
+    month = batch_ts.strftime("%m")
+    day = batch_ts.strftime("%d")
+    hour = batch_ts.strftime("%H")
+    hhmm = batch_ts.strftime("%H%M")
+    prefix = f"{app_folder}/{positions_table_name}/year={year}/month={month}/day={day}/hour={hour}/"
+    return f"{bucket_name}/{prefix}positions_{hhmm}_*.parquet"
 
 
 def format_uqr_report(uqr: Dict[str, Any]) -> str:

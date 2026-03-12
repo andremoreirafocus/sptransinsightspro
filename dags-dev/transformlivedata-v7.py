@@ -16,7 +16,7 @@ from transformlivedata.config import get_config
 from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
-from transformlivedata.quality.uqr import (
+from transformlivedata.quality.create_data_quality_report import (
     build_uqr,
     format_uqr_report,
     save_uqr_to_storage,
@@ -103,6 +103,7 @@ def load_transform_save_positions(logical_date_string):
         )
     )
     uqr = build_uqr(
+        config=config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
         source_file=f"posicoes_onibus-{year}{month}{day}{hour}{minute}.json",
@@ -112,10 +113,11 @@ def load_transform_save_positions(logical_date_string):
         expectations_summary=expectations_summary,
         pass_threshold=1.0,
         warn_threshold=0.980,
+        batch_ts=transform_result["batch_ts"],
     )
     validation_report = format_uqr_report(uqr)
     logger.info(validation_report)
-    save_uqr_to_storage(config, uqr, positions_df["extracao_ts"].iloc[0])
+    save_uqr_to_storage(config, uqr, transform_result["batch_ts"])
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df, "trusted")
@@ -135,9 +137,7 @@ def load_transform_save_positions(logical_date_string):
         logger.info(
             f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
         )
-    validation_filename = create_lineage_report(
-        config, execution_id
-    )
+    validation_filename = create_lineage_report(config, execution_id)
     mark_request_as_processed(config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
     return {
