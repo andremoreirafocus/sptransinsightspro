@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 def create_lineage_report(
     config: Dict[str, Any],
-    validation_report: str,
     execution_id: str,
 ) -> Tuple[str, str]:
     """
@@ -41,13 +40,7 @@ def create_lineage_report(
     write_lineage_report(lineage_data, lineage_report_filename)
     logger.info(f"Lineage report saved to {lineage_report_filename}")
 
-    # Save validation report to file
-    validation_report_filename = f"validation_report_{execution_id}.txt"
-    with open(validation_report_filename, "w") as f:
-        f.write(validation_report)
-    logger.info(f"Validation report saved to {validation_report_filename}")
-
-    return lineage_report_filename, validation_report_filename
+    return lineage_report_filename
 
 
 def load_lineage_config(config: Dict[str, Any]) -> Dict[str, Any]:

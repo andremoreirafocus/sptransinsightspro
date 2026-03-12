@@ -118,16 +118,13 @@ def load_transform_save_positions(logical_date_string):
         logical_date_string.replace(":", "").replace("+", "").replace("-", "")
     )
     uqr_json_filename = f"uqr-{uqr_suffix}.json"
-    uqr_txt_filename = f"uqr-{uqr_suffix}.txt"
     write_uqr_json(uqr, uqr_json_filename)
-    with open(uqr_txt_filename, "w") as f:
-        f.write(validation_report)
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df)
     logger.info(f"Saved {positions_df.shape[0]} records to trusted layer")
-    report_filename, validation_filename = create_lineage_report(
-        config, validation_report, execution_id
+    validation_filename = create_lineage_report(
+        config, execution_id
     )
     mark_request_as_processed(config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
