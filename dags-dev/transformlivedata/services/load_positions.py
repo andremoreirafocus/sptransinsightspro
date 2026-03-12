@@ -55,7 +55,7 @@ def load_positions(config, year, month, day, hour, minute):
         # print(datastr)
         logger.info("Data is compressed, decompressing...")
         datastr = decompress_data(data.getvalue())
-        print(f"Decompressed data {datastr}")
+        # print(f"Decompressed data {datastr}")
         logger.info("Data decompressed successfully.")
     else:
         datastr = read_file_from_minio_to_str(

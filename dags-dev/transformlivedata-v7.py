@@ -121,8 +121,14 @@ def load_transform_save_positions(logical_date_string):
     write_uqr_json(uqr, uqr_json_filename)
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
-    save_positions_to_storage(config, valid_postions_df)
-    logger.info(f"Saved {positions_df.shape[0]} records to trusted layer")
+    save_positions_to_storage(config, valid_postions_df, "trusted")
+    logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
+    if invalid_positions_df is not None and not invalid_positions_df.empty:
+        logger.info("Saving invalid positions to quarantine...")
+        save_positions_to_storage(config, invalid_positions_df, "quarantined")
+        logger.info(
+            f"Saved {invalid_positions_df.shape[0]} records to quarantined layer"
+        )
     validation_filename = create_lineage_report(
         config, execution_id
     )
