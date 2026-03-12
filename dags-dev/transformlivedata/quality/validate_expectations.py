@@ -137,14 +137,14 @@ def validate_expectations(df_to_be_validated, transformed_expectations_config):
         failure_counts = {}
         for reason in reasons_list:
             failure_counts[reason] = failure_counts.get(reason, 0) + 1
-        top_failure_reasons = [
+        failure_reasons = [
             {"rule": rule, "count": count} for rule, count in failure_counts.items()
         ]
         expectations_summary = {
             "total_checks": total_checks,
             "checks_failed": checks_failed,
             "rows_failed": len(bad_indices),
-            "top_failure_reasons": top_failure_reasons,
+            "failure_reasons": failure_reasons,
         }
     return valid_df, invalid_df, expectations_summary
     # --- DATA DOCS GENERATION ---

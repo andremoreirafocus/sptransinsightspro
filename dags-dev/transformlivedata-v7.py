@@ -1,7 +1,6 @@
 from transformlivedata.services.load_positions import load_positions
 from transformlivedata.services.transform_positions import (
     transform_positions,
-    get_transformation_metrics_and_issues_report,
 )
 from transformlivedata.services.save_positions_to_storage import (
     save_positions_to_storage,
@@ -17,6 +16,7 @@ from transformlivedata.config import get_config
 from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
+from transformlivedata.quality.uqr import build_uqr, format_uqr_report
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
@@ -86,17 +86,31 @@ def load_transform_save_positions(logical_date_string):
         logger.error("No valid position records found after transformation.")
         raise ValueError("No valid position records found after transformation.")
     positions_df = transform_result["positions"]
-    validation_report = get_transformation_metrics_and_issues_report(transform_result)
-    logger.info(validation_report)
     expectations_config = os.path.join(
         script_dir, "transformlivedata", "config", "transformed_data_expectations.json"
     )
     logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
     logger.info("Validating positions expectations...")
-    valid_postions_df, invalid_positions_df, expectations_summary = validate_expectations(
-        positions_df,
-        expectations_config,
+    valid_postions_df, invalid_positions_df, expectations_summary = (
+        validate_expectations(
+            positions_df,
+            expectations_config,
+        )
     )
+    validation_report = format_uqr_report(
+        build_uqr(
+            execution_id=execution_id,
+            logical_date_utc=logical_date_string,
+            source_file=f"posicoes_onibus-{year}{month}{day}{hour}{minute}.json",
+            transform_result=transform_result,
+            valid_df=valid_postions_df,
+            invalid_df=invalid_positions_df,
+            expectations_summary=expectations_summary,
+            pass_threshold=1.0,
+            warn_threshold=0.980,
+        )
+    )
+    logger.info(validation_report)
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df)
