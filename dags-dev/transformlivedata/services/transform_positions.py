@@ -264,7 +264,7 @@ def transform_positions(config, raw_positions):
         return None
 
     logger.info("Preloading trip details from database...")
-    trip_details_df = load_trip_details(config)
+    trip_details_df = load_trip_details(config["general"])
     if trip_details_df is None or trip_details_df.empty:
         trip_details_df = pd.DataFrame()
     logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
@@ -427,11 +427,14 @@ def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
 
 
 def get_raw_path_map(config: Dict[str, Any]) -> Dict[str, str]:
-    schema_path = config.get("RAW_DATA_SCHEMA_CONFIG")
-    if not schema_path:
-        return {}
-    with open(schema_path, "r") as f:
-        schema = json.load(f)
+    if "raw_data_json_schema" in config and config["raw_data_json_schema"]:
+        schema = config["raw_data_json_schema"]
+    else:
+        schema_path = config.get("RAW_DATA_SCHEMA_CONFIG")
+        if not schema_path:
+            return {}
+        with open(schema_path, "r") as f:
+            schema = json.load(f)
     payload_props = (
         schema.get("properties", {}).get("payload", {}).get("properties", {})
     )

@@ -17,6 +17,22 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 3 seções:
+- `general`
+- `raw_data_json_schema`
+- `data_expectations`
+
+### Local/dev
+- `general` vem do arquivo `.env` em `dags-dev/transformlivedata/.env`
+- `raw_data_json_schema` vem de `dags-dev/transformlivedata/config/raw_data_schema_config.json`
+- `data_expectations` vem de `dags-dev/transformlivedata/config/transformed_data_expectations.json`
+
+### Airflow (produção)
+- Variable `transformlivedata_general` (JSON)
+- Variable `transformlivedata_raw_data_json_schema` (JSON)
+- Variable `transformlivedata_data_expectations` (JSON)
+
+### Chaves esperadas em `general`
 RAW_BUCKET = <raw_bucket> 
 APP_FOLDER = "sptrans"
 GTFS_FOLDER = "gtfs"
@@ -424,5 +440,4 @@ WHERE
     AND p.veiculo_id = 41559 
 ORDER BY 
     distance_meters, veiculo_ts;
-
 

@@ -5,21 +5,22 @@ Validates raw API responses against raw_expectations.json schema before
 any data transformation occurs.
 """
 
-import json
 import logging
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Union
 
 import jsonschema
 
 logger = logging.getLogger(__name__)
 
 
-def validate_json_data_schema(data: Dict, config_file: str) -> Tuple[bool, List[str]]:
+def validate_json_data_schema(
+    data: Dict, schema: Union[Dict, str]
+) -> Tuple[bool, List[str]]:
     """Validate raw API response dict against JSON schema.
 
     Args:
         data: Raw API response dict to validate
-        config_file: Path to raw_expectations.json schema file
+        schema: JSON schema dict or path to schema JSON file
 
     Returns:
         Tuple of (is_valid, error_messages)
@@ -31,8 +32,8 @@ def validate_json_data_schema(data: Dict, config_file: str) -> Tuple[bool, List[
         json.JSONDecodeError: If schema config_file is not valid JSON
     """
     try:
-        schema = load_raw_schema(config_file)
-        jsonschema.validate(instance=data, schema=schema)
+        schema_dict = load_raw_schema(schema) if isinstance(schema, str) else schema
+        jsonschema.validate(instance=data, schema=schema_dict)
         logger.debug("Raw data validation passed")
         return True, []
     except jsonschema.ValidationError as e:
