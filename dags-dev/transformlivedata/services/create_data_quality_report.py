@@ -4,7 +4,7 @@ from datetime import datetime
 from infra.minio_functions import write_generic_bytes_to_minio
 
 
-def build_uqr(
+def build_data_quality_report(
     config,
     execution_id: str,
     logical_date_utc: str,
@@ -115,18 +115,18 @@ def build_quarantine_path(config, batch_ts):
     return f"{bucket_name}/{prefix}positions_{hhmm}_*.parquet"
 
 
-def format_uqr_report(uqr: Dict[str, Any]) -> str:
-    row_counts = uqr.get("row_counts", {})
-    transform_metrics = uqr.get("transformation_metrics", {})
-    transform_issues = uqr.get("transformation_issues", {})
-    expectations_summary = uqr.get("expectations_summary", {})
-    outcome = uqr.get("outcome", {})
+def format_data_quality_report_report(data_quality_report: Dict[str, Any]) -> str:
+    row_counts = data_quality_report.get("row_counts", {})
+    transform_metrics = data_quality_report.get("transformation_metrics", {})
+    transform_issues = data_quality_report.get("transformation_issues", {})
+    expectations_summary = data_quality_report.get("expectations_summary", {})
+    outcome = data_quality_report.get("outcome", {})
     lines = [
-        "UQR SUMMARY",
+        "data_quality_report SUMMARY",
         "-" * 80,
-        f"Execution ID: {uqr.get('execution_id')}",
-        f"Logical Date (UTC): {uqr.get('logical_date_utc')}",
-        f"Source File: {uqr.get('source_file')}",
+        f"Execution ID: {data_quality_report.get('execution_id')}",
+        f"Logical Date (UTC): {data_quality_report.get('logical_date_utc')}",
+        f"Source File: {data_quality_report.get('source_file')}",
         "",
         "Record Counts",
         f"- Raw input records: {row_counts.get('raw_records', 0)}",
@@ -152,7 +152,7 @@ def format_uqr_report(uqr: Dict[str, Any]) -> str:
         f"- Checks failed: {expectations_summary.get('checks_failed', 0)}",
         f"- Records failed: {expectations_summary.get('rows_failed', 0)}",
         f"- Failure reasons: {expectations_summary.get('failure_reasons', [])}",
-        f"- Colum lineage: {uqr.get('artifacts', {}).get('colum lineage', {})}",
+        f"- Colum lineage: {data_quality_report.get('artifacts', {}).get('colum lineage', {})}",
         "",
         "Outcome",
         f"- Status: {outcome.get('status', 'WARN')}",
@@ -162,16 +162,16 @@ def format_uqr_report(uqr: Dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def uqr_to_json(uqr: Dict[str, Any]) -> str:
-    return json.dumps(uqr, ensure_ascii=False, indent=2, default=str)
+def data_quality_report_to_json(data_quality_report: Dict[str, Any]) -> str:
+    return json.dumps(data_quality_report, ensure_ascii=False, indent=2, default=str)
 
 
-def write_uqr_json(uqr: Dict[str, Any], output_path: str) -> None:
+def write_data_quality_report_json(data_quality_report: Dict[str, Any], output_path: str) -> None:
     with open(output_path, "w") as f:
-        f.write(uqr_to_json(uqr))
+        f.write(data_quality_report_to_json(data_quality_report))
 
 
-def save_uqr_to_storage(config, uqr, batch_ts):
+def save_data_quality_report_to_storage(config, data_quality_report, batch_ts):
     def get_config(config):
         bucket_name = config["METADATA_BUCKET"]
         report_folder = config["QUALITY_REPORT_FOLDER"]
@@ -197,7 +197,7 @@ def save_uqr_to_storage(config, uqr, batch_ts):
     object_name = f"{prefix}quality-report-positions_{hhmm}.json"
     write_generic_bytes_to_minio(
         connection_data,
-        buffer=uqr_to_json(uqr).encode("utf-8"),
+        buffer=data_quality_report_to_json(data_quality_report).encode("utf-8"),
         bucket_name=bucket_name,
         object_name=object_name,
     )

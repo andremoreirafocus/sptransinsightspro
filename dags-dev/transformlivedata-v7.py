@@ -15,10 +15,10 @@ from transformlivedata.config import get_config
 from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
-from transformlivedata.quality.create_data_quality_report import (
-    build_uqr,
-    format_uqr_report,
-    save_uqr_to_storage,
+from transformlivedata.services.create_data_quality_report import (
+    build_data_quality_report,
+    format_data_quality_report_report,
+    save_data_quality_report_to_storage,
 )
 import pandas as pd
 from datetime import datetime
@@ -101,7 +101,7 @@ def load_transform_save_positions(logical_date_string):
             expectations_config,
         )
     )
-    uqr = build_uqr(
+    data_quality_report = build_data_quality_report(
         config=config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
@@ -114,9 +114,9 @@ def load_transform_save_positions(logical_date_string):
         warn_threshold=0.980,
         batch_ts=transform_result["batch_ts"],
     )
-    validation_report = format_uqr_report(uqr)
+    validation_report = format_data_quality_report_report(data_quality_report)
     logger.info(validation_report)
-    save_uqr_to_storage(config, uqr, transform_result["batch_ts"])
+    save_data_quality_report_to_storage(config, data_quality_report, transform_result["batch_ts"])
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     save_positions_to_storage(config, valid_postions_df, "trusted")
