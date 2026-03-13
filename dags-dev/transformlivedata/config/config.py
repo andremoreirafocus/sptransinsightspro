@@ -81,14 +81,38 @@ def get_airflow_config():
 
 def get_local_config(env_values):
     base_dir = os.path.dirname(os.path.abspath(__file__))
+    general_config_path = os.path.join(base_dir, "general_config.json")
     raw_schema_path = os.path.join(base_dir, "raw_data_schema_config.json")
     expectations_path = os.path.join(base_dir, "transformed_data_expectations.json")
+    with open(general_config_path, "r") as f:
+        general_config = json.load(f)
     with open(raw_schema_path, "r") as f:
         raw_data_json_schema = json.load(f)
     with open(expectations_path, "r") as f:
         data_expectations = json.load(f)
+    general = general_config
+    storage = general.setdefault("storage", {})
+    database = general.setdefault("database", {})
+    if env_values.get("MINIO_ENDPOINT"):
+        storage["minio_endpoint"] = env_values.get("MINIO_ENDPOINT")
+    if env_values.get("ACCESS_KEY"):
+        storage["access_key"] = env_values.get("ACCESS_KEY")
+    if env_values.get("SECRET_KEY"):
+        storage["secret_key"] = env_values.get("SECRET_KEY")
+    if env_values.get("DB_HOST"):
+        database["host"] = env_values.get("DB_HOST")
+    if env_values.get("DB_PORT"):
+        database["port"] = env_values.get("DB_PORT")
+    if env_values.get("DB_DATABASE"):
+        database["database"] = env_values.get("DB_DATABASE")
+    if env_values.get("DB_USER"):
+        database["user"] = env_values.get("DB_USER")
+    if env_values.get("DB_PASSWORD"):
+        database["password"] = env_values.get("DB_PASSWORD")
+    if env_values.get("DB_SSLMODE"):
+        database["sslmode"] = env_values.get("DB_SSLMODE")
     return {
-        "general": dict(env_values),
+        "general": general,
         "raw_data_json_schema": raw_data_json_schema,
         "data_expectations": data_expectations,
     }

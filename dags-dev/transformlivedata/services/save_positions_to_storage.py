@@ -17,20 +17,22 @@ def save_positions_to_storage(config, positions_df, target_bucket):
 
     def get_config(config, target_bucket):
         try:
+            storage = config["storage"]
+            tables = config["tables"]
             if target_bucket == "trusted":
-                bucket_name = config["TRUSTED_BUCKET"]
+                bucket_name = storage["trusted_bucket"]
             elif target_bucket == "quarantined":
-                bucket_name = config["QUARANTINED_BUCKET"]
+                bucket_name = storage["quarantined_bucket"]
             else:
                 raise ValueError(
                     f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'."
                 )
-            app_folder = config["APP_FOLDER"]
-            positions_table_name = config["POSITIONS_TABLE_NAME"]
+            app_folder = storage["app_folder"]
+            positions_table_name = tables["positions_table_name"]
             connection_data = {
-                "minio_endpoint": config["MINIO_ENDPOINT"],
-                "access_key": config["ACCESS_KEY"],
-                "secret_key": config["SECRET_KEY"],
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
                 "secure": False,
             }
             return bucket_name, app_folder, positions_table_name, connection_data

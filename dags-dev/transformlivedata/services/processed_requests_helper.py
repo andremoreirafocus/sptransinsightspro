@@ -1,5 +1,5 @@
 import logging
-from infra.sql_db import execute_select_query, execute_update_query
+from infra.sql_db_v2 import execute_select_query, execute_update_query
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +22,10 @@ def get_unprocessed_requests(config):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = config["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
@@ -76,10 +76,10 @@ def mark_request_as_processed(config, logical_date):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = config["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
@@ -137,10 +137,10 @@ def mark_request_as_processed_by_filename(config, filename):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = config["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"

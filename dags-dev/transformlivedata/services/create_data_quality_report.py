@@ -82,8 +82,10 @@ def build_data_quality_report(
 
 def build_quality_report_path(config, batch_ts):
     def get_config(config):
-        bucket_name = config["METADATA_BUCKET"]
-        report_folder = config["QUALITY_REPORT_FOLDER"]
+        storage = config["storage"]
+        quality = config["quality"]
+        bucket_name = storage["metadata_bucket"]
+        report_folder = quality["quality_report_folder"]
         return bucket_name, report_folder
 
     bucket_name, report_folder = get_config(config)
@@ -99,9 +101,11 @@ def build_quality_report_path(config, batch_ts):
 
 def build_quarantine_path(config, batch_ts):
     def get_config(config):
-        bucket_name = config["QUARANTINED_BUCKET"]
-        app_folder = config["APP_FOLDER"]
-        positions_table_name = config["POSITIONS_TABLE_NAME"]
+        storage = config["storage"]
+        tables = config["tables"]
+        bucket_name = storage["quarantined_bucket"]
+        app_folder = storage["app_folder"]
+        positions_table_name = tables["positions_table_name"]
         return bucket_name, app_folder, positions_table_name
 
     bucket_name, app_folder, positions_table_name = get_config(config)
@@ -173,13 +177,15 @@ def write_data_quality_report_json(data_quality_report: Dict[str, Any], output_p
 
 def save_data_quality_report_to_storage(config, data_quality_report, batch_ts):
     def get_config(config):
-        bucket_name = config["METADATA_BUCKET"]
-        report_folder = config["QUALITY_REPORT_FOLDER"]
-        app_folder = config["APP_FOLDER"]
+        storage = config["storage"]
+        quality = config["quality"]
+        bucket_name = storage["metadata_bucket"]
+        report_folder = quality["quality_report_folder"]
+        app_folder = storage["app_folder"]
         connection_data = {
-            "minio_endpoint": config["MINIO_ENDPOINT"],
-            "access_key": config["ACCESS_KEY"],
-            "secret_key": config["SECRET_KEY"],
+            "minio_endpoint": storage["minio_endpoint"],
+            "access_key": storage["access_key"],
+            "secret_key": storage["secret_key"],
             "secure": False,
         }
         return bucket_name, report_folder, app_folder, connection_data
