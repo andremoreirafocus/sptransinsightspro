@@ -34,6 +34,7 @@ def get_airflow_config():
     raw_data_compression_extension = transformlivedata_vars[
         "raw_data_compression_extension"
     ]
+    raw_data_schema_config = transformlivedata_vars["raw_data_schema_config"]
     raw_events_table_name = transformlivedata_vars["raw_events_table_name"]
     metadata_bucket = transformlivedata_vars["metadata_bucket"]
     quality_report_folder = transformlivedata_vars["quality_report_folder"]
@@ -57,6 +58,7 @@ def get_airflow_config():
         "SECRET_KEY": minio_secret_key,
         "RAW_DATA_COMPRESSION": raw_data_compression,
         "RAW_DATA_COMPRESSION_EXTENSION": raw_data_compression_extension,
+        "RAW_DATA_SCHEMA_CONFIG": raw_data_schema_config,
         "RAW_EVENTS_TABLE_NAME": raw_events_table_name,
         "METADATA_BUCKET": metadata_bucket,
         "QUALITY_REPORT_FOLDER": quality_report_folder,

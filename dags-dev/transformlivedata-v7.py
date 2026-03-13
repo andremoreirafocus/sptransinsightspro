@@ -11,7 +11,6 @@ from transformlivedata.services.processed_requests_helper import (
 from transformlivedata.quality.validate_expectations import (
     validate_expectations,
 )
-from transformlivedata.services.lineage_report import create_lineage_report
 from transformlivedata.config import get_config
 from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
@@ -137,7 +136,6 @@ def load_transform_save_positions(logical_date_string):
         logger.info(
             f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
         )
-    validation_filename = create_lineage_report(config, execution_id)
     mark_request_as_processed(config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
     return {
