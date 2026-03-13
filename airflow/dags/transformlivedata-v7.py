@@ -1,3 +1,6 @@
+from airflow import DAG
+from airflow.operators.python import PythonOperator
+from airflow.utils.dates import days_ago
 from transformlivedata.services.load_positions import load_positions
 from transformlivedata.services.transform_positions import (
     transform_positions,
@@ -21,39 +24,32 @@ from transformlivedata.services.create_data_quality_report import (
     save_data_quality_report_to_storage,
 )
 import pandas as pd
-from datetime import datetime
 from zoneinfo import ZoneInfo
-import logging
-from logging.handlers import RotatingFileHandler
 import uuid
 
-LOG_FILENAME = "transformlivedata.log"
-
-# In Airflow just remove this logging configuration block
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        # Rotation: 5MB per file, keeping the last 5 files
-        RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
-        logging.StreamHandler(),  # Also keeps console output
-    ],
-)
+import logging
 
 logger = logging.getLogger(__name__)
 
+default_args = {
+    "owner": "airflow",
+    "depends_on_past": False,
+    "start_date": days_ago(0),
+    "max_active_runs": 1,
+    "email_on_failure": False,
+    "email_on_retry": False,
+    "retries": 0,
+}
 
-def load_transform_save_positions(logical_date_string):
-    """
-    Load, transform, and save positions with JSON-driven raw validation and GE lineage tracking.
 
-    INTEGRATION POINT 1: Raw validation using RawDataExpectations (jsonschema-driven)
-    """
-    # Create unique execution ID for tracking
-    config = get_config()
-    general_config = config["general"]
-    dt_utc = datetime.fromisoformat(logical_date_string)
-    dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
+# def load_transform_save_positions(logical_date_string, **kwargs):
+def load_transform_save_positions(**context):
+    # logical_date = context["logical_date"]
+    logical_date = context["dag_run"].logical_date
+    logical_date_string = logical_date.isoformat()
+    print("logical_date:", logical_date)
+    print("logical_date type:", type(logical_date))
+    dt = logical_date.astimezone(ZoneInfo("America/Sao_Paulo"))
     year = dt.strftime("%Y")
     month = dt.strftime("%m")
     day = dt.strftime("%d")
@@ -61,7 +57,10 @@ def load_transform_save_positions(logical_date_string):
     minute = dt.strftime("%M")
     execution_id = str(uuid.uuid4())
     logger.info(f"Starting execution {execution_id}")
-    logger.info(f"Transforming position for {dt}...")
+    config = get_config()
+    general_config = config["general"]
+    logging.info(f"Transforming position for {dt}...")
+    execution_id = str(uuid.uuid4())
     logger.info("=== LOAD STAGE: load_positions ===")
     raw_positions = load_positions(general_config, year, month, day, hour, minute)
     if not raw_positions:
@@ -142,13 +141,20 @@ def load_transform_save_positions(logical_date_string):
     }
 
 
-def main():
-    logical_date_string = (
-        "2026-02-26T20:36:00+00:00"  # Replace with the actual logical_date_string
+# Criando o DAG
+with DAG(
+    "transformlivedata-v7",
+    default_args=default_args,
+    description="Load data from raw layer, process it, and store it in trusted layer",
+    schedule=None,
+    catchup=False,
+    max_active_runs=1,
+    tags=["sptrans"],
+) as dag:
+    load_transform_save_positions_task = PythonOperator(
+        task_id="transform_positions",
+        python_callable=load_transform_save_positions,
+        # op_kwargs={"logical_date_string": "{{ ts }}"},
     )
-    result = load_transform_save_positions(logical_date_string)
-    logger.info(f"Pipeline result: {result}")
 
-
-if __name__ == "__main__":
-    main()
+    load_transform_save_positions_task

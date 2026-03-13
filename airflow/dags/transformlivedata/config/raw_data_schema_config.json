@@ -1,0 +1,116 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "RawPositionsAPIResponse",
+  "description": "Pydantic JSON Schema for raw API response validation (pre-transformation)",
+  "type": "object",
+  "required": ["metadata", "payload"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["extracted_at", "source", "total_vehicles"],
+      "properties": {
+        "extracted_at": {
+          "type": "string",
+          "description": "Timestamp of data extraction (ISO format expected)"
+        },
+        "source": {
+          "type": "string",
+          "description": "Data source identifier"
+        },
+        "total_vehicles": {
+          "type": "integer",
+          "description": "Total number of vehicles reported in this payload"
+        }
+      }
+    },
+    "payload": {
+      "type": "object",
+      "required": ["hr", "l"],
+      "properties": {
+        "hr": {
+          "oneOf": [
+            {"type": "integer"},
+            {"type": "array"},
+            {"type": "string"}
+          ],
+          "description": "Hour information (flexible type: int, array, or string)"
+        },
+        "l": {
+          "type": "array",
+          "description": "Lines array (required, must be non-empty array)",
+          "items": {
+            "type": "object",
+            "required": ["c", "cl", "sl", "vs"],
+            "properties": {
+              "c": {
+                "type": "string",
+                "description": "Line identifier code"
+              },
+              "cl": {
+                "oneOf": [
+                  {"type": "integer"}
+                ],
+                "description": "Line code (can be string or integer)"
+              },
+              "sl": {
+                "type": "integer",
+                "description": "Direction/Sentido (0=outbound, 1=return)"
+              },
+              "lt0": {
+                "type": ["string", "null"],
+                "description": "Destination (optional)"
+              },
+              "lt1": {
+                "type": ["string", "null"],
+                "description": "Origin (optional)"
+              },
+              "vs": {
+                "type": "array",
+                "description": "Vehicles array for this line",
+                "items": {
+                  "$ref": "#/definitions/Vehicle"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "Vehicle": {
+      "type": "object",
+      "title": "Vehicle",
+      "description": "Individual vehicle in line.vs array",
+      "required": ["p", "py", "px", "ta"],
+      "properties": {
+        "p": {
+          "type": "integer",
+          "description": "Vehicle ID (prefix/number)"
+        },
+        "a": {
+          "type": "boolean",
+          "description": "Accessibility flag (optional)"
+        },
+        "ta": {
+          "type": "string",
+          "description": "Vehicle timestamp"
+        },
+        "py": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "integer"}
+          ],
+          "description": "Latitude coordinate"
+        },
+        "px": {
+          "oneOf": [
+            {"type": "number"},
+            {"type": "integer"}
+          ],
+          "description": "Longitude coordinate"
+        }
+      }
+    }
+  }
+}

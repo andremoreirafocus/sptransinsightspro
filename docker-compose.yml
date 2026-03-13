@@ -18,29 +18,31 @@ services:
     networks:
        rede_fia:  
   airflow_webserver:
-      image: apache/airflow:2.8.4-python3.11
-      container_name: airflow_webserver
-      restart: always
-      environment:
-        AIRFLOW__CORE__EXECUTOR: LocalExecutor
-        AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
-        AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
-        AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
-        AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
-        AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
-      volumes:
-        - ./airflow/dags:/opt/airflow/dags
-        - ./airflow/requirements.txt:/requirements.txt
-        - ./airflow/connections.json:/opt/airflow/connections.json
-        - ./airflow/variables.json:/opt/airflow/variables.json
-      ports:
-        - "8080:8080"
-      depends_on:
-        - airflow_postgres
-      networks: 
-        - rede_fia  
-      command: >
-        bash -c "pip install -r /requirements.txt && airflow db init && airflow webserver"
+    image: apache/airflow:2.8.4-python3.11
+    container_name: airflow_webserver
+    restart: always
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
+      AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
+      AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'True'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/requirements.txt:/requirements.txt
+      - ./airflow/connections.json:/opt/airflow/connections.json
+      - ./airflow/variables.json:/opt/airflow/variables.json
+      - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
+      - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
+    ports:
+      - "8080:8080"
+    depends_on:
+      - airflow_postgres
+    networks: 
+      - rede_fia  
+    command: >
+      bash -c "pip install -r /requirements.txt && airflow db init && airflow webserver"
 
   airflow_scheduler:
     image: apache/airflow:2.8.4-python3.11
@@ -56,6 +58,8 @@ services:
       - ./airflow/requirements.txt:/requirements.txt
       - ./airflow/connections.json:/opt/airflow/connections.json
       - ./airflow/variables.json:/opt/airflow/variables.json
+      - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
+      - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
     depends_on:
       - airflow_postgres
     networks:

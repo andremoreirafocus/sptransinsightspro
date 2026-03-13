@@ -12,16 +12,14 @@ logger = logging.getLogger(__name__)
 
 def load_positions(config, year, month, day, hour, minute):
     def get_config(config):
-        storage = config["storage"]
-        compression = config["compression"]
-        source_bucket = storage["raw_bucket"]
-        app_folder = storage["app_folder"]
-        raw_data_compression = bool(compression["raw_data_compression"])
-        compression_extension = compression.get("raw_data_compression_extension", "")
+        source_bucket = config["RAW_BUCKET"]
+        app_folder = config["APP_FOLDER"]
+        raw_data_compression = config["RAW_DATA_COMPRESSION"] == "true"
+        compression_extension = config.get("RAW_DATA_COMPRESSION_EXTENSION", "")
         connection_data = {
-            "minio_endpoint": storage["minio_endpoint"],
-            "access_key": storage["access_key"],
-            "secret_key": storage["secret_key"],
+            "minio_endpoint": config["MINIO_ENDPOINT"],
+            "access_key": config["ACCESS_KEY"],
+            "secret_key": config["SECRET_KEY"],
             "secure": False,
         }
         return (
@@ -57,7 +55,7 @@ def load_positions(config, year, month, day, hour, minute):
         # print(datastr)
         logger.info("Data is compressed, decompressing...")
         datastr = decompress_data(data.getvalue())
-        # print(f"Decompressed data {datastr}")
+        print(f"Decompressed data {datastr}")
         logger.info("Data decompressed successfully.")
     else:
         datastr = read_file_from_minio_to_str(
