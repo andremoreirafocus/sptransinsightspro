@@ -1,6 +1,6 @@
-import duckdb
 import pandas as pd
 import logging
+from infra.duck_db_v2 import get_duckdb_connection
 
 logger = logging.getLogger(__name__)
 
@@ -54,16 +54,7 @@ def save_positions_to_storage(config, positions_df, target_bucket):
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
         positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
-        con = duckdb.connect(":memory:")
-        con.execute(f"""
-            INSTALL httpfs;
-            LOAD httpfs;
-            SET s3_endpoint='{connection_data["minio_endpoint"]}'; 
-            SET s3_access_key_id='{connection_data["access_key"]}';
-            SET s3_secret_access_key='{connection_data["secret_key"]}';
-            SET s3_use_ssl=false;
-            SET s3_url_style='path';
-        """)
+        con = get_duckdb_connection(connection_data)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         logger.info(
             f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."

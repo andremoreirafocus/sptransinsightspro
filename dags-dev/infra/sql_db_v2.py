@@ -5,21 +5,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_dataframe_to_db(config, df, full_table_name):
-    def get_config(config):
-        try:
-            db = config["database"]
-            host = db["host"]
-            port = db["port"]
-            dbname = db["database"]
-            dbuser = db["user"]
-            password = db["password"]
-            return (host, port, dbname, dbuser, password)
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise
-
-    (host, port, dbname, dbuser, password) = get_config(config)
+def save_dataframe_to_db(connection, df, full_table_name):
+    try:
+        host = connection["host"]
+        port = connection["port"]
+        dbname = connection["database"]
+        dbuser = connection["user"]
+        password = connection["password"]
+    except KeyError as e:
+        logger.error(f"Missing required connection key: {e}")
+        raise
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     engine = create_engine(db_uri)
     schema = full_table_name.split(".")[0]
@@ -33,21 +28,16 @@ def save_dataframe_to_db(config, df, full_table_name):
     )
 
 
-def update_db_table_with_dataframe(config, df, full_table_name):
-    def get_config(config):
-        try:
-            db = config["database"]
-            host = db["host"]
-            port = db["port"]
-            dbname = db["database"]
-            dbuser = db["user"]
-            password = db["password"]
-            return (host, port, dbname, dbuser, password)
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise
-
-    (host, port, dbname, dbuser, password) = get_config(config)
+def update_db_table_with_dataframe(connection, df, full_table_name):
+    try:
+        host = connection["host"]
+        port = connection["port"]
+        dbname = connection["database"]
+        dbuser = connection["user"]
+        password = connection["password"]
+    except KeyError as e:
+        logger.error(f"Missing required connection key: {e}")
+        raise
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     schema = full_table_name.split(".")[0]
     table_name = full_table_name.split(".")[1]
@@ -65,7 +55,7 @@ def update_db_table_with_dataframe(config, df, full_table_name):
         conn.execute(text(f'ANALYZE {schema}."{table_name}"'))
 
 
-def save_row(config, schema, table, row_tuple, columns):
+def save_row(connection, schema, table, row_tuple, columns):
     """
     Save a single row to the database.
 
@@ -84,19 +74,13 @@ def save_row(config, schema, table, row_tuple, columns):
         bool: True if save was successful, False otherwise
     """
 
-    def get_config(config):
-        """Extract database configuration from config object."""
-        db = config["database"]
-        host = db["host"]
-        port = db["port"]
-        dbname = db["database"]
-        dbuser = db["user"]
-        password = db["password"]
-        return host, port, dbname, dbuser, password
-
     try:
         # Get database configuration
-        host, port, dbname, dbuser, password = get_config(config)
+        host = connection["host"]
+        port = connection["port"]
+        dbname = connection["database"]
+        dbuser = connection["user"]
+        password = connection["password"]
 
         # Build database URI
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
@@ -131,7 +115,7 @@ def save_row(config, schema, table, row_tuple, columns):
         return False
 
 
-def execute_select_query(config, query):
+def execute_select_query(connection, query):
     """
     Execute a SELECT query and return results as a list of dictionaries.
 
@@ -143,19 +127,13 @@ def execute_select_query(config, query):
         list: List of rows as dictionaries, empty list if no results or error occurs
     """
 
-    def get_config(config):
-        """Extract database configuration from config object."""
-        db = config["database"]
-        host = db["host"]
-        port = db["port"]
-        dbname = db["database"]
-        dbuser = db["user"]
-        password = db["password"]
-        return host, port, dbname, dbuser, password
-
     try:
         # Get database configuration
-        host, port, dbname, dbuser, password = get_config(config)
+        host = connection["host"]
+        port = connection["port"]
+        dbname = connection["database"]
+        dbuser = connection["user"]
+        password = connection["password"]
         # Build database URI
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
         # Create engine and connection for this specific operation
@@ -175,7 +153,7 @@ def execute_select_query(config, query):
         return []
 
 
-def execute_update_query(config, query, params=None):
+def execute_update_query(connection, query, params=None):
     """
     Execute an UPDATE, DELETE, or other DML query.
 
@@ -188,19 +166,13 @@ def execute_update_query(config, query, params=None):
         bool: True if update was successful, False otherwise
     """
 
-    def get_config(config):
-        """Extract database configuration from config object."""
-        db = config["database"]
-        host = db["host"]
-        port = db["port"]
-        dbname = db["database"]
-        dbuser = db["user"]
-        password = db["password"]
-        return host, port, dbname, dbuser, password
-
     try:
         # Get database configuration
-        host, port, dbname, dbuser, password = get_config(config)
+        host = connection["host"]
+        port = connection["port"]
+        dbname = connection["database"]
+        dbuser = connection["user"]
+        password = connection["password"]
         # Build database URI
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
         # Create engine and connection for this specific operation
