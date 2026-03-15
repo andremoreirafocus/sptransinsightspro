@@ -64,11 +64,11 @@ def validate_expectations(df_to_be_validated, expectations_suite):
 
     # clear_internal_gx_warnings()
     gx_context = gx.get_context(mode="ephemeral")
-    if isinstance(expectations_suite, str):
-        with open(expectations_suite, "r") as f:
-            suite_dict = json.load(f)
-    else:
-        suite_dict = expectations_suite
+    # if isinstance(expectations_suite, str):
+    #     with open(expectations_suite, "r") as f:
+    #         suite_dict = json.load(f)
+    # else:
+    suite_dict = expectations_suite
     suite = ExpectationSuite(**suite_dict)
     gx_context.add_or_update_expectation_suite(expectation_suite=suite)
     datasource_name = "pandas_datasource"
