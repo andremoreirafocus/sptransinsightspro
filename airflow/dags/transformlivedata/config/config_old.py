@@ -1,8 +1,6 @@
 import os
 import json
 
-PIPELINE_NAME = "transformlivedata"
-
 
 def get_config():
     # Check if we are running inside Airflow
@@ -14,7 +12,7 @@ def get_config():
         # Pulling from local .env or hardcoded defaults for testing
         from dotenv import dotenv_values
 
-        return get_local_config(dotenv_values(f"{PIPELINE_NAME}/.env"))
+        return get_local_config(dotenv_values("transformlivedata/.env"))
 
 
 def get_airflow_config():
@@ -25,12 +23,12 @@ def get_airflow_config():
     minio_endpoint = f"{minio_conn.host}:{minio_conn.port}"
     minio_access_key = minio_conn.login
     minio_secret_key = minio_conn.password
-    general_vars = Variable.get(f"{PIPELINE_NAME}_general", deserialize_json=True)
+    general_vars = Variable.get("transformlivedata_general", deserialize_json=True)
     raw_data_json_schema = Variable.get(
-        f"{PIPELINE_NAME}_raw_data_json_schema", deserialize_json=True
+        "transformlivedata_raw_data_json_schema", deserialize_json=True
     )
     data_expectations = Variable.get(
-        f"{PIPELINE_NAME}_data_expectations", deserialize_json=True
+        "transformlivedata_data_expectations", deserialize_json=True
     )
     storage = general_vars["storage"]
     tables = general_vars["tables"]
@@ -70,21 +68,16 @@ def get_airflow_config():
 
 def get_local_config(env_values):
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    general_config_path = os.path.join(base_dir, f"{PIPELINE_NAME}_general.json")
-    raw_schema_path = os.path.join(
-        base_dir, f"{PIPELINE_NAME}_raw_data_json_schema.json"
-    )
-    expectations_path = os.path.join(
-        base_dir, f"{PIPELINE_NAME}_data_expectations.json"
-    )
+    general_config_path = os.path.join(base_dir, "general_config.json")
+    raw_schema_path = os.path.join(base_dir, "raw_data_schema_config.json")
+    expectations_path = os.path.join(base_dir, "transformed_data_expectations.json")
     with open(general_config_path, "r") as f:
-        general = json.load(f).get(f"{PIPELINE_NAME}_general")
+        general_config = json.load(f)
     with open(raw_schema_path, "r") as f:
-        raw_data_json_schema = json.load(f).get(
-            f"{PIPELINE_NAME}_raw_data_json_schema", {}
-        )
+        raw_data_json_schema = json.load(f)
     with open(expectations_path, "r") as f:
-        data_expectations = json.load(f).get(f"{PIPELINE_NAME}_data_expectations", {})
+        data_expectations = json.load(f)
+    general = general_config
     storage = general.setdefault("storage", {})
     database = general.setdefault("database", {})
     if env_values.get("MINIO_ENDPOINT"):
