@@ -14,29 +14,6 @@
         "orchestrate_wait_time_seconds": 15,
         "description": "Configuration for orchestrating transform DAG, including target DAG name and wait time"
     },
-    "transformlivedata_general": {
-        "storage": {
-            "raw_bucket": "raw",
-            "trusted_bucket": "trusted",
-            "quarantined_bucket": "quarantined",
-            "metadata_bucket": "metadata",
-            "app_folder": "sptrans",
-            "gtfs_folder": "gtfs"
-        },
-        "tables": {
-            "positions_table_name": "positions",
-            "trip_details_table_name": "trip_details",
-            "raw_events_table_name": "to_be_processed.raw"
-        },
-        "compression": {
-            "raw_data_compression": true,
-            "raw_data_compression_extension": ".zst"
-        },
-        "quality": {
-            "quality_report_folder": "quality-reports"
-        },
-        "description": "Configuration for transforming live data, including bucket names and table names."
-    },
     "updatelatestpositions": {
         "trusted_bucket": "trusted",
         "app_folder": "sptrans",

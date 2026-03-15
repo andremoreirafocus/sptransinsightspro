@@ -35,6 +35,7 @@ services:
       - ./airflow/variables.json:/opt/airflow/variables.json
       - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
       - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
+      - ./airflow/transformlivedata_general.json:/opt/airflow/transformlivedata_general.json
     ports:
       - "8080:8080"
     depends_on:
@@ -60,6 +61,7 @@ services:
       - ./airflow/variables.json:/opt/airflow/variables.json
       - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
       - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
+      - ./airflow/transformlivedata_general.json:/opt/airflow/transformlivedata_general.json
     depends_on:
       - airflow_postgres
     networks:
