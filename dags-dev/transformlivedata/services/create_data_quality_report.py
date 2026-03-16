@@ -1,7 +1,11 @@
 from typing import Dict, Any
 import json
+import logging
 from datetime import datetime
 from infra.minio_functions import write_generic_bytes_to_minio
+
+# This logger inherits the configuration from the root logger in main.py
+logger = logging.getLogger(__name__)
 
 
 def build_data_quality_report(
@@ -27,8 +31,17 @@ def build_data_quality_report(
     acceptance_rate = (
         accepted_records / transformed_records if transformed_records > 0 else 0.0
     )
-    checks_failed = expectations_summary.get("checks_failed", 0)
-    if acceptance_rate >= pass_threshold and checks_failed == 0:
+    expectations_with_violations = expectations_summary.get(
+        "expectations_with_violations", 0
+    )
+    expectations_failed_due_to_exceptions = expectations_summary.get(
+        "expectations_failed_due_to_exceptions", 0
+    )
+    if (
+        acceptance_rate >= pass_threshold
+        and expectations_with_violations == 0
+        and expectations_failed_due_to_exceptions == 0
+    ):
         status = "PASS"
     elif acceptance_rate >= warn_threshold:
         status = "WARN"
@@ -63,9 +76,14 @@ def build_data_quality_report(
         },
         "expectations_summary": {
             "total_checks": expectations_summary.get("total_checks", 0),
-            "checks_failed": expectations_summary.get("checks_failed", 0),
+            "expectations_successful": expectations_summary.get(
+                "expectations_successful", 0
+            ),
+            "expectations_with_violations": expectations_with_violations,
+            "expectations_failed_due_to_exceptions": expectations_failed_due_to_exceptions,
             "rows_failed": expectations_summary.get("rows_failed", 0),
-            "failure_reasons": expectations_summary.get("failure_reasons", []),
+            "violation_reasons": expectations_summary.get("violation_reasons", []),
+            "exception_reasons": expectations_summary.get("exception_reasons", []),
         },
         "outcome": {
             "status": status,
@@ -120,50 +138,75 @@ def build_quarantine_path(config, batch_ts):
 
 
 def format_data_quality_report_report(data_quality_report: Dict[str, Any]) -> str:
-    row_counts = data_quality_report.get("row_counts", {})
-    transform_metrics = data_quality_report.get("transformation_metrics", {})
-    transform_issues = data_quality_report.get("transformation_issues", {})
-    expectations_summary = data_quality_report.get("expectations_summary", {})
-    outcome = data_quality_report.get("outcome", {})
-    lines = [
-        "data_quality_report SUMMARY",
-        "-" * 80,
-        f"Execution ID: {data_quality_report.get('execution_id')}",
-        f"Logical Date (UTC): {data_quality_report.get('logical_date_utc')}",
-        f"Source File: {data_quality_report.get('source_file')}",
-        "",
-        "Record Counts",
-        f"- Raw input records: {row_counts.get('raw_records', 0)}",
-        f"- Transformed records: {row_counts.get('transformed_records', 0)}",
-        f"- Accepted records: {row_counts.get('accepted_records', 0)}",
-        f"- Rejected records: {row_counts.get('rejected_records', 0)}",
-        "",
-        "Transformation Processing Metrics",
-        f"- Total vehicles processed: {transform_metrics.get('total_vehicles_processed', 0)}",
-        f"- Valid vehicles: {transform_metrics.get('valid_vehicles', 0)}",
-        f"- Invalid vehicles: {transform_metrics.get('invalid_vehicles', 0)}",
-        f"- Expected vehicles: {transform_metrics.get('expected_vehicles', 0)}",
-        f"- Lines processed: {transform_metrics.get('total_lines_processed', 0)}",
-        "",
-        "Transformation Processing Issues",
-        f"- Invalid trips: {len(transform_issues.get('invalid_trips', []))} - {transform_issues.get('invalid_trips', [])}",
-        f"- Invalid vehicle IDs: {len(transform_issues.get('invalid_vehicle_ids', []))} - {transform_issues.get('invalid_vehicle_ids', [])}",
-        f"- Distance calculation errors: {transform_issues.get('distance_calculation_errors', 0)}",
-        f"- Lines with invalid vehicles: {transform_issues.get('lines_with_invalid_vehicles', 0)}",
-        "",
-        "Post Transformation Validation Summary",
-        f"- Total checks: {expectations_summary.get('total_checks', 0)}",
-        f"- Checks failed: {expectations_summary.get('checks_failed', 0)}",
-        f"- Records failed: {expectations_summary.get('rows_failed', 0)}",
-        f"- Failure reasons: {expectations_summary.get('failure_reasons', [])}",
-        f"- Colum lineage: {data_quality_report.get('artifacts', {}).get('colum lineage', {})}",
-        "",
-        "Outcome",
-        f"- Status: {outcome.get('status', 'WARN')}",
-        f"- Acceptance rate: {outcome.get('acceptance_rate', 0.0) * 100:.2f}%",
-        f"- Policy version: {outcome.get('policy_version', 'v1')}",
-    ]
-    return "\n".join(lines)
+    try:
+        row_counts = data_quality_report["row_counts"]
+        transform_metrics = data_quality_report["transformation_metrics"]
+        transform_issues = data_quality_report["transformation_issues"]
+        expectations_summary = data_quality_report["expectations_summary"]
+        outcome = data_quality_report["outcome"]
+        execution_id = data_quality_report["execution_id"]
+        logical_date_utc = data_quality_report["logical_date_utc"]
+        source_file = data_quality_report["source_file"]
+        artifacts = data_quality_report["artifacts"]
+        column_lineage = artifacts["colum lineage"]
+        lines = [
+            "data_quality_report SUMMARY",
+            "-" * 80,
+            f"Execution ID: {execution_id}",
+            f"Logical Date (UTC): {logical_date_utc}",
+            f"Source File: {source_file}",
+            "",
+            "Record Counts",
+            f"- Raw input records: {row_counts['raw_records']}",
+            f"- Transformed records: {row_counts['transformed_records']}",
+            f"- Accepted records: {row_counts['accepted_records']}",
+            f"- Rejected records: {row_counts['rejected_records']}",
+            "",
+            "Transformation Processing Metrics",
+            f"- Total vehicles processed: {transform_metrics['total_vehicles_processed']}",
+            f"- Valid vehicles: {transform_metrics['valid_vehicles']}",
+            f"- Invalid vehicles: {transform_metrics['invalid_vehicles']}",
+            f"- Expected vehicles: {transform_metrics['expected_vehicles']}",
+            f"- Lines processed: {transform_metrics['total_lines_processed']}",
+            "",
+            "Transformation Processing Issues",
+            f"- Invalid trips: {len(transform_issues['invalid_trips'])} - {transform_issues['invalid_trips']}",
+            f"- Invalid vehicle IDs: {len(transform_issues['invalid_vehicle_ids'])} - {transform_issues['invalid_vehicle_ids']}",
+            f"- Distance calculation errors: {transform_issues['distance_calculation_errors']}",
+            f"- Lines with invalid vehicles: {transform_issues['lines_with_invalid_vehicles']}",
+            "",
+            "Post Transformation Validation Summary",
+            f"- Total checks: {expectations_summary['total_checks']}",
+            f"- Expectations successful: {expectations_summary['expectations_successful']}",
+            f"- Expectations with violations: {expectations_summary['expectations_with_violations']}",
+        ]
+        if expectations_summary["expectations_failed_due_to_exceptions"] > 0:
+            lines.append(
+                f"- Expectations failed due to exceptions: {expectations_summary['expectations_failed_due_to_exceptions']}"
+            )
+        lines.append(f"- Records failed: {expectations_summary['rows_failed']}")
+        if expectations_summary["violation_reasons"]:
+            lines.append(
+                f"- Expectation violation reasons: {expectations_summary['violation_reasons']}"
+            )
+        if expectations_summary["exception_reasons"]:
+            lines.append(
+                f"- Expectation exception reasons: {expectations_summary['exception_reasons']}"
+            )
+        lines.extend(
+            [
+                f"- Colum lineage: {column_lineage}",
+                "",
+                "Outcome",
+                f"- Status: {outcome['status']}",
+                f"- Acceptance rate: {outcome['acceptance_rate'] * 100:.2f}%",
+                f"- Policy version: {outcome['policy_version']}",
+            ]
+        )
+        return "\n".join(lines)
+    except Exception as e:
+        logger.error("Error parsing data_quality_report: %s", e)
+        raise
 
 
 def data_quality_report_to_json(data_quality_report: Dict[str, Any]) -> str:
