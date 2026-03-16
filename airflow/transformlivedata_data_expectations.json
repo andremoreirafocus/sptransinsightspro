@@ -8,8 +8,8 @@
         "evaluation_parameters": {
             "lat_min_value": -23.916334,
             "lat_max_value": -23.189743,
-            "long_min_value": -46.792037,
-            "long_max_value": -46.984037
+            "long_min_value": -46.984037,
+            "long_max_value": -46.184930
         },
         "expectations": [
             {

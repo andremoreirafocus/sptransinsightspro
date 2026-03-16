@@ -33,21 +33,62 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         bad_indices = set()
         reasons_by_index = {}
         total_checks = 0
-        checks_failed = 0
+        expectations_with_violations = 0
+        expectations_failed_due_to_exceptions = 0
+        exception_reasons = []
         for run_result in checkpoint_result.run_results.values():
             validation_results = run_result["validation_result"]["results"]
             total_checks += len(validation_results)
             for expectation_result in validation_results:
-                if not expectation_result.get("success", False):
-                    checks_failed += 1
-                result = expectation_result.get("result", {})
-                unexpected_indices = result.get("unexpected_index_list") or []
-                if len(unexpected_indices) > 0:
-                    expectation_config = expectation_result.get(
-                        "expectation_config", {}
+                try:
+                    exception_info = expectation_result["exception_info"]
+                    expectation_config = expectation_result["expectation_config"]
+                    expectation_type = expectation_config["expectation_type"]
+                    kwargs = expectation_config["kwargs"]
+                    column = kwargs.get("column")
+                except Exception as e:
+                    logger.error("Error while parsing GX result: %s", e)
+                    raise
+                raised_exception = False
+                exception_message = None
+                exception_traceback = None
+                if "raised_exception" in exception_info:
+                    raised_exception = exception_info["raised_exception"]
+                    exception_message = exception_info["exception_message"]
+                    exception_traceback = exception_info["exception_traceback"]
+                else:
+                    # Nested metric-id keyed exceptions
+                    for _, info in exception_info.items():
+                        if "raised_exception" in info and info["raised_exception"]:
+                            raised_exception = True
+                            exception_message = info["exception_message"]
+                            exception_traceback = info["exception_traceback"]
+                            break
+                if raised_exception:
+                    expectations_failed_due_to_exceptions += 1
+                    logger.error(
+                        "GX exception in expectation: %s%s | message: %s",
+                        expectation_type,
+                        f" (column: {column})" if column else "",
+                        exception_message,
                     )
-                    expectation_type = expectation_config.get("expectation_type")
-                    column = expectation_config.get("kwargs", {}).get("column")
+                    exception_reasons.append(
+                        {
+                            "rule": expectation_type,
+                            "column": column,
+                            "exception_message": exception_message,
+                            "exception_traceback": exception_traceback,
+                        }
+                    )
+                    continue
+                result = expectation_result["result"]
+                unexpected_indices = (
+                    result["unexpected_index_list"]
+                    if "unexpected_index_list" in result
+                    else []
+                )
+                if len(unexpected_indices) > 0:
+                    expectations_with_violations += 1
                     violation_count = len(unexpected_indices)
                     logger.info(
                         f"{expectation_type}"
@@ -60,15 +101,22 @@ def validate_expectations(df_to_be_validated, expectations_suite):
                     for idx in unexpected_indices:
                         bad_indices.add(idx)
                         reasons_by_index[idx] = reasons_by_index.get(idx, []) + [reason]
-        return bad_indices, reasons_by_index, total_checks, checks_failed
+        return (
+            bad_indices,
+            reasons_by_index,
+            total_checks,
+            expectations_with_violations,
+            expectations_failed_due_to_exceptions,
+            exception_reasons,
+        )
 
     # clear_internal_gx_warnings()
     gx_context = gx.get_context(mode="ephemeral")
-    if isinstance(expectations_suite, str):
-        with open(expectations_suite, "r") as f:
-            suite_dict = json.load(f)
-    else:
-        suite_dict = expectations_suite
+    # if isinstance(expectations_suite, str):
+    #     with open(expectations_suite, "r") as f:
+    #         suite_dict = json.load(f)
+    # else:
+    suite_dict = expectations_suite
     suite = ExpectationSuite(**suite_dict)
     gx_context.add_or_update_expectation_suite(expectation_suite=suite)
     datasource_name = "pandas_datasource"
@@ -95,25 +143,36 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         ],
     )
     checkpoint_result = checkpoint.run(result_format="COMPLETE")
+    (
+        bad_indices,
+        reasons_by_index,
+        total_checks,
+        expectations_with_violations,
+        expectations_failed_due_to_exceptions,
+        exception_reasons,
+    ) = extract_unmatched_expectations_details(checkpoint_result)
+    expectations_successful = (
+        total_checks
+        - expectations_with_violations
+        - expectations_failed_due_to_exceptions
+    )
     if checkpoint_result.success:
         logger.info("Validation successful!")
         valid_df = df_to_be_validated
         invalid_df = None
         expectations_summary = {
-            "total_checks": 0,
-            "checks_failed": 0,
+            "total_checks": total_checks,
+            "expectations_successful": expectations_successful,
+            "expectations_with_violations": expectations_with_violations,
+            "expectations_failed_due_to_exceptions": expectations_failed_due_to_exceptions,
             "rows_failed": 0,
-            "top_failure_reasons": [],
+            "violation_reasons": [],
+            "exception_reasons": exception_reasons,
         }
     else:
         logger.warning("Validation failures detected!")
+        # logger.info(f"checkpoint_result: {checkpoint_result}")
         logger.info("Checking for unmatched expectations...")
-        (
-            bad_indices,
-            reasons_by_index,
-            total_checks,
-            checks_failed,
-        ) = extract_unmatched_expectations_details(checkpoint_result)
         bad_indices_list = list(bad_indices)
         valid_df = df_to_be_validated.drop(index=bad_indices_list)
         invalid_df = df_to_be_validated.loc[bad_indices_list]
@@ -136,9 +195,12 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         ]
         expectations_summary = {
             "total_checks": total_checks,
-            "checks_failed": checks_failed,
+            "expectations_successful": expectations_successful,
+            "expectations_with_violations": expectations_with_violations,
+            "expectations_failed_due_to_exceptions": expectations_failed_due_to_exceptions,
             "rows_failed": len(bad_indices),
-            "failure_reasons": failure_reasons,
+            "violation_reasons": failure_reasons,
+            "exception_reasons": exception_reasons,
         }
     return valid_df, invalid_df, expectations_summary
     # --- DATA DOCS GENERATION ---

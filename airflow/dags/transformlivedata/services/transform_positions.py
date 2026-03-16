@@ -169,7 +169,6 @@ def build_metrics_and_issues(
     payload_lines = raw_positions.get("payload", {}).get("l", [])
     total_lines_processed = len(payload_lines)
     expected_vehicles = raw_positions.get("metadata", {}).get("total_vehicles", 0)
-
     valid_count = valid_df.shape[0]
     invalid_count = invalid_df.shape[0]
     metrics = {
@@ -179,7 +178,6 @@ def build_metrics_and_issues(
         "expected_vehicles": expected_vehicles,
         "total_lines_processed": total_lines_processed,
     }
-
     invalid_vehicle_ids = (
         invalid_df["veiculo_id"].dropna().astype(int).tolist()
         if not invalid_df.empty
@@ -190,26 +188,14 @@ def build_metrics_and_issues(
         if not invalid_df.empty
         else []
     )
-
-    expected_by_line = {line.get("c"): int(line.get("qv", 0)) for line in payload_lines}
-    actual_by_line = (
-        valid_df.groupby("linha_lt")["veiculo_id"].count().to_dict()
-        if not valid_df.empty
-        else {}
+    lines_with_invalid_vehicles = (
+        int(invalid_df["linha_lt"].nunique()) if not invalid_df.empty else 0
     )
-    vehicle_count_discrepancies_per_line = []
-    for linha, expected in expected_by_line.items():
-        actual = actual_by_line.get(linha, 0)
-        if actual != expected:
-            vehicle_count_discrepancies_per_line.append(
-                {"linha": linha, "expected": expected, "actual": actual}
-            )
-
     issues = {
         "invalid_vehicle_ids": invalid_vehicle_ids,
         "invalid_trips": invalid_trips,
         "distance_calculation_errors": distance_errors,
-        "vehicle_count_discrepancies_per_line": vehicle_count_discrepancies_per_line,
+        "lines_with_invalid_vehicles": lines_with_invalid_vehicles,
     }
     return metrics, issues
 
