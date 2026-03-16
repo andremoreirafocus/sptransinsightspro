@@ -10,7 +10,7 @@
     },
     "orchestratetransform": {
         "raw_events_table_name": "to_be_processed.raw",
-        "orchestrate_target_dag": "transformlivedata-v4",
+        "orchestrate_target_dag": "transformlivedata-v7",
         "orchestrate_wait_time_seconds": 15,
         "description": "Configuration for orchestrating transform DAG, including target DAG name and wait time"
     },

@@ -10,14 +10,14 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_positions(config, year, month, day, hour, minute):
+def load_positions(config, partition_path, source_file):
     def get_config(config):
         storage = config["storage"]
         compression = config["compression"]
         source_bucket = storage["raw_bucket"]
         app_folder = storage["app_folder"]
         raw_data_compression = bool(compression["raw_data_compression"])
-        compression_extension = compression.get("raw_data_compression_extension", "")
+        compression_extension = compression["raw_data_compression_extension"]
         connection_data = {
             "minio_endpoint": storage["minio_endpoint"],
             "access_key": storage["access_key"],
@@ -39,10 +39,12 @@ def load_positions(config, year, month, day, hour, minute):
         compression_extension,
         connection_data,
     ) = get_config(config)
-    hour_minute = f"{hour}{minute}"
-    prefix = f"{app_folder}/year={year}/month={month}/day={day}/"
-    base_file_name = "posicoes_onibus"
-    object_name = f"{prefix}{base_file_name}-{year}{month}{day}{hour_minute}.json"
+    try:
+        prefix = f"{app_folder}/{partition_path}"
+        object_name = f"{prefix}{source_file}"
+    except Exception as e:
+        logger.error("Error building object_name: %s", e)
+        raise
     if raw_data_compression:
         object_name += compression_extension
     # print(f"Config: {config}")

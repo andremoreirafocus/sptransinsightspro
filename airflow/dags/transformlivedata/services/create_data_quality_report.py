@@ -14,13 +14,18 @@ def build_data_quality_report(
     logical_date_utc: str,
     source_file: str,
     transform_result: Dict[str, Any],
-    valid_df,
-    invalid_df,
-    expectations_summary: Dict[str, Any],
+    expectations_result: Dict[str, Any],
     pass_threshold: float,
     warn_threshold: float,
     batch_ts,
 ) -> Dict[str, Any]:
+    try:
+        valid_df = expectations_result["valid_df"]
+        invalid_df = expectations_result["invalid_df"]
+        expectations_summary = expectations_result["expectations_summary"]
+    except Exception as e:
+        logger.error("Error parsing expectations_result: %s", e)
+        raise
     metrics = transform_result.get("metrics", {})
     issues = transform_result.get("issues", {})
     transformed_records = transform_result.get("positions").shape[0]
@@ -98,6 +103,34 @@ def build_data_quality_report(
     }
 
 
+def create_data_quality_report(
+    config,
+    execution_id: str,
+    logical_date_utc: str,
+    source_file: str,
+    transform_result: Dict[str, Any],
+    expectations_result: Dict[str, Any],
+    pass_threshold: float = 1.0,
+    warn_threshold: float = 0.980,
+) -> Dict[str, Any]:
+    data_quality_report = build_data_quality_report(
+        config=config,
+        execution_id=execution_id,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        transform_result=transform_result,
+        expectations_result=expectations_result,
+        pass_threshold=pass_threshold,
+        warn_threshold=warn_threshold,
+        batch_ts=transform_result["batch_ts"],
+    )
+    validation_report = format_data_quality_report(data_quality_report)
+    logger.info(validation_report)
+    save_data_quality_report_to_storage(
+        config, data_quality_report, transform_result["batch_ts"]
+    )
+
+
 def build_quality_report_path(config, batch_ts):
     def get_config(config):
         storage = config["storage"]
@@ -137,7 +170,7 @@ def build_quarantine_path(config, batch_ts):
     return f"{bucket_name}/{prefix}positions_{hhmm}_*.parquet"
 
 
-def format_data_quality_report_report(data_quality_report: Dict[str, Any]) -> str:
+def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
     try:
         row_counts = data_quality_report["row_counts"]
         transform_metrics = data_quality_report["transformation_metrics"]
