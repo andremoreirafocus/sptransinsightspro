@@ -1,8 +1,9 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from airflow.models import DagRun
-from airflow.models.dagrun import DagRunType, DagRunState
+from airflow.models import DagRun, DagBag
+from airflow.models.dagrun import DagRunState
+from airflow.api.common.trigger_dag import trigger_dag
 from airflow.utils.db import create_session
 from airflow.utils import timezone
 from orchestratetransform.services.processed_requests_helper import (
@@ -25,7 +26,7 @@ default_args = {
     "max_active_runs": 1,
     "email_on_failure": False,
     "email_on_retry": False,
-    "retries": 3,
+    "retries": 0,
 }
 
 
@@ -47,8 +48,6 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
     logger.info(
         f"Starting DAG for unprocessed request with logical_date: {logical_date}..."
     )
-
-    # Convert logical_date to datetime object and ISO string
     if isinstance(logical_date, datetime):
         logical_date_dt = logical_date
         logical_date_str = logical_date.isoformat()
@@ -56,6 +55,10 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
         logical_date_str = str(logical_date)
         logical_date_dt = datetime.fromisoformat(logical_date_str)
 
+        dagbag = DagBag(read_dags_from_db=True)
+        if dag_name not in dagbag.dags:
+            logger.error("Target DAG not found: %s", dag_name)
+            return False
     try:
         # Check for existing failed DAG runs with the same logical_date
         with create_session() as session:
@@ -69,12 +72,10 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
                 )
                 .all()
             )
-
             if existing_runs:
                 logger.info(
                     f"Found {len(existing_runs)} existing run(s) for logical_date: {logical_date}"
                 )
-
                 for existing_run in existing_runs:
                     if existing_run.state in [
                         DagRunState.FAILED,
@@ -97,32 +98,20 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
                             f"Run with run_id: {existing_run.run_id} is in state: {existing_run.state}. "
                             f"Creating a new run anyway."
                         )
-
                 session.commit()
-
-        # Create a unique run_id for this DAG execution
-        run_id = f"manual__{timezone.utcnow().strftime('%Y%m%d_%H%M%S')}__{uuid.uuid4().hex[:8]}"
-        logger.info(f"Generated run_id for DAG: {run_id}")
-
-        # Create a new DagRun for transformlivedata-v4
-        dag_run = DagRun(
-            dag_id=dag_name,
-            run_id=run_id,
-            execution_date=logical_date_dt,
-            start_date=logical_date_dt,
-            external_trigger=True,
-            run_type=DagRunType.MANUAL,
-            conf={"logical_date_string": logical_date_str},
+        logger.info(
+            "Triggering DAG '%s' for logical_date: %s", dag_name, logical_date_str
         )
-
-        # Add the DagRun to the database
-        with create_session() as session:
-            session.add(dag_run)
-            session.commit()
-
+        trigger_dag(
+            dag_id=dag_name,
+            run_id=f"manual__{timezone.utcnow().strftime('%Y%m%d_%H%M%S')}__{uuid.uuid4().hex[:8]}",
+            conf={"logical_date_string": logical_date_str},
+            execution_date=logical_date_dt,
+            replace_microseconds=False,
+        )
         logger.info(
             f"DAG for unprocessed request with logical_date: {logical_date} started successfully! "
-            f"(run_id: {run_id})"
+            f"(dag_id: {dag_name})"
         )
         return True
 
@@ -136,7 +125,6 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
 def trigger_dag_for_unprocessed_requests():
     config = get_config()
 
-    # Get configuration values from config (Airflow Variables)
     def get_config_values(config):
         try:
             dag_name = config["ORCHESTRATE_TARGET_DAG"]
@@ -147,8 +135,6 @@ def trigger_dag_for_unprocessed_requests():
             raise
 
     dag_name, wait_time_seconds = get_config_values(config)
-    # Wait for ingest service to complete file download, MinIO save, and database write
-    # The ingest service takes time to: download JSON, save to MinIO, and save pending request to DB
     logger.info(
         f"Waiting {wait_time_seconds} seconds for ingest service to complete file processing..."
     )
@@ -160,7 +146,13 @@ def trigger_dag_for_unprocessed_requests():
             logger.info(
                 f"Found request with filename: {request['filename']} and logical_date: {request['logical_date']}"
             )
-            run_dag_for_unprocessed_request(dag_name, request["logical_date"])
+            if not run_dag_for_unprocessed_request(dag_name, request["logical_date"]):
+                logger.error(
+                    f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
+                )
+                raise RuntimeError(
+                    f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
+                )
     else:
         logger.info("No unprocessed requests found.")
 
