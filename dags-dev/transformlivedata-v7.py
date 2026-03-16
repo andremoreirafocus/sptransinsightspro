@@ -16,9 +16,7 @@ from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
 from transformlivedata.services.create_data_quality_report import (
-    build_data_quality_report,
-    format_data_quality_report_report,
-    save_data_quality_report_to_storage,
+    create_data_quality_report,
 )
 import pandas as pd
 from datetime import datetime
@@ -88,29 +86,21 @@ def load_transform_save_positions(logical_date_string):
     positions_df = transform_result["positions"]
     logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
     logger.info("Validating positions expectations...")
-    valid_postions_df, invalid_positions_df, expectations_summary = (
-        validate_expectations(
-            positions_df,
-            config["data_expectations"],
-        )
+    expectations_result = validate_expectations(
+        positions_df,
+        config["data_expectations"],
     )
-    data_quality_report = build_data_quality_report(
+    valid_postions_df = expectations_result["valid_df"]
+    invalid_positions_df = expectations_result["invalid_df"]
+    create_data_quality_report(
         config=general_config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
         source_file=f"posicoes_onibus-{year}{month}{day}{hour}{minute}.json",
         transform_result=transform_result,
-        valid_df=valid_postions_df,
-        invalid_df=invalid_positions_df,
-        expectations_summary=expectations_summary,
+        expectations_result=expectations_result,
         pass_threshold=1.0,
         warn_threshold=0.980,
-        batch_ts=transform_result["batch_ts"],
-    )
-    validation_report = format_data_quality_report_report(data_quality_report)
-    logger.info(validation_report)
-    save_data_quality_report_to_storage(
-        general_config, data_quality_report, transform_result["batch_ts"]
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")

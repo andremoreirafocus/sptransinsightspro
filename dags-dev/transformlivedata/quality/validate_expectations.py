@@ -202,7 +202,11 @@ def validate_expectations(df_to_be_validated, expectations_suite):
             "violation_reasons": failure_reasons,
             "exception_reasons": exception_reasons,
         }
-    return valid_df, invalid_df, expectations_summary
+    return {
+        "valid_df": valid_df,
+        "invalid_df": invalid_df,
+        "expectations_summary": expectations_summary,
+    }
     # --- DATA DOCS GENERATION ---
     gx_context.build_data_docs()
     # This finds the local path to the 'index.html' of your documentation
