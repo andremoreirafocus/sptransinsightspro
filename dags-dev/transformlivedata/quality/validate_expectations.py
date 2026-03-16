@@ -107,6 +107,7 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         }
     else:
         logger.warning("Validation failures detected!")
+        logger.info(f"checkpoint_result: {checkpoint_result}")
         logger.info("Checking for unmatched expectations...")
         (
             bad_indices,

@@ -57,8 +57,8 @@ def build_data_quality_report(
             "distance_calculation_errors": len(
                 issues.get("distance_calculation_errors", [])
             ),
-            "vehicle_count_discrepancies_per_line": len(
-                issues.get("vehicle_count_discrepancies_per_line", [])
+            "lines_with_invalid_vehicles": issues.get(
+                "lines_with_invalid_vehicles", 0
             ),
         },
         "expectations_summary": {
@@ -149,7 +149,7 @@ def format_data_quality_report_report(data_quality_report: Dict[str, Any]) -> st
         f"- Invalid trips: {len(transform_issues.get('invalid_trips', []))} - {transform_issues.get('invalid_trips', [])}",
         f"- Invalid vehicle IDs: {len(transform_issues.get('invalid_vehicle_ids', []))} - {transform_issues.get('invalid_vehicle_ids', [])}",
         f"- Distance calculation errors: {transform_issues.get('distance_calculation_errors', 0)}",
-        f"- Lines with vehicle count discrepancies: {transform_issues.get('vehicle_count_discrepancies_per_line', 0)}",
+        f"- Lines with invalid vehicles: {transform_issues.get('lines_with_invalid_vehicles', 0)}",
         "",
         "Post Transformation Validation Summary",
         f"- Total checks: {expectations_summary.get('total_checks', 0)}",
