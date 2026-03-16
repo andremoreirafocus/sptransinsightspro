@@ -18,9 +18,10 @@ from transformlivedata.quality.validate_json_data_schema import (
 from transformlivedata.services.create_data_quality_report import (
     create_data_quality_report,
 )
+from transformlivedata.services.build_logical_date_context import (
+    build_logical_date_context,
+)
 import pandas as pd
-from datetime import datetime
-from zoneinfo import ZoneInfo
 import logging
 from logging.handlers import RotatingFileHandler
 import uuid
@@ -42,32 +43,24 @@ logger = logging.getLogger(__name__)
 
 
 def load_transform_save_positions(logical_date_string):
-    """
-    Load, transform, and save positions with JSON-driven raw validation and GE lineage tracking.
-
-    INTEGRATION POINT 1: Raw validation using RawDataExpectations (jsonschema-driven)
-    """
-    # Create unique execution ID for tracking
-    config = get_config()
-    general_config = config["general"]
-    dt_utc = datetime.fromisoformat(logical_date_string)
-    dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
-    year = dt.strftime("%Y")
-    month = dt.strftime("%m")
-    day = dt.strftime("%d")
-    hour = dt.strftime("%H")
-    minute = dt.strftime("%M")
+    logical_date_context = build_logical_date_context(logical_date_string)
+    pipeline_config = get_config()
+    general_config = pipeline_config["general"]
     execution_id = str(uuid.uuid4())
     logger.info(f"Starting execution {execution_id}")
-    logger.info(f"Transforming position for {dt}...")
+    logger.info(f"Transforming position for {logical_date_string}...")
     logger.info("=== LOAD STAGE: load_positions ===")
-    raw_positions = load_positions(general_config, year, month, day, hour, minute)
+    raw_positions = load_positions(
+        general_config,
+        logical_date_context["partition_path"],
+        logical_date_context["source_file"],
+    )
     if not raw_positions:
         logger.error("No position data found to transform.")
         raise ValueError("No position data found to transform.")
     logger.info("=== RAW DATA VALIDATION STAGE ===")
     is_valid, validation_errors = validate_json_data_schema(
-        raw_positions, config["raw_data_json_schema"]
+        raw_positions, pipeline_config["raw_data_json_schema"]
     )
     if not is_valid:
         error_msg = f"Raw data validation failed: {validation_errors}"
@@ -75,7 +68,7 @@ def load_transform_save_positions(logical_date_string):
         raise ValueError(error_msg)
     logger.info("Raw data validation passed ✓")
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
-    transform_result = transform_positions(config, raw_positions)
+    transform_result = transform_positions(pipeline_config, raw_positions)
     if (
         not transform_result
         or transform_result.get("positions") is None
@@ -88,7 +81,7 @@ def load_transform_save_positions(logical_date_string):
     logger.info("Validating positions expectations...")
     expectations_result = validate_expectations(
         positions_df,
-        config["data_expectations"],
+        pipeline_config["data_expectations"],
     )
     valid_postions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
@@ -96,7 +89,7 @@ def load_transform_save_positions(logical_date_string):
         config=general_config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
-        source_file=f"posicoes_onibus-{year}{month}{day}{hour}{minute}.json",
+        source_file=logical_date_context["source_file"],
         transform_result=transform_result,
         expectations_result=expectations_result,
         pass_threshold=1.0,
@@ -123,13 +116,6 @@ def load_transform_save_positions(logical_date_string):
         )
     mark_request_as_processed(general_config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
-    return {
-        "execution_id": execution_id,
-        "records_processed": valid_postions_df.shape[0],
-        # "validation_passed": validation_results["overall_success"],
-        # "lineage_report": report_filename,
-        # "validation_report": validation_filename,
-    }
 
 
 def main():
