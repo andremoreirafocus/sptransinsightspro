@@ -36,10 +36,15 @@ docker compose exec airflow_webserver airflow users create \
 Para importar conexões e variáveis de ambiente usadas pelas DAGS
 ```shell
 docker exec -it airflow_webserver bash
-airflow connections import connections.json 
-airflow variables import variables.json 
+airflow connections import variables_and_connections/connections.json 
+airflow variables import variables_and_connections/variables.json 
+airflow variables import variables_and_connections/transformlivedata_general.json 
+airflow variables import variables_and_connections/transformlivedata_data_expectations.json
+airflow variables import variables_and_connections/transformlivedata_data_expectations.json
 ```
 
+
+### Nao esta sendo usado
 Para criar usuário do extractloadlivedata que invoca DAGs
 ```shell
 airflow roles create API_Trigger

@@ -31,11 +31,7 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
-      - ./airflow/connections.json:/opt/airflow/connections.json
-      - ./airflow/variables.json:/opt/airflow/variables.json
-      - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
-      - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
-      - ./airflow/transformlivedata_general.json:/opt/airflow/transformlivedata_general.json
+      - ./airflow/variables_and_connections:/opt/airflow/variables_and_connections
     ports:
       - "8080:8080"
     depends_on:
@@ -57,11 +53,7 @@ services:
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
-      - ./airflow/connections.json:/opt/airflow/connections.json
-      - ./airflow/variables.json:/opt/airflow/variables.json
-      - ./airflow/transformlivedata_data_expectations.json:/opt/airflow/transformlivedata_data_expectations.json
-      - ./airflow/transformlivedata_raw_data_json_schema.json:/opt/airflow/transformlivedata_raw_data_json_schema.json
-      - ./airflow/transformlivedata_general.json:/opt/airflow/transformlivedata_general.json
+      - ./airflow/variables_and_connections:/opt/airflow/variables_and_connections
     depends_on:
       - airflow_postgres
     networks:
