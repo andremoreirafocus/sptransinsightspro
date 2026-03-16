@@ -1,5 +1,5 @@
 import logging
-from infra.sql_db import execute_select_query, execute_update_query
+from infra.sql_db_v2 import execute_select_query, execute_update_query
 
 logger = logging.getLogger(__name__)
 
@@ -32,11 +32,18 @@ def get_unprocessed_requests(config):
             )
 
         schema, table = raw_events_table.split(".", 1)
-        return schema, table
+        connection = {
+            "host": config["DB_HOST"],
+            "port": config["DB_PORT"],
+            "database": config["DB_DATABASE"],
+            "user": config["DB_USER"],
+            "password": config["DB_PASSWORD"],
+        }
+        return connection, schema, table
 
     try:
         # Get schema and table from config
-        schema, table = get_config(config)
+        connection, schema, table = get_config(config)
 
         # Build SELECT query for unprocessed requests
         query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
@@ -45,7 +52,7 @@ def get_unprocessed_requests(config):
         print(f"Fetching unprocessed requests from {schema}.{table}")
 
         # Execute query
-        results = execute_select_query(config, query)
+        results = execute_select_query(connection, query)
 
         if results:
             logger.info(f"Found {len(results)} unprocessed request(s)")
@@ -86,11 +93,18 @@ def mark_request_as_processed(config, logical_date):
             )
 
         schema, table = raw_events_table.split(".", 1)
-        return schema, table
+        connection = {
+            "host": config["DB_HOST"],
+            "port": config["DB_PORT"],
+            "database": config["DB_DATABASE"],
+            "user": config["DB_USER"],
+            "password": config["DB_PASSWORD"],
+        }
+        return connection, schema, table
 
     try:
         # Get schema and table from config
-        schema, table = get_config(config)
+        connection, schema, table = get_config(config)
 
         # Build UPDATE query
         query = f"""
@@ -104,7 +118,7 @@ def mark_request_as_processed(config, logical_date):
         )
 
         # Execute update
-        success = execute_update_query(config, query, {"logical_date": logical_date})
+        success = execute_update_query(connection, query, {"logical_date": logical_date})
 
         if success:
             logger.info(f"Request with logical_date={logical_date} marked as processed")
@@ -147,11 +161,18 @@ def mark_request_as_processed_by_filename(config, filename):
             )
 
         schema, table = raw_events_table.split(".", 1)
-        return schema, table
+        connection = {
+            "host": config["DB_HOST"],
+            "port": config["DB_PORT"],
+            "database": config["DB_DATABASE"],
+            "user": config["DB_USER"],
+            "password": config["DB_PASSWORD"],
+        }
+        return connection, schema, table
 
     try:
         # Get schema and table from config
-        schema, table = get_config(config)
+        connection, schema, table = get_config(config)
 
         # Build UPDATE query
         query = f"""
@@ -165,7 +186,7 @@ def mark_request_as_processed_by_filename(config, filename):
         )
 
         # Execute update
-        success = execute_update_query(config, query, {"filename": filename})
+        success = execute_update_query(connection, query, {"filename": filename})
 
         if success:
             logger.info(f"Request with filename={filename} marked as processed")
