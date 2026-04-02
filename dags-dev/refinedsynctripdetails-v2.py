@@ -4,7 +4,7 @@ from refinedsynctripdetails.services.load_trip_details_from_storage_to_dataframe
 from refinedsynctripdetails.services.save_trip_details_from_dataframe_to_refined import (
     save_trip_details_from_dataframe_to_refined,
 )
-from refinedsynctripdetails.config import get_config
+from refinedsynctripdetails.config.config import get_config
 import logging
 from logging.handlers import RotatingFileHandler
 
