@@ -14,12 +14,15 @@
         "orchestrate_wait_time_seconds": 15,
         "description": "Configuration for orchestrating transform DAG, including target DAG name and wait time"
     },
-    "updatelatestpositions": {
-        "trusted_bucket": "trusted",
-        "app_folder": "sptrans",
-        "positions_table_name": "positions",
-        "latest_positions_table_name": "refined.latest_positions",
-        "description": "Configuration for updating latest positions, including bucket names and table names."
+    "updatelatestpositions_general": {
+        "storage": {
+            "trusted_bucket": "trusted",
+            "app_folder": "sptrans"
+        },
+        "tables": {
+            "positions_table_name": "positions",
+            "latest_positions_table_name": "refined.latest_positions"
+        }
     },
     "refinedfinishedtrips": {
         "analysis_hours_window": 3,

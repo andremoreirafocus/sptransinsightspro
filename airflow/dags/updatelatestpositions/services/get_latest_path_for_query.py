@@ -9,13 +9,16 @@ logger = logging.getLogger(__name__)
 def get_latest_path_for_query(config):
     def get_config(config):
         try:
-            bucket = config["TRUSTED_BUCKET"]
-            app_folder = config["APP_FOLDER"]
-            positions_table_name = config["POSITIONS_TABLE_NAME"]
+            general = config["general"]
+            storage = general["storage"]
+            tables = general["tables"]
+            bucket = storage["trusted_bucket"]
+            app_folder = storage["app_folder"]
+            positions_table_name = tables["positions_table_name"]
             connection_data = {
-                "minio_endpoint": config["MINIO_ENDPOINT"],
-                "access_key": config["ACCESS_KEY"],
-                "secret_key": config["SECRET_KEY"],
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
                 "secure": False,
             }
             return (

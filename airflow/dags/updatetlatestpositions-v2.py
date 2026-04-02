@@ -4,7 +4,7 @@ from airflow.utils.dates import days_ago
 from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
-from updatelatestpositions.config import get_config
+from updatelatestpositions.config.config import get_config
 
 # Definindo os argumentos padrão para as tarefas do DAG
 default_args = {
