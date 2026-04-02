@@ -1,0 +1,11 @@
+{
+    "refinedsynctripdetails_general": {
+        "storage": {
+            "trusted_bucket": "trusted",
+            "gtfs_folder": "gtfs"
+        },
+        "tables": {
+            "trip_details_table_name": "refined.trip_details"
+        }
+    }
+}

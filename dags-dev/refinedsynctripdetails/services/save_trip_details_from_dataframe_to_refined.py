@@ -7,13 +7,15 @@ logger = logging.getLogger(__name__)
 def save_trip_details_from_dataframe_to_refined(config, df_trip_details):
     def get_config(config):
         try:
-            trip_details_table_name = config["TRIP_DETAILS_TABLE_NAME"]
+            tables = config["general"]["tables"]
+            database = config["general"]["database"]
+            trip_details_table_name = tables["trip_details_table_name"]
             connection = {
-                "host": config["DB_HOST"],
-                "port": config["DB_PORT"],
-                "database": config["DB_DATABASE"],
-                "user": config["DB_USER"],
-                "password": config["DB_PASSWORD"],
+                "host": database["host"],
+                "port": database["port"],
+                "database": database["database"],
+                "user": database["user"],
+                "password": database["password"],
             }
             return connection, trip_details_table_name
         except KeyError as e:

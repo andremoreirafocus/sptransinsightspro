@@ -1,5 +1,6 @@
 import logging
 import os
+import json
 
 
 def get_config():
@@ -14,7 +15,38 @@ def get_config():
         # Pulling from local .env or hardcoded defaults for testing
         from dotenv import dotenv_values
 
-        return dotenv_values("refinedsynctripdetails/.env")
+        return get_local_config(dotenv_values("refinedsynctripdetails/.env"))
+
+
+def get_local_config(env_values):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    config_path = os.path.join(base_dir, "config", "refinedsynctripdetails.json")
+    with open(config_path, "r") as f:
+        general = json.load(f)["refinedsynctripdetails_general"]
+
+    storage = general.setdefault("storage", {})
+    database = general.setdefault("database", {})
+    if env_values.get("MINIO_ENDPOINT"):
+        storage["minio_endpoint"] = env_values.get("MINIO_ENDPOINT")
+    if env_values.get("ACCESS_KEY"):
+        storage["access_key"] = env_values.get("ACCESS_KEY")
+    if env_values.get("SECRET_KEY"):
+        storage["secret_key"] = env_values.get("SECRET_KEY")
+    if env_values.get("DB_HOST"):
+        database["host"] = env_values.get("DB_HOST")
+    if env_values.get("DB_PORT"):
+        database["port"] = env_values.get("DB_PORT")
+    if env_values.get("DB_DATABASE"):
+        database["database"] = env_values.get("DB_DATABASE")
+    if env_values.get("DB_USER"):
+        database["user"] = env_values.get("DB_USER")
+    if env_values.get("DB_PASSWORD"):
+        database["password"] = env_values.get("DB_PASSWORD")
+    if env_values.get("DB_SSLMODE"):
+        database["sslmode"] = env_values.get("DB_SSLMODE")
+    return {
+        "general": general,
+    }
 
 
 def get_airflow_config():
