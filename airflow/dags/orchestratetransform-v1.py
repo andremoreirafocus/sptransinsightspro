@@ -92,7 +92,7 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
                         logger.info(
                             f"Run with run_id: {existing_run.run_id} is already {existing_run.state}. Skipping new trigger."
                         )
-                        return False
+                        return "SKIPPED_RUNNING"
                     else:
                         logger.info(
                             f"Run with run_id: {existing_run.run_id} is in state: {existing_run.state}. "
@@ -113,13 +113,13 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
             f"DAG for unprocessed request with logical_date: {logical_date} started successfully! "
             f"(dag_id: {dag_name})"
         )
-        return True
+        return "TRIGGERED"
 
     except Exception as e:
         logger.error(
             f"Failed to trigger DAG for logical_date {logical_date}: {e}", exc_info=True
         )
-        return False
+        return "FAILED"
 
 
 def trigger_dag_for_unprocessed_requests():
@@ -146,12 +146,20 @@ def trigger_dag_for_unprocessed_requests():
             logger.info(
                 f"Found request with filename: {request['filename']} and logical_date: {request['logical_date']}"
             )
-            if not run_dag_for_unprocessed_request(dag_name, request["logical_date"]):
+            result = run_dag_for_unprocessed_request(
+                dag_name, request["logical_date"]
+            )
+            if result == "FAILED":
                 logger.error(
                     f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
                 )
                 raise RuntimeError(
                     f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
+                )
+            if result == "SKIPPED_RUNNING":
+                logger.info(
+                    "Skipping trigger because DAG is already running for logical_date: %s",
+                    request["logical_date"],
                 )
     else:
         logger.info("No unprocessed requests found.")

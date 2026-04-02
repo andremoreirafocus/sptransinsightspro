@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 default_args = {
     "owner": "airflow",
     "depends_on_past": False,
-    "start_date": days_ago(0),
+    "start_date": days_ago(20),
     "max_active_runs": 1,
     "email_on_failure": False,
     "email_on_retry": False,
