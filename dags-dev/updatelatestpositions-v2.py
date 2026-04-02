@@ -1,7 +1,7 @@
 from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
-from updatelatestpositions.config import get_config
+from updatelatestpositions.config.config import get_config
 
 import logging
 from logging.handlers import RotatingFileHandler
