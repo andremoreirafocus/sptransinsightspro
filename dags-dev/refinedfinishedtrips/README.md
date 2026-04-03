@@ -17,12 +17,14 @@ Para cada linha e veículo:
 - Criação do arquivo de configurações
 
 ## Configurações
-ANALYSIS_HOURS_WINDOW=<numero_de_horas_analise_viagens_finalizadas>
-APP_FOLDER="sptrans"
-TRUSTED_BUCKET = "trusted"
-POSITIONS_TABLE_NAME="positions"
-FINISHED_TRIPS_TABLE_NAME="refined.finished_trips"
-APP_FOLDER="sptrans"
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+- `general`
+
+### Local/dev
+- `general` vem do arquivo `dags-dev/refinedfinishedtrips/config/refinedfinishedtrips.json`
+- `.env` em `dags-dev/refinedfinishedtrips/.env` é usado apenas para credenciais de conexão
+
+Credenciais esperadas no `.env`:
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
@@ -32,6 +34,27 @@ DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
+
+Chaves esperadas em `general`
+```json
+{
+  "analysis": {
+    "hours_window": 3
+  },
+  "storage": {
+    "app_folder": "sptrans",
+    "trusted_bucket": "trusted"
+  },
+  "tables": {
+    "positions_table_name": "positions",
+    "finished_trips_table_name": "refined.finished_trips"
+  }
+}
+```
+
+### Airflow (produção)
+- Variable `refinedfinishedtrips_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
 
 ## Instruções para instalação
 Para instalar os requisitos:

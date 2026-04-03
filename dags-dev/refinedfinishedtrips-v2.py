@@ -1,7 +1,7 @@
 from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
     extract_trips_for_all_Lines_and_vehicles_pandas as extract_trips_for_all_Lines_and_vehicles,
 )
-from refinedfinishedtrips.config import get_config
+from refinedfinishedtrips.config.config import get_config
 
 import logging
 from logging.handlers import RotatingFileHandler

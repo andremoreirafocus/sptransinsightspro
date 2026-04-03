@@ -29,13 +29,18 @@
             "latest_positions_table_name": "refined.latest_positions"
         }
     },
-    "refinedfinishedtrips": {
-        "analysis_hours_window": 3,
-        "trusted_bucket": "trusted",
-        "app_folder": "sptrans",
-        "positions_table_name": "positions",
-        "finished_trips_table_name": "refined.finished_trips",
-        "description": "Configuration for updating latest positions, including bucket names and table names."
+    "refinedfinishedtrips_general": {
+        "analysis": {
+            "hours_window": 3
+        },
+        "storage": {
+            "app_folder": "sptrans",
+            "trusted_bucket": "trusted"
+        },
+        "tables": {
+            "positions_table_name": "positions",
+            "finished_trips_table_name": "refined.finished_trips"
+        }
     },
     "refinedsynctripdetails_general": {
         "storage": {

@@ -1,4 +1,4 @@
-from infra.duck_db import get_duckdb_connection
+from infra.duck_db_v2 import get_duckdb_connection
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import logging
@@ -10,34 +10,52 @@ logger = logging.getLogger(__name__)
 def get_recent_positions(config):
     def get_config(config):
         try:
-            hours_interval = int(config["ANALYSIS_HOURS_WINDOW"])
-            bucket_name = config["TRUSTED_BUCKET"]
-            app_folder = config["APP_FOLDER"]
-            positions_table_name = config["POSITIONS_TABLE_NAME"]
-            return hours_interval, bucket_name, app_folder, positions_table_name
+            general = config["general"]
+            analysis = general["analysis"]
+            storage = general["storage"]
+            tables = general["tables"]
+            hours_interval = int(analysis["hours_window"])
+            bucket_name = storage["trusted_bucket"]
+            app_folder = storage["app_folder"]
+            positions_table_name = tables["positions_table_name"]
+            connection = {
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
+                "secure": False,
+            }
+            return hours_interval, bucket_name, app_folder, positions_table_name, connection
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
             raise
 
-    hours_interval, bucket_name, app_folder, positions_table_name = get_config(config)
+    (
+        hours_interval,
+        bucket_name,
+        app_folder,
+        positions_table_name,
+        connection,
+    ) = get_config(config)
     logger.info(
         f"Bulk loading last {hours_interval} hours of positions for all vehicles..."
     )
-    # now = datetime.now(timezone.utc)
-    now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
+    now = datetime.now(timezone.utc)
+    # now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")
     current_hour = int(now.strftime("%H"))
+    logger.info(f"Current hour: {current_hour}")
     min_hour = current_hour - hours_interval
+    logger.info(f"Minimum hour: {min_hour}")
     if min_hour < 0:
         min_hour = 0
     s3_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}/year={year}/month={month}/day={day}/**"
     try:
         logger.info("Connecting to DuckDB...")
-        con = get_duckdb_connection(config)
+        con = get_duckdb_connection(connection)
         logger.info(
-            f"Retrieveing position records for the last {hours_interval} hours..."
+            f"Retrieveing position records for the last {hours_interval} hours in {s3_path}..."
         )
         # Optimized: Select only needed columns for trip detection
         # Sorted by linha_lt, veiculo_id first for index-based grouping, then veiculo_ts for chronological order
@@ -48,6 +66,8 @@ def get_recent_positions(config):
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
             ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;
         """
+        logger.info("Executing SQL query...")
+        logger.info(f"SQL query: {sql}")
         df_recent_positions = con.execute(sql).df()
         total_records = df_recent_positions.shape[0]
         logger.info(f"Retrieved {total_records} position records.")

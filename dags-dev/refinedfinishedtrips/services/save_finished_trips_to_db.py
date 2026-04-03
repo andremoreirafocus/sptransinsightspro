@@ -14,12 +14,14 @@ def save_finished_trips_to_db(config, trips_tuples):
 
     def get_config(config):
         try:
-            table_name = config["FINISHED_TRIPS_TABLE_NAME"]
-            host = config["DB_HOST"]
-            port = config["DB_PORT"]
-            dbname = config["DB_DATABASE"]
-            dbuser = config["DB_USER"]
-            password = config["DB_PASSWORD"]
+            general = config["general"]
+            tables = general["tables"]
+            table_name = tables["finished_trips_table_name"]
+            host = general["DB_HOST"]
+            port = general["DB_PORT"]
+            dbname = general["DB_DATABASE"]
+            dbuser = general["DB_USER"]
+            password = general["DB_PASSWORD"]
             return (table_name, host, port, dbname, dbuser, password)
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
