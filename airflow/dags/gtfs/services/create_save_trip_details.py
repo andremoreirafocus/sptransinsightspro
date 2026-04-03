@@ -1,4 +1,4 @@
-from infra.duck_db import get_duckdb_connection
+from infra.duck_db_v2 import get_duckdb_connection
 import logging
 
 logger = logging.getLogger(__name__)
@@ -7,17 +7,27 @@ logger = logging.getLogger(__name__)
 def create_trip_details_table_and_fill_missing_data(config):
     def get_config(config):
         try:
-            bucket_name = config["TRUSTED_BUCKET"]
-            app_folder = config["GTFS_FOLDER"]
-            trip_details = config["TRIP_DETAILS_TABLE_NAME"]
-            return bucket_name, app_folder, trip_details
+            general = config["general"]
+            storage = general["storage"]
+            tables = general["tables"]
+            bucket_name = storage["trusted_bucket"]
+            app_folder = storage["gtfs_folder"]
+            trip_details = tables["trip_details_table_name"]
+            connection = {
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
+                "secure": False,
+            }
+            return bucket_name, app_folder, trip_details, connection
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
             raise
 
+    con = None
     try:
-        bucket_name, app_folder, trip_details = get_config(config)
-        con = get_duckdb_connection(config)
+        bucket_name, app_folder, trip_details, connection = get_config(config)
+        con = get_duckdb_connection(connection)
         stop_times_table_path = f"{bucket_name}/{app_folder}/stop_times"
         stops_table_path = f"{bucket_name}/{app_folder}/stops"
         con.execute(f"""

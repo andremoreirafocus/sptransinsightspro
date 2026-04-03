@@ -15,7 +15,7 @@ from gtfs.services.transforms import (
     transform_stops,
     transform_trips,
 )
-from gtfs.config import get_config
+from gtfs.config.config import get_config
 
 
 import logging

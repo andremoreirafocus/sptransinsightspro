@@ -7,16 +7,23 @@ logger = logging.getLogger(__name__)
 
 def save_files_to_raw_storage(config, files_list):
     def get_config(config):
-        folder = config.get("LOCAL_DOWNLOADS_FOLDER")
-        bucket_name = config.get("RAW_BUCKET")
-        app_folder = config.get("GTFS_FOLDER")
-        connection_data = {
-            "minio_endpoint": config["MINIO_ENDPOINT"],
-            "access_key": config["ACCESS_KEY"],
-            "secret_key": config["SECRET_KEY"],
-            "secure": False,
-        }
-        return folder, bucket_name, app_folder, connection_data
+        try:
+            general = config["general"]
+            extraction = general["extraction"]
+            storage = general["storage"]
+            folder = extraction["local_downloads_folder"]
+            bucket_name = storage["raw_bucket"]
+            app_folder = storage["gtfs_folder"]
+            connection_data = {
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
+                "secure": False,
+            }
+            return folder, bucket_name, app_folder, connection_data
+        except KeyError as e:
+            logger.error(f"Missing required configuration key: {e}")
+            raise
 
     folder, bucket_name, app_folder, connection_data = get_config(config)
     for file_name in files_list:
