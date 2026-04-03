@@ -7,15 +7,21 @@ logger = logging.getLogger(__name__)
 
 def save_buffer_to_storage(config, file_name, buffer):
     def get_config(config):
-        destination_bucket = config["TRUSTED_BUCKET"]
-        app_folder = config["GTFS_FOLDER"]
-        connection_data = {
-            "minio_endpoint": config["MINIO_ENDPOINT"],
-            "access_key": config["ACCESS_KEY"],
-            "secret_key": config["SECRET_KEY"],
-            "secure": False,
-        }
-        return destination_bucket, app_folder, connection_data
+        try:
+            general = config["general"]
+            storage = general["storage"]
+            destination_bucket = storage["trusted_bucket"]
+            app_folder = storage["gtfs_folder"]
+            connection_data = {
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
+                "secure": False,
+            }
+            return destination_bucket, app_folder, connection_data
+        except KeyError as e:
+            logger.error(f"Missing required configuration key: {e}")
+            raise
 
     destination_bucket, app_folder, connection_data = get_config(config)
     logger.info(

@@ -15,15 +15,21 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
     """
 
     def get_config(config):
-        source_bucket = config["RAW_BUCKET"]
-        app_folder = config["GTFS_FOLDER"]
-        connection_data = {
-            "minio_endpoint": config["MINIO_ENDPOINT"],
-            "access_key": config["ACCESS_KEY"],
-            "secret_key": config["SECRET_KEY"],
-            "secure": False,
-        }
-        return source_bucket, app_folder, connection_data
+        try:
+            general = config["general"]
+            storage = general["storage"]
+            source_bucket = storage["raw_bucket"]
+            app_folder = storage["gtfs_folder"]
+            connection_data = {
+                "minio_endpoint": storage["minio_endpoint"],
+                "access_key": storage["access_key"],
+                "secret_key": storage["secret_key"],
+                "secure": False,
+            }
+            return source_bucket, app_folder, connection_data
+        except KeyError as e:
+            logger.error(f"Missing required configuration key: {e}")
+            raise
 
     source_bucket, app_folder, connection_data = get_config(config)
     logger.info(

@@ -9,11 +9,17 @@ logger = logging.getLogger(__name__)
 
 def extract_gtfs_files(config):
     def get_config(config):
-        url = config["GTFS_URL"]
-        login = config["LOGIN"]
-        password = config["PASSWORD"]
-        downloads_folder = config["LOCAL_DOWNLOADS_FOLDER"]
-        return url, login, password, downloads_folder
+        try:
+            general = config["general"]
+            extraction = general["extraction"]
+            url = extraction["gtfs_url"]
+            login = extraction["login"]
+            password = extraction["password"]
+            downloads_folder = extraction["local_downloads_folder"]
+            return url, login, password, downloads_folder
+        except KeyError as e:
+            logger.error(f"Missing required configuration key: {e}")
+            raise
 
     url, login, password, downloads_folder = get_config(config)
     response = requests.get(url, auth=(login, password))
