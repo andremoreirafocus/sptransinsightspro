@@ -15,19 +15,41 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-TRUSTED_BUCKET = "trusted"
-APP_FOLDER = "sptrans"
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+- `general`
+
+### Local/dev
+- `general` vem do arquivo `dags-dev/updatelatestpositions/config/updatelatestpositions.json`
+- `.env` em `dags-dev/updatelatestpositions/.env` é usado apenas para credenciais de conexão
+
+Credenciais esperadas no `.env`:
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
-POSITIONS_TABLE_NAME="positions"
-LATEST_POSITIONS_TABLE_NAME="refined.latest_positions"
 DB_HOST=<db_hostname>
 DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
+
+Chaves esperadas em `general`
+```json
+{
+  "storage": {
+    "trusted_bucket": "trusted",
+    "app_folder": "sptrans"
+  },
+  "tables": {
+    "positions_table_name": "positions",
+    "latest_positions_table_name": "refined.latest_positions"
+  }
+}
+```
+
+### Airflow (produção)
+- Variable `updatelatestpositions_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
 
 ## Instruções para instalação
 Para instalar os requisitos:

@@ -19,17 +19,42 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-GTFS_URL = "http://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS"
-LOGIN = <insira seu login>
-PASSWORD = <insira sua senha>
-LOCAL_DOWNLOADS_FOLDER = "gtfs_files"
-RAW_BUCKET = "raw"
-TRUSTED_BUCKET = "trusted"
-GTFS_FOLDER = "gtfs"    # Pasta destino da extração dos arquivos GTFS para o bucket raw e da transformação para o bucket trusted
-TRIP_DETAILS_TABLE_NAME = "trip_details"
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+- `general`
+
+### Local/dev
+- `general` vem do arquivo `dags-dev/gtfs/config/gtfs.json`
+- `.env` em `dags-dev/gtfs/.env` é usado apenas para credenciais de conexão
+
+Credenciais esperadas no `.env`:
+GTFS_URL="http://www.sptrans.com.br/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS"
+LOGIN=<insira seu login>
+PASSWORD=<insira sua senha>
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
+
+Chaves esperadas em `general`
+```json
+{
+  "extraction": {
+    "local_downloads_folder": "gtfs_files"
+  },
+  "storage": {
+    "app_folder": "sptrans",
+    "gtfs_folder": "gtfs",
+    "raw_bucket": "raw",
+    "trusted_bucket": "trusted"
+  },
+  "tables": {
+    "trip_details_table_name": "trip_details"
+  }
+}
+```
+
+### Airflow (produção)
+- Variable `gtfs_general` (JSON)
+- Credenciais via Connections (GTFS e MinIO)
 
 ## Instruções para instalação
 Para instalar os requisitos:
@@ -42,4 +67,3 @@ Para instalar os requisitos:
 python gtfs-v2.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
-
