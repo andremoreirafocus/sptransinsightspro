@@ -14,13 +14,37 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-RAW_EVENTS_TABLE_NAME = "to_be_processed.raw"
-DB_HOST="localhost"
-DB_PORT=5432
-DB_DATABASE="sptrans_insights"
-DB_USER=<user_airflow_postgres>
-DB_PASSWORD=<password_airflow_postgres>
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+- `general`
+
+### Local/dev
+- `general` vem do arquivo `dags-dev/orchestratetransform/config/orchestratetransform.json`
+- `.env` em `dags-dev/orchestratetransform/.env` é usado apenas para credenciais de conexão
+
+Credenciais esperadas no `.env`:
+DB_HOST=<db_hostname>
+DB_PORT=<PORT>
+DB_DATABASE=<dbname>
+DB_USER=<user>
+DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
+
+Chaves esperadas em `general`
+```json
+{
+  "orchestration": {
+    "target_dag": "transformlivedata-v7",
+    "wait_time_seconds": 15
+  },
+  "tables": {
+    "raw_events_table_name": "to_be_processed.raw"
+  }
+}
+```
+
+### Airflow (produção)
+- Variable `orchestratetransform_general` (JSON)
+- Credenciais via Connection (Airflow Postgres)
 
 ## Instruções para instalação
 Para instalar os requisitos:
@@ -35,4 +59,3 @@ python orchestratetransform-v1.py
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
 ## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
-
