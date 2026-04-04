@@ -1,0 +1,11 @@
+{
+  "orchestratetransform_general": {
+    "orchestration": {
+      "target_dag": "transformlivedata-v7",
+      "wait_time_seconds": 15
+    },
+    "tables": {
+      "raw_events_table_name": "to_be_processed.raw"
+    }
+  }
+}

@@ -13,11 +13,14 @@
             "trip_details_table_name": "trip_details"
         }
     },
-    "orchestratetransform": {
-        "raw_events_table_name": "to_be_processed.raw",
-        "orchestrate_target_dag": "transformlivedata-v7",
-        "orchestrate_wait_time_seconds": 15,
-        "description": "Configuration for orchestrating transform DAG, including target DAG name and wait time"
+    "orchestratetransform_general": {
+        "orchestration": {
+            "target_dag": "transformlivedata-v7",
+            "wait_time_seconds": 15
+        },
+        "tables": {
+            "raw_events_table_name": "to_be_processed.raw"
+        }
     },
     "updatelatestpositions_general": {
         "storage": {

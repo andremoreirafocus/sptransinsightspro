@@ -148,9 +148,7 @@ def trigger_dag_for_unprocessed_requests():
             logger.info(
                 f"Found request with filename: {request['filename']} and logical_date: {request['logical_date']}"
             )
-            result = run_dag_for_unprocessed_request(
-                dag_name, request["logical_date"]
-            )
+            result = run_dag_for_unprocessed_request(dag_name, request["logical_date"])
             if result == "FAILED":
                 logger.error(
                     f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
@@ -168,7 +166,7 @@ def trigger_dag_for_unprocessed_requests():
 
 
 with DAG(
-    "orchestratetransform-v1",
+    "orchestratetransform-v2",
     default_args=default_args,
     description="Orchestrate transform for unprocessed requests",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute

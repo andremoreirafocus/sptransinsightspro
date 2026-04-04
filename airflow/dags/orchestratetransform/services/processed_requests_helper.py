@@ -22,10 +22,13 @@ def get_unprocessed_requests(config):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        general = config["general"]
+        tables = general["tables"]
+        database = general["database"]
+        if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = tables["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
@@ -33,11 +36,11 @@ def get_unprocessed_requests(config):
 
         schema, table = raw_events_table.split(".", 1)
         connection = {
-            "host": config["DB_HOST"],
-            "port": config["DB_PORT"],
-            "database": config["DB_DATABASE"],
-            "user": config["DB_USER"],
-            "password": config["DB_PASSWORD"],
+            "host": database["host"],
+            "port": database["port"],
+            "database": database["database"],
+            "user": database["user"],
+            "password": database["password"],
         }
         return connection, schema, table
 
@@ -83,10 +86,13 @@ def mark_request_as_processed(config, logical_date):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        general = config["general"]
+        tables = general["tables"]
+        database = general["database"]
+        if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = tables["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
@@ -94,11 +100,11 @@ def mark_request_as_processed(config, logical_date):
 
         schema, table = raw_events_table.split(".", 1)
         connection = {
-            "host": config["DB_HOST"],
-            "port": config["DB_PORT"],
-            "database": config["DB_DATABASE"],
-            "user": config["DB_USER"],
-            "password": config["DB_PASSWORD"],
+            "host": database["host"],
+            "port": database["port"],
+            "database": database["database"],
+            "user": database["user"],
+            "password": database["password"],
         }
         return connection, schema, table
 
@@ -151,10 +157,13 @@ def mark_request_as_processed_by_filename(config, filename):
 
     def get_config(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "RAW_EVENTS_TABLE_NAME" not in config:
+        general = config["general"]
+        tables = general["tables"]
+        database = general["database"]
+        if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
+        raw_events_table = tables["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
@@ -162,11 +171,11 @@ def mark_request_as_processed_by_filename(config, filename):
 
         schema, table = raw_events_table.split(".", 1)
         connection = {
-            "host": config["DB_HOST"],
-            "port": config["DB_PORT"],
-            "database": config["DB_DATABASE"],
-            "user": config["DB_USER"],
-            "password": config["DB_PASSWORD"],
+            "host": database["host"],
+            "port": database["port"],
+            "database": database["database"],
+            "user": database["user"],
+            "password": database["password"],
         }
         return connection, schema, table
 
