@@ -9,13 +9,14 @@ def save_trips_to_db(config, trips_table):
     try:
         general = config["general"]
         tables = general["tables"]
+        database = general["database"]
         table_name = tables["finished_trips_table_name"]
         connection = {
-            "host": general["DB_HOST"],
-            "port": general["DB_PORT"],
-            "database": general["DB_DATABASE"],
-            "user": general["DB_USER"],
-            "password": general["DB_PASSWORD"],
+            "host": database["host"],
+            "port": database["port"],
+            "database": database["database"],
+            "user": database["user"],
+            "password": database["password"],
         }
     except KeyError as e:
         logger.error(f"Missing required configuration key: {e}")

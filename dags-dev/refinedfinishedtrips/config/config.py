@@ -27,6 +27,7 @@ def get_local_config(env_values):
     analysis = general.setdefault("analysis", {})
     storage = general.setdefault("storage", {})
     tables = general.setdefault("tables", {})
+    database = general.setdefault("database", {})
     if env_values.get("MINIO_ENDPOINT"):
         storage["minio_endpoint"] = env_values.get("MINIO_ENDPOINT")
     if env_values.get("ACCESS_KEY"):
@@ -34,17 +35,17 @@ def get_local_config(env_values):
     if env_values.get("SECRET_KEY"):
         storage["secret_key"] = env_values.get("SECRET_KEY")
     if env_values.get("DB_HOST"):
-        general["DB_HOST"] = env_values.get("DB_HOST")
+        database["host"] = env_values.get("DB_HOST")
     if env_values.get("DB_PORT"):
-        general["DB_PORT"] = env_values.get("DB_PORT")
+        database["port"] = env_values.get("DB_PORT")
     if env_values.get("DB_DATABASE"):
-        general["DB_DATABASE"] = env_values.get("DB_DATABASE")
+        database["database"] = env_values.get("DB_DATABASE")
     if env_values.get("DB_USER"):
-        general["DB_USER"] = env_values.get("DB_USER")
+        database["user"] = env_values.get("DB_USER")
     if env_values.get("DB_PASSWORD"):
-        general["DB_PASSWORD"] = env_values.get("DB_PASSWORD")
+        database["password"] = env_values.get("DB_PASSWORD")
     if env_values.get("DB_SSLMODE"):
-        general["DB_SSLMODE"] = env_values.get("DB_SSLMODE")
+        database["sslmode"] = env_values.get("DB_SSLMODE")
     return {
         "general": general,
     }
@@ -76,20 +77,22 @@ def get_airflow_config():
     analysis = refinedfinishedtrips_vars["analysis"]
     storage = refinedfinishedtrips_vars["storage"]
     tables = refinedfinishedtrips_vars["tables"]
+    database = refinedfinishedtrips_vars.get("database", {})
     storage["minio_endpoint"] = minio_endpoint
     storage["access_key"] = minio_access_key
     storage["secret_key"] = minio_secret_key
+    database["host"] = postgres_host
+    database["port"] = postgres_port
+    database["database"] = postgres_database
+    database["user"] = postgres_user
+    database["password"] = postgres_password
+    database["sslmode"] = postgres_sslmode
     config = {
         "general": {
             "analysis": analysis,
             "storage": storage,
             "tables": tables,
-            "DB_HOST": postgres_host,
-            "DB_PORT": postgres_port,
-            "DB_DATABASE": postgres_database,
-            "DB_USER": postgres_user,
-            "DB_PASSWORD": postgres_password,
-            "DB_SSLMODE": postgres_sslmode,
+            "database": database,
         }
     }
     logging.info(f"Airflow configuration for finsihed trips calculation: {config}")
