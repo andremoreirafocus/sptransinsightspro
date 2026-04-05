@@ -89,14 +89,16 @@ def main():
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         if sys.argv[1] == "dev":
-            logger.info("Parameter detected. Running task directly...")
+            logger.info("dev parameter detected. Running task once and immediately...")
             run_extractloadlivedata_task()
         else:
             logger.error("Invalid parameter. You have 2 ways of running:")
             logger.error(
                 "1. Without parameters: Runs the scheduled task at the specified interval"
             )
-            logger.error("2. With 'dev' parameter: Runs the task just once")
+            logger.error(
+                "2. With 'dev' parameter: Runs the task just once and immediately"
+            )
             sys.exit(1)
     else:
         main()

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import logging
 
-from src.infra.sql_db import save_row
+from src.infra.sql_db_v2 import save_row
 from src.infra.cache import (
     add_to_cache,
     get_from_cache,
@@ -89,6 +89,13 @@ def save_processing_request(config, pending_marker):
             )
             return False
         schema, table = raw_events_table.split(".", 1)
+        connection = {
+            "host": config["DB_HOST"],
+            "port": config["DB_PORT"],
+            "database": config["DB_DATABASE"],
+            "user": config["DB_USER"],
+            "password": config["DB_PASSWORD"],
+        }
         # Get logical date from filename
         logical_date = get_utc_logical_date_from_file(pending_marker)
         # Get current UTC time for created_at and updated_at
@@ -104,7 +111,7 @@ def save_processing_request(config, pending_marker):
         # Column names in the same order as row_tuple
         columns = ["filename", "logical_date", "processed", "created_at", "updated_at"]
         # Save to database using the generic function from sql_db module
-        success = save_row(config, schema, table, row_tuple, columns)
+        success = save_row(connection, schema, table, row_tuple, columns)
         if success:
             logger.info(
                 f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
