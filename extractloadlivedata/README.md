@@ -3,17 +3,49 @@ Extrair os dados de posição dos ônibus a partir da API da SPTRANS periodicame
 A implementação final é feita via um microserviço que é executado via um container Docker orquestrado pelo Docker Compose
 
 ## O que este subprojeto faz
-- extrai a informação de posição dos ônibus a partir da API da SPTRANS periodicamente em um intervalo previamente definido, fazendo uso de exponential backoff em caso de falha na obtenção de dados válidos
-- cria em memória um objeto JSON contendo o payload e metadados sobre a extração do dados, como o timestamp da operação e a origem do dado 
-- salva este objeto em uma pasta em um volume local
-- salva este mesmo objeto em uma pasta no Minio
-- caso a compressão seja habilitada salva os arquivos json comprimidos no formato Zstandard
-- caso o object storage esteja indisponível, o arquivo salvo localmente é mantido até que o serviço de storage esteja disponível e então o arquivo local seja removido
+- extrai periodicamente posições de ônibus da API da SPTrans em um intervalo configurável; em caso de falhas ou payload inválido, a operação é reexecutada com backoff exponencial
+- valida a estrutura mínima do payload recebido e registra métricas de referência (horário e total de veículos)
+- cria em memória um objeto JSON com `metadata` (origem, timestamp e total de veículos) e `payload` original
+- salva o JSON localmente em um volume configurado
+- persiste o JSON no MinIO na camada raw, em uma pasta por data, podendo salvar comprimido em Zstandard ou em JSON puro
+- mantém arquivos locais pendentes de salvamento no object storage quando este está indisponível, tentando novamente nas próximas execuções e removendo o arquivo local após a persistência tesr sido bem-sucedida
+- registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow
 
 
 ## Pré-requisitos
 - Disponibilidade do serviço de object storage para salvamento dos dados extraídos da API da SPTrans 
 - Criação do arquivo de configurações
+- Criação de schema e tabela no banco de dados para armazenamento dos reequests de processamento de arquivos de posição de ônibus extraídos da API
+
+```sql
+CREATE DATABASE sptrans_insights;
+
+\c sptrans_insights
+-- First, ensure the schema exists
+CREATE SCHEMA to_be_processed;
+
+-- Create the table
+CREATE TABLE IF NOT EXISTS to_be_processed.raw (
+    id BIGSERIAL PRIMARY KEY,
+    filename VARCHAR(255) NOT NULL,
+    logical_date TIMESTAMPTZ NOT NULL,
+    processed BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL
+);
+
+-- Create index on processed column for efficient filtering of unprocessed requests
+CREATE INDEX IF NOT EXISTS idx_raw_processed ON to_be_processed.raw(processed);
+
+-- Create index on filename column for efficient file lookups
+CREATE INDEX IF NOT EXISTS idx_raw_filename ON to_be_processed.raw(filename);
+
+-- Create index on logical_date column for efficient date-based queries
+CREATE INDEX IF NOT EXISTS idx_raw_logical_date ON to_be_processed.raw(logical_date);
+
+-- Create index on created_at for ordering queries
+CREATE INDEX IF NOT EXISTS idx_raw_created_at ON to_be_processed.raw(created_at);
+```
 
 ## Configurações
 API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
@@ -28,6 +60,7 @@ SOURCE_BUCKET = "raw"
 APP_FOLDER = "sptrans"
 INGEST_BUFFER_PATH = "../ingest_buffer"  # pasta aonde os arquivos são salvos no volume local
 DATA_COMPRESSION_ON_SAVE = "true"  # habilita a compressão de arquivos ao salvar local e na camda raw
+
 
 ## Para instalar os requisitos
 - cd <diretorio deste subprojeto>
@@ -61,16 +94,5 @@ No docker compose:
     Para iniciar o container 
 ```shell
         docker compose up -d extractloadlivedata
-
-## Para criar o tópico Kafka necessário ao subprojeto:
-Para iniciar o Kafka:
-```shell
-    docker compose up -d kafka-broker zookeeper akhq
-```
-Para criar o tópico:
-```shell
-    docker exec -it kafka-broker /bin/bash
-    kafka-topics --bootstrap-server localhost:9092 --create --partitions 1 --replication-factor 1 --topic sptrans-positions;
-
 
 
