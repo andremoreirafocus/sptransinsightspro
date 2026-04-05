@@ -35,6 +35,7 @@ Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, execut
 - ![transformlivedata](./dags-dev/transformlivedata/README.md)
 - ![refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
 - ![updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
+- ![extractloadlivedata](./extractloadlivedata/README.md)
 
 Para iniciar o projeto:
  Se o arquivo .env não existir na raiz do projeto, crie-o com o seguinte conteúdo:
@@ -45,11 +46,10 @@ Para iniciar o projeto:
 
  Caso deseje iniciar serviços específicos:
  ```shell
-  docker compose up -d kafka-broker akhq
   docker compose up -d minio
   docker compose up -d postgres
-  docker compose up -d postgres_airflow webserver scheduler
-  docker compose up -d extraclivedata loadlivedata
+  docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
+  docker compose up -d extractloadlivedata
   docker compose up -d jupyter
 ```
 
