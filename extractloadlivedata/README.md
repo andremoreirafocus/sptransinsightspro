@@ -1,6 +1,10 @@
 ## Objetivo deste subprojeto
-Extrair os dados de posição dos ônibus a partir da API da SPTRANS periodicamente e salvá-los na camada raq.
+Extrair os dados de posição dos ônibus a partir da API da SPTRANS periodicamente e salvá-los na camada raw.
 A implementação final é feita via um microserviço que é executado via um container Docker orquestrado pelo Docker Compose
+Como o principal objetyivo do projeto é extrair informações sobre as viagens concluídas, a partir da extração periódica das posições instantâneas de todos os ônibus via api e esta informação não pode ser obtida em nenhum outro momento, a robustez do serviço é vital para o atingimento do onjetivo do projeto, foi desenhada uma arquitetura que permitisse que os dados fossem extraídos mesmo que o serviço de object storage e o orquestrador estivessem indisponíveis.
+Para tal, todos os arquivos que contem as posições de ônibus extraídas da API são primeiramente salvos em um volume local e persistente gerenciado por este microserviço e, somente em seguida, são salvos no object storage e, em caso de sucesso, removidos do volume local.
+Para suportar esta possibilidade de falha e recuperação dos dados, a cada arquivo salvo no object storage é criado um registro em uma tabela de itens a serem processados pelo orquestrador que através de uma DAG orquestardora, verifica periodicamente se há nesta tabela algum regsitro de arquivo de posições a ser processado e, em caso positivo, inicia uma outra DAG de execução da transformação dos dados de posição contidos no arquivo.
+Esta arquitetura suporta a falha do obsjetc storage, do orquestador e do banco de dados do orquestrador, aonde os registros de arquivos a serem processados são salvos.
 
 ## O que este subprojeto faz
 - extrai periodicamente posições de ônibus da API da SPTrans em um intervalo configurável; em caso de falhas ou payload inválido, a operação é reexecutada com backoff exponencial
@@ -8,8 +12,8 @@ A implementação final é feita via um microserviço que é executado via um co
 - cria em memória um objeto JSON com `metadata` (origem, timestamp e total de veículos) e `payload` original
 - salva o JSON localmente em um volume configurado
 - persiste o JSON no MinIO na camada raw, em uma pasta por data, podendo salvar comprimido em Zstandard ou em JSON puro
-- mantém arquivos locais pendentes de salvamento no object storage quando este está indisponível, tentando novamente nas próximas execuções e removendo o arquivo local após a persistência tesr sido bem-sucedida
-- registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow
+- mantém arquivos locais pendentes de salvamento no object storage quando este está indisponível, tentando novamente nas próximas execuções e removendo o arquivo local após a persistência ter sido bem-sucedida
+- registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow. Caso a criação do do registro falhe, o mesmo continua salvo localmente até que a operação seja concluída com sucesso. Caso o Airflow esteja indisponível, ao retornar ao funcionamento, a DAG orquestradora identifica os registros de arquivos pendentes de transformação e dispara a DAG de transformação para cada arquivo, um por vez e na ordem de criação dos arquivos de posição dos ônibus, garantindo uma entrega ordenada das posições ao longo do tempo.
 
 
 ## Pré-requisitos
@@ -48,18 +52,32 @@ CREATE INDEX IF NOT EXISTS idx_raw_created_at ON to_be_processed.raw(created_at)
 ```
 
 ## Configurações
-API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"
-TOKEN =  <insira o token de acesso à API, obtido após cadastro no site da SPTrans>
-EXTRACTION_INTERVAL_SECONDS = 120  # intervalo entre extrações subsequentes dos dados de posição de omibus em segundos 
-API_MAX_RETRIES = 4   # numero de retries do get na api com backoff exponencial 
-STORAGE_MAX_RETRIES = 0 # numero de retries da escrita no object storage com backoff exponencial alem do que a bblioteca implementa
-MINIO_ENDPOINT="localhost:9000"
-ACCESS_KEY="datalake"
-SECRET_KEY="datalake"
-SOURCE_BUCKET = "raw"
-APP_FOLDER = "sptrans"
-INGEST_BUFFER_PATH = "../ingest_buffer"  # pasta aonde os arquivos são salvos no volume local
-DATA_COMPRESSION_ON_SAVE = "true"  # habilita a compressão de arquivos ao salvar local e na camda raw
+EXTRACTION_INTERVAL_SECONDS = 120  # intervalo entre extrações subsequentes dos dados em segundos
+API_BASE_URL = "https://api.olhovivo.sptrans.com.br/v2.1"  # URL base da API da SPTrans
+TOKEN =  <insira o token de acesso à API, obtido após cadastro no site da SPTrans>  # token de autenticação da API
+API_MAX_RETRIES = 4  # número de retries do GET na API com backoff exponencial
+INGEST_BUFFER_PATH = "../ingest_buffer"  # pasta local para arquivos temporários
+DATA_COMPRESSION_ON_SAVE = "true"  # habilita compressão ao salvar localmente e na camada raw
+PROCESSING_REQUESTS_CACHE_DIR = "../.diskcache_pending_processing_requests"  # cache para requests pendentes de processamento
+SOURCE_BUCKET = "raw"  # bucket de destino na camada raw
+APP_FOLDER = "sptrans"  # pasta base do app dentro do bucket
+STORAGE_MAX_RETRIES = 0  # retries de escrita no object storage com backoff exponencial
+RAW_EVENTS_TABLE_NAME = "to_be_processed.raw"  # tabela de requests pendentes (schema.tabela)
+MINIO_ENDPOINT="localhost:9000"  # endpoint do MinIO
+ACCESS_KEY="datalake"  # access key do MinIO
+SECRET_KEY="datalake"  # secret key do MinIO
+DB_HOST="localhost"  # host do banco de dados
+DB_PORT=5432  # porta do banco de dados
+DB_DATABASE="sptrans_insights"  # nome do banco de dados
+DB_USER="airflow"  # usuário do banco de dados
+DB_PASSWORD="airflow"  # senha do banco de dados
+DB_SSLMODE="prefer"  # modo SSL da conexão com o banco
+#Legacy env variables
+AIRFLOW_USER = "ingest_service"  # usuário para autenticação na API do Airflow
+AIRFLOW_PASSWORD = "ingest_password"  # senha para autenticação na API do Airflow
+AIRFLOW_WEBSERVER = "localhost"  # hostname do webserver do Airflow
+AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
+INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
 
 
 ## Para instalar os requisitos
@@ -94,5 +112,4 @@ No docker compose:
     Para iniciar o container 
 ```shell
         docker compose up -d extractloadlivedata
-
 
