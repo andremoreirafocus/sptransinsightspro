@@ -1,6 +1,6 @@
 from src.infra.storage import save_data_to_json_file
 from src.infra.minio_functions import write_generic_bytes_to_minio
-from src.infra.compression import compress_data
+from src.infra.compression import compress_data, decompress_data
 import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
@@ -51,6 +51,27 @@ def save_bus_positions_to_local_volume(config, data):
         filename,
         compression,
     )
+
+
+def load_bus_positions_from_local_volume_file(folder, file):
+    file_path = f"{folder}/{file}"
+    if file.split(".")[-1] != "json":
+        logger.info(f"Pending file '{file}' is compressed.")
+        file_is_compressed = True
+    else:
+        file_is_compressed = False
+    try:
+        if file_is_compressed:
+            with open(file_path, "rb") as f:
+                file_content = f.read()
+                file_content = json.loads(decompress_data(file_content))
+        else:
+            with open(file_path, "r") as f:
+                file_content_json = f.read()
+                file_content = json.loads(file_content_json)
+    except Exception as e:
+        logger.error(f"Error getting pending file '{file}': {e}")
+    return file_content
 
 
 def remove_local_file(config, data):

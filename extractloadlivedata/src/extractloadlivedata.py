@@ -2,9 +2,10 @@ from src.services.extract_buses_positions import (
     extract_buses_positions_with_retries,
     get_buses_positions_with_metadata,
 )
-from src.services.save_bus_positions import (
+from src.services.save_load_bus_positions import (
     save_bus_positions_to_local_volume,
     save_bus_positions_to_storage_with_retries,
+    load_bus_positions_from_local_volume_file,
     remove_local_file,
     get_pending_storage_save_list,
 )
@@ -17,9 +18,7 @@ from src.services.save_processing_requests import (
     create_pending_processing_request,
     trigger_pending_processing_requests,
 )
-from src.infra.compression import decompress_data
 from src.config import get_config
-import json
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -43,28 +42,17 @@ def extractloadlivedata():
             logger.info(
                 f"Attempting to save pending file '{pending_storage_save_file}' to storage."
             )
-            pending_storage_save_file_path = (
-                f"{ingest_buffer_folder}/{pending_storage_save_file}"
-            )
-            if pending_storage_save_file.split(".")[-1] != "json":
-                logger.info(
-                    f"Pending file '{pending_storage_save_file}' is compressed."
-                )
-                file_is_compressed = True
-            else:
-                file_is_compressed = False
             save_on_storage_failure = False
             try:
-                if file_is_compressed:
-                    with open(pending_storage_save_file_path, "rb") as f:
-                        pending_data = f.read()
-                        pending_data = json.loads(decompress_data(pending_data))
-                else:
-                    with open(pending_storage_save_file_path, "r") as f:
-                        pending_data_json = f.read()
-                        pending_data = json.loads(pending_data_json)
-                if save_bus_positions_to_storage_with_retries(config, pending_data):
-                    remove_local_file(config, pending_data)
+                pending_storage_save_file_content = (
+                    load_bus_positions_from_local_volume_file(
+                        ingest_buffer_folder, pending_storage_save_file
+                    )
+                )
+                if save_bus_positions_to_storage_with_retries(
+                    config, pending_storage_save_file_content
+                ):
+                    remove_local_file(config, pending_storage_save_file_content)
                     # create_pending_invokation(config, pending_storage_save_file)
                     create_pending_processing_request(config, pending_storage_save_file)
                 else:
