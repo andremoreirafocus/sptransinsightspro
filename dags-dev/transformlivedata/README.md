@@ -1,5 +1,5 @@
 ## Objetivo deste subprojeto
-Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans e já disponibilizados na camada raw pelo microserviço loadlivedata enriquecendo-os com os dados extraídos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
+Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans, já disponibilizados na camada raw pelo microserviço extractloadlivedata, enriquecendo-os com os dados obtidos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
 A implementação final é feita via a DAG transformlivedata do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
 As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
@@ -8,7 +8,8 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 ## O que este subprojeto faz
 - lê um arquivo JSON com as posicoes instantâneas dos onibus fornecidos pela sptrans armazenado no bucket da camada raw no serviço de object storage particionados por ano, mes e dia
 - transforma os dados em uma big table consolidada em memória enriquecendo-os com dados da tabela de detalhes das viagens gerada pelo subprocesso gtfs
-- salva os dados de posição instantânea transformados e enriquecidos da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
+- salva os dados de posição instantânea transformados e enriquecidos, da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
+
 
 
 ## Pré-requisitos

@@ -1,6 +1,5 @@
 import great_expectations as gx
 from great_expectations.core.expectation_suite import ExpectationSuite
-import json
 import warnings
 import logging
 from datetime import datetime, timezone
@@ -48,7 +47,7 @@ def validate_expectations(df_to_be_validated, expectations_suite):
                     column = kwargs.get("column")
                 except Exception as e:
                     logger.error("Error while parsing GX result: %s", e)
-                    raise
+                    raise ValueError(f"Error while parsing GX result: {e}")
                 raised_exception = False
                 exception_message = None
                 exception_traceback = None
@@ -110,12 +109,7 @@ def validate_expectations(df_to_be_validated, expectations_suite):
             exception_reasons,
         )
 
-    # clear_internal_gx_warnings()
     gx_context = gx.get_context(mode="ephemeral")
-    # if isinstance(expectations_suite, str):
-    #     with open(expectations_suite, "r") as f:
-    #         suite_dict = json.load(f)
-    # else:
     suite_dict = expectations_suite
     suite = ExpectationSuite(**suite_dict)
     gx_context.add_or_update_expectation_suite(expectation_suite=suite)
@@ -171,7 +165,6 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         }
     else:
         logger.warning("Validation failures detected!")
-        # logger.info(f"checkpoint_result: {checkpoint_result}")
         logger.info("Checking for unmatched expectations...")
         bad_indices_list = list(bad_indices)
         valid_df = df_to_be_validated.drop(index=bad_indices_list)
@@ -207,12 +200,3 @@ def validate_expectations(df_to_be_validated, expectations_suite):
         "invalid_df": invalid_df,
         "expectations_summary": expectations_summary,
     }
-    # --- DATA DOCS GENERATION ---
-    gx_context.build_data_docs()
-    # This finds the local path to the 'index.html' of your documentation
-    docs_url = gx_context.get_docs_sites_urls()[0]["site_url"]
-    # # Optional: Automatically open the docs in your default browser
-    import webbrowser
-
-    webbrowser.open(docs_url)
-    logger.info(f"Data Docs generated at: {docs_url}")
