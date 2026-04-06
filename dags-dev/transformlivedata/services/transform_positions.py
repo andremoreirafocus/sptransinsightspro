@@ -4,8 +4,13 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, List
 import pandas as pd
 import logging
-import json
-from transformlivedata.lineage.lineage import get_json_raw_fields_path_from_schema
+from transformlivedata.lineage.lineage_functions import (
+    get_json_raw_fields_path_from_schema,
+    build_api_lineage,
+    get_column_type,
+    build_join_lineage,
+    merge_lineage_fragments,
+)
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -98,9 +103,13 @@ def enrich_with_trip_details(
     if trip_details_df.empty:
         df["_merge"] = "left_only"
         return df, {}
-    joined = df.merge(trip_details_df, on="trip_id", how="left", indicator=True)
-    lineage = build_join_lineage(joined, trip_details_df.columns)
-    return joined, lineage
+    merge_key = "trip_id"
+    merge_table_name = "trip_details"
+    df_enriched = df.merge(trip_details_df, on=merge_key, how="left", indicator=True)
+    lineage = build_join_lineage(
+        df_enriched, merge_table_name, merge_key, trip_details_df.columns
+    )
+    return df_enriched, lineage
 
 
 def compute_distances(
@@ -214,11 +223,6 @@ def build_transformation_result(
         else pd.DataFrame(columns=valid_df_columns)
     )
     invalid_df_columns = valid_df_columns + ["invalid_reason", "validation_failed_at"]
-    # invalid_positions_df = (
-    #     invalid_df[invalid_df_columns].copy()
-    #     if not invalid_df.empty
-    #     else pd.DataFrame(columns=invalid_df_columns)
-    # )
     if invalid_df.empty:
         invalid_positions_df = pd.DataFrame(columns=invalid_df_columns)
     else:
@@ -244,14 +248,7 @@ def transform_positions(config, raw_positions):
         return raw_schema
 
     logger.info("Converting raw positions to positions table...")
-    payload = raw_positions.get("payload")
     metadata = raw_positions.get("metadata")
-    if not payload or "hr" not in payload:
-        logger.error("No 'hr' field found in raw positions data.")
-        return None
-    if "l" not in payload:
-        logger.error("No 'l' field found in raw positions data.")
-        return None
     logger.info("Preloading trip details from database...")
     trip_details_df = load_trip_details(config["general"])
     if trip_details_df is None or trip_details_df.empty:
@@ -335,56 +332,6 @@ def transform_positions(config, raw_positions):
         f"Total invalid vehicles ids: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids']}"
     )
     return result
-
-
-def merge_lineage_fragments(*fragments: Dict[str, Any]) -> Dict[str, Any]:
-    lineage = {}
-    for fragment in fragments:
-        lineage.update(fragment)
-    return lineage
-
-
-def get_column_type(df: pd.DataFrame, column: str) -> str:
-    if column not in df.columns:
-        return "unknown"
-    dtype = str(df[column].dtype)
-    if dtype.startswith("int"):
-        return "int"
-    if dtype.startswith("float"):
-        return "float"
-    if dtype.startswith("bool"):
-        return "boolean"
-    if "datetime" in dtype:
-        return "timestamp"
-    return "string"
-
-
-def build_api_lineage(
-    df: pd.DataFrame, rename_map: Dict[str, str], raw_path_map: Dict[str, str]
-) -> Dict[str, Any]:
-    lineage = {}
-    for raw_key, out_col in rename_map.items():
-        lineage[out_col] = {
-            "inputs": [raw_path_map.get(raw_key, raw_key)],
-            "type": get_column_type(df, out_col),
-            "transformation": "API rename/cast",
-        }
-    return lineage
-
-
-def build_join_lineage(
-    df: pd.DataFrame, trip_details_columns: List[str]
-) -> Dict[str, Any]:
-    lineage = {}
-    for col in trip_details_columns:
-        if col == "trip_id" or col not in df.columns:
-            continue
-        lineage[col] = {
-            "inputs": [f"trip_details.{col}"],
-            "type": get_column_type(df, col),
-            "transformation": "trip_details left join",
-        }
-    return lineage
 
 
 def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
