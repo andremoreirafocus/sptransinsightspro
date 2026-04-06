@@ -1,5 +1,5 @@
 ## Objetivo deste subprojeto
-Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans e já disponibilizados na camada raw pelo microserviço loadlivedata enriquecendo-os com os dados extraídos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
+Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans, já disponibilizados na camada raw pelo microserviço extractloadlivedata, enriquecendo-os com os dados obtidos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
 A implementação final é feita via a DAG transformlivedata do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
 As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
@@ -7,12 +7,17 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 
 ## O que este subprojeto faz
 - lê um arquivo JSON com as posicoes instantâneas dos onibus fornecidos pela sptrans armazenado no bucket da camada raw no serviço de object storage particionados por ano, mes e dia
+- valida o JSON bruto com um schema configurável em arquivo JSON
 - transforma os dados em uma big table consolidada em memória enriquecendo-os com dados da tabela de detalhes das viagens gerada pelo subprocesso gtfs
-- salva os dados de posição instantânea transformados e enriquecidos da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
+- salva os dados de posição instantânea transformados e enriquecidos, da tabela em memória para uma pasta (prefixo) sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora para acelerar a busca e filtragem por timestamp de extração das posições instantâneas dos ônibus
+- valida o resultado transformado com Great Expectations a partir de uma suite configurada externamente em um arquivo JSON
+- cria quarentena para registros inválidos em um bucket com particionamento igual à da camada trusted e enriquecido com o motivo da quarentena de cada registro
+- gera e salva um relatório de qualidade com contagens de registros, métricas de transformação, issues detectadas e resumo de expectativas (sucessos, violações e exceções) em um bucket de metadados
+- inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente a partir do schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
 
 
 ## Pré-requisitos
-- Disponibilidade de dois buckets: uma para a camada raw e outro para a camada trusted, previamente criados no serviço de object storage
+- Disponibilidade de quatro buckets: para a camada raw, para a camada trusted, para os registros em quarentena e para os relatórios de qualidade, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw e leitura e escrita na camada trusted
 - Criação do arquivo de configurações
 

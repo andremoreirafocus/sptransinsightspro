@@ -17,9 +17,14 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-TRUSTED_BUCKET = "trusted"
-GTFS_FOLDER="gtfs"
-TRIP_DETAILS_TABLE_NAME="refined.trip_details"
+As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+- `general`
+
+### Local/dev
+- `general` vem do arquivo `dags-dev/refinedsynctripdetails/config/refinedsynctripdetails.json`
+- `.env` em `dags-dev/refinedsynctripdetails/.env` é usado apenas para credenciais de conexão
+
+Credenciais esperadas no `.env`:
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
@@ -29,6 +34,23 @@ DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
 DB_SSLMODE="prefer"
+
+Chaves esperadas em `general`
+```json
+{
+  "storage": {
+    "trusted_bucket": "trusted",
+    "gtfs_folder": "gtfs"
+  },
+  "tables": {
+    "trip_details_table_name": "refined.trip_details"
+  }
+}
+```
+
+### Airflow (produção)
+- Variable `refinedsynctripdetails_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
 
 ## Instruções para instalação
 Para instalar os requisitos:
