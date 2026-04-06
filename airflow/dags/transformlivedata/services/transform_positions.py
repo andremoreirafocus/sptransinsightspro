@@ -2,9 +2,15 @@ from transformlivedata.services.load_trip_details import load_trip_details
 from dateutil import parser
 from datetime import datetime, timezone
 from typing import Dict, Any, Tuple, List
-import json
 import pandas as pd
 import logging
+from transformlivedata.lineage.lineage_functions import (
+    get_json_raw_fields_path_from_schema,
+    build_api_lineage,
+    get_column_type,
+    build_join_lineage,
+    merge_lineage_fragments,
+)
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -58,9 +64,6 @@ def flatten_raw_positions(raw_positions: Dict[str, Any]) -> pd.DataFrame:
         sep="_",
         errors="ignore",
     )
-    # logger.info(
-    #     f"Flattened raw positions into DataFrame with {df_flat.shape[0]} records and columns: {df_flat.columns.tolist()}"
-    # )
     return df_flat
 
 
@@ -100,9 +103,13 @@ def enrich_with_trip_details(
     if trip_details_df.empty:
         df["_merge"] = "left_only"
         return df, {}
-    joined = df.merge(trip_details_df, on="trip_id", how="left", indicator=True)
-    lineage = build_join_lineage(joined, trip_details_df.columns)
-    return joined, lineage
+    merge_key = "trip_id"
+    merge_table_name = "trip_details"
+    df_enriched = df.merge(trip_details_df, on=merge_key, how="left", indicator=True)
+    lineage = build_join_lineage(
+        df_enriched, merge_table_name, merge_key, trip_details_df.columns
+    )
+    return df_enriched, lineage
 
 
 def compute_distances(
@@ -216,11 +223,6 @@ def build_transformation_result(
         else pd.DataFrame(columns=valid_df_columns)
     )
     invalid_df_columns = valid_df_columns + ["invalid_reason", "validation_failed_at"]
-    # invalid_positions_df = (
-    #     invalid_df[invalid_df_columns].copy()
-    #     if not invalid_df.empty
-    #     else pd.DataFrame(columns=invalid_df_columns)
-    # )
     if invalid_df.empty:
         invalid_positions_df = pd.DataFrame(columns=invalid_df_columns)
     else:
@@ -239,27 +241,23 @@ def build_transformation_result(
 
 
 def transform_positions(config, raw_positions):
-    logger.info("Converting raw positions to positions table...")
-    payload = raw_positions.get("payload")
-    metadata = raw_positions.get("metadata")
-    if not payload or "hr" not in payload:
-        logger.error("No 'hr' field found in raw positions data.")
-        return None
-    if "l" not in payload:
-        logger.error("No 'l' field found in raw positions data.")
-        return None
+    def get_config(config):
+        raw_schema = config.get("raw_data_json_schema")
+        if not raw_schema:
+            raise ValueError("raw_data_json_schema is required in config.")
+        return raw_schema
 
+    logger.info("Converting raw positions to positions table...")
+    metadata = raw_positions.get("metadata")
     logger.info("Preloading trip details from database...")
     trip_details_df = load_trip_details(config["general"])
     if trip_details_df is None or trip_details_df.empty:
         trip_details_df = pd.DataFrame()
     logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
-
     df_flat = flatten_raw_positions(raw_positions)
     if df_flat.empty:
         logger.error("No position data found to transform.")
         return None
-
     rename_map = {
         "c": "linha_lt",
         "cl": "linha_code",
@@ -272,7 +270,8 @@ def transform_positions(config, raw_positions):
         "py": "veiculo_lat",
         "px": "veiculo_long",
     }
-    raw_path_map = get_raw_path_map(config)
+    raw_schema = get_config(config)
+    raw_path_map = get_json_raw_fields_path_from_schema(raw_schema)
     df_normalized, lineage_api = normalize_columns(
         df_flat, rename_map, raw_path_map, metadata
     )
@@ -280,7 +279,6 @@ def transform_positions(config, raw_positions):
     df_enriched, lineage_join = enrich_with_trip_details(
         df_with_trip_id, trip_details_df
     )
-
     valid_df, invalid_df = split_valid_invalid(df_enriched)
     if not valid_df.empty:
         valid_df, distance_errors, lineage_calc = compute_distances(valid_df)
@@ -289,7 +287,6 @@ def transform_positions(config, raw_positions):
         lineage_calc = {}
     invalid_df["distance_to_first_stop"] = None
     invalid_df["distance_to_last_stop"] = None
-
     metrics, issues = build_metrics_and_issues(
         raw_positions, valid_df, invalid_df, distance_errors
     )
@@ -337,56 +334,6 @@ def transform_positions(config, raw_positions):
     return result
 
 
-def merge_lineage_fragments(*fragments: Dict[str, Any]) -> Dict[str, Any]:
-    lineage = {}
-    for fragment in fragments:
-        lineage.update(fragment)
-    return lineage
-
-
-def get_column_type(df: pd.DataFrame, column: str) -> str:
-    if column not in df.columns:
-        return "unknown"
-    dtype = str(df[column].dtype)
-    if dtype.startswith("int"):
-        return "int"
-    if dtype.startswith("float"):
-        return "float"
-    if dtype.startswith("bool"):
-        return "boolean"
-    if "datetime" in dtype:
-        return "timestamp"
-    return "string"
-
-
-def build_api_lineage(
-    df: pd.DataFrame, rename_map: Dict[str, str], raw_path_map: Dict[str, str]
-) -> Dict[str, Any]:
-    lineage = {}
-    for raw_key, out_col in rename_map.items():
-        lineage[out_col] = {
-            "inputs": [raw_path_map.get(raw_key, raw_key)],
-            "type": get_column_type(df, out_col),
-            "transformation": "API rename/cast",
-        }
-    return lineage
-
-
-def build_join_lineage(
-    df: pd.DataFrame, trip_details_columns: List[str]
-) -> Dict[str, Any]:
-    lineage = {}
-    for col in trip_details_columns:
-        if col == "trip_id" or col not in df.columns:
-            continue
-        lineage[col] = {
-            "inputs": [f"trip_details.{col}"],
-            "type": get_column_type(df, col),
-            "transformation": "trip_details left join",
-        }
-    return lineage
-
-
 def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
     return {
         "distance_to_first_stop": {
@@ -410,51 +357,3 @@ def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
             "transformation": "calculated based on current position",
         },
     }
-
-
-def get_raw_path_map(config: Dict[str, Any]) -> Dict[str, str]:
-    if "raw_data_json_schema" in config and config["raw_data_json_schema"]:
-        schema = config["raw_data_json_schema"]
-    else:
-        schema_path = config.get("RAW_DATA_SCHEMA_CONFIG")
-        if not schema_path:
-            return {}
-        with open(schema_path, "r") as f:
-            schema = json.load(f)
-    payload_props = (
-        schema.get("properties", {}).get("payload", {}).get("properties", {})
-    )
-    first_level_list = None
-    for key, value in payload_props.items():
-        if value.get("type") == "array":
-            first_level_list = key
-            break
-    if not first_level_list:
-        return {}
-    first_level_items = payload_props.get(first_level_list, {}).get("items", {})
-    first_level_props = first_level_items.get("properties", {})
-    second_level_list = None
-    for key, value in first_level_props.items():
-        if value.get("type") == "array":
-            second_level_list = key
-            break
-    if not second_level_list:
-        return {}
-    second_level_items = (
-        first_level_props.get(second_level_list, {}).get("items", {})
-    )
-    ref = second_level_items.get("$ref", "")
-    ref_name = ref.split("/")[-1] if ref else None
-    if not ref_name:
-        return {}
-    vehicle_props = schema.get("definitions", {}).get(ref_name, {}).get("properties", {})
-    raw_path_map = {}
-    for key in first_level_props.keys():
-        if key == second_level_list:
-            continue
-        raw_path_map[key] = f"payload.{first_level_list}[i].{key}"
-    for key in vehicle_props.keys():
-        raw_path_map[key] = (
-            f"payload.{first_level_list}[i].{second_level_list}[j].{key}"
-        )
-    return raw_path_map
