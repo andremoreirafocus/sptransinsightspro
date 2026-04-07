@@ -252,12 +252,13 @@ def transform_positions(config, raw_positions):
     logger.info("Preloading trip details from database...")
     trip_details_df = load_trip_details(config["general"])
     if trip_details_df is None or trip_details_df.empty:
-        trip_details_df = pd.DataFrame()
+        logger.error("trip_details_df is empty. Aborting transformation.")
+        raise ValueError("trip_details_df is empty. Aborting transformation.")
     logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
     df_flat = flatten_raw_positions(raw_positions)
     if df_flat.empty:
-        logger.error("No position data found to transform.")
-        return None
+        logger.error("No position data resulted from flattening.")
+        raise ValueError("No position data resulted from flattening.")
     rename_map = {
         "c": "linha_lt",
         "cl": "linha_code",
@@ -275,10 +276,16 @@ def transform_positions(config, raw_positions):
     df_normalized, lineage_api = normalize_columns(
         df_flat, rename_map, raw_path_map, metadata
     )
+    if df_normalized.empty:
+        logger.error("No position data resulted from normalization.")
+        raise ValueError("No position data resulted from normalization.")
     df_with_trip_id = add_trip_id(df_normalized)
     df_enriched, lineage_join = enrich_with_trip_details(
         df_with_trip_id, trip_details_df
     )
+    if df_enriched.empty:
+        logger.error("No position data resulted from enrichment.")
+        raise ValueError("No position data resulted from enrichment.")
     valid_df, invalid_df = split_valid_invalid(df_enriched)
     if not valid_df.empty:
         valid_df, distance_errors, lineage_calc = compute_distances(valid_df)
