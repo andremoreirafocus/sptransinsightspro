@@ -1,9 +1,4 @@
 from transformlivedata.services.load_trip_details import load_trip_details
-from dateutil import parser
-from datetime import datetime, timezone
-from typing import Dict, Any, Tuple, List
-import pandas as pd
-import logging
 from transformlivedata.lineage.lineage_functions import (
     get_json_raw_fields_path_from_schema,
     build_api_lineage,
@@ -11,6 +6,13 @@ from transformlivedata.lineage.lineage_functions import (
     build_join_lineage,
     merge_lineage_fragments,
 )
+from dateutil import parser
+from datetime import datetime, timezone
+from typing import Dict, Any, Tuple, List
+from math import radians, sin, cos, sqrt, atan2
+import pandas as pd
+import logging
+
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -37,8 +39,6 @@ def get_trip_id(linha, sentido):
 
 
 def calculate_distance(lat1, lon1, lat2, lon2) -> Tuple[float, bool]:
-    from math import radians, sin, cos, sqrt, atan2
-
     try:
         R = 6371000
         phi1 = radians(lat1)
@@ -100,9 +100,6 @@ def add_trip_id(df: pd.DataFrame) -> pd.DataFrame:
 def enrich_with_trip_details(
     df: pd.DataFrame, trip_details_df: pd.DataFrame
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    if trip_details_df.empty:
-        df["_merge"] = "left_only"
-        return df, {}
     merge_key = "trip_id"
     merge_table_name = "trip_details"
     df_enriched = df.merge(trip_details_df, on=merge_key, how="left", indicator=True)
@@ -157,14 +154,30 @@ def compute_distances(
     return df, distance_errors, lineage
 
 
-def split_valid_invalid(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+def split_enriched_valid_invalid(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     invalid_mask = df["_merge"] == "left_only"
     valid_df = df.loc[~invalid_mask].copy()
     invalid_df = df.loc[invalid_mask].copy()
     if not invalid_df.empty:
         invalid_df["invalid_reason"] = "transform_error:trip_details_missing"
         invalid_df["validation_failed_at"] = datetime.now(timezone.utc)
+        invalid_df["distance_to_first_stop"] = None
+        invalid_df["distance_to_last_stop"] = None
     return valid_df, invalid_df
+
+
+def split_calculated_valid_invalid(
+    calculated_distance_df: pd.DataFrame,
+) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    distance_error_mask = (calculated_distance_df["distance_to_first_stop"] == -1.0) | (
+        calculated_distance_df["distance_to_last_stop"] == -1.0
+    )
+    distance_invalid_df = calculated_distance_df.loc[distance_error_mask].copy()
+    if not distance_invalid_df.empty:
+        distance_invalid_df["invalid_reason"] = "transform_error:distance_calculation"
+        distance_invalid_df["validation_failed_at"] = datetime.now(timezone.utc)
+    distance_valid_df = calculated_distance_df.loc[~distance_error_mask].copy()
+    return distance_valid_df, distance_invalid_df
 
 
 def build_metrics_and_issues(
@@ -244,17 +257,12 @@ def transform_positions(config, raw_positions):
     def get_config(config):
         raw_schema = config.get("raw_data_json_schema")
         if not raw_schema:
+            logger.error("raw_data_json_schema is missing in config.")
             raise ValueError("raw_data_json_schema is required in config.")
         return raw_schema
 
     logger.info("Converting raw positions to positions table...")
     metadata = raw_positions.get("metadata")
-    logger.info("Preloading trip details from database...")
-    trip_details_df = load_trip_details(config["general"])
-    if trip_details_df is None or trip_details_df.empty:
-        logger.error("trip_details_df is empty. Aborting transformation.")
-        raise ValueError("trip_details_df is empty. Aborting transformation.")
-    logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
     df_flat = flatten_raw_positions(raw_positions)
     if df_flat.empty:
         logger.error("No position data resulted from flattening.")
@@ -279,6 +287,12 @@ def transform_positions(config, raw_positions):
     if df_normalized.empty:
         logger.error("No position data resulted from normalization.")
         raise ValueError("No position data resulted from normalization.")
+    logger.info("Preloading trip details from database...")
+    trip_details_df = load_trip_details(config["general"])
+    if trip_details_df is None or trip_details_df.empty:
+        logger.error("trip_details_df is empty. Aborting transformation.")
+        raise ValueError("trip_details_df is empty. Aborting transformation.")
+    logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
     df_with_trip_id = add_trip_id(df_normalized)
     df_enriched, lineage_join = enrich_with_trip_details(
         df_with_trip_id, trip_details_df
@@ -286,14 +300,27 @@ def transform_positions(config, raw_positions):
     if df_enriched.empty:
         logger.error("No position data resulted from enrichment.")
         raise ValueError("No position data resulted from enrichment.")
-    valid_df, invalid_df = split_valid_invalid(df_enriched)
-    if not valid_df.empty:
-        valid_df, distance_errors, lineage_calc = compute_distances(valid_df)
+    enriched_valid_df, enriched_invalid_df = split_enriched_valid_invalid(df_enriched)
+    if enriched_valid_df.empty:
+        logger.error("No valid position data after enrichment.")
+        raise ValueError("No valid position data after enrichment.")
+    calculated_distance_df, distance_errors, lineage_calc = compute_distances(
+        enriched_valid_df
+    )
+    if calculated_distance_df.empty:
+        logger.error("No position data after distance calculation.")
+        raise ValueError("No position data after distance calculation.")
+    valid_df, distance_invalid_df = split_calculated_valid_invalid(
+        calculated_distance_df
+    )
+    if distance_invalid_df.empty:
+        invalid_df = enriched_invalid_df
     else:
-        distance_errors = []
-        lineage_calc = {}
-    invalid_df["distance_to_first_stop"] = None
-    invalid_df["distance_to_last_stop"] = None
+        invalid_df = (
+            pd.concat([enriched_invalid_df, distance_invalid_df], ignore_index=True)
+            if not enriched_invalid_df.empty
+            else distance_invalid_df
+        )
     metrics, issues = build_metrics_and_issues(
         raw_positions, valid_df, invalid_df, distance_errors
     )
