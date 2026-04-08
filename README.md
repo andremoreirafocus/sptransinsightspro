@@ -53,9 +53,8 @@ Para iniciar o projeto:
   docker compose up -d jupyter
 ```
 
-Para monitorar os serviços ou efetuar configurações:
- AKHQ (Kafka): 
- http://localhost:28080/ui/
+
+## Para monitorar os serviços ou efetuar configurações:
 
  Minio:
  http://localhost:9001/login
@@ -65,6 +64,36 @@ Para monitorar os serviços ou efetuar configurações:
 
  Jupyter:
  http://localhost:8888/
+
+
+## Ciclo de Desenvolvimento e Deployment
+
+Para garantir a estabilidade do ambiente de produção, o projeto adota um fluxo de Promotion-based Development. No caso dos pipelines, todo o código é desenvolvido e testado no diretório `dags-dev` e, após validado, é "promovido" para o diretório de produção do Airflow (`airflow/dags`).
+
+### Promoção de Pipelines (DAGs)
+Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting) e executa os testes unitários antes de sincronizar os arquivos com a produção:
+
+```shell
+# Sintaxe: python scripts/promote_pipeline.py <nome_da_pipeline>
+python scripts/promote_pipeline.py transformlivedata
+```
+
+Este script realiza os seguintes passos:
+1.  Análise estática: executa o `ruff` no subdiretório da pipeline.
+2.  Testes de unidade: executa o `pytest` na pasta de testes da pipeline.
+3.  Deploy do código: sincroniza o subdiretório, os arquivos de DAG correspondentes e a pasta compartilhada `infra` para a produção.
+
+### Deployment de Microserviços
+Para atualizar e reiniciar o microserviço de ingestão (`extractloadlivedata`), utilize o script de deployment:
+
+```shell
+# Sintaxe: python scripts/deploy_service.py <nome_do_servico> <diretorio_do_servico>
+python scripts/deploy_service.py extractloadlivedata extractloadlivedata
+```
+
+Este script realiza o build da imagem Docker e reinicia o container através do Docker Compose.
+
+
 
  
 

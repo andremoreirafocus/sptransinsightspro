@@ -9,6 +9,7 @@ import logging
 from typing import Dict, Tuple, List, Union
 
 import jsonschema
+import json
 
 logger = logging.getLogger(__name__)
 
