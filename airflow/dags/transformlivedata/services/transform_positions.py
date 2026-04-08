@@ -8,7 +8,7 @@ from transformlivedata.lineage.lineage_functions import (
 )
 from dateutil import parser
 from datetime import datetime, timezone
-from typing import Dict, Any, Tuple, List
+from typing import Any, Dict, List, Tuple
 from math import radians, sin, cos, sqrt, atan2
 import pandas as pd
 import logging
@@ -26,8 +26,8 @@ def calculate_quality_score(result: Dict[str, Any]) -> float:
     return round((valid / total) * 100, 2)
 
 
-def get_trip_id(linha, sentido):
-    def sentido_convertido(sentido):
+def get_trip_id(linha: str, sentido: int) -> str:
+    def sentido_convertido(sentido: int) -> int:
         if sentido == 1:
             return 0
         elif sentido == 2:
@@ -38,7 +38,9 @@ def get_trip_id(linha, sentido):
     return f"{linha}-{sentido_convertido(sentido)}"
 
 
-def calculate_distance(lat1, lon1, lat2, lon2) -> Tuple[float, bool]:
+def calculate_distance(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> Tuple[float, bool]:
     try:
         R = 6371000
         phi1 = radians(lat1)
@@ -114,7 +116,7 @@ def compute_distances(
 ) -> Tuple[pd.DataFrame, List[Dict[str, Any]], Dict[str, Any]]:
     distance_errors = []
 
-    def calc_first(row):
+    def calc_first(row: pd.Series) -> float:
         dist, ok = calculate_distance(
             float(row["veiculo_lat"]),
             float(row["veiculo_long"]),
@@ -131,7 +133,7 @@ def compute_distances(
             )
         return dist
 
-    def calc_last(row):
+    def calc_last(row: pd.Series) -> float:
         dist, ok = calculate_distance(
             float(row["veiculo_lat"]),
             float(row["veiculo_long"]),
@@ -226,7 +228,7 @@ def build_transformation_result(
     valid_df_columns: List[str],
     metrics: Dict[str, Any],
     issues: Dict[str, Any],
-    batch_ts,
+    batch_ts: Any,
     lineage: Dict[str, Any],
 ) -> Dict[str, Any]:
 
@@ -253,8 +255,10 @@ def build_transformation_result(
     return result
 
 
-def transform_positions(config, raw_positions):
-    def get_config(config):
+def transform_positions(
+    config: Dict[str, Any], raw_positions: Dict[str, Any]
+) -> Dict[str, Any]:
+    def get_config(config: Dict[str, Any]) -> Dict[str, Any]:
         raw_schema = config.get("raw_data_json_schema")
         if not raw_schema:
             logger.error("raw_data_json_schema is missing in config.")

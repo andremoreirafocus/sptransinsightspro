@@ -1,12 +1,17 @@
 import pandas as pd
 import logging
+from typing import Any, Dict, Optional, Tuple
 from infra.duck_db_v2 import get_duckdb_connection
 
 logger = logging.getLogger(__name__)
 
 
 
-def save_positions_to_storage(config, positions_df, target_bucket):
+def save_positions_to_storage(
+    config: Dict[str, Any],
+    positions_df: Optional[pd.DataFrame],
+    target_bucket: str,
+) -> None:
     """
     Storage Layer:
     Saves a list of position tuples to MinIO in Parquet format.
@@ -15,7 +20,9 @@ def save_positions_to_storage(config, positions_df, target_bucket):
     - Supports target_bucket: "trusted" or "quarantined"
     """
 
-    def get_config(config, target_bucket):
+    def get_config(
+        config: Dict[str, Any], target_bucket: str
+    ) -> Tuple[str, str, str, Dict[str, Any]]:
         try:
             storage = config["storage"]
             tables = config["tables"]
