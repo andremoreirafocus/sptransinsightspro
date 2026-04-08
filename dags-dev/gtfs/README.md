@@ -53,6 +53,7 @@ Chaves esperadas em `general`
 ```
 
 ### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `gtfs_general` (JSON)
 - Credenciais via Connections (GTFS e MinIO)
 

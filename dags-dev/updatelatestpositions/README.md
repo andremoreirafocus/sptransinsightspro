@@ -1,6 +1,6 @@
 ## Objetivo deste subprojeto
 Disponibilizar as posições instantâneas mais recentes dos ônibus na camada refined para consumo pelo dashboard.
-A implementação final é feita via a DAGs refinedlivedata e updatelatestpositions do Airflow.
+A implementação final é feita via a DAG updatelatestpositions do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
 As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
 
@@ -48,6 +48,7 @@ Chaves esperadas em `general`
 ```
 
 ### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `updatelatestpositions_general` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
 
@@ -59,7 +60,7 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python ./refinedfinishedtrips-v2.py
+python ./updatelatestpositions-v2.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 

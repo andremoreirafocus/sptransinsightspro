@@ -1,6 +1,6 @@
 ## Objetivo deste subprojeto
 Calcular as viagens finalizadas a partir do histórico de posições instantâneas dos ônibus e armazena o seu histórico consolidado para análise de eficiência.
-A implementação final é feita via a DAG gtfs do Airflow.
+A implementação final é feita via a DAG refinedfinishedtrips do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
 As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
 
@@ -53,6 +53,7 @@ Chaves esperadas em `general`
 ```
 
 ### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `refinedfinishedtrips_general` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
 

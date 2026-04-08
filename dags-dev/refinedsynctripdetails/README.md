@@ -1,6 +1,6 @@
 ## Objetivo deste subprojeto
 Sincronizar a tabela de detalhes de viagem gerada na camada trusted a partir da extração de dados do GFTS da SPTRANS com a camada refined para servir à camada de visualização.
-A implementação final é feita via a DAG gtfs do Airflow.
+A implementação final é feita via a DAG refinedsynctripdetails do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
 As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
 
@@ -49,6 +49,7 @@ Chaves esperadas em `general`
 ```
 
 ### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `refinedsynctripdetails_general` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
 
