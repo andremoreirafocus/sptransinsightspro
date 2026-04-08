@@ -5,13 +5,14 @@ from infra.minio_functions import (
 from infra.compression import decompress_data
 import json
 import logging
+from typing import Any, Dict, Tuple
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def load_positions(config, partition_path, source_file):
-    def get_config(config):
+def load_positions(config: Dict[str, Any], partition_path: str, source_file: str) -> Dict[str, Any]:
+    def get_config(config: Dict[str, Any]) -> Tuple[str, str, bool, str, Dict[str, Any]]:
         storage = config["storage"]
         compression = config["compression"]
         source_bucket = storage["raw_bucket"]

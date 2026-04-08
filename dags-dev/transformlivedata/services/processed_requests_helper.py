@@ -1,10 +1,11 @@
 import logging
+from typing import Any, Dict, List, Tuple
 from infra.sql_db_v2 import execute_select_query, execute_update_query
 
 logger = logging.getLogger(__name__)
 
 
-def get_unprocessed_requests(config):
+def get_unprocessed_requests(config: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Get all unprocessed requests from the RAW_EVENTS_TABLE_NAME table.
 
@@ -20,7 +21,7 @@ def get_unprocessed_requests(config):
               Returns empty list if table not found or query fails
     """
 
-    def get_config(config):
+    def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
@@ -56,7 +57,7 @@ def get_unprocessed_requests(config):
         return []
 
 
-def mark_request_as_processed(config, logical_date):
+def mark_request_as_processed(config: Dict[str, Any], logical_date: str) -> bool:
     """
     Mark a processing request as processed by updating the processed field to true.
 
@@ -71,7 +72,7 @@ def mark_request_as_processed(config, logical_date):
         bool: True if update was successful, False otherwise
     """
 
-    def get_config(config):
+    def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
@@ -116,7 +117,9 @@ def mark_request_as_processed(config, logical_date):
         return False
 
 
-def mark_request_as_processed_by_filename(config, filename):
+def mark_request_as_processed_by_filename(
+    config: Dict[str, Any], filename: str
+) -> bool:
     """
     Mark a processing request as processed by updating the processed field to true.
 
@@ -131,7 +134,7 @@ def mark_request_as_processed_by_filename(config, filename):
         bool: True if update was successful, False otherwise
     """
 
-    def get_config(config):
+    def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         if "tables" not in config or "raw_events_table_name" not in config["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")

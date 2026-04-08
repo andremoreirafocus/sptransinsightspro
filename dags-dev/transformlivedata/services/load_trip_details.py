@@ -1,11 +1,15 @@
 from infra.duck_db_v2 import get_duckdb_connection
 import logging
+from typing import Any, Dict, Tuple
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-def load_trip_details(config):
-    def get_config(config):
+def load_trip_details(config: Dict[str, Any]) -> pd.DataFrame:
+    def get_config(
+        config: Dict[str, Any]
+    ) -> Tuple[Dict[str, Any], str, str, str]:
         try:
             storage = config["storage"]
             tables = config["tables"]

@@ -1,8 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from typing import Dict
 
 
-def build_logical_date_context(logical_date_string: str) -> dict:
+def build_logical_date_context(logical_date_string: str) -> Dict[str, str]:
     try:
         dt_utc = datetime.fromisoformat(logical_date_string)
         dt = dt_utc.astimezone(ZoneInfo("America/Sao_Paulo"))

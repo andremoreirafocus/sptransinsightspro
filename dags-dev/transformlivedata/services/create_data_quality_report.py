@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Any, Dict, Tuple
 import json
 import logging
 from datetime import datetime
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_data_quality_report(
-    config,
+    config: Dict[str, Any],
     execution_id: str,
     logical_date_utc: str,
     source_file: str,
@@ -17,7 +17,7 @@ def build_data_quality_report(
     expectations_result: Dict[str, Any],
     pass_threshold: float,
     warn_threshold: float,
-    batch_ts,
+    batch_ts: Any,
 ) -> Dict[str, Any]:
     try:
         valid_df = expectations_result["valid_df"]
@@ -104,7 +104,7 @@ def build_data_quality_report(
 
 
 def create_data_quality_report(
-    config,
+    config: Dict[str, Any],
     execution_id: str,
     logical_date_utc: str,
     source_file: str,
@@ -112,7 +112,7 @@ def create_data_quality_report(
     expectations_result: Dict[str, Any],
     pass_threshold: float = 1.0,
     warn_threshold: float = 0.980,
-) -> Dict[str, Any]:
+) -> None:
     data_quality_report = build_data_quality_report(
         config=config,
         execution_id=execution_id,
@@ -131,8 +131,8 @@ def create_data_quality_report(
     )
 
 
-def build_quality_report_path(config, batch_ts):
-    def get_config(config):
+def build_quality_report_path(config: Dict[str, Any], batch_ts: Any) -> str:
+    def get_config(config: Dict[str, Any]) -> Tuple[str, str]:
         storage = config["storage"]
         quality = config["quality"]
         bucket_name = storage["metadata_bucket"]
@@ -150,8 +150,8 @@ def build_quality_report_path(config, batch_ts):
     return f"{bucket_name}/{prefix}quality-report-positions_{hhmm}.json"
 
 
-def build_quarantine_path(config, batch_ts):
-    def get_config(config):
+def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
+    def get_config(config: Dict[str, Any]) -> Tuple[str, str, str]:
         storage = config["storage"]
         tables = config["tables"]
         bucket_name = storage["quarantined_bucket"]
@@ -251,8 +251,10 @@ def write_data_quality_report_json(data_quality_report: Dict[str, Any], output_p
         f.write(data_quality_report_to_json(data_quality_report))
 
 
-def save_data_quality_report_to_storage(config, data_quality_report, batch_ts):
-    def get_config(config):
+def save_data_quality_report_to_storage(
+    config: Dict[str, Any], data_quality_report: Dict[str, Any], batch_ts: Any
+) -> None:
+    def get_config(config: Dict[str, Any]) -> Tuple[str, str, str, Dict[str, Any]]:
         storage = config["storage"]
         quality = config["quality"]
         bucket_name = storage["metadata_bucket"]
