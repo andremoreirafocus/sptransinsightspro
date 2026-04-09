@@ -5,11 +5,23 @@ import logging
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
+client_factory = Minio
 
-def list_objects_in_minio_bucket(
+
+def _get_object_storage_client(connection_data, client=None):
+    return client or client_factory(
+        connection_data["minio_endpoint"],
+        access_key=connection_data["access_key"],
+        secret_key=connection_data["secret_key"],
+        secure=connection_data["secure"],
+    )
+
+
+def list_objects_in_object_storage_bucket(
     connection_data,
     bucket_name,
     prefix,
+    client=None,
 ):
     """
     Lists files in a MinIO folder (prefix).
@@ -20,12 +32,7 @@ def list_objects_in_minio_bucket(
     """
 
     try:
-        client = Minio(
-            connection_data["minio_endpoint"],
-            access_key=connection_data["access_key"],
-            secret_key=connection_data["secret_key"],
-            secure=connection_data["secure"],
-        )
+        client = _get_object_storage_client(connection_data, client)
         objects = client.list_objects(bucket_name, prefix=prefix, recursive=True)
         return [obj.object_name for obj in objects]
     except Exception as e:
@@ -33,7 +40,9 @@ def list_objects_in_minio_bucket(
         return []
 
 
-def read_file_from_minio(connection_data, bucket_name, object_name):
+def read_file_from_object_storage(
+    connection_data, bucket_name, object_name, client=None
+):
     """
     Reads a file from MinIO and returns its contents as a string.
     :param connection data: MinIO connection data
@@ -42,12 +51,7 @@ def read_file_from_minio(connection_data, bucket_name, object_name):
     :return: file content as a string
     """
     try:
-        client = Minio(
-            connection_data["minio_endpoint"],
-            access_key=connection_data["access_key"],
-            secret_key=connection_data["secret_key"],
-            secure=connection_data["secure"],
-        )
+        client = _get_object_storage_client(connection_data, client)
         response = client.get_object(bucket_name, object_name)
         content = response.read().decode("utf-8")
         response.close()
@@ -58,7 +62,9 @@ def read_file_from_minio(connection_data, bucket_name, object_name):
         return None
 
 
-def write_generic_bytes_to_minio(connection_data, buffer, bucket_name, object_name):
+def write_generic_bytes_to_object_storage(
+    connection_data, buffer, bucket_name, object_name, client=None
+):
     """
     Writes a io bytes buffer (such as from Pandas) to MinIO at the specified bucket and object name.
     :param connection data: MinIO connection data
@@ -66,12 +72,7 @@ def write_generic_bytes_to_minio(connection_data, buffer, bucket_name, object_na
     :param object_name: Object name for the JSON file in MinIO
     :return: void
     """
-    client = Minio(
-        connection_data["minio_endpoint"],
-        access_key=connection_data["access_key"],
-        secret_key=connection_data["secret_key"],
-        secure=connection_data["secure"],
-    )
+    client = _get_object_storage_client(connection_data, client)
 
     if not client.bucket_exists(bucket_name):
         client.make_bucket(bucket_name)

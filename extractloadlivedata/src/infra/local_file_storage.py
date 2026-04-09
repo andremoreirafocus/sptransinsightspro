@@ -7,7 +7,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_data_to_json_file(data, downloads_folder, file_name, compression=False):
+def save_data_to_json_file(
+    data,
+    downloads_folder,
+    file_name,
+    compression=False,
+    open_fn=None,
+    makedirs_fn=None,
+):
+    open_fn = open_fn or open
+    makedirs_fn = makedirs_fn or os.makedirs
     try:
         if compression:
             logger.info("Compressing data..")
@@ -17,10 +26,10 @@ def save_data_to_json_file(data, downloads_folder, file_name, compression=False)
             logger.info("Data compressed successfully.")
         else:
             mode = "w"
-        os.makedirs(downloads_folder, exist_ok=True)
+        makedirs_fn(downloads_folder, exist_ok=True)
         file_with_path = os.path.join(downloads_folder, file_name)
         logger.info(f"Writing buses_positions to file {file_with_path} ...")
-        with open(file_with_path, mode) as file:
+        with open_fn(file_with_path, mode) as file:
             file.write(data)
         logger.info("File saved successfully!!!")
         return True

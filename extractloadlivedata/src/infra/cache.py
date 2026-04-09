@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 _cache = None
 
 
-def get_cache(config):
+def get_cache(config, cache_factory=None):
     """
     Get or initialize the diskcache instance.
 
@@ -26,14 +26,15 @@ def get_cache(config):
 
     global _cache
     cache_dir = get_config(config)
+    cache_factory = cache_factory or dc.Cache
     if _cache is None:
         os.makedirs(cache_dir, exist_ok=True)
-        _cache = dc.Cache(cache_dir)
+        _cache = cache_factory(cache_dir)
         logger.info(f"Cache initialized at {cache_dir}")
     return _cache
 
 
-def add_to_cache(config, key, value):
+def add_to_cache(config, key, value, cache_factory=None):
     """
     Add an item to the cache.
 
@@ -43,12 +44,12 @@ def add_to_cache(config, key, value):
         value: Value to store
     """
     logger.info(f"Adding to cache with key '{key}'")
-    cache = get_cache(config)
+    cache = get_cache(config, cache_factory=cache_factory)
     cache[key] = value
     logger.info(f"Cache entry created with key '{key}' and value '{value}'")
 
 
-def get_from_cache(config):
+def get_from_cache(config, cache_factory=None):
     """
     Retrieve all items from the cache.
 
@@ -59,13 +60,13 @@ def get_from_cache(config):
         list: Sorted list of all cache keys
     """
     logger.info("Retrieving all items from cache...")
-    cache = get_cache(config)
+    cache = get_cache(config, cache_factory=cache_factory)
     items = sorted(list(cache))
     logger.info(f"Found {len(items)} item(s) in cache.")
     return items
 
 
-def get_cache_value(config, key):
+def get_cache_value(config, key, cache_factory=None):
     """
     Retrieve a specific value from the cache.
 
@@ -76,11 +77,11 @@ def get_cache_value(config, key):
     Returns:
         Value associated with key, or None if not found
     """
-    cache = get_cache(config)
+    cache = get_cache(config, cache_factory=cache_factory)
     return cache.get(key)
 
 
-def remove_from_cache(config, key):
+def remove_from_cache(config, key, cache_factory=None):
     """
     Remove an item from the cache.
 
@@ -89,7 +90,7 @@ def remove_from_cache(config, key):
         key: Cache key to remove
     """
     logger.info(f"Removing cache entry with key '{key}'")
-    cache = get_cache(config)
+    cache = get_cache(config, cache_factory=cache_factory)
     if key in cache:
         del cache[key]
         logger.info(f"Cache entry '{key}' removed successfully.")

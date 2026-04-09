@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_row(connection, schema, table, row_tuple, columns):
+def save_row(connection, schema, table, row_tuple, columns, engine_factory=None):
     """
     Save a single row to the database.
 
@@ -30,7 +30,8 @@ def save_row(connection, schema, table, row_tuple, columns):
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-        engine = create_engine(db_uri)
+        engine_factory = engine_factory or create_engine
+        engine = engine_factory(db_uri)
 
         columns_str = ", ".join(f'"{col}"' for col in columns)
         placeholders = ", ".join([f":{col}" for col in columns])
@@ -53,7 +54,7 @@ def save_row(connection, schema, table, row_tuple, columns):
         return False
 
 
-def execute_select_query(connection, query):
+def execute_select_query(connection, query, engine_factory=None):
     """
     Execute a SELECT query and return results as a list of dictionaries.
     """
@@ -69,7 +70,8 @@ def execute_select_query(connection, query):
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-        engine = create_engine(db_uri)
+        engine_factory = engine_factory or create_engine
+        engine = engine_factory(db_uri)
 
         logger.info(f"Executing SELECT query: {query[:100]}...")
         with engine.begin() as conn:
@@ -83,7 +85,7 @@ def execute_select_query(connection, query):
         return []
 
 
-def execute_update_query(connection, query, params=None):
+def execute_update_query(connection, query, params=None, engine_factory=None):
     """
     Execute an UPDATE, DELETE, or other DML query.
     """
@@ -99,7 +101,8 @@ def execute_update_query(connection, query, params=None):
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-        engine = create_engine(db_uri)
+        engine_factory = engine_factory or create_engine
+        engine = engine_factory(db_uri)
 
         logger.info(f"Executing UPDATE query: {query[:100]}...")
         with engine.begin() as conn:

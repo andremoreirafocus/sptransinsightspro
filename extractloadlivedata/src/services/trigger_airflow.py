@@ -99,7 +99,7 @@ def get_utc_logical_date_from_file(pending_marker):
     return logical_date
 
 
-def trigger_airflow_dag_run(config, pending_marker):
+def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
     """
     Sends the POST request to Airflow API using logical_date.
     """
@@ -133,7 +133,8 @@ def trigger_airflow_dag_run(config, pending_marker):
     }
     print(f"payload: {payload}")
     try:
-        r = requests.post(
+        post_fn = post_fn or requests.post
+        r = post_fn(
             airflow_url,
             json=payload,
             auth=auth,

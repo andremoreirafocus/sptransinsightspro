@@ -1,5 +1,7 @@
-from src.infra.storage import save_data_to_json_file
-from src.infra.minio_functions import write_generic_bytes_to_minio
+from src.infra.local_file_storage import save_data_to_json_file
+from src.infra.object_storage import (
+    write_generic_bytes_to_object_storage,
+)
 from src.infra.compression import compress_data, decompress_data
 import time
 from datetime import datetime
@@ -53,8 +55,9 @@ def save_bus_positions_to_local_volume(config, data):
     )
 
 
-def load_bus_positions_from_local_volume_file(folder, file):
+def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
     file_path = f"{folder}/{file}"
+    open_fn = open_fn or open
     if file.split(".")[-1] != "json":
         logger.info(f"Pending file '{file}' is compressed.")
         file_is_compressed = True
@@ -62,11 +65,11 @@ def load_bus_positions_from_local_volume_file(folder, file):
         file_is_compressed = False
     try:
         if file_is_compressed:
-            with open(file_path, "rb") as f:
+            with open_fn(file_path, "rb") as f:
                 file_content = f.read()
                 file_content = json.loads(decompress_data(file_content))
         else:
-            with open(file_path, "r") as f:
+            with open_fn(file_path, "r") as f:
                 file_content_json = f.read()
                 file_content = json.loads(file_content_json)
     except Exception as e:
@@ -74,18 +77,20 @@ def load_bus_positions_from_local_volume_file(folder, file):
     return file_content
 
 
-def remove_local_file(config, data):
+def remove_local_file(config, data, glob_fn=None, remove_fn=None):
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
         return ingest_buffer_folder
 
     ingest_buffer_folder = get_config(config)
+    glob_fn = glob_fn or glob.glob
+    remove_fn = remove_fn or os.remove
     filename_without_path, _ = get_file_name_from_data(data)
     filename = f"{ingest_buffer_folder}/{filename_without_path}*"
     logging.info(
         f"Attempting to remove local file(s) matching '{filename}' from '{ingest_buffer_folder}'"
     )
-    matching_files = glob.glob(filename)
+    matching_files = glob_fn(filename)
     logger.debug(f"Matching files found: {matching_files}")
     if not matching_files:
         logger.error(f"No matching local file found for '{filename}' to remove.")
@@ -98,26 +103,27 @@ def remove_local_file(config, data):
         # file_path = f"{ingest_buffer_folder}/{file}"
         file_path = file
         try:
-            os.remove(file_path)
+            remove_fn(file_path)
             logger.info(f"Local file '{file_path}' removed successfully.")
         except Exception as e:
             logger.error(f"Error removing local file '{file_path}': {e}")
 
 
-def get_pending_storage_save_list(config):
+def get_pending_storage_save_list(config, listdir_fn=None):
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
         return ingest_buffer_folder
 
     ingest_buffer_folder = get_config(config)
+    listdir_fn = listdir_fn or os.listdir
     pending_files = []
-    for file in os.listdir(ingest_buffer_folder):
+    for file in listdir_fn(ingest_buffer_folder):
         if file.startswith("posicoes_onibus"):
             pending_files.append(file)
     return pending_files
 
 
-def save_bus_positions_to_storage_with_retries(config, data):
+def save_bus_positions_to_storage_with_retries(config, data, sleep_fn=None):
     def get_config(config):
         # Usamos uma chave específica para retries de storage,
         # ou reaproveitamos a da API conforme sua preferência
@@ -125,6 +131,7 @@ def save_bus_positions_to_storage_with_retries(config, data):
         return storage_max_retries
 
     storage_max_retries = get_config(config)
+    sleep_fn = sleep_fn or time.sleep
 
     retries = 0
     back_off = 1
@@ -147,7 +154,7 @@ def save_bus_positions_to_storage_with_retries(config, data):
             logger.warning(
                 f"Storage save failed! Retrying in {back_off} seconds... Error: {e}"
             )
-            time.sleep(back_off)
+            sleep_fn(back_off)
             back_off *= 2
     return False
 
@@ -165,12 +172,10 @@ def save_bus_positions_to_storage(config, data):
     logger.info(
         f"Received data for {total_qv} vehicles from {total_bus_lines} bus lines."
     )
-    hour_minute, _, _ = get_payload_summary(data)
     data_json = json.dumps(data)
     save_data_to_raw_object_storage(
         config,
         data=data_json,
-        hour_minute=hour_minute,
         compression=compression,
     )
 
@@ -217,7 +222,7 @@ def data_structure_is_valid(data):
     return True
 
 
-def save_data_to_raw_object_storage(config, data, hour_minute, compression=False):
+def save_data_to_raw_object_storage(config, data, compression=False, client=None):
     def get_config(config):
         raw_bucket_name = config["SOURCE_BUCKET"]
         app_folder = config["APP_FOLDER"]
@@ -246,11 +251,12 @@ def save_data_to_raw_object_storage(config, data, hour_minute, compression=False
                 logger.info("Data compressed successfully.")
             else:
                 data = data.encode("utf-8")
-            write_generic_bytes_to_minio(
+            write_generic_bytes_to_object_storage(
                 connection_data,
                 buffer=data,
                 bucket_name=raw_bucket_name,
                 object_name=destination_object_name,
+                client=client,
             )
         except Exception as e:
             logger.error(

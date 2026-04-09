@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_buses_positions_with_retries(config):
+def extract_buses_positions_with_retries(config, session=None):
     def get_config(config):
         token = config["TOKEN"]
         api_base_url = config["API_BASE_URL"]
@@ -25,6 +25,7 @@ def extract_buses_positions_with_retries(config):
         buses_positions_payload = extract_buses_positions(
             token=token,
             base_url=api_base_url,
+            session=session,
         )
         if buses_positions_response_is_valid(buses_positions_payload):
             download_successful = True
@@ -65,8 +66,8 @@ def get_buses_positions_with_metadata(buses_positions_payload):
     return buses_positions, reference_time
 
 
-def extract_buses_positions(base_url, token):
-    session = requests.Session()
+def extract_buses_positions(base_url, token, session=None):
+    session = session or requests.Session()
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
     try:
         response_auth = session.post(auth_url)
