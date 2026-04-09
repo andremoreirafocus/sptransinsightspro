@@ -10,11 +10,13 @@ class FakeObjectStorageClient:
         self.created_bucket = True
 
     def put_object(self, bucket_name, object_name, data, length, content_type):
+        buffer = data.read()
         self.put_calls.append(
             {
                 "bucket_name": bucket_name,
                 "object_name": object_name,
                 "data": data,
+                "buffer": buffer,
                 "length": length,
                 "content_type": content_type,
             }

@@ -123,7 +123,9 @@ def get_pending_storage_save_list(config, listdir_fn=None):
     return pending_files
 
 
-def save_bus_positions_to_storage_with_retries(config, data, sleep_fn=None):
+def save_bus_positions_to_storage_with_retries(
+    config, data, sleep_fn=None, save_fn=None
+):
     def get_config(config):
         # Usamos uma chave específica para retries de storage,
         # ou reaproveitamos a da API conforme sua preferência
@@ -132,13 +134,14 @@ def save_bus_positions_to_storage_with_retries(config, data, sleep_fn=None):
 
     storage_max_retries = get_config(config)
     sleep_fn = sleep_fn or time.sleep
+    save_fn = save_fn or save_bus_positions_to_storage
 
     retries = 0
     back_off = 1
     save_successful = False
     while not save_successful:
         try:
-            save_bus_positions_to_storage(config, data)
+            save_fn(config, data)
             save_successful = True
             if retries > 0:
                 logger.info(f"Storage save successful after {retries} retries.")
