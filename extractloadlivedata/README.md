@@ -82,6 +82,16 @@ AIRFLOW_WEBSERVER = "localhost"  # hostname do webserver do Airflow
 AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
 INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
 
+## Testes unitários
+Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas. A cobertura atual inclui:
+- `tests/test_extract_buses_positions.py`: validações de payload, autenticação e fluxo de retries na extração.
+- `tests/test_save_load_bus_positions.py`: validação de estrutura, compressão, leitura de arquivos, persistência com retries, remoção de arquivos locais e filtros de pendências.
+- `tests/test_save_processing_requests.py`: criação e disparo de requests de processamento com cache e persistência no banco.
+- `tests/test_trigger_airflow.py`: criação e disparo de invocações do Airflow via HTTP e cache.
+- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, e validação de configuração.
+- `tests/test_sql_db_v2.py`: contratos de persistência, seleção e atualização com engine injetado.
+- `tests/test_object_storage.py`: leitura, listagem e escrita no object storage com cliente injetado.
+
 
 ## Para instalar os requisitos
 - cd <diretorio deste subprojeto>
