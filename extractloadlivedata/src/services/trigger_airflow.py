@@ -1,43 +1,24 @@
 import requests
-import diskcache as dc
-import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
 
+from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
+
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
-# Diskcache directory for pending invocations
-# CACHE_DIR = "../.diskcache_pending_invocations"
-
-# Initialize the cache
-_cache = None
-
-
-def get_cache(config):
-    """Get or initialize the diskcache instance."""
-
-    def get_config(config):
-        CACHE_DIR = config["INVOKATIONS_CACHE_DIR"]
-        return CACHE_DIR
-
-    global _cache
-    CACHE_DIR = get_config(config)
-    if _cache is None:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        _cache = dc.Cache(CACHE_DIR)
-    return _cache
-
-
 def create_pending_invokation(config, filename):
     """Add a pending invocation to the cache."""
-    logger.info(f"Creating pending invokation for file '{filename}'")
-    cache = get_cache(config)
+    def get_config(config):
+        cache_dir = config["INVOKATIONS_CACHE_DIR"]
+        return cache_dir
 
+    logger.info(f"Creating pending invokation for file '{filename}'")
     # Use filename as key, storing the filename as value
     marker_name = f"{filename.split('.')[0]}.pending"
-    cache[marker_name] = filename
+    cache_dir = get_config(config)
+    add_to_cache(cache_dir, marker_name, filename)
 
     logger.info(
         f"Pending invokation created in cache with key '{marker_name}' and value '{filename}'"
@@ -46,20 +27,24 @@ def create_pending_invokation(config, filename):
 
 def remove_pending_invokation(config, marker_name):
     """Remove a pending invocation from the cache."""
+    def get_config(config):
+        cache_dir = config["INVOKATIONS_CACHE_DIR"]
+        return cache_dir
+
     logger.info(f"Removing pending invokation marker '{marker_name}'")
-    cache = get_cache(config)
-    if marker_name in cache:
-        del cache[marker_name]
-        logger.info(f"Pending invokation marker '{marker_name}' removed successfully.")
-    else:
-        logger.warning(f"Pending invokation marker '{marker_name}' not found in cache.")
+    cache_dir = get_config(config)
+    remove_from_cache(cache_dir, marker_name)
 
 
 def get_pending_invokations(config):
     """Retrieve all pending invocations from the cache."""
+    def get_config(config):
+        cache_dir = config["INVOKATIONS_CACHE_DIR"]
+        return cache_dir
+
     logger.info("Checking for pending invokations...")
-    cache = get_cache(config)
-    pending_markers = sorted(list(cache))
+    cache_dir = get_config(config)
+    pending_markers = get_from_cache(cache_dir)
     logger.info(f"Found {len(pending_markers)} pending invokation(s).")
     return pending_markers
 
