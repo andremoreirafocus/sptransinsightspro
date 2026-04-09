@@ -45,6 +45,7 @@ def extract_buses_positions_with_retries(config, session=None):
             logger.error(
                 "Max retries reached. Download failed. Skipping this extraction cycle."
             )
+            break
     return None
 
 
