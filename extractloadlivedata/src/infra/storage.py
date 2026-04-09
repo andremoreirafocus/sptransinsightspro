@@ -1,5 +1,4 @@
 from src.infra.compression import compress_data
-from src.infra.wsl_functions import is_disk_space_ok_wsl, is_wsl
 import os
 
 import logging
@@ -9,10 +8,6 @@ logger = logging.getLogger(__name__)
 
 
 def save_data_to_json_file(data, downloads_folder, file_name, compression=False):
-    if is_wsl():
-        if not is_disk_space_ok_wsl():
-            logger.error("Disk space critical: skipping execution")
-            return False
     try:
         if compression:
             logger.info("Compressing data..")

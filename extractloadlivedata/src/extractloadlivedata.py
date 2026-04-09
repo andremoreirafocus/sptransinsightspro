@@ -26,8 +26,12 @@ logger = logging.getLogger(__name__)
 
 
 def extractloadlivedata():
+    def get_config_values(config):
+        ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
+        return ingest_buffer_folder
+
     config = get_config()
-    ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
+    ingest_buffer_folder = get_config_values(config)
     buses_positions_payload = extract_buses_positions_with_retries(config)
     download_successful = buses_positions_payload is not None
     if download_successful:
@@ -52,6 +56,9 @@ def extractloadlivedata():
                 if save_bus_positions_to_storage_with_retries(
                     config, pending_storage_save_file_content
                 ):
+                    logger.info(
+                        "Pending file saved to storage successfully."
+                    )
                     remove_local_file(config, pending_storage_save_file_content)
                     # create_pending_invokation(config, pending_storage_save_file)
                     create_pending_processing_request(config, pending_storage_save_file)

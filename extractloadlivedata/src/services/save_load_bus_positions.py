@@ -180,9 +180,8 @@ def get_payload_summary(data):
     total_qv = 0
     payload = data.get("payload")
     for line in payload.get("l", []):
-        # logger.info(f"Line: {line.get('qv')}")
         total_qv += int(line.get("qv", 0))
-    total_bus_lines = len(data.get("l", []))
+    total_bus_lines = len(payload.get("l"))
     return hour_minute, total_qv, total_bus_lines
 
 

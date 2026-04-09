@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 def create_pending_processing_request(config, pending_marker):
     """Add a pending processing request to the cache."""
-    logger.info(f"Creating pending processing request for marker '{pending_marker}'")
+    logger.info(f"Creating pending processing request for '{pending_marker}'")
     # Use marker name without extension as key
     marker_name = f"{pending_marker.split('.')[0]}.pending"
     add_to_cache(config, marker_name, pending_marker)
@@ -35,7 +35,7 @@ def remove_pending_processing_request(config, marker_name):
 def get_utc_logical_date_from_file(pending_marker):
     """Extract logical date from filename and convert to UTC timezone-aware datetime."""
     try:
-        logger.info(f"Extracting logical date from pending_marker: {pending_marker}")
+        logger.info(f"Extracting logical date from: {pending_marker}")
         # Remove extension(s) to get the timestamp
         # e.g., "posicoes_onibus-202602150936.json" or "posicoes_onibus-202602150936.json.zst"
         filename_without_ext = pending_marker.split(".")[0]
@@ -76,18 +76,18 @@ def save_processing_request(config, pending_marker):
     Returns:
         bool: True if save was successful, False otherwise
     """
-    try:
-        logger.info(f"Saving processing request for marker '{pending_marker}'")
-        # Parse RAW_EVENTS_TABLE_NAME to get schema and table
+    def get_config(config):
         if "RAW_EVENTS_TABLE_NAME" not in config:
             logger.error("RAW_EVENTS_TABLE_NAME configuration is missing.")
-            return False
+            raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
         raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
         if "." not in raw_events_table:
             logger.error(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
             )
-            return False
+            raise ValueError(
+                "RAW_EVENTS_TABLE_NAME must be in 'schema.table' format."
+            )
         schema, table = raw_events_table.split(".", 1)
         connection = {
             "host": config["DB_HOST"],
@@ -96,6 +96,11 @@ def save_processing_request(config, pending_marker):
             "user": config["DB_USER"],
             "password": config["DB_PASSWORD"],
         }
+        return connection, schema, table
+
+    try:
+        logger.info(f"Saving processing request for: '{pending_marker}'")
+        connection, schema, table = get_config(config)
         # Get logical date from filename
         logical_date = get_utc_logical_date_from_file(pending_marker)
         # Get current UTC time for created_at and updated_at
