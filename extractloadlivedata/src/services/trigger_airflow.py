@@ -8,7 +8,7 @@ from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
-def create_pending_invokation(config, filename):
+def create_pending_invokation(config, filename, cache_factory=None):
     """Add a pending invocation to the cache."""
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
@@ -18,14 +18,14 @@ def create_pending_invokation(config, filename):
     # Use filename as key, storing the filename as value
     marker_name = f"{filename.split('.')[0]}.pending"
     cache_dir = get_config(config)
-    add_to_cache(cache_dir, marker_name, filename)
+    add_to_cache(cache_dir, marker_name, filename, cache_factory=cache_factory)
 
     logger.info(
         f"Pending invokation created in cache with key '{marker_name}' and value '{filename}'"
     )
 
 
-def remove_pending_invokation(config, marker_name):
+def remove_pending_invokation(config, marker_name, cache_factory=None):
     """Remove a pending invocation from the cache."""
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
@@ -33,10 +33,10 @@ def remove_pending_invokation(config, marker_name):
 
     logger.info(f"Removing pending invokation marker '{marker_name}'")
     cache_dir = get_config(config)
-    remove_from_cache(cache_dir, marker_name)
+    remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
 
 
-def get_pending_invokations(config):
+def get_pending_invokations(config, cache_factory=None):
     """Retrieve all pending invocations from the cache."""
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
@@ -44,22 +44,26 @@ def get_pending_invokations(config):
 
     logger.info("Checking for pending invokations...")
     cache_dir = get_config(config)
-    pending_markers = get_from_cache(cache_dir)
+    pending_markers = get_from_cache(cache_dir, cache_factory=cache_factory)
     logger.info(f"Found {len(pending_markers)} pending invokation(s).")
     return pending_markers
 
 
-def trigger_pending_airflow_dag_invokations(config):
+def trigger_pending_airflow_dag_invokations(
+    config, post_fn=None, cache_factory=None
+):
     """Trigger all pending invocations and remove them if successful."""
     pending_markers = get_pending_invokations(
-        config,
+        config, cache_factory=cache_factory
     )
     if pending_markers:
         for pending_marker in pending_markers:
             print(f"Pending invokation found: {pending_marker}")
             print(f"Found {len(pending_markers)} pending invokation(s). Processing...")
-            if trigger_airflow_dag_run(config, pending_marker):
-                remove_pending_invokation(config, pending_marker)
+            if trigger_airflow_dag_run(config, pending_marker, post_fn=post_fn):
+                remove_pending_invokation(
+                    config, pending_marker, cache_factory=cache_factory
+                )
     else:
         print("No pending invokations found.")
 
