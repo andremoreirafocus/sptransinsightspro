@@ -4,7 +4,7 @@ from src.services.extract_buses_positions import (
     extract_buses_positions_with_retries,
     get_buses_positions_summary,
 )
-from tests.fakes import FakeHttpSession
+from tests.fakes.http_session import FakeHttpSession
 
 
 def test_buses_positions_response_is_valid_ok():

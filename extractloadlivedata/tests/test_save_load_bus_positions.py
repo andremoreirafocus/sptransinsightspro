@@ -8,7 +8,7 @@ from src.services.save_load_bus_positions import (
     save_bus_positions_to_storage_with_retries,
     save_data_to_raw_object_storage,
 )
-from tests.fakes import FakeObjectStorageClient
+from tests.fakes.object_storage_client import FakeObjectStorageClient
 
 
 def build_sample_data():

@@ -14,8 +14,9 @@ from src.infra.cache import (
 logger = logging.getLogger(__name__)
 
 
-def create_pending_processing_request(config, pending_marker):
+def create_pending_processing_request(config, pending_marker, cache_factory=None):
     """Add a pending processing request to the cache."""
+
     def get_config(config):
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
@@ -24,27 +25,29 @@ def create_pending_processing_request(config, pending_marker):
     # Use marker name without extension as key
     marker_name = f"{pending_marker.split('.')[0]}.pending"
     cache_dir = get_config(config)
-    add_to_cache(cache_dir, marker_name, pending_marker)
+    add_to_cache(cache_dir, marker_name, pending_marker, cache_factory=cache_factory)
 
 
-def get_pending_processing_requests(config):
+def get_pending_processing_requests(config, cache_factory=None):
     """Retrieve all pending processing requests from the cache."""
+
     def get_config(config):
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
     cache_dir = get_config(config)
-    return get_from_cache(cache_dir)
+    return get_from_cache(cache_dir, cache_factory=cache_factory)
 
 
-def remove_pending_processing_request(config, marker_name):
+def remove_pending_processing_request(config, marker_name, cache_factory=None):
     """Remove a pending processing request from the cache."""
+
     def get_config(config):
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
     cache_dir = get_config(config)
-    remove_from_cache(cache_dir, marker_name)
+    remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
 
 
 def get_utc_logical_date_from_file(pending_marker):
@@ -80,7 +83,9 @@ def get_utc_logical_date_from_file(pending_marker):
         raise
 
 
-def save_processing_request(config, pending_marker):
+def save_processing_request(
+    config, pending_marker, save_row_fn=None, engine_factory=None
+):
     """
     Save a processing request to the database.
 
@@ -91,6 +96,7 @@ def save_processing_request(config, pending_marker):
     Returns:
         bool: True if save was successful, False otherwise
     """
+
     def get_config(config):
         if "RAW_EVENTS_TABLE_NAME" not in config:
             logger.error("RAW_EVENTS_TABLE_NAME configuration is missing.")
@@ -131,7 +137,15 @@ def save_processing_request(config, pending_marker):
         # Column names in the same order as row_tuple
         columns = ["filename", "logical_date", "processed", "created_at", "updated_at"]
         # Save to database using the generic function from sql_db module
-        success = save_row(connection, schema, table, row_tuple, columns)
+        save_row_fn = save_row_fn or save_row
+        success = save_row_fn(
+            connection,
+            schema,
+            table,
+            row_tuple,
+            columns,
+            engine_factory=engine_factory,
+        )
         if success:
             logger.info(
                 f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
@@ -149,7 +163,9 @@ def save_processing_request(config, pending_marker):
         return False
 
 
-def trigger_pending_processing_requests(config):
+def trigger_pending_processing_requests(
+    config, cache_factory=None, save_fn=None
+):
     """
     Process all pending processing requests and save them to the database.
     Only remove from cache if the database save was successful.
@@ -158,16 +174,23 @@ def trigger_pending_processing_requests(config):
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
-    pending_markers = get_pending_processing_requests(config)
+    pending_markers = get_pending_processing_requests(
+        config, cache_factory=cache_factory
+    )
     cache_dir = get_config(config)
     if pending_markers:
         for pending_marker_key in pending_markers:
             logger.info(f"Processing pending request: {pending_marker_key}")
-            pending_marker_value = get_cache_value(cache_dir, pending_marker_key)
+            pending_marker_value = get_cache_value(
+                cache_dir, pending_marker_key, cache_factory=cache_factory
+            )
 
             if pending_marker_value:
-                if save_processing_request(config, pending_marker_value):
-                    remove_pending_processing_request(config, pending_marker_key)
+                save_fn = save_fn or save_processing_request
+                if save_fn(config, pending_marker_value):
+                    remove_pending_processing_request(
+                        config, pending_marker_key, cache_factory=cache_factory
+                    )
                 else:
                     logger.warning(
                         f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
