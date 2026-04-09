@@ -16,20 +16,35 @@ logger = logging.getLogger(__name__)
 
 def create_pending_processing_request(config, pending_marker):
     """Add a pending processing request to the cache."""
+    def get_config(config):
+        cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
+        return cache_dir
+
     logger.info(f"Creating pending processing request for '{pending_marker}'")
     # Use marker name without extension as key
     marker_name = f"{pending_marker.split('.')[0]}.pending"
-    add_to_cache(config, marker_name, pending_marker)
+    cache_dir = get_config(config)
+    add_to_cache(cache_dir, marker_name, pending_marker)
 
 
 def get_pending_processing_requests(config):
     """Retrieve all pending processing requests from the cache."""
-    return get_from_cache(config)
+    def get_config(config):
+        cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
+        return cache_dir
+
+    cache_dir = get_config(config)
+    return get_from_cache(cache_dir)
 
 
 def remove_pending_processing_request(config, marker_name):
     """Remove a pending processing request from the cache."""
-    remove_from_cache(config, marker_name)
+    def get_config(config):
+        cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
+        return cache_dir
+
+    cache_dir = get_config(config)
+    remove_from_cache(cache_dir, marker_name)
 
 
 def get_utc_logical_date_from_file(pending_marker):
@@ -139,11 +154,16 @@ def trigger_pending_processing_requests(config):
     Process all pending processing requests and save them to the database.
     Only remove from cache if the database save was successful.
     """
+    def get_config(config):
+        cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
+        return cache_dir
+
     pending_markers = get_pending_processing_requests(config)
+    cache_dir = get_config(config)
     if pending_markers:
         for pending_marker_key in pending_markers:
             logger.info(f"Processing pending request: {pending_marker_key}")
-            pending_marker_value = get_cache_value(config, pending_marker_key)
+            pending_marker_value = get_cache_value(cache_dir, pending_marker_key)
 
             if pending_marker_value:
                 if save_processing_request(config, pending_marker_value):
