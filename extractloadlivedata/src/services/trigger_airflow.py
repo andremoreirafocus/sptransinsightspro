@@ -8,8 +8,10 @@ from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
+
 def create_pending_invokation(config, filename, cache_factory=None):
     """Add a pending invocation to the cache."""
+
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
@@ -27,6 +29,7 @@ def create_pending_invokation(config, filename, cache_factory=None):
 
 def remove_pending_invokation(config, marker_name, cache_factory=None):
     """Remove a pending invocation from the cache."""
+
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
@@ -38,6 +41,7 @@ def remove_pending_invokation(config, marker_name, cache_factory=None):
 
 def get_pending_invokations(config, cache_factory=None):
     """Retrieve all pending invocations from the cache."""
+
     def get_config(config):
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
@@ -49,23 +53,21 @@ def get_pending_invokations(config, cache_factory=None):
     return pending_markers
 
 
-def trigger_pending_airflow_dag_invokations(
-    config, post_fn=None, cache_factory=None
-):
+def trigger_pending_airflow_dag_invokations(config, post_fn=None, cache_factory=None):
     """Trigger all pending invocations and remove them if successful."""
-    pending_markers = get_pending_invokations(
-        config, cache_factory=cache_factory
-    )
+    pending_markers = get_pending_invokations(config, cache_factory=cache_factory)
     if pending_markers:
         for pending_marker in pending_markers:
-            print(f"Pending invokation found: {pending_marker}")
-            print(f"Found {len(pending_markers)} pending invokation(s). Processing...")
+            logger.info(f"Pending invokation found: {pending_marker}")
+            logger.info(
+                f"Found {len(pending_markers)} pending invokation(s). Processing..."
+            )
             if trigger_airflow_dag_run(config, pending_marker, post_fn=post_fn):
                 remove_pending_invokation(
                     config, pending_marker, cache_factory=cache_factory
                 )
     else:
-        print("No pending invokations found.")
+        logger.info("No pending invokations found.")
 
 
 def get_utc_logical_date_from_file(pending_marker):
@@ -79,11 +81,8 @@ def get_utc_logical_date_from_file(pending_marker):
     hour = timestamp[8:10]
     minute = timestamp[10:12]
     dt_obj = datetime(int(year), int(month), int(day), int(hour), int(minute))
-    print(dt_obj)
     dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
-    print(dt_obj)
     dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
-    print(dt_utc)
     logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
     return logical_date
 
@@ -107,7 +106,7 @@ def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
         return airflow_url, auth
 
     airflow_url, auth = get_config(config)
-    print(f"Airflow URL: {airflow_url}")
+    logger.info(f"Airflow URL: {airflow_url}")
     logical_date = get_utc_logical_date_from_file(pending_marker)
     logger.info(
         f"Triggering Airflow DAG for : {pending_marker} file and logical_date: {logical_date}"
@@ -120,7 +119,7 @@ def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
         },
         "note": "Triggered by microservice after successful Raw upload",
     }
-    print(f"payload: {payload}")
+    logger.info(f"Request payload to be submitted: {payload}")
     try:
         post_fn = post_fn or requests.post
         r = post_fn(
@@ -142,12 +141,14 @@ def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
         logger.error(f"Exception details: {e}")
         return False
 
+
 def main():
-    
-    logical_date = get_utc_logical_date_from_file("posicoes_onibus-202602241926.json.zst")
-    print(
-        f"Logical_date: {logical_date}"
+
+    logical_date = get_utc_logical_date_from_file(
+        "posicoes_onibus-202602241926.json.zst"
     )
+    logger.info(f"Logical_date: {logical_date}")
+
 
 if __name__ == "__main__":
     main()

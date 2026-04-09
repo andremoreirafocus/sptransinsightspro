@@ -56,14 +56,14 @@ def save_bus_positions_to_local_volume(config, data):
 
 
 def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
-    file_path = f"{folder}/{file}"
-    open_fn = open_fn or open
-    if file.split(".")[-1] != "json":
-        logger.info(f"Pending file '{file}' is compressed.")
-        file_is_compressed = True
-    else:
-        file_is_compressed = False
     try:
+        file_path = f"{folder}/{file}"
+        open_fn = open_fn or open
+        if file.split(".")[-1] != "json":
+            logger.info(f"Pending file '{file}' is compressed.")
+            file_is_compressed = True
+        else:
+            file_is_compressed = False
         if file_is_compressed:
             with open_fn(file_path, "rb") as f:
                 file_content = f.read()
@@ -74,6 +74,7 @@ def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
                 file_content = json.loads(file_content_json)
     except Exception as e:
         logger.error(f"Error getting pending file '{file}': {e}")
+        raise ValueError(f"Error getting pending file '{file}': {e}")
     return file_content
 
 
