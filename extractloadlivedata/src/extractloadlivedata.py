@@ -10,10 +10,10 @@ from src.services.save_load_bus_positions import (
     get_pending_storage_save_list,
 )
 
-# from src.services.trigger_airflow import (
-#     create_pending_invokation,
-#     trigger_pending_airflow_dag_invokations,
-# )
+from src.services.trigger_airflow import (
+    create_pending_invokation,
+    trigger_pending_airflow_dag_invokations,
+)
 from src.services.save_processing_requests import (
     create_pending_processing_request,
     trigger_pending_processing_requests,
@@ -28,10 +28,17 @@ logger = logging.getLogger(__name__)
 def extractloadlivedata():
     def get_config_values(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
-        return ingest_buffer_folder
+        notification_engine = config.get("NOFICATION_ENGINE")
+        if notification_engine is None:
+            raise KeyError(
+                "NOFICATION_ENGINE configuration is missing."
+            )
+        notification_engine = notification_engine.strip()
+        return ingest_buffer_folder, notification_engine
 
     config = get_config()
-    ingest_buffer_folder = get_config_values(config)
+    ingest_buffer_folder, notification_engine = get_config_values(config)
+    logger.info(f"Notification engine set to: {notification_engine}")
     buses_positions_payload = extract_buses_positions_with_retries(config)
     download_successful = buses_positions_payload is not None
     if download_successful:
@@ -56,12 +63,14 @@ def extractloadlivedata():
                 if save_bus_positions_to_storage_with_retries(
                     config, pending_storage_save_file_content
                 ):
-                    logger.info(
-                        "Pending file saved to storage successfully."
-                    )
+                    logger.info("Pending file saved to storage successfully.")
                     remove_local_file(config, pending_storage_save_file_content)
-                    # create_pending_invokation(config, pending_storage_save_file)
-                    create_pending_processing_request(config, pending_storage_save_file)
+                    if notification_engine == "airflow":
+                        create_pending_invokation(config, pending_storage_save_file)
+                    else:
+                        create_pending_processing_request(
+                            config, pending_storage_save_file
+                        )
                 else:
                     logger.error(
                         f"Failed to save pending file '{pending_storage_save_file}' to storage after retries."
@@ -76,5 +85,7 @@ def extractloadlivedata():
             logger.error(
                 "One or more pending files failed to save to storage. Waiting for the next execution to retry."
             )
-        # trigger_pending_airflow_dag_invokations(config)
-        trigger_pending_processing_requests(config)
+        if notification_engine == "airflow":
+            trigger_pending_airflow_dag_invokations(config)
+        else:
+            trigger_pending_processing_requests(config)

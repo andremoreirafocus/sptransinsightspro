@@ -5,6 +5,7 @@ Como o principal objetyivo do projeto é extrair informações sobre as viagens 
 Para tal, todos os arquivos que contem as posições de ônibus extraídas da API são primeiramente salvos em um volume local e persistente gerenciado por este microserviço e, somente em seguida, são salvos no object storage e, em caso de sucesso, removidos do volume local.
 Para suportar esta possibilidade de falha e recuperação dos dados, a cada arquivo salvo no object storage é criado um registro em uma tabela de itens a serem processados pelo orquestrador que através de uma DAG orquestardora, verifica periodicamente se há nesta tabela algum regsitro de arquivo de posições a ser processado e, em caso positivo, inicia uma outra DAG de execução da transformação dos dados de posição contidos no arquivo.
 Esta arquitetura suporta a falha do obsjetc storage, do orquestador e do banco de dados do orquestrador, aonde os registros de arquivos a serem processados são salvos.
+Embora esta não seja a melhor opção para resiliência completa do fluxo, há também a possibilidade de, ao invés de registrar a solicitação no banco de dados para a DAG orquestradora, disparar diretamente a execução da DAG de transformação via API do Airflow. Essa escolha é configurável por variável de ambiente e permite alternar entre um fluxo baseado em fila persistida e um fluxo baseado em disparo direto.
 
 ## O que este subprojeto faz
 - extrai periodicamente posições de ônibus da API da SPTrans em um intervalo configurável; em caso de falhas ou payload inválido, a operação é reexecutada com backoff exponencial
@@ -14,6 +15,7 @@ Esta arquitetura suporta a falha do obsjetc storage, do orquestador e do banco d
 - persiste o JSON no MinIO na camada raw, em uma pasta por data, podendo salvar comprimido em Zstandard ou em JSON puro
 - mantém arquivos locais pendentes de salvamento no object storage quando este está indisponível, tentando novamente nas próximas execuções e removendo o arquivo local após a persistência ter sido bem-sucedida
 - registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow. Caso a criação do do registro falhe, o mesmo continua salvo localmente até que a operação seja concluída com sucesso. Caso o Airflow esteja indisponível, ao retornar ao funcionamento, a DAG orquestradora identifica os registros de arquivos pendentes de transformação e dispara a DAG de transformação para cada arquivo, um por vez e na ordem de criação dos arquivos de posição dos ônibus, garantindo uma entrega ordenada das posições ao longo do tempo.
+- alternativamente, pode disparar diretamente a DAG de transformação via API do Airflow, sem criar registro no banco, dependendo da configuração
 
 
 ## Pré-requisitos
@@ -63,6 +65,7 @@ SOURCE_BUCKET = "raw"  # bucket de destino na camada raw
 APP_FOLDER = "sptrans"  # pasta base do app dentro do bucket
 STORAGE_MAX_RETRIES = 0  # retries de escrita no object storage com backoff exponencial
 RAW_EVENTS_TABLE_NAME = "to_be_processed.raw"  # tabela de requests pendentes (schema.tabela)
+NOFICATION_ENGINE = "processing_requests"  # define o mecanismo de notificação: "processing_requests" (banco) ou "airflow" (API)
 MINIO_ENDPOINT="localhost:9000"  # endpoint do MinIO
 ACCESS_KEY="datalake"  # access key do MinIO
 SECRET_KEY="datalake"  # secret key do MinIO
@@ -112,4 +115,3 @@ No docker compose:
     Para iniciar o container 
 ```shell
         docker compose up -d extractloadlivedata
-

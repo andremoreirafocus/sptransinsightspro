@@ -13,7 +13,7 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - valida o resultado transformado com Great Expectations a partir de uma suite configurada externamente em um arquivo JSON
 - cria quarentena para registros inválidos em um bucket com particionamento igual à da camada trusted e enriquecido com o motivo da quarentena de cada registro
 - gera e salva um relatório de qualidade com contagens de registros, métricas de transformação, issues detectadas e resumo de expectativas (sucessos, violações e exceções) em um bucket de metadados
-- inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente a partir do schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
+- inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente com base no schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
 
 
 ## Pré-requisitos
