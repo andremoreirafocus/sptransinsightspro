@@ -102,15 +102,8 @@ def test_flatten_positions():
             ],
         },
     }
-
     df = pd.DataFrame(raw_positions)
-
-    # Flatten the positions
     df_flat = flatten_raw_positions(df)
-    print(df_flat.head())  # Debug: Check the structure of the flattened DataFrame
-    print(df_flat.columns)  # Debug: Check the structure of the flattened DataFrame
-
-    # Check if the flattened DataFrame has the expected structure
     expected_columns = [
         "p",
         "a",
@@ -130,12 +123,10 @@ def test_flatten_positions():
         assert col in df_flat.columns, (
             f"Column '{col}' is missing in the flattened DataFrame"
         )
-
     expected_rows = sum(len(line["vs"]) for line in raw_positions["payload"]["l"])
     assert len(df_flat) == expected_rows, (
         f"Expected {expected_rows} rows in the flattened DataFrame, but got {len(df_flat)}"
     )
-
     expected_rows_by_vehicle = {
         21300: {
             "c": "2104-10",

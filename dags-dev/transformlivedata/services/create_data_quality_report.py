@@ -25,7 +25,7 @@ def build_data_quality_report(
         expectations_summary = expectations_result["expectations_summary"]
     except Exception as e:
         logger.error("Error parsing expectations_result: %s", e)
-        raise
+        raise ValueError(f"Error parsing expectations_result: {e}")
     metrics = transform_result.get("metrics", {})
     issues = transform_result.get("issues", {})
     transformed_records = transform_result.get("positions").shape[0]
@@ -239,7 +239,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
         return "\n".join(lines)
     except Exception as e:
         logger.error("Error parsing data_quality_report: %s", e)
-        raise
+        raise ValueError(f"Error parsing data_quality_report: {e}")
 
 
 def data_quality_report_to_json(data_quality_report: Dict[str, Any]) -> str:

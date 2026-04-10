@@ -23,7 +23,7 @@ def load_trip_details_from_storage_to_dataframe(config):
             return connection, bucket_name, gtfs_folder, trip_details_table_name
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     connection, bucket_name, gtfs_folder, trip_details_table_name = get_config(config)
     s3_path = f"s3://{bucket_name}/{gtfs_folder}/{trip_details_table_name}/{trip_details_table_name}.parquet"
@@ -36,7 +36,7 @@ def load_trip_details_from_storage_to_dataframe(config):
         return df
     except Exception as e:
         logger.error(f"Error fetching trip_details from storage: {e}")
-        raise
+        raise ValueError(f"Error fetching trip_details from storage: {e}")
     finally:
         if con:
             con.close()

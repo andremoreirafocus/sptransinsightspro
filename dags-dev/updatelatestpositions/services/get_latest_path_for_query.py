@@ -29,7 +29,7 @@ def get_latest_path_for_query(config):
             )
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     (
         bucket,
@@ -39,10 +39,10 @@ def get_latest_path_for_query(config):
     ) = get_config(config)
     latest_path_for_query = None
     now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
-    for i in range(2):  # Look back window
+    for i in range(2):
         check_time = now - timedelta(hours=i)
         prefix = f"{app_folder}/{positions_table_name}/{check_time.strftime('year=%Y/month=%m/day=%d/hour=%H')}/"
-        print(f"prefix: {prefix}")
+        logger.info(f"Looking at prefix: {bucket}/{prefix}...")
         objects = list_objects_in_minio_bucket(
             connection_data,
             bucket,

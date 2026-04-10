@@ -32,7 +32,7 @@ def create_latest_positions_table(config):
             return latest_positions_table_name, storage_connection, database_connection
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     latest_positions_table_name, storage_connection, database_connection = get_config(
         config
@@ -63,7 +63,7 @@ def create_latest_positions_table(config):
 
     except Exception as e:
         logger.error(f"Update failed: {e}")
-        raise
+        raise ValueError(f"Update failed: {e}")
     finally:
         if "con" in locals():
             con.close()

@@ -20,7 +20,7 @@ def save_trips_to_db(config, trips_table):
         }
     except KeyError as e:
         logger.error(f"Missing required configuration key: {e}")
-        raise
+        raise ValueError(f"Missing required configuration key: {e}")
     insert_sql = f"""
     INSERT INTO {table_name} (
             trip_id,

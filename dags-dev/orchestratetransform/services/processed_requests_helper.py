@@ -52,7 +52,7 @@ def get_unprocessed_requests(config):
         query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
 
         logger.info(f"Fetching unprocessed requests from {schema}.{table}")
-        print(f"Fetching unprocessed requests from {schema}.{table}")
+        logger.info(f"Fetching unprocessed requests from {schema}.{table}")
 
         # Execute query
         results = execute_select_query(connection, query)

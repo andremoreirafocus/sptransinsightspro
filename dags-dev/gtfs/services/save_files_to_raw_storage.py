@@ -23,7 +23,7 @@ def save_files_to_raw_storage(config, files_list):
             return folder, bucket_name, app_folder, connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     folder, bucket_name, app_folder, connection_data = get_config(config)
     for file_name in files_list:

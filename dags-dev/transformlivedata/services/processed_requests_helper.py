@@ -45,7 +45,6 @@ def get_unprocessed_requests(config: Dict[str, Any]) -> List[Dict[str, Any]]:
         connection, schema, table = get_config(config)
         query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
         logger.info(f"Fetching unprocessed requests from {schema}.{table}")
-        print(f"Fetching unprocessed requests from {schema}.{table}")
         results = execute_select_query(connection, query)
         if results:
             logger.info(f"Found {len(results)} unprocessed request(s)")

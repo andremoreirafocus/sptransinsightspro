@@ -45,11 +45,9 @@ def load_positions(config: Dict[str, Any], partition_path: str, source_file: str
         object_name = f"{prefix}{source_file}"
     except Exception as e:
         logger.error("Error building object_name: %s", e)
-        raise
+        raise ValueError(f"Error building object_name: {e}")
     if raw_data_compression:
         object_name += compression_extension
-    # print(f"Config: {config}")
-    # print(f"Connection data: {connection_data}")
     logger.info(
         f"Loading position data {object_name} from bucket: {source_bucket}, folder: {app_folder}"
     )
@@ -57,16 +55,13 @@ def load_positions(config: Dict[str, Any], partition_path: str, source_file: str
         data = read_file_from_minio_to_BytesIO(
             connection_data, source_bucket, object_name
         )
-        # print(datastr)
         logger.info("Data is compressed, decompressing...")
         datastr = decompress_data(data.getvalue())
-        # print(f"Decompressed data {datastr}")
         logger.info("Data decompressed successfully.")
     else:
         datastr = read_file_from_minio_to_str(
             connection_data, source_bucket, object_name
         )
     logger.info(f"Loaded {len(datastr)} bytes from {object_name}")
-    # logger.info(data)
     data = json.loads(datastr)
     return data

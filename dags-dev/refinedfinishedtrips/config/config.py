@@ -72,7 +72,7 @@ def get_airflow_config():
         postgres_sslmode = postgres_conn.extra_dejson["sslmode"]
     except Exception as e:
         logging.error("Missing required key in postgres_conn.extra_dejson: %s", e)
-        raise
+        raise ValueError(f"Missing required key in postgres_conn.extra_dejson: {e}")
 
     analysis = refinedfinishedtrips_vars["analysis"]
     storage = refinedfinishedtrips_vars["storage"]

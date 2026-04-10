@@ -19,7 +19,7 @@ def extract_gtfs_files(config):
             return url, login, password, downloads_folder
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     url, login, password, downloads_folder = get_config(config)
     response = requests.get(url, auth=(login, password))

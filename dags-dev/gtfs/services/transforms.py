@@ -12,12 +12,12 @@ logger = logging.getLogger(__name__)
 
 
 def transform_csv_table_to_parquet(config, table_name):
-    print(f"Transforming {table_name}...")
+    logger.info(f"Transforming {table_name}...")
     csv_bytes = load_raw_csv_to_buffer_from_storage(config, table_name)
     parquet_buffer = convert_buffer_from_csv_to_parquet(csv_bytes)
     file_name = f"{table_name}.parquet"
     save_buffer_to_storage(config, file_name, parquet_buffer)
-    print("Transformation successful.")
+    logger.info("Transformation successful.")
 
 
 def transform_routes(config):

@@ -21,7 +21,7 @@ def save_buffer_to_storage(config, file_name, buffer):
             return destination_bucket, app_folder, connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     destination_bucket, app_folder, connection_data = get_config(config)
     logger.info(

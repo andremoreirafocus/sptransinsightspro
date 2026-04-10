@@ -44,7 +44,7 @@ def trigger_dag_for_unprocessed_requests():
             return dag_name, wait_time_seconds
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     dag_name, wait_time_seconds = get_config_values(config)
     time.sleep(wait_time_seconds)

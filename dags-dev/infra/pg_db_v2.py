@@ -41,7 +41,7 @@ def bulk_insert_data_table(connection, sql, data_table):
         if conn:
             conn.rollback()
         logger.error(f"Unexpected error during transformation: {e}")
-        raise
+        raise ValueError(f"Unexpected error during transformation: {e}")
     finally:
         if conn:
             cur.close()
@@ -60,7 +60,7 @@ def fetch_data_from_db_as_df(connection, sql):
         return df
     except Exception as e:
         logger.error(f"Error fetching data to DataFrame: {e}")
-        raise
+        raise ValueError(f"Error fetching data to DataFrame: {e}")
     finally:
         if conn:
             conn.close()
@@ -101,7 +101,7 @@ def save_table_to_db(connection, schema, table_name, columns, buffer):
         if conn:
             cur.close()
             conn.close()
-            print("Database connection closed.")
+            logger.info("Database connection closed.")
 
 
 def execute_sql_command(connection, sqls):

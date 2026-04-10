@@ -29,7 +29,7 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
             return source_bucket, app_folder, connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     source_bucket, app_folder, connection_data = get_config(config)
     logger.info(
@@ -37,7 +37,7 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
     )
     prefix = f"{app_folder}/"
     object_name = f"{prefix}{file_name}/{file_name}.txt"
-    print(f"Reading object: {object_name} from bucket: {source_bucket} ...")
+    logger.info(f"Reading object: {object_name} from bucket: {source_bucket} ...")
     data = read_file_from_minio_to_BytesIO(connection_data, source_bucket, object_name)
     logger.info(f"Loaded {data.getbuffer().nbytes} bytes from {object_name}")
     return data

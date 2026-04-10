@@ -56,7 +56,7 @@ def read_file_from_minio_to_str(connection_data, bucket_name, object_name):
         response.release_conn()
         return content
     except Exception as e:
-        print(f"Error reading JSON from MinIO: {e}")
+        logger.error(f"Error reading JSON from MinIO: {e}")
         return None
 
 
@@ -81,7 +81,7 @@ def read_file_from_minio_to_BytesIO(connection_data, bucket_name, object_name):
         response.release_conn()
         return content
     except Exception as e:
-        print(f"Error reading JSON from MinIO: {e}")
+        logger.error(f"Error reading JSON from MinIO: {e}")
         return None
 
 
@@ -120,4 +120,4 @@ def write_generic_bytes_to_minio(connection_data, buffer, bucket_name, object_na
         length=data_length,
         content_type="application/octet-stream",
     )
-    print(f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'")
+    logger.info(f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'")

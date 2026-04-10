@@ -22,7 +22,7 @@ def create_trip_details_table_and_fill_missing_data(config):
             return bucket_name, app_folder, trip_details, connection
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     con = None
     try:
@@ -103,7 +103,7 @@ def create_trip_details_table_and_fill_missing_data(config):
         logger.info(f"Table successfully exported to s3://{trip_details_table_path}/")
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
-        raise
+        raise ValueError(f"An unexpected error occurred: {e}")
     finally:
         if con:
             con.close()

@@ -16,8 +16,7 @@ def save_dataframe_to_db(config, df, full_table_name):
             return (host, port, dbname, dbuser, password)
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
-
+            raise ValueError(f"Missing required configuration key: {e}")
     (host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     engine = create_engine(db_uri)
@@ -43,7 +42,7 @@ def update_db_table_with_dataframe(config, df, full_table_name):
             return (host, port, dbname, dbuser, password)
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     (host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"

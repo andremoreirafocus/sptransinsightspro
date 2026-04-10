@@ -27,7 +27,7 @@ def get_recent_positions(config):
             return hours_interval, bucket_name, app_folder, positions_table_name, connection
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     (
         hours_interval,
@@ -76,7 +76,7 @@ def get_recent_positions(config):
             logger.info("DuckDB connection closed.")
     except Exception as e:
         logger.error(f"Data retrieval failed: {e}")
-        raise
+        raise ValueError(f"Data retrieval failed: {e}")
     finally:
         if "con" in locals():
             con.close()
