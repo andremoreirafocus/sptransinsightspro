@@ -11,7 +11,8 @@ from transformlivedata.services.processed_requests_helper import (
 from transformlivedata.quality.validate_expectations import (
     validate_expectations,
 )
-from transformlivedata.config.config import get_config
+from pipeline_configurator.config import get_config
+from transformlivedata.config.transformlivedata_config_schema import GeneralConfig
 from transformlivedata.quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
@@ -26,7 +27,8 @@ import logging
 from logging.handlers import RotatingFileHandler
 import uuid
 
-LOG_FILENAME = "transformlivedata.log"
+PIPELINE_NAME = "transformlivedata"
+LOG_FILENAME = f"{PIPELINE_NAME}.log"
 
 # In Airflow just remove this logging configuration block
 logging.basicConfig(
@@ -44,14 +46,25 @@ logger = logging.getLogger(__name__)
 
 def load_transform_save_positions(logical_date_string):
     logical_date_context = build_logical_date_context(logical_date_string)
-    pipeline_config = get_config()
-    general_config = pipeline_config["general"]
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            "minio_conn",
+            "airflow_postgres_conn",
+            load_raw_data_json_schema=True,
+            load_data_expectations=True,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
     execution_id = str(uuid.uuid4())
     logger.info(f"Starting execution {execution_id}")
     logger.info(f"Transforming position for {logical_date_string}...")
     logger.info("=== LOAD STAGE: load_positions ===")
     raw_positions = load_positions(
-        general_config,
+        pipeline_config,
         logical_date_context["partition_path"],
         logical_date_context["source_file"],
     )
@@ -86,7 +99,7 @@ def load_transform_save_positions(logical_date_string):
     valid_postions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
     create_data_quality_report(
-        config=general_config,
+        config=pipeline_config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
         source_file=logical_date_context["source_file"],
@@ -97,7 +110,7 @@ def load_transform_save_positions(logical_date_string):
     )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
-    save_positions_to_storage(general_config, valid_postions_df, "trusted")
+    save_positions_to_storage(pipeline_config, valid_postions_df, "trusted")
     logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
     transform_invalid_df = transform_result.get("invalid_positions")
     invalid_frames = [
@@ -110,11 +123,11 @@ def load_transform_save_positions(logical_date_string):
     )
     if combined_invalid_df is not None and not combined_invalid_df.empty:
         logger.info("Saving invalid positions to quarantine...")
-        save_positions_to_storage(general_config, combined_invalid_df, "quarantined")
+        save_positions_to_storage(pipeline_config, combined_invalid_df, "quarantined")
         logger.info(
             f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
         )
-    mark_request_as_processed(general_config, logical_date_string)
+    mark_request_as_processed(pipeline_config, logical_date_string)
     logger.info(f"Execution {execution_id} completed successfully")
 
 

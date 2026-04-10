@@ -23,15 +23,16 @@ def get_unprocessed_requests(config: Dict[str, Any]) -> List[Dict[str, Any]]:
 
     def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
+        general = config["general"]
+        if "tables" not in general or "raw_events_table_name" not in general["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
-        raw_events_table = config["tables"]["raw_events_table_name"]
+        raw_events_table = general["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
             )
         schema, table = raw_events_table.split(".", 1)
-        db = config["database"]
+        db = config["connections"]["database"]
         connection = {
             "host": db["host"],
             "port": db["port"],
@@ -73,15 +74,16 @@ def mark_request_as_processed(config: Dict[str, Any], logical_date: str) -> bool
 
     def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
+        general = config["general"]
+        if "tables" not in general or "raw_events_table_name" not in general["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
-        raw_events_table = config["tables"]["raw_events_table_name"]
+        raw_events_table = general["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
             )
         schema, table = raw_events_table.split(".", 1)
-        db = config["database"]
+        db = config["connections"]["database"]
         connection = {
             "host": db["host"],
             "port": db["port"],
@@ -135,16 +137,17 @@ def mark_request_as_processed_by_filename(
 
     def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
-        if "tables" not in config or "raw_events_table_name" not in config["tables"]:
+        general = config["general"]
+        if "tables" not in general or "raw_events_table_name" not in general["tables"]:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
-        raw_events_table = config["tables"]["raw_events_table_name"]
+        raw_events_table = general["tables"]["raw_events_table_name"]
         if "." not in raw_events_table:
             raise ValueError(
                 f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
             )
         schema, table = raw_events_table.split(".", 1)
-        db = config["database"]
+        db = config["connections"]["database"]
         connection = {
             "host": db["host"],
             "port": db["port"],

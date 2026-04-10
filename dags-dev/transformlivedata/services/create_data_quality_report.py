@@ -133,10 +133,10 @@ def create_data_quality_report(
 
 def build_quality_report_path(config: Dict[str, Any], batch_ts: Any) -> str:
     def get_config(config: Dict[str, Any]) -> Tuple[str, str]:
-        storage = config["storage"]
-        quality = config["quality"]
+        general = config["general"]
+        storage = general["storage"]
         bucket_name = storage["metadata_bucket"]
-        report_folder = quality["quality_report_folder"]
+        report_folder = storage["quality_report_folder"]
         return bucket_name, report_folder
 
     bucket_name, report_folder = get_config(config)
@@ -152,8 +152,9 @@ def build_quality_report_path(config: Dict[str, Any], batch_ts: Any) -> str:
 
 def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
     def get_config(config: Dict[str, Any]) -> Tuple[str, str, str]:
-        storage = config["storage"]
-        tables = config["tables"]
+        general = config["general"]
+        storage = general["storage"]
+        tables = general["tables"]
         bucket_name = storage["quarantined_bucket"]
         app_folder = storage["app_folder"]
         positions_table_name = tables["positions_table_name"]
@@ -255,15 +256,17 @@ def save_data_quality_report_to_storage(
     config: Dict[str, Any], data_quality_report: Dict[str, Any], batch_ts: Any
 ) -> None:
     def get_config(config: Dict[str, Any]) -> Tuple[str, str, str, Dict[str, Any]]:
-        storage = config["storage"]
-        quality = config["quality"]
+        general = config["general"]
+        connections = config["connections"]
+        storage = general["storage"]
         bucket_name = storage["metadata_bucket"]
-        report_folder = quality["quality_report_folder"]
+        report_folder = storage["quality_report_folder"]
         app_folder = storage["app_folder"]
+        object_storage = connections["object_storage"]
         connection_data = {
-            "minio_endpoint": storage["minio_endpoint"],
-            "access_key": storage["access_key"],
-            "secret_key": storage["secret_key"],
+            "minio_endpoint": object_storage["endpoint"],
+            "access_key": object_storage["access_key"],
+            "secret_key": object_storage["secret_key"],
             "secure": False,
         }
         return bucket_name, report_folder, app_folder, connection_data

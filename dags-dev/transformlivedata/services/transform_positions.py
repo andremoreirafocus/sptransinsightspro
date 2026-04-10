@@ -292,7 +292,7 @@ def transform_positions(
         logger.error("No position data resulted from normalization.")
         raise ValueError("No position data resulted from normalization.")
     logger.info("Preloading trip details from database...")
-    trip_details_df = load_trip_details(config["general"])
+    trip_details_df = load_trip_details(config)
     if trip_details_df is None or trip_details_df.empty:
         logger.error("trip_details_df is empty. Aborting transformation.")
         raise ValueError("trip_details_df is empty. Aborting transformation.")

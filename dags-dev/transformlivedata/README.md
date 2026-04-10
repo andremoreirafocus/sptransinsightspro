@@ -53,7 +53,8 @@ Chaves esperadas em `general`
     "quarantined_bucket": "quarantined",
     "metadata_bucket": "metadata",
     "app_folder": "sptrans",
-    "gtfs_folder": "gtfs"
+    "gtfs_folder": "gtfs",
+    "quality_report_folder": "quality-reports"
   },
   "tables": {
     "positions_table_name": "positions",
@@ -64,9 +65,6 @@ Chaves esperadas em `general`
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
-  "quality": {
-    "quality_report_folder": "quality-reports"
-  }
 }
 ```
 

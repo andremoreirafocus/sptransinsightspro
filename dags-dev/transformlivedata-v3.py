@@ -3,7 +3,7 @@ from transformlivedata.services.transform_positions import transform_positions
 from transformlivedata.services.save_positions_to_storage import (
     save_positions_to_storage,
 )
-from transformlivedata.config import get_config
+from pipeline_configurator.config import get_config
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging

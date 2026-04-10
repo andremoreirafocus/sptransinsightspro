@@ -6,7 +6,7 @@ from transformlivedata.services.save_positions_to_storage import (
 from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
 )
-from transformlivedata.config import get_config
+from pipeline_configurator.config import get_config
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging

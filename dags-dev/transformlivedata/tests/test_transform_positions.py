@@ -577,7 +577,45 @@ def trip_details_valid():
 
 @pytest.fixture
 def config_valid():
-    return {"general": {}, "raw_data_json_schema": {"dummy": True}}
+    return {
+        "general": {
+            "storage": {
+                "raw_bucket": "raw",
+                "trusted_bucket": "trusted",
+                "quarantined_bucket": "quarantined",
+                "metadata_bucket": "metadata",
+                "app_folder": "sptrans",
+                "gtfs_folder": "gtfs",
+                "quality_report_folder": "quality-reports",
+            },
+            "tables": {
+                "positions_table_name": "positions",
+                "trip_details_table_name": "trip_details",
+                "raw_events_table_name": "to_be_processed.raw",
+            },
+            "compression": {
+                "raw_data_compression": True,
+                "raw_data_compression_extension": ".zst",
+            },
+        },
+        "connections": {
+            "object_storage": {
+                "endpoint": "minio:9000",
+                "access_key": "key",
+                "secret_key": "secret",
+            },
+            "database": {
+                "host": "db",
+                "port": 5432,
+                "database": "sptrans_insights",
+                "user": "user",
+                "password": "pass",
+                "sslmode": "prefer",
+            },
+        },
+        "raw_data_json_schema": {"dummy": True},
+        "data_expectations": {},
+    }
 
 
 @pytest.fixture(autouse=True)
