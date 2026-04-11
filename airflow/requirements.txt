@@ -5,3 +5,4 @@ minio==7.2.20
 duckdb==1.4.4
 zstandard==0.25.0
 great-expectations==0.18.14
+pydantic==2.11.4

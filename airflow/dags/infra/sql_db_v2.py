@@ -14,7 +14,7 @@ def save_dataframe_to_db(connection, df, full_table_name):
         password = connection["password"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     engine = create_engine(db_uri)
     schema = full_table_name.split(".")[0]
@@ -37,7 +37,7 @@ def update_db_table_with_dataframe(connection, df, full_table_name):
         password = connection["password"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     schema = full_table_name.split(".")[0]
     table_name = full_table_name.split(".")[1]

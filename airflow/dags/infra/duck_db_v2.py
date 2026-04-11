@@ -12,7 +12,7 @@ def get_duckdb_connection(connection):
         secret_key = connection["secret_key"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
     con = duckdb.connect(database=":memory:")
     con.execute(f"""
         INSTALL httpfs;

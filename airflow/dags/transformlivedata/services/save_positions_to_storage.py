@@ -24,8 +24,10 @@ def save_positions_to_storage(
         config: Dict[str, Any], target_bucket: str
     ) -> Tuple[str, str, str, Dict[str, Any]]:
         try:
-            storage = config["storage"]
-            tables = config["tables"]
+            general = config["general"]
+            connections = config["connections"]
+            storage = general["storage"]
+            tables = general["tables"]
             if target_bucket == "trusted":
                 bucket_name = storage["trusted_bucket"]
             elif target_bucket == "quarantined":
@@ -36,10 +38,11 @@ def save_positions_to_storage(
                 )
             app_folder = storage["app_folder"]
             positions_table_name = tables["positions_table_name"]
+            object_storage = connections["object_storage"]
             connection_data = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return bucket_name, app_folder, positions_table_name, connection_data

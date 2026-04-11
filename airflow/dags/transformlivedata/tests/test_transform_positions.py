@@ -102,15 +102,8 @@ def test_flatten_positions():
             ],
         },
     }
-
     df = pd.DataFrame(raw_positions)
-
-    # Flatten the positions
     df_flat = flatten_raw_positions(df)
-    print(df_flat.head())  # Debug: Check the structure of the flattened DataFrame
-    print(df_flat.columns)  # Debug: Check the structure of the flattened DataFrame
-
-    # Check if the flattened DataFrame has the expected structure
     expected_columns = [
         "p",
         "a",
@@ -130,12 +123,10 @@ def test_flatten_positions():
         assert col in df_flat.columns, (
             f"Column '{col}' is missing in the flattened DataFrame"
         )
-
     expected_rows = sum(len(line["vs"]) for line in raw_positions["payload"]["l"])
     assert len(df_flat) == expected_rows, (
         f"Expected {expected_rows} rows in the flattened DataFrame, but got {len(df_flat)}"
     )
-
     expected_rows_by_vehicle = {
         21300: {
             "c": "2104-10",
@@ -586,7 +577,45 @@ def trip_details_valid():
 
 @pytest.fixture
 def config_valid():
-    return {"general": {}, "raw_data_json_schema": {"dummy": True}}
+    return {
+        "general": {
+            "storage": {
+                "raw_bucket": "raw",
+                "trusted_bucket": "trusted",
+                "quarantined_bucket": "quarantined",
+                "metadata_bucket": "metadata",
+                "app_folder": "sptrans",
+                "gtfs_folder": "gtfs",
+                "quality_report_folder": "quality-reports",
+            },
+            "tables": {
+                "positions_table_name": "positions",
+                "trip_details_table_name": "trip_details",
+                "raw_events_table_name": "to_be_processed.raw",
+            },
+            "compression": {
+                "raw_data_compression": True,
+                "raw_data_compression_extension": ".zst",
+            },
+        },
+        "connections": {
+            "object_storage": {
+                "endpoint": "minio:9000",
+                "access_key": "key",
+                "secret_key": "secret",
+            },
+            "database": {
+                "host": "db",
+                "port": 5432,
+                "database": "sptrans_insights",
+                "user": "user",
+                "password": "pass",
+                "sslmode": "prefer",
+            },
+        },
+        "raw_data_json_schema": {"dummy": True},
+        "data_expectations": {},
+    }
 
 
 @pytest.fixture(autouse=True)

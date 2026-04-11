@@ -11,15 +11,18 @@ def load_trip_details(config: Dict[str, Any]) -> pd.DataFrame:
         config: Dict[str, Any]
     ) -> Tuple[Dict[str, Any], str, str, str]:
         try:
-            storage = config["storage"]
-            tables = config["tables"]
+            general = config["general"]
+            connections = config["connections"]
+            storage = general["storage"]
+            tables = general["tables"]
             bucket_name = storage["trusted_bucket"]
             gtfs_folder = storage["gtfs_folder"]
             trip_details_table_name = tables["trip_details_table_name"]
+            object_storage = connections["object_storage"]
             connection = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return connection, bucket_name, gtfs_folder, trip_details_table_name

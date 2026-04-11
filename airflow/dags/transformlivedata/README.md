@@ -13,7 +13,7 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - valida o resultado transformado com Great Expectations a partir de uma suite configurada externamente em um arquivo JSON
 - cria quarentena para registros inválidos em um bucket com particionamento igual à da camada trusted e enriquecido com o motivo da quarentena de cada registro
 - gera e salva um relatório de qualidade com contagens de registros, métricas de transformação, issues detectadas e resumo de expectativas (sucessos, violações e exceções) em um bucket de metadados
-- inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente a partir do schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
+- inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente com base no schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
 
 
 ## Pré-requisitos
@@ -53,7 +53,8 @@ Chaves esperadas em `general`
     "quarantined_bucket": "quarantined",
     "metadata_bucket": "metadata",
     "app_folder": "sptrans",
-    "gtfs_folder": "gtfs"
+    "gtfs_folder": "gtfs",
+    "quality_report_folder": "quality-reports"
   },
   "tables": {
     "positions_table_name": "positions",
@@ -64,9 +65,6 @@ Chaves esperadas em `general`
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
-  "quality": {
-    "quality_report_folder": "quality-reports"
-  }
 }
 ```
 
@@ -76,6 +74,13 @@ No Airflow, as configurações e credenciais são gerenciadas utilzando-se os re
 - Variable `transformlivedata_raw_data_json_schema` (JSON)
 - Variable `transformlivedata_data_expectations` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
+
+## Testes unitários
+Os testes unitários deste subprojeto estão restritos ao módulo `transform_positions.py` e cobrem o núcleo da lógica de transformação, incluindo:
+- validação de payloads e estrutura mínima dos dados
+- mapeamento e enriquecimento dos campos transformados
+- cálculos e agregações aplicadas às posições dos veículos
+- cenários de erro para dados ausentes ou inválidos
 
 
 ## Instruções para instalação

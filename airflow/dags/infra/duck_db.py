@@ -18,7 +18,7 @@ def get_duckdb_connection(config):
             return connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     connection_data = get_config(config)
     con = duckdb.connect(database=":memory:")
