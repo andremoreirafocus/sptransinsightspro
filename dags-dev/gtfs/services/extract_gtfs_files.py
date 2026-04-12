@@ -12,9 +12,10 @@ def extract_gtfs_files(config):
         try:
             general = config["general"]
             extraction = general["extraction"]
-            url = extraction["gtfs_url"]
-            login = extraction["login"]
-            password = extraction["password"]
+            connection = config["connections"]["http"]
+            url = f"{connection['conn_type']}://{connection['host']}{connection['schema']}"
+            login = connection["login"]
+            password = connection["password"]
             downloads_folder = extraction["local_downloads_folder"]
             return url, login, password, downloads_folder
         except KeyError as e:

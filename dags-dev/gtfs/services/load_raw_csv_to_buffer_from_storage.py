@@ -20,10 +20,11 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
             storage = general["storage"]
             source_bucket = storage["raw_bucket"]
             app_folder = storage["gtfs_folder"]
+            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return source_bucket, app_folder, connection_data

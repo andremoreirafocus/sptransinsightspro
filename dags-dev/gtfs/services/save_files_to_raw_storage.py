@@ -14,10 +14,11 @@ def save_files_to_raw_storage(config, files_list):
             folder = extraction["local_downloads_folder"]
             bucket_name = storage["raw_bucket"]
             app_folder = storage["gtfs_folder"]
+            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return folder, bucket_name, app_folder, connection_data

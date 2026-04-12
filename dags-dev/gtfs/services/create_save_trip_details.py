@@ -13,10 +13,11 @@ def create_trip_details_table_and_fill_missing_data(config):
             bucket_name = storage["trusted_bucket"]
             app_folder = storage["gtfs_folder"]
             trip_details = tables["trip_details_table_name"]
+            object_storage = config["connections"]["object_storage"]
             connection = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return bucket_name, app_folder, trip_details, connection
