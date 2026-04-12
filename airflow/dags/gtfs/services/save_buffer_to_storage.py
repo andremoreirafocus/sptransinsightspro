@@ -12,16 +12,17 @@ def save_buffer_to_storage(config, file_name, buffer):
             storage = general["storage"]
             destination_bucket = storage["trusted_bucket"]
             app_folder = storage["gtfs_folder"]
+            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             return destination_bucket, app_folder, connection_data
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
     destination_bucket, app_folder, connection_data = get_config(config)
     logger.info(

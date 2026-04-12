@@ -5,6 +5,8 @@ from typing import Any, Dict, Optional
 from pipeline_configurator.get_connections import (
     get_database_connection_from_airflow,
     get_database_connection_from_env,
+    get_http_connection_from_airflow,
+    get_http_connection_from_env,
     get_object_storage_connection_from_airflow,
     get_object_storage_connection_from_env,
 )
@@ -14,6 +16,7 @@ def get_config(
     pipeline: str,
     env: Optional[str],
     general_schema: Any,
+    http_conn_name: str,
     object_storage_conn_name: str,
     database_conn_name: str,
     load_raw_data_json_schema: bool = False,
@@ -34,6 +37,7 @@ def get_config(
             pipeline,
             load_raw_data_json_schema=load_raw_data_json_schema,
             load_data_expectations=load_data_expectations,
+            http_conn_name=http_conn_name,
             object_storage_conn_name=object_storage_conn_name,
             database_conn_name=database_conn_name,
             general_schema=general_schema,
@@ -43,6 +47,7 @@ def get_config(
     return _get_local_config(
         pipeline,
         dotenv_values(f"{pipeline}/.env"),
+        http_conn_name=http_conn_name,
         object_storage_conn_name=object_storage_conn_name,
         database_conn_name=database_conn_name,
         load_raw_data_json_schema=load_raw_data_json_schema,
@@ -55,6 +60,7 @@ def _get_airflow_config(
     pipeline: str,
     load_raw_data_json_schema: bool = False,
     load_data_expectations: bool = False,
+    http_conn_name: str = None,
     object_storage_conn_name: str = None,
     database_conn_name: str = None,
     general_schema: Any = None,
@@ -81,6 +87,9 @@ def _get_airflow_config(
         )
         config["data_expectations"] = data_expectations
     connections = {}
+    if http_conn_name is not None:
+        http_connection = get_http_connection_from_airflow(http_conn_name)
+        connections["http"] = http_connection
     if object_storage_conn_name is not None:
         object_storage = get_object_storage_connection_from_airflow(
             object_storage_conn_name
@@ -96,6 +105,7 @@ def _get_airflow_config(
 def _get_local_config(
     pipeline: str,
     env_values: Dict[str, Any],
+    http_conn_name: str = None,
     object_storage_conn_name: str = None,
     database_conn_name: str = None,
     load_raw_data_json_schema: bool = False,
@@ -135,6 +145,9 @@ def _get_local_config(
         config["data_expectations"] = data_expectations
 
     connections = {}
+    if http_conn_name is not None:
+        http_connection = get_http_connection_from_env(env_values)
+        connections["http"] = http_connection
     if object_storage_conn_name is not None:
         object_storage = get_object_storage_connection_from_env(env_values)
         connections["object_storage"] = object_storage
