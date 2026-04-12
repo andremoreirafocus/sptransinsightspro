@@ -9,7 +9,7 @@ def save_trips_to_db(config, trips_table):
     try:
         general = config["general"]
         tables = general["tables"]
-        database = general["database"]
+        database = config["connections"]["database"]
         table_name = tables["finished_trips_table_name"]
         connection = {
             "host": database["host"],

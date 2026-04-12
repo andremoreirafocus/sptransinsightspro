@@ -37,6 +37,7 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
             pipeline_name,
             None,
             GeneralConfig,
+            None,
             "minio_conn",
             "airflow_postgres_conn",
             load_raw_data_json_schema=True,

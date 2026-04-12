@@ -14,7 +14,6 @@ def extract_raw_trips_metadata(records):
         previous_trip_end_index = -1
         first_direction_change = True
         for i in range(1, len(records)):
-            # print(records[i]["veiculo_ts"].astimezone(ZoneInfo("America/Sao_Paulo")))
             previous_index, current_index = i - 1, i
             if (
                 records[current_index]["linha_sentido"]
@@ -36,25 +35,12 @@ def extract_raw_trips_metadata(records):
                 else:
                     trips_metadata.append(discovered_trip)
                     logger.debug(f"Trip added: {discovered_trip}")
-                # start = records[discovered_trip["start_position_index"]]["veiculo_ts"]
-                # end = records[discovered_trip["end_position_index"]]["veiculo_ts"]
-                # print(
-                #     f"Start: {start.astimezone(ZoneInfo('America/Sao_Paulo'))}, End: {end.astimezone(ZoneInfo('America/Sao_Paulo'))}-> Sentido: {discovered_trip['sentido']}"
-                # )
         discovered_trip = {
             "start_position_index": previous_trip_end_index + 1,
             "end_position_index": current_index,
             "sentido": records[current_index]["linha_sentido"],
         }
         logger.debug(f"Discarding last trip: {discovered_trip}")
-
-        # Discarding last trip as it may be incomplete
-        # trips_metadata.append(discovered_trip)
-        # start = records[discovered_trip["start_position_index"]]["veiculo_ts"]
-        # end = records[discovered_trip["end_position_index"]]["veiculo_ts"]
-        # print(
-        #     f"Start: {start.astimezone(ZoneInfo('America/Sao_Paulo'))}, End: {end.astimezone(ZoneInfo('America/Sao_Paulo'))}-> Sentido: {discovered_trip['sentido']}"
-        # )
     return trips_metadata
 
 
@@ -119,5 +105,4 @@ def generate_trips_table(position_records, trips_metadata, linha_lt, veiculo_id)
             average_speed,
         )
         trips.append(trip_record)
-        # print(trip_record)
     return trips

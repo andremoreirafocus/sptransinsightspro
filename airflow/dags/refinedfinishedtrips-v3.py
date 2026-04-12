@@ -5,7 +5,10 @@ from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pand
     extract_trips_for_all_Lines_and_vehicles_pandas as extract_trips_for_all_Lines_and_vehicles,
 )
 
-from refinedfinishedtrips.config.config import get_config
+from pipeline_configurator.config import get_config
+from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
+    GeneralConfig,
+)
 
 import logging
 
@@ -22,13 +25,34 @@ default_args = {
 
 
 # Função que combina todas as etapas do pipeline de ingestão de dados
+PIPELINE_NAME = "refinedfinishedtrips"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logging.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
+
+
 def extract_trips():
-    config = get_config()
-    extract_trips_for_all_Lines_and_vehicles(config)
+    pipeline_config = _load_pipeline_config()
+    extract_trips_for_all_Lines_and_vehicles(pipeline_config)
 
 
 with DAG(
-    "refinefinishedtrips-v2",
+    "refinedfinishedtrips-v3",
     default_args=default_args,
     description="Calculate finished trips for all lines and vehicles",
     schedule_interval="*/5 * * * *",  # Use cron expression for every minute

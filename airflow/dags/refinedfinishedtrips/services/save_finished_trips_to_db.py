@@ -16,7 +16,7 @@ def save_finished_trips_to_db(config, trips_tuples):
         try:
             general = config["general"]
             tables = general["tables"]
-            database = general["database"]
+            database = config["connections"]["database"]
             table_name = tables["finished_trips_table_name"]
             host = database["host"]
             port = database["port"]
@@ -26,20 +26,16 @@ def save_finished_trips_to_db(config, trips_tuples):
             return (table_name, host, port, dbname, dbuser, password)
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
-            raise
+            raise ValueError(f"Missing required configuration key: {e}")
 
-    # 1. Configuration & Engine Setup
     (table_name, host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-    # Pure SQLAlchemy engine
     engine = create_engine(db_uri)
     staging_table = f"{table_name}_stg"
-    print(f"Using staging table: {staging_table} for batch operations.")
+    logger.info(f"Using staging table: {staging_table} for batch operations.")
     try:
-        # 2. Prepare Staging Table
         with engine.begin() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
-            # Clone production schema to staging (fastest way to ensure types match)
             conn.execute(
                 text(f"""
                 CREATE UNLOGGED TABLE {staging_table} 
@@ -47,14 +43,12 @@ def save_finished_trips_to_db(config, trips_tuples):
             """)
             )
             if trips_tuples:
-                # Named parameters are the most robust for bulk execution
                 insert_stmt = text(f"""
                     INSERT INTO {staging_table} (
                         trip_id, vehicle_id, trip_start_time, trip_end_time, 
                         duration, is_circular, average_speed
                     ) VALUES (:t_id, :v_id, :t_start, :t_end, :dur, :circ, :spd)
                 """)
-                # Mapping tuples to keys for the staging insert
                 params = [
                     {
                         "t_id": t[0],
@@ -67,9 +61,7 @@ def save_finished_trips_to_db(config, trips_tuples):
                     }
                     for t in trips_tuples
                 ]
-                # SQLAlchemy automatically detects a list of dicts and performs a batch insert
                 conn.execute(insert_stmt, params)
-        # 3. Atomic Upsert from Staging to Final Table
         with engine.begin() as conn:
             upsert_query = text(f"""
                 INSERT INTO {table_name} (
@@ -86,16 +78,14 @@ def save_finished_trips_to_db(config, trips_tuples):
             execution_result = conn.execute(upsert_query)
             new_rows = execution_result.rowcount
             skipped_rows = len(trips_tuples) - new_rows
-            # Update table stats for PowerBI
             conn.execute(text(f"ANALYZE {table_name};"))
             logger.info(
                 f"Sync complete: {new_rows} new trips added, {skipped_rows} duplicates skipped."
             )
     except Exception as e:
         logger.error(f"Persistence failed: {e}")
-        raise
+        raise ValueError(f"Persistence failed: {e}")
     finally:
-        # 4. Final Cleanup of staging table
         try:
             with engine.begin() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))

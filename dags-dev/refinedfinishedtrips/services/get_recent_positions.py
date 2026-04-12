@@ -1,6 +1,7 @@
 from infra.duck_db_v2 import get_duckdb_connection
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
+
+# from zoneinfo import ZoneInfo
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -18,13 +19,20 @@ def get_recent_positions(config):
             bucket_name = storage["trusted_bucket"]
             app_folder = storage["app_folder"]
             positions_table_name = tables["positions_table_name"]
+            object_storage = config["connections"]["object_storage"]
             connection = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
-            return hours_interval, bucket_name, app_folder, positions_table_name, connection
+            return (
+                hours_interval,
+                bucket_name,
+                app_folder,
+                positions_table_name,
+                connection,
+            )
         except KeyError as e:
             logger.error(f"Missing required configuration key: {e}")
             raise ValueError(f"Missing required configuration key: {e}")

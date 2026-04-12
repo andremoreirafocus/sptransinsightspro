@@ -1,7 +1,10 @@
 from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
     extract_trips_for_all_Lines_and_vehicles_pandas as extract_trips_for_all_Lines_and_vehicles,
 )
-from refinedfinishedtrips.config.config import get_config
+from pipeline_configurator.config import get_config
+from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
+    GeneralConfig,
+)
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -21,11 +24,30 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+PIPELINE_NAME = "refinedfinishedtrips"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 
 def extract_trips():
-    config = get_config()
-    extract_trips_for_all_Lines_and_vehicles(config)
+    pipeline_config = _load_pipeline_config()
+    extract_trips_for_all_Lines_and_vehicles(pipeline_config)
 
 
 def main():

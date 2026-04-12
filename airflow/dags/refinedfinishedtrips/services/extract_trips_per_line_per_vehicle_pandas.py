@@ -15,7 +15,6 @@ def extract_trips_per_line_per_vehicle_pandas(
     try:
         if not positions_list or start_idx > end_idx:
             return
-        # Extract positions for this vehicle using index-based slicing
         position_records = positions_list[start_idx : end_idx + 1]
         if not position_records:
             logger.debug(f"No positions for line {linha_lt} vehicle {veiculo_id}")
@@ -36,5 +35,4 @@ def extract_trips_per_line_per_vehicle_pandas(
         return finished_trips
     except Exception as e:
         logger.error(f"Error processing {linha_lt}/{veiculo_id}: {e}")
-        print(f"Error processing {linha_lt}/{veiculo_id}: {e}")
         raise TypeError(f"Error processing {linha_lt}/{veiculo_id}:")
