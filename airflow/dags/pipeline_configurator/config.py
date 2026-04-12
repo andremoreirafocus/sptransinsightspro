@@ -60,35 +60,31 @@ def _get_airflow_config(
     from airflow.models import Variable
 
     general_vars = Variable.get(f"{pipeline}_general", deserialize_json=True)
-    raw_data_json_schema = (
-        Variable.get(
-            f"{pipeline}_raw_data_json_schema", deserialize_json=True, default_var={}
-        )
-        if load_raw_data_json_schema
-        else {}
-    )
-    data_expectations = (
-        Variable.get(
-            f"{pipeline}_data_expectations", deserialize_json=True, default_var={}
-        )
-        if load_data_expectations
-        else {}
-    )
     _validate_general_input(general_vars, general_schema)
+    config = {
+        "general": general_vars,
+    }
+    if load_raw_data_json_schema:
+        raw_data_json_schema = Variable.get(
+            f"{pipeline}_raw_data_json_schema",
+            deserialize_json=True,
+            default_var={},
+        )
+        config["raw_data_json_schema"] = raw_data_json_schema
+    if load_data_expectations:
+        data_expectations = Variable.get(
+            f"{pipeline}_data_expectations",
+            deserialize_json=True,
+            default_var={},
+        )
+        config["data_expectations"] = data_expectations
     connections = {
         "object_storage": get_object_storage_connection_from_airflow(
             object_storage_conn_name
         ),
         "database": get_database_connection_from_airflow(database_conn_name),
     }
-    config = {
-        "general": general_vars,
-        "connections": connections,
-    }
-    if load_raw_data_json_schema:
-        config["raw_data_json_schema"] = raw_data_json_schema
-    if load_data_expectations:
-        config["data_expectations"] = data_expectations
+    config["connections"] = connections
     return config
 
 
@@ -103,46 +99,47 @@ def _get_local_config(
     general_config_path = os.path.join(
         base_dir, "..", pipeline, "config", f"{pipeline}_general.json"
     )
-    raw_schema_path = os.path.join(
-        base_dir, "..", pipeline, "config", f"{pipeline}_raw_data_json_schema.json"
-    )
-    expectations_path = os.path.join(
-        base_dir, "..", pipeline, "config", f"{pipeline}_data_expectations.json"
-    )
-    with open(general_config_path, "r") as f:
-        general_config = json.load(f).get(f"{pipeline}_general")
-    raw_data_json_schema = (
-        _load_optional_json(raw_schema_path, f"{pipeline}_raw_data_json_schema")
-        if load_raw_data_json_schema
-        else {}
-    )
-    data_expectations = (
-        _load_optional_json(expectations_path, f"{pipeline}_data_expectations")
-        if load_data_expectations
-        else {}
-    )
+    try:
+        with open(general_config_path, "r") as f:
+            general_config = json.load(f).get(f"{pipeline}_general")
+    except FileNotFoundError as e:
+        raise ValueError(
+            f"Failed to load config key {pipeline}_general from file {general_config_path}: {e}"
+        )
     _validate_general_input(general_config, general_schema)
+    config = {
+        "general": general_config,
+    }
+    if load_raw_data_json_schema:
+        raw_schema_path = os.path.join(
+            base_dir, "..", pipeline, "config", f"{pipeline}_raw_data_json_schema.json"
+        )
+        raw_data_json_schema = _load_json(
+            raw_schema_path, f"{pipeline}_raw_data_json_schema"
+        )
+        config["raw_data_json_schema"] = raw_data_json_schema
+    if load_data_expectations:
+        expectations_path = os.path.join(
+            base_dir, "..", pipeline, "config", f"{pipeline}_data_expectations.json"
+        )
+        data_expectations = _load_json(
+            expectations_path, f"{pipeline}_data_expectations"
+        )
+        config["data_expectations"] = data_expectations
     connections = {
         "object_storage": get_object_storage_connection_from_env(env_values),
         "database": get_database_connection_from_env(env_values),
     }
-    config = {
-        "general": general_config,
-        "connections": connections,
-    }
-    if load_raw_data_json_schema:
-        config["raw_data_json_schema"] = raw_data_json_schema
-    if load_data_expectations:
-        config["data_expectations"] = data_expectations
+    config["connections"] = connections
     return config
 
 
-def _load_optional_json(path: str, key: str) -> Dict[str, Any]:
+def _load_json(path: str, key: str) -> Dict[str, Any]:
     try:
         with open(path, "r") as f:
             return json.load(f).get(key, {})
-    except FileNotFoundError:
-        return {}
+    except FileNotFoundError as e:
+        raise ValueError(f"Failed to load config key {key} from file {path}: {e}")
 
 
 def _validate_general_input(
