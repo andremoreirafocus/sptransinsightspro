@@ -43,6 +43,8 @@ def get_config(
     return _get_local_config(
         pipeline,
         dotenv_values(f"{pipeline}/.env"),
+        object_storage_conn_name=object_storage_conn_name,
+        database_conn_name=database_conn_name,
         load_raw_data_json_schema=load_raw_data_json_schema,
         load_data_expectations=load_data_expectations,
         general_schema=general_schema,
@@ -53,8 +55,8 @@ def _get_airflow_config(
     pipeline: str,
     load_raw_data_json_schema: bool = False,
     load_data_expectations: bool = False,
-    object_storage_conn_name: str = "minio_conn",
-    database_conn_name: str = "airflow_postgres_conn",
+    object_storage_conn_name: str = None,
+    database_conn_name: str = None,
     general_schema: Any = None,
 ) -> Dict[str, Any]:
     from airflow.models import Variable
@@ -78,12 +80,15 @@ def _get_airflow_config(
             default_var={},
         )
         config["data_expectations"] = data_expectations
-    connections = {
-        "object_storage": get_object_storage_connection_from_airflow(
+    connections = {}
+    if object_storage_conn_name is not None:
+        object_storage = get_object_storage_connection_from_airflow(
             object_storage_conn_name
-        ),
-        "database": get_database_connection_from_airflow(database_conn_name),
-    }
+        )
+        connections["object_storage"] = object_storage
+    if database_conn_name is not None:
+        database = get_database_connection_from_airflow(database_conn_name)
+        connections["database"] = database
     config["connections"] = connections
     return config
 
@@ -91,6 +96,8 @@ def _get_airflow_config(
 def _get_local_config(
     pipeline: str,
     env_values: Dict[str, Any],
+    object_storage_conn_name: str = None,
+    database_conn_name: str = None,
     load_raw_data_json_schema: bool = False,
     load_data_expectations: bool = False,
     general_schema: Any = None,
@@ -126,10 +133,14 @@ def _get_local_config(
             expectations_path, f"{pipeline}_data_expectations"
         )
         config["data_expectations"] = data_expectations
-    connections = {
-        "object_storage": get_object_storage_connection_from_env(env_values),
-        "database": get_database_connection_from_env(env_values),
-    }
+
+    connections = {}
+    if object_storage_conn_name is not None:
+        object_storage = get_object_storage_connection_from_env(env_values)
+        connections["object_storage"] = object_storage
+    if database_conn_name is not None:
+        database = get_database_connection_from_env(env_values)
+        connections["database"] = database
     config["connections"] = connections
     return config
 
