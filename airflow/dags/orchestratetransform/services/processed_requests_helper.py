@@ -24,7 +24,7 @@ def get_unprocessed_requests(config):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         general = config["general"]
         tables = general["tables"]
-        database = general["database"]
+        database = config["connections"]["database"]
         if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
@@ -88,7 +88,7 @@ def mark_request_as_processed(config, logical_date):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         general = config["general"]
         tables = general["tables"]
-        database = general["database"]
+        database = config["connections"]["database"]
         if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 
@@ -159,7 +159,7 @@ def mark_request_as_processed_by_filename(config, filename):
         """Extract RAW_EVENTS_TABLE_NAME and parse schema and table."""
         general = config["general"]
         tables = general["tables"]
-        database = general["database"]
+        database = config["connections"]["database"]
         if "raw_events_table_name" not in tables:
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
 

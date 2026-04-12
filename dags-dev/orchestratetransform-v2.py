@@ -1,7 +1,10 @@
 from orchestratetransform.services.processed_requests_helper import (
     get_unprocessed_requests,
 )
-from orchestratetransform.config.config import get_config
+from pipeline_configurator.config import get_config
+from orchestratetransform.config.orchestratetransform_config_schema import (
+    GeneralConfig,
+)
 import time
 import logging
 from logging.handlers import RotatingFileHandler
@@ -20,6 +23,25 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+PIPELINE_NAME = "orchestratetransform"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            None,
+            "airflow_postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 
 def run_dag_for_unprocessed_request(logical_date):
@@ -32,7 +54,7 @@ def run_dag_for_unprocessed_request(logical_date):
 
 
 def trigger_dag_for_unprocessed_requests():
-    config = get_config()
+    config = _load_pipeline_config()
 
     # Get configuration values from config (Airflow Variables)
     def get_config_values(config):

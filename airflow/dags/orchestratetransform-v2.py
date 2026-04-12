@@ -9,7 +9,10 @@ from airflow.utils import timezone
 from orchestratetransform.services.processed_requests_helper import (
     get_unprocessed_requests,
 )
-from orchestratetransform.config.config import get_config
+from pipeline_configurator.config import get_config
+from orchestratetransform.config.orchestratetransform_config_schema import (
+    GeneralConfig,
+)
 import uuid
 from datetime import datetime
 from sqlalchemy import and_
@@ -17,6 +20,25 @@ import time
 import logging
 
 logger = logging.getLogger(__name__)
+PIPELINE_NAME = "orchestratetransform"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            None,
+            "airflow_postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 # Definindo os argumentos padrão para as tarefas do DAG
 default_args = {
@@ -123,7 +145,7 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
 
 
 def trigger_dag_for_unprocessed_requests():
-    config = get_config()
+    config = _load_pipeline_config()
 
     def get_config_values(config):
         try:
