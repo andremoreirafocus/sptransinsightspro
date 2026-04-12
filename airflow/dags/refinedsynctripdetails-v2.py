@@ -10,7 +10,10 @@ from refinedsynctripdetails.services.load_trip_details_from_storage_to_dataframe
 from refinedsynctripdetails.services.save_trip_details_from_dataframe_to_refined import (
     save_trip_details_from_dataframe_to_refined,
 )
-from refinedsynctripdetails.config.config import get_config
+from pipeline_configurator.config import get_config
+from refinedsynctripdetails.config.refinedsynctripdetails_config_schema import (
+    GeneralConfig,
+)
 from datetime import timedelta
 # import logging
 
@@ -27,10 +30,30 @@ default_args = {
 }
 
 
+PIPELINE_NAME = "refinedsynctripdetails"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
+
+
 def refined_sync_trip_details():
-    config = get_config()
-    df_trip_details = load_trip_details_from_storage_to_dataframe(config)
-    save_trip_details_from_dataframe_to_refined(config, df_trip_details)
+    pipeline_config = _load_pipeline_config()
+    df_trip_details = load_trip_details_from_storage_to_dataframe(pipeline_config)
+    save_trip_details_from_dataframe_to_refined(pipeline_config, df_trip_details)
 
 
 with DAG(

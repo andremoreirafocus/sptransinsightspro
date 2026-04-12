@@ -8,7 +8,7 @@ def save_trip_details_from_dataframe_to_refined(config, df_trip_details):
     def get_config(config):
         try:
             tables = config["general"]["tables"]
-            database = config["general"]["database"]
+            database = config["connections"]["database"]
             trip_details_table_name = tables["trip_details_table_name"]
             connection = {
                 "host": database["host"],

@@ -4,7 +4,10 @@ from refinedsynctripdetails.services.load_trip_details_from_storage_to_dataframe
 from refinedsynctripdetails.services.save_trip_details_from_dataframe_to_refined import (
     save_trip_details_from_dataframe_to_refined,
 )
-from refinedsynctripdetails.config.config import get_config
+from pipeline_configurator.config import get_config
+from refinedsynctripdetails.config.refinedsynctripdetails_config_schema import (
+    GeneralConfig,
+)
 import logging
 from logging.handlers import RotatingFileHandler
 
@@ -22,6 +25,25 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+PIPELINE_NAME = "refinedsynctripdetails"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 
 def refined_sync_trip_details(config):
@@ -31,8 +53,8 @@ def refined_sync_trip_details(config):
 
 
 def main():
-    config = get_config()
-    refined_sync_trip_details(config)
+    pipeline_config = _load_pipeline_config()
+    refined_sync_trip_details(pipeline_config)
 
 
 if __name__ == "__main__":
