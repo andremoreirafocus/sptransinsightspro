@@ -4,7 +4,10 @@ from airflow.utils.dates import days_ago
 from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
-from updatelatestpositions.config.config import get_config
+from pipeline_configurator.config import get_config
+from updatelatestpositions.config.updatelatestpositions_config_schema import (
+    GeneralConfig,
+)
 
 # Definindo os argumentos padrão para as tarefas do DAG
 default_args = {
@@ -19,8 +22,20 @@ default_args = {
 
 
 def update_latest_positions_table():
-    config = get_config()
-    create_latest_positions_table(config)
+    try:
+        pipeline_config = get_config(
+            "updatelatestpositions",
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    create_latest_positions_table(pipeline_config)
 
 
 # Criando o DAG

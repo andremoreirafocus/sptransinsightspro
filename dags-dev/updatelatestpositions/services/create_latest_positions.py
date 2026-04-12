@@ -12,14 +12,14 @@ def create_latest_positions_table(config):
     def get_config(config):
         try:
             general = config["general"]
-            storage = general["storage"]
             tables = general["tables"]
-            database = general["database"]
+            database = config["connections"]["database"]
             latest_positions_table_name = tables["latest_positions_table_name"]
+            object_storage = config["connections"]["object_storage"]
             storage_connection = {
-                "minio_endpoint": storage["minio_endpoint"],
-                "access_key": storage["access_key"],
-                "secret_key": storage["secret_key"],
+                "minio_endpoint": object_storage["endpoint"],
+                "access_key": object_storage["access_key"],
+                "secret_key": object_storage["secret_key"],
                 "secure": False,
             }
             database_connection = {
@@ -40,9 +40,7 @@ def create_latest_positions_table(config):
     try:
         latest_path_for_query = get_latest_path_for_query(config)
         if not latest_path_for_query:
-            logger.error(
-                "No recent data found in the last 2 hours. Scan aborted."
-            )
+            logger.error("No recent data found in the last 2 hours. Scan aborted.")
             return
         logger.info(f"Discovery successful: {latest_path_for_query}")
         con = get_duckdb_connection(storage_connection)

@@ -1,7 +1,10 @@
 from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
-from updatelatestpositions.config.config import get_config
+from pipeline_configurator.config import get_config
+from updatelatestpositions.config.updatelatestpositions_config_schema import (
+    GeneralConfig,
+)
 
 import logging
 from logging.handlers import RotatingFileHandler
@@ -20,11 +23,30 @@ logging.basicConfig(
 )
 
 logger = logging.getLogger(__name__)
+PIPELINE_NAME = "updatelatestpositions"
+
+
+def _load_pipeline_config():
+    try:
+        pipeline_config = get_config(
+            PIPELINE_NAME,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+            load_raw_data_json_schema=False,
+            load_data_expectations=False,
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 
 def update_latest_positions_table():
-    config = get_config()
-    create_latest_positions_table(config)
+    pipeline_config = _load_pipeline_config()
+    create_latest_positions_table(pipeline_config)
 
 
 def main():
