@@ -2,7 +2,7 @@
 Fazer a transformação dos dados extraídos de posição dos ôibus da API da SPTrans, já disponibilizados na camada raw pelo microserviço extractloadlivedata, enriquecendo-os com os dados obtidos do GTFS da SPTrans, extraidos e transformados pelo processo gtfs.
 A implementação final é feita via a DAG transformlivedata do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
-As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
+As configurações são carregadas de forma automática via `pipeline_configurator`, de acordo com o ambiente de execução, seja produção (Airflow) ou desenvolvimento local.
 
 
 ## O que este subprojeto faz
@@ -22,15 +22,16 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 3 seções:
+As configurações são centralizadas no módulo `pipeline_configurator` e expostas como um objeto canônico com:
 - `general`
-- `raw_data_json_schema`
-- `data_expectations`
+- `connections`
+- `raw_data_json_schema` (opcional)
+- `data_expectations` (opcional)
 
 ### Local/dev
-- `general` vem do arquivo `dags-dev/transformlivedata/config/general_config.json`
-- `raw_data_json_schema` vem de `dags-dev/transformlivedata/config/raw_data_schema_config.json`
-- `data_expectations` vem de `dags-dev/transformlivedata/config/transformed_data_expectations.json`
+- `general` vem do arquivo `dags-dev/transformlivedata/config/transformlivedata_general.json`
+- `raw_data_json_schema` vem de `dags-dev/transformlivedata/config/transformlivedata_raw_data_json_schema.json`
+- `data_expectations` vem de `dags-dev/transformlivedata/config/transformlivedata_data_expectations.json`
 - `.env` em `dags-dev/transformlivedata/.env` é usado apenas para credenciais de conexão
 
 Credenciais esperadas no `.env`:

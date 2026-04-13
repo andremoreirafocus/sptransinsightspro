@@ -2,7 +2,7 @@
 Checar quais arquivos de posições de ônibus extraídos da API da SPTrans já foram disponibilizados na camada raw pelo microserviço extractloadlivedata mas ainda não foram procesadors pela DAG transformlivedata.
 A implementação final é feita via a DAG orchestratetransform do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
-As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
+As configurações são carregadas de forma automática via `pipeline_configurator`, de acordo com o ambiente de execução, seja produção (Airflow) ou desenvolvimento local.
 
 
 ## O que este subprojeto faz
@@ -14,11 +14,12 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+As configurações são centralizadas no módulo `pipeline_configurator` e expostas como um objeto canônico com:
 - `general`
+- `connections`
 
 ### Local/dev
-- `general` vem do arquivo `dags-dev/orchestratetransform/config/orchestratetransform.json`
+- `general` vem do arquivo `dags-dev/orchestratetransform/config/orchestratetransform_general.json`
 - `.env` em `dags-dev/orchestratetransform/.env` é usado apenas para credenciais de conexão
 
 Credenciais esperadas no `.env`:

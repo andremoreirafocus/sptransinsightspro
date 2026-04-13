@@ -65,6 +65,23 @@ Para iniciar o projeto:
  Jupyter:
  http://localhost:8888/
 
+## Configuração unificada de pipelines
+Para padronizar a configuração entre pipelines e ambientes, o projeto utiliza o módulo `pipeline_configurator` (em `dags-dev/pipeline_configurator` e promovido para `airflow/dags/pipeline_configurator`).  
+Ele fornece um único ponto de entrada para carregar configurações e conexões, com validação estruturada via schemas Pydantic específicos para cada pipeline.
+
+Padrão de saída (contrato canônico):
+- `general`: parâmetros funcionais da pipeline (ex.: buckets, tabelas, pastas, janelas de análise)
+- `connections`: credenciais e endpoints (ex.: `object_storage`, `database`, `http`)
+- `raw_data_json_schema`: schema de validação do formato dos dados JSON provenientes da ingestão de dados da API, quando aplicável 
+- `data_expectations`: suite de expectations para checagem de qualidade do pipeline, quando aplicável 
+
+O módulo resolve automaticamente o ambiente de execução:
+- **Local/dev**: carrega arquivos JSON de configuração e `.env` locais
+- **Airflow**: usa Variables e Connections do Airflow
+
+Esse padrão reduz acoplamento entre serviços e garante consistência entre todos os pipelines.
+![Para mais informações:](./dags-dev/pipeline_configurator/README.md)
+
 
 ## Ciclo de Desenvolvimento e Deployment
 
@@ -96,5 +113,4 @@ Este script realiza o build da imagem Docker e reinicia o container através do 
 
 
  
-
 

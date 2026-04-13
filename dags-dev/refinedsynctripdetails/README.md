@@ -2,7 +2,7 @@
 Sincronizar a tabela de detalhes de viagem gerada na camada trusted a partir da extração de dados do GFTS da SPTRANS com a camada refined para servir à camada de visualização.
 A implementação final é feita via a DAG refinedsynctripdetails do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
-As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
+As configurações são carregadas de forma automática via `pipeline_configurator`, de acordo com o ambiente de execução, seja produção (Airflow) ou desenvolvimento local.
 
 ## O que este subprojeto faz
 - Lê da camada trusted a tabela de detalhes de viagem gerada a partir da extração de dados do GFTS da SPTRANS.
@@ -17,11 +17,12 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+As configurações são centralizadas no módulo `pipeline_configurator` e expostas como um objeto canônico com:
 - `general`
+- `connections`
 
 ### Local/dev
-- `general` vem do arquivo `dags-dev/refinedsynctripdetails/config/refinedsynctripdetails.json`
+- `general` vem do arquivo `dags-dev/refinedsynctripdetails/config/refinedsynctripdetails_general.json`
 - `.env` em `dags-dev/refinedsynctripdetails/.env` é usado apenas para credenciais de conexão
 
 Credenciais esperadas no `.env`:

@@ -2,7 +2,7 @@
 Disponibilizar as posições instantâneas mais recentes dos ônibus na camada refined para consumo pelo dashboard.
 A implementação final é feita via a DAG updatelatestpositions do Airflow.
 O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojetos implementados via Airflow, aumentando a agilidade durante a experimentação.
-As configurações são carregadas de forma automática - via arquivo config.py - de acordo com o ambiente de execução, seja produção, via Airflow, ou desenvolvimento, local.
+As configurações são carregadas de forma automática via `pipeline_configurator`, de acordo com o ambiente de execução, seja produção (Airflow) ou desenvolvimento local.
 
 ## O que este subprojeto faz
 - lê as masis recentes posições instantâneas armazenadas na tabela de posições armazendas sptrans no bucket da camada trusted no serviço de object storage
@@ -15,11 +15,12 @@ As configurações são carregadas de forma automática - via arquivo config.py 
 - Criação do arquivo de configurações
 
 ## Configurações
-As configurações são centralizadas em `config/config.py` e expostas como um único objeto com 1 seção:
+As configurações são centralizadas no módulo `pipeline_configurator` e expostas como um objeto canônico com:
 - `general`
+- `connections`
 
 ### Local/dev
-- `general` vem do arquivo `dags-dev/updatelatestpositions/config/updatelatestpositions.json`
+- `general` vem do arquivo `dags-dev/updatelatestpositions/config/updatelatestpositions_general.json`
 - `.env` em `dags-dev/updatelatestpositions/.env` é usado apenas para credenciais de conexão
 
 Credenciais esperadas no `.env`:
