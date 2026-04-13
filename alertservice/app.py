@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
+from logging.handlers import RotatingFileHandler
 import os
 import smtplib
 import sqlite3
@@ -14,8 +16,19 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+LOG_FILENAME = "alertservice.log"
+
+logging.basicConfig(
+    level=logging.DEBUG,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[
+        RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
+        logging.StreamHandler(sys.stdout),
+    ],
+    force=True,
+)
 logger = logging.getLogger("alertservice")
-logging.basicConfig(level=logging.INFO)
+logger.setLevel(logging.DEBUG)
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.path.join(APP_DIR, "storage", "alerts.db")
@@ -116,6 +129,14 @@ def _send_email(subject: str, body: str) -> None:
     if not smtp_host or not email_from or not email_to:
         raise RuntimeError("SMTP_HOST, EMAIL_FROM, and EMAIL_TO must be set")
 
+    logger.debug(
+        "SMTP config: host=%s port=%s user_set=%s tls=%s",
+        smtp_host,
+        smtp_port,
+        bool(smtp_user),
+        use_tls,
+    )
+
     msg = EmailMessage()
     msg["From"] = email_from
     msg["To"] = email_to
@@ -123,6 +144,7 @@ def _send_email(subject: str, body: str) -> None:
     msg.set_content(body)
 
     with smtplib.SMTP(smtp_host, smtp_port) as server:
+        server.set_debuglevel(1)
         if use_tls:
             server.starttls()
         if smtp_user and smtp_password:
@@ -203,35 +225,64 @@ def _evaluate_cumulative_warn(pipeline: str, config: Dict[str, Any]) -> bool:
 def on_startup() -> None:
     if os.path.exists(ENV_PATH):
         load_dotenv(ENV_PATH)
+    logger.info("Alertservice starting up")
+    required_env = ["SMTP_HOST", "EMAIL_FROM", "EMAIL_TO"]
+    missing = [key for key in required_env if not os.getenv(key)]
+    if missing:
+        msg = f"Missing required env keys: {', '.join(missing)}"
+        logger.error(msg)
+        raise RuntimeError(msg)
     _init_db()
+
+
+@app.on_event("shutdown")
+def on_shutdown() -> None:
+    logger.info("Alertservice stopped by user")
 
 
 @app.post("/notify")
 def notify(payload: NotificationPayload) -> Dict[str, Any]:
-    summary = payload.summary or {}
-    if not summary:
-        raise HTTPException(status_code=400, detail="summary is required")
+    try:
+        summary = payload.summary or {}
+        if not summary:
+            raise HTTPException(status_code=400, detail="summary is required")
 
-    pipeline = summary.get("pipeline", "unknown")
-    status = summary.get("status", "WARN")
+        pipeline = summary.get("pipeline", "unknown")
+        status = summary.get("status", "WARN")
+        logger.info("Received notification: pipeline=%s status=%s", pipeline, status)
+        if status == "FAIL":
+            logger.info(
+                "Received summary payload:\\n%s",
+                json.dumps(summary, ensure_ascii=False, indent=2, default=str),
+            )
+        else:
+            logger.debug(
+                "Received summary payload:\\n%s",
+                json.dumps(summary, ensure_ascii=False, indent=2, default=str),
+            )
 
-    _store_summary(summary)
+        _store_summary(summary)
 
-    config = _load_config()
-    notify_on_fail = config.get(pipeline, {}).get("notify_on_fail", True)
-    notify_on_warn = config.get(pipeline, {}).get("notify_on_warn", True)
+        config = _load_config()
+        notify_on_fail = config.get(pipeline, {}).get("notify_on_fail", True)
+        notify_on_warn = config.get(pipeline, {}).get("notify_on_warn", True)
 
-    subject_prefix = os.getenv("EMAIL_SUBJECT_PREFIX", "[DQ]")
-    subject = f"{subject_prefix} {pipeline} - {status}"
-    body = _format_summary(summary)
+        subject_prefix = os.getenv("EMAIL_SUBJECT_PREFIX", "[DQ]")
+        subject = f"{subject_prefix} {pipeline} - {status}"
+        body = _format_summary(summary)
 
-    if status == "FAIL" and notify_on_fail:
-        _send_email(subject, body)
-        return {"status": "sent", "reason": "fail"}
-
-    if status == "WARN" and notify_on_warn:
-        if _evaluate_cumulative_warn(pipeline, config):
+        if status == "FAIL" and notify_on_fail:
             _send_email(subject, body)
-            return {"status": "sent", "reason": "cumulative_warn"}
+            return {"status": "sent", "reason": "fail"}
 
-    return {"status": "stored"}
+        if status == "WARN" and notify_on_warn:
+            if _evaluate_cumulative_warn(pipeline, config):
+                _send_email(subject, body)
+                return {"status": "sent", "reason": "cumulative_warn"}
+
+        return {"status": "stored"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Notification processing failed: %s", e)
+        raise HTTPException(status_code=500, detail="notification processing failed")

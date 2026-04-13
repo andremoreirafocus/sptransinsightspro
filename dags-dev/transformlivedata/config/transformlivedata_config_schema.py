@@ -27,11 +27,17 @@ class CompressionConfig(BaseModel):
     raw_data_compression_extension: str
 
 
+class NotificationsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    webhook_url: str
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     storage: StorageConfig
     tables: TablesConfig
     compression: CompressionConfig
+    notifications: NotificationsConfig
 
 
 class ObjectStorageConnection(BaseModel):

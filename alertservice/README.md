@@ -48,6 +48,9 @@ transformlivedata:
 - `EMAIL_TO` (lista separada por vírgula)
 - `EMAIL_SUBJECT_PREFIX` (opcional)
 
+Observação: `SMTP_HOST`, `EMAIL_FROM` e `EMAIL_TO` são obrigatórios.  
+Se estiverem ausentes, o serviço falha no startup.
+
 ### Como executar
 #### Docker
 ```bash
@@ -72,3 +75,4 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 - Eventos são armazenados em SQLite (`alertservice/storage/alerts.db`).
 - `FAIL` envia alerta imediato.
 - `WARN` envia alerta apenas se regras cumulativas forem atingidas.
+- Logs são gravados em `alertservice.log` (rotacionado) e também enviados ao stdout.

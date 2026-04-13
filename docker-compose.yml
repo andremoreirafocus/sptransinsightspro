@@ -121,6 +121,20 @@ services:
     networks:
       - rede_fia
 
+  alertservice:
+    build:
+      context: ./alertservice
+      dockerfile: Dockerfile
+    container_name: alertservice
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./alertservice/.env:/app/.env
+      - alertservice_data:/app/storage
+    networks:
+      - rede_fia
+    restart: always
+
 networks:
   rede_fia:
     driver: bridge
@@ -132,3 +146,4 @@ volumes:
   ingest_buffer: {}
   diskcache_pending_invocations: {}
   diskcache_pending_processing_requests: {}
+  alertservice_data: {}

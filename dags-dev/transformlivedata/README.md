@@ -122,8 +122,14 @@ Chaves esperadas em `general`
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
+  "notifications": {
+    "webhook_url": "http://localhost:8000/notify"
+  }
 }
 ```
+
+Observação: `webhook_url` é obrigatório.  
+Para desativar notificações, use o valor `"disabled"`.
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.

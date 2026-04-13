@@ -23,6 +23,7 @@ from transformlivedata.services.create_data_quality_report import (
 from transformlivedata.services.build_logical_date_context import (
     build_logical_date_context,
 )
+from infra.notifications import send_webhook
 import pandas as pd
 import logging
 import uuid
@@ -57,7 +58,7 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
 
     def write_failure_report(phase: str, message: str) -> None:
         try:
-            create_failure_quality_report(
+            failure_report = create_failure_quality_report(
                 config=pipeline_config,
                 execution_id=execution_id,
                 logical_date_utc=logical_date_string,
@@ -74,6 +75,16 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
                 quarantine_save_status=quarantine_save_status,
                 quarantine_save_error=quarantine_save_error,
             )
+            summary = failure_report.get("summary", {})
+            webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
+            if webhook_url.strip().lower() in {"disabled", "none", "null"}:
+                logger.info("Webhook notification disabled (failure path)")
+            else:
+                try:
+                    send_webhook(summary, webhook_url)
+                    logger.info("Webhook notification sent (failure path)")
+                except Exception as e:
+                    logger.error("Webhook notification failed: %s", e)
         except Exception as e:
             logger.error("Failed to write quality report on failure: %s", e)
 
@@ -181,7 +192,7 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
         logger.error(error_msg)
         write_failure_report("mark_processed", error_msg)
         raise
-    create_data_quality_report(
+    report = create_data_quality_report(
         config=pipeline_config,
         execution_id=execution_id,
         logical_date_utc=logical_date_string,
@@ -193,4 +204,14 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
+    summary = report.get("summary", {})
+    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
+    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
+        logger.info("Webhook notification disabled (success path)")
+    else:
+        try:
+            send_webhook(summary, webhook_url)
+            logger.info("Webhook notification sent (success path)")
+        except Exception as e:
+            logger.error("Webhook notification failed: %s", e)
     logger.info(f"Execution {execution_id} completed successfully")
