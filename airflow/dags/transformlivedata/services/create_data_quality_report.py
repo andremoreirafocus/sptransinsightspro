@@ -2,7 +2,7 @@ from typing import Any, Dict, Tuple
 import json
 import logging
 from datetime import datetime
-from infra.minio_functions import write_generic_bytes_to_minio
+from infra.object_storage import write_generic_bytes_to_object_storage
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -262,11 +262,8 @@ def save_data_quality_report_to_storage(
         bucket_name = storage["metadata_bucket"]
         report_folder = storage["quality_report_folder"]
         app_folder = storage["app_folder"]
-        object_storage = connections["object_storage"]
         connection_data = {
-            "minio_endpoint": object_storage["endpoint"],
-            "access_key": object_storage["access_key"],
-            "secret_key": object_storage["secret_key"],
+            **connections["object_storage"],
             "secure": False,
         }
         return bucket_name, report_folder, app_folder, connection_data
@@ -282,7 +279,7 @@ def save_data_quality_report_to_storage(
         f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
     )
     object_name = f"{prefix}quality-report-positions_{hhmm}.json"
-    write_generic_bytes_to_minio(
+    write_generic_bytes_to_object_storage(
         connection_data,
         buffer=data_quality_report_to_json(data_quality_report).encode("utf-8"),
         bucket_name=bucket_name,

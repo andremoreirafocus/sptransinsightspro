@@ -44,12 +44,15 @@ def list_objects_in_object_storage_bucket(
         raise
 
 
-def read_file_from_object_storage(connection, bucket_name, object_name, client=None):
+
+def read_file_from_object_storage_to_str(
+    connection, bucket_name, object_name, client=None
+):
     """
     Reads a file from object storage and returns its contents as a string.
     :param connection: Object storage connection data
     :param bucket_name: Object storage bucket name
-    :param object_name: Object name for the JSON file in object storage
+    :param object_name: Object name for the file in object storage
     :return: file content as a string
     """
     try:
@@ -60,7 +63,7 @@ def read_file_from_object_storage(connection, bucket_name, object_name, client=N
         response.release_conn()
         return content
     except Exception as e:
-        logger.error(f"Error reading JSON from {bucket_name}/{object_name}: {e}")
+        logger.error(f"Error reading file from {bucket_name}/{object_name}: {e}")
         raise
 
 

@@ -1,6 +1,6 @@
-from infra.minio_functions import (
-    read_file_from_minio_to_str,
-    read_file_from_minio_to_BytesIO,
+from infra.object_storage import (
+    read_file_from_object_storage_to_str,
+    read_file_from_object_storage_to_bytesio,
 )
 from infra.compression import decompress_data
 import json
@@ -25,11 +25,8 @@ def load_positions(
         app_folder = storage["app_folder"]
         raw_data_compression = bool(compression["raw_data_compression"])
         compression_extension = compression["raw_data_compression_extension"]
-        object_storage = connections["object_storage"]
         connection_data = {
-            "minio_endpoint": object_storage["endpoint"],
-            "access_key": object_storage["access_key"],
-            "secret_key": object_storage["secret_key"],
+            **connections["object_storage"],
             "secure": False,
         }
         return (
@@ -59,14 +56,14 @@ def load_positions(
         f"Loading position data {object_name} from bucket: {source_bucket}, folder: {app_folder}"
     )
     if raw_data_compression:
-        data = read_file_from_minio_to_BytesIO(
+        data = read_file_from_object_storage_to_bytesio(
             connection_data, source_bucket, object_name
         )
         logger.info("Data is compressed, decompressing...")
         datastr = decompress_data(data.getvalue())
         logger.info("Data decompressed successfully.")
     else:
-        datastr = read_file_from_minio_to_str(
+        datastr = read_file_from_object_storage_to_str(
             connection_data, source_bucket, object_name
         )
     logger.info(f"Loaded {len(datastr)} bytes from {object_name}")

@@ -1,4 +1,4 @@
-from infra.duck_db_v2 import get_duckdb_connection
+from infra.duck_db_v3 import get_duckdb_connection
 import logging
 from typing import Any, Dict, Tuple
 import pandas as pd
@@ -18,11 +18,8 @@ def load_trip_details(config: Dict[str, Any]) -> pd.DataFrame:
             bucket_name = storage["trusted_bucket"]
             gtfs_folder = storage["gtfs_folder"]
             trip_details_table_name = tables["trip_details_table_name"]
-            object_storage = connections["object_storage"]
             connection = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **connections["object_storage"],
                 "secure": False,
             }
             return connection, bucket_name, gtfs_folder, trip_details_table_name

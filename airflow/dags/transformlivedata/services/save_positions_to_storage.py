@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 from typing import Any, Dict, Optional, Tuple
-from infra.duck_db_v2 import get_duckdb_connection
+from infra.duck_db_v3 import get_duckdb_connection
 
 logger = logging.getLogger(__name__)
 
@@ -38,11 +38,8 @@ def save_positions_to_storage(
                 )
             app_folder = storage["app_folder"]
             positions_table_name = tables["positions_table_name"]
-            object_storage = connections["object_storage"]
             connection_data = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **connections["object_storage"],
                 "secure": False,
             }
             return bucket_name, app_folder, positions_table_name, connection_data
