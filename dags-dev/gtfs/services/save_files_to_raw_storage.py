@@ -1,4 +1,4 @@
-from infra.minio_functions import write_generic_bytes_to_minio
+from infra.object_storage import write_generic_bytes_to_object_storage
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -14,11 +14,8 @@ def save_files_to_raw_storage(config, files_list):
             folder = extraction["local_downloads_folder"]
             bucket_name = storage["raw_bucket"]
             app_folder = storage["gtfs_folder"]
-            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return folder, bucket_name, app_folder, connection_data
@@ -38,7 +35,7 @@ def save_files_to_raw_storage(config, files_list):
         logger.info(
             f"Writing file: {local_file_path} to {bucket_name}/{destination_object_name}..."
         )
-        write_generic_bytes_to_minio(
+        write_generic_bytes_to_object_storage(
             connection_data,
             buffer=data,
             bucket_name=bucket_name,

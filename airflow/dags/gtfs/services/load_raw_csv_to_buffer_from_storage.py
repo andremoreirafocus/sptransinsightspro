@@ -1,4 +1,4 @@
-from infra.minio_functions import read_file_from_minio_to_BytesIO
+from infra.object_storage import read_file_from_object_storage_to_bytesio
 
 import logging
 
@@ -20,11 +20,8 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
             storage = general["storage"]
             source_bucket = storage["raw_bucket"]
             app_folder = storage["gtfs_folder"]
-            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return source_bucket, app_folder, connection_data
@@ -39,6 +36,8 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
     prefix = f"{app_folder}/"
     object_name = f"{prefix}{file_name}/{file_name}.txt"
     logger.info(f"Reading object: {object_name} from bucket: {source_bucket} ...")
-    data = read_file_from_minio_to_BytesIO(connection_data, source_bucket, object_name)
+    data = read_file_from_object_storage_to_bytesio(
+        connection_data, source_bucket, object_name
+    )
     logger.info(f"Loaded {data.getbuffer().nbytes} bytes from {object_name}")
     return data

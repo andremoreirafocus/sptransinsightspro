@@ -64,6 +64,28 @@ def read_file_from_object_storage(connection, bucket_name, object_name, client=N
         raise
 
 
+def read_file_from_object_storage_to_bytesio(
+    connection, bucket_name, object_name, client=None
+):
+    """
+    Reads a file from object storage and returns its contents as a BytesIO buffer.
+    :param connection: Object storage connection data
+    :param bucket_name: Object storage bucket name
+    :param object_name: Object name for the file in object storage
+    :return: file content as io.BytesIO
+    """
+    try:
+        client = _get_object_storage_client(connection, client)
+        response = client.get_object(bucket_name, object_name)
+        content = io.BytesIO(response.read())
+        response.close()
+        response.release_conn()
+        return content
+    except Exception as e:
+        logger.error(f"Error reading bytes from {bucket_name}/{object_name}: {e}")
+        raise
+
+
 def write_generic_bytes_to_object_storage(
     connection, buffer, bucket_name, object_name, client=None
 ):

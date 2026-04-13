@@ -1,4 +1,4 @@
-from infra.duck_db_v2 import get_duckdb_connection
+from infra.duck_db_v3 import get_duckdb_connection
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,11 +13,8 @@ def create_trip_details_table_and_fill_missing_data(config):
             bucket_name = storage["trusted_bucket"]
             app_folder = storage["gtfs_folder"]
             trip_details = tables["trip_details_table_name"]
-            object_storage = config["connections"]["object_storage"]
             connection = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return bucket_name, app_folder, trip_details, connection

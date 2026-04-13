@@ -1,4 +1,4 @@
-from infra.minio_functions import write_generic_bytes_to_minio
+from infra.object_storage import write_generic_bytes_to_object_storage
 import logging
 
 # This logger inherits the configuration from the root logger in main.py
@@ -12,11 +12,8 @@ def save_buffer_to_storage(config, file_name, buffer):
             storage = general["storage"]
             destination_bucket = storage["trusted_bucket"]
             app_folder = storage["gtfs_folder"]
-            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return destination_bucket, app_folder, connection_data
@@ -31,7 +28,7 @@ def save_buffer_to_storage(config, file_name, buffer):
     prefix = f"{app_folder}/{file_name.split('.')[0]}"
     destination_object_name = f"{prefix}/{file_name}"
     try:
-        write_generic_bytes_to_minio(
+        write_generic_bytes_to_object_storage(
             connection_data,
             buffer=buffer,
             bucket_name=destination_bucket,
