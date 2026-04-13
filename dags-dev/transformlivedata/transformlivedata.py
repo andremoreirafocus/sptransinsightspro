@@ -18,6 +18,7 @@ from transformlivedata.quality.validate_json_data_schema import (
 )
 from transformlivedata.services.create_data_quality_report import (
     create_data_quality_report,
+    create_failure_quality_report,
 )
 from transformlivedata.services.build_logical_date_context import (
     build_logical_date_context,
@@ -49,15 +50,50 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
     execution_id = str(uuid.uuid4())
     logger.info(f"Starting execution {execution_id}")
     logger.info(f"Transforming position for {logical_date_string}...")
+    transform_result = None
+    expectations_result = None
+    quarantine_save_status = "SKIPPED"
+    quarantine_save_error = None
+
+    def write_failure_report(phase: str, message: str) -> None:
+        try:
+            create_failure_quality_report(
+                config=pipeline_config,
+                execution_id=execution_id,
+                logical_date_utc=logical_date_string,
+                source_file=logical_date_context["source_file"],
+                failure_phase=phase,
+                failure_message=message,
+                batch_ts=(
+                    transform_result.get("batch_ts")
+                    if transform_result is not None
+                    else logical_date_string
+                ),
+                transform_result=transform_result,
+                expectations_result=expectations_result,
+                quarantine_save_status=quarantine_save_status,
+                quarantine_save_error=quarantine_save_error,
+            )
+        except Exception as e:
+            logger.error("Failed to write quality report on failure: %s", e)
+
     logger.info("=== LOAD STAGE: load_positions ===")
-    raw_positions = load_positions(
-        pipeline_config,
-        logical_date_context["partition_path"],
-        logical_date_context["source_file"],
-    )
+    try:
+        raw_positions = load_positions(
+            pipeline_config,
+            logical_date_context["partition_path"],
+            logical_date_context["source_file"],
+        )
+    except Exception as e:
+        error_msg = f"Load positions failed: {e}"
+        logger.error(error_msg)
+        write_failure_report("load_positions", error_msg)
+        raise
     if not raw_positions:
-        logger.error("No position data found to transform.")
-        raise ValueError("No position data found to transform.")
+        error_msg = "No position data found to transform."
+        logger.error(error_msg)
+        write_failure_report("load_positions", error_msg)
+        raise ValueError(error_msg)
     logger.info("=== RAW DATA VALIDATION STAGE ===")
     is_valid, validation_errors = validate_json_data_schema(
         raw_positions, pipeline_config["raw_data_json_schema"]
@@ -65,40 +101,51 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
     if not is_valid:
         error_msg = f"Raw data validation failed: {validation_errors}"
         logger.error(error_msg)
+        write_failure_report("raw_schema_validation", error_msg)
         raise ValueError(error_msg)
     logger.info("Raw data validation passed ✓")
     logger.info("=== TRANSFORM STAGE: transform_positions ===")
-    transform_result = transform_positions(pipeline_config, raw_positions)
+    try:
+        transform_result = transform_positions(pipeline_config, raw_positions)
+    except Exception as e:
+        error_msg = f"Transform failed: {e}"
+        logger.error(error_msg)
+        write_failure_report("transform", error_msg)
+        raise
     if (
         not transform_result
         or transform_result.get("positions") is None
         or transform_result["positions"].empty
     ):
-        logger.error("No valid position records found after transformation.")
-        raise ValueError("No valid position records found after transformation.")
+        error_msg = "No valid position records found after transformation."
+        logger.error(error_msg)
+        write_failure_report("transform", error_msg)
+        raise ValueError(error_msg)
     positions_df = transform_result["positions"]
     logger.info("=== EXPECTATIONS VALIDATION STAGE: validate_expectations ===")
     logger.info("Validating positions expectations...")
-    expectations_result = validate_expectations(
-        positions_df,
-        pipeline_config["data_expectations"],
-    )
+    try:
+        expectations_result = validate_expectations(
+            positions_df,
+            pipeline_config["data_expectations"],
+        )
+    except Exception as e:
+        error_msg = f"Expectations validation failed: {e}"
+        logger.error(error_msg)
+        write_failure_report("expectations", error_msg)
+        raise
     valid_postions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
-    create_data_quality_report(
-        config=pipeline_config,
-        execution_id=execution_id,
-        logical_date_utc=logical_date_string,
-        source_file=logical_date_context["source_file"],
-        transform_result=transform_result,
-        expectations_result=expectations_result,
-        pass_threshold=1.0,
-        warn_threshold=0.980,
-    )
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
-    save_positions_to_storage(pipeline_config, valid_postions_df, "trusted")
-    logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
+    try:
+        save_positions_to_storage(pipeline_config, valid_postions_df, "trusted")
+        logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
+    except Exception as e:
+        error_msg = f"Failed to save trusted positions: {e}"
+        logger.error(error_msg)
+        write_failure_report("save_trusted", error_msg)
+        raise
     transform_invalid_df = transform_result.get("invalid_positions")
     invalid_frames = [
         df for df in [transform_invalid_df, invalid_positions_df] if df is not None
@@ -110,9 +157,40 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
     )
     if combined_invalid_df is not None and not combined_invalid_df.empty:
         logger.info("Saving invalid positions to quarantine...")
-        save_positions_to_storage(pipeline_config, combined_invalid_df, "quarantined")
-        logger.info(
-            f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
-        )
-    mark_request_as_processed(pipeline_config, logical_date_string)
+        try:
+            save_positions_to_storage(
+                pipeline_config, combined_invalid_df, "quarantined"
+            )
+            quarantine_save_status = "SUCCESS"
+            logger.info(
+                f"Saved {combined_invalid_df.shape[0]} records to quarantined layer"
+            )
+        except Exception as e:
+            quarantine_save_status = "FAILED"
+            quarantine_save_error = str(e)
+            error_msg = f"Failed to save quarantined positions: {e}"
+            logger.error(error_msg)
+            write_failure_report("save_quarantine", error_msg)
+            raise
+    else:
+        quarantine_save_status = "SKIPPED"
+    try:
+        mark_request_as_processed(pipeline_config, logical_date_string)
+    except Exception as e:
+        error_msg = f"Failed to mark request as processed: {e}"
+        logger.error(error_msg)
+        write_failure_report("mark_processed", error_msg)
+        raise
+    create_data_quality_report(
+        config=pipeline_config,
+        execution_id=execution_id,
+        logical_date_utc=logical_date_string,
+        source_file=logical_date_context["source_file"],
+        transform_result=transform_result,
+        expectations_result=expectations_result,
+        pass_threshold=1.0,
+        warn_threshold=0.980,
+        quarantine_save_status=quarantine_save_status,
+        quarantine_save_error=quarantine_save_error,
+    )
     logger.info(f"Execution {execution_id} completed successfully")
