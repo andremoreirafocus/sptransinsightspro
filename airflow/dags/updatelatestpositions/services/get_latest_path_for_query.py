@@ -1,4 +1,4 @@
-from infra.minio_functions import list_objects_in_minio_bucket
+from infra.object_storage import list_objects_in_object_storage_bucket
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import logging
@@ -15,11 +15,8 @@ def get_latest_path_for_query(config):
             bucket = storage["trusted_bucket"]
             app_folder = storage["app_folder"]
             positions_table_name = tables["positions_table_name"]
-            object_storage = config["connections"]["object_storage"]
             connection_data = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return (
@@ -44,7 +41,7 @@ def get_latest_path_for_query(config):
         check_time = now - timedelta(hours=i)
         prefix = f"{app_folder}/{positions_table_name}/{check_time.strftime('year=%Y/month=%m/day=%d/hour=%H')}/"
         logger.info(f"Looking at prefix: {bucket}/{prefix}...")
-        objects = list_objects_in_minio_bucket(
+        objects = list_objects_in_object_storage_bucket(
             connection_data,
             bucket,
             prefix,

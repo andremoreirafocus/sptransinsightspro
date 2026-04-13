@@ -1,4 +1,4 @@
-from infra.duck_db_v2 import get_duckdb_connection
+from infra.duck_db_v3 import get_duckdb_connection
 from infra.sql_db_v2 import update_db_table_with_dataframe
 from updatelatestpositions.services.get_latest_path_for_query import (
     get_latest_path_for_query,
@@ -15,11 +15,8 @@ def create_latest_positions_table(config):
             tables = general["tables"]
             database = config["connections"]["database"]
             latest_positions_table_name = tables["latest_positions_table_name"]
-            object_storage = config["connections"]["object_storage"]
             storage_connection = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             database_connection = {
