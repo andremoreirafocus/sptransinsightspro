@@ -1,4 +1,4 @@
-from infra.duck_db_v2 import get_duckdb_connection
+from infra.duck_db_v3 import get_duckdb_connection
 from datetime import datetime, timezone
 
 # from zoneinfo import ZoneInfo
@@ -19,11 +19,8 @@ def get_recent_positions(config):
             bucket_name = storage["trusted_bucket"]
             app_folder = storage["app_folder"]
             positions_table_name = tables["positions_table_name"]
-            object_storage = config["connections"]["object_storage"]
             connection = {
-                "minio_endpoint": object_storage["endpoint"],
-                "access_key": object_storage["access_key"],
-                "secret_key": object_storage["secret_key"],
+                **config["connections"]["object_storage"],
                 "secure": False,
             }
             return (
