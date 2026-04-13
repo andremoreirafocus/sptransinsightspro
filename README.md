@@ -2,20 +2,29 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
+A pipeline mais crítica do projeto (`transformlivedata`) aplica um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade.
+
 A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
 ## Arquitetura
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
-- Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. ![Para mais informações:](./airflow/README.md). O enquanto o ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informações:](./dags-dev/README.md)
+- Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. ![Para mais informações:](./airflow/README.md). 
+O ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informações:](./dags-dev/README.md)
+Detalhes sobre as DAGS:
     - DAG gtfs: processo composto de 3 etapas principais.   
         - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS e salva na camada raw. 
         - transformação: cria tabelas na camada trusted, a partir dos dados brutos extraído do GTFS da SPTRANS e armazenados na camada raw
         - criação de uma tabela de dados de viagens, a partir dos dados das diversas tabelas GTFS, utilizada para enriquecer os dados de posição extraídos da API SPTrans. 
         - Esta DAG envia um sinal ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens seja iniciada automaticamente.
         ![Para mais informações:](./dags-dev/gtfs/README.md)
-    - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. ![Para mais informações:](./dags-dev/transformlivedata/README.md)
+    - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. 
+        - Validação do JSON bruto via JSON Schema (configuração externa)
+        - Validação pós-transformação via Great Expectations (suite externa)
+        - Quarentena de registros inválidos
+        - Relatório de qualidade em JSON com `summary` e `details`, incluindo métricas, issues e informações parciais em caso de falha
+        ![Para mais informações:](./dags-dev/transformlivedata/README.md)
     - DAG orchestratetransform: processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.  ![Para mais informações:](./dags-dev/orchestratetransform/README.md)
     - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
     - DAG refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
@@ -113,4 +122,3 @@ Este script realiza o build da imagem Docker e reinicia o container através do 
 
 
  
-

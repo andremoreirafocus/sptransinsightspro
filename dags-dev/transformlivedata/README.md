@@ -15,6 +15,62 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 - gera e salva um relatório de qualidade com contagens de registros, métricas de transformação, issues detectadas e resumo de expectativas (sucessos, violações e exceções) em um bucket de metadados
 - inclui no relatório de qualidade a lineage das colunas, que é gerada automaticamente com base no schema JSON utilizado na validação do dado bruto, mapeando os caminhos do JSON para as colunas transformadas e adiciona ao lineage as colunas de cada passo da transformação.
 
+## Relatório de qualidade e observabilidade
+O pipeline gera um relatório de qualidade em formato JSON no bucket de metadados. Esse relatório possui duas seções:
+- `summary`: bloco enxuto para observabilidade (status, falhas, taxa de aceitação e contagens resumidas)
+- `details`: corpo completo com métricas, issues, validações e artefatos
+
+### Validações orientadas a configuração
+O processo de validação é orientado a configuração, não a código:
+- JSON Schema: (validação do dado bruto) definido em `dags-dev/transformlivedata/config/transformlivedata_raw_data_json_schema.json`
+- Great Expectations (validação pós-transformação) definido em `dags-dev/transformlivedata/config/transformlivedata_data_expectations.json`
+
+Isso permite atualizar regras sem alterar o código e facilita o reuso das validações em outros projetos e pipelines.
+
+### Métricas de transformação
+O relatório inclui métricas geradas durante a transformação:
+- total de veículos processados, válidos e inválidos
+- total de linhas processadas
+- issues detectadas (ex.: veículos inválidos, viagens inválidas, erros de cálculo de distância)
+
+### Validação com Great Expectations (GX)
+Após a transformação, a tabela é validada com uma suite GX:
+- violações e exceções são registradas
+- linhas inválidas são isoladas e reportadas
+
+### Quarentena
+Registros inválidos oriundos do processo de transformação ou de validação pelo Great Expecttaions são salvos na camada de quarentena.
+O relatório também indica se a persistência da quarentena foi bem sucedida.
+
+### Resumo (summary)
+O bloco `summary` traz um diagnóstico rápido para monitoramento:
+- `status` (`PASS` | `WARN` | `FAIL`)
+- `failure_phase` e `failure_message` quando há erro
+- `rows_failed` = inválidos da transformação + falhas do GX
+- `acceptance_rate` = `(raw_records - rows_failed) / raw_records`
+
+Em caso de falha que interrompa o pipeline, o relatório ainda é gerado com informações parciais das etapas concluídas até o ponto de erro.  
+Isso permite identificar exatamente em qual fase o processamento parou e quais métricas já haviam sido calculadas, mesmo quando o pipeline não completa o fluxo inteiro.
+
+### Estrutura simplificada (exemplo)
+```json
+{
+  "summary": {
+    "status": "WARN",
+    "rows_failed": 9,
+    "acceptance_rate": 0.999,
+    "failure_phase": null
+  },
+  "details": {
+    "transformation_row_counts": { ... },
+    "transformation_metrics": { ... },
+    "transformation_issues": { ... },
+    "expectations_summary": { ... },
+    "artifacts": { ... }
+  }
+}
+```
+
 
 ## Pré-requisitos
 - Disponibilidade de quatro buckets: para a camada raw, para a camada trusted, para os registros em quarentena e para os relatórios de qualidade, previamente criados no serviço de object storage
