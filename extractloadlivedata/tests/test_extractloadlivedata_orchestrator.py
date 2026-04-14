@@ -62,9 +62,9 @@ def test_extractloadlivedata_missing_notification_engine_raises():
     try:
         extractloadlivedata(config=config, services=services)
     except KeyError as exc:
-        assert "NOFICATION_ENGINE" in str(exc)
+        assert "NOTIFICATION_ENGINE" in str(exc)
     else:
-        assert False, "Expected KeyError for missing NOFICATION_ENGINE"
+        assert False, "Expected KeyError for missing NOTIFICATION_ENGINE"
 
 
 def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
@@ -72,7 +72,7 @@ def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
     services = _build_services(call_log, pending_list=["posicoes.json"])
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
-        "NOFICATION_ENGINE": "airflow",
+        "NOTIFICATION_ENGINE": "airflow",
     }
     extractloadlivedata(config=config, services=services)
     assert "create_pending_invokation" in call_log
@@ -86,7 +86,7 @@ def test_extractloadlivedata_processing_requests_branch_uses_processing_requests
     services = _build_services(call_log, pending_list=["posicoes.json"])
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
-        "NOFICATION_ENGINE": "processing_requests",
+        "NOTIFICATION_ENGINE": "processing_requests",
     }
     extractloadlivedata(config=config, services=services)
     assert "create_pending_processing_request" in call_log

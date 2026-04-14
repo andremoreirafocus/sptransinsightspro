@@ -1,5 +1,5 @@
 from src.extractloadlivedata import extractloadlivedata
-from src.config import get_config
+from src.config import get_config, validate_config
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
 import sys
@@ -59,6 +59,7 @@ def get_scheduling_config():
 
 
 def main():
+    validate_config(get_config())
     minutes_schedule, seconds_schedule, grace_time, minutes, seconds = (
         get_scheduling_config()
     )

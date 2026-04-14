@@ -61,10 +61,10 @@ def _build_services() -> Services:
 
 def _get_config_values(config: dict) -> Tuple[str, str]:
     ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
-    notification_engine = config.get("NOFICATION_ENGINE")
+    notification_engine = config.get("NOTIFICATION_ENGINE")
     if notification_engine is None:
         raise KeyError(
-            "NOFICATION_ENGINE configuration is missing."
+            "NOTIFICATION_ENGINE configuration is missing."
         )
     notification_engine = notification_engine.strip()
     return ingest_buffer_folder, notification_engine

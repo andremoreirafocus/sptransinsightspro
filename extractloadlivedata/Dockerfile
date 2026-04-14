@@ -16,10 +16,9 @@ COPY ./requirements.txt .
 # Install dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Copy the rest of the application code
-# We copy from the specific folder into the container's /app
-# COPY extractlivedata/ .
-COPY ./ .
+# 2. Copy only the application source code
+COPY ./src ./src
+COPY ./main.py .
 
 # Set the entry point. 
 # (Replace 'main.py' with your actual script name, e.g., 'extract.py')
