@@ -66,7 +66,10 @@ def test_fail_sends_email(pipeline_config, valid_summary_fail):
 
 def test_fail_notify_disabled(pipeline_config, valid_summary_fail):
     config = {**pipeline_config}
-    config["transformlivedata"] = {**config["transformlivedata"], "notify_on_fail": False}
+    config["transformlivedata"] = {
+        **config["transformlivedata"],
+        "notify_on_fail": False,
+    }
     sender = FakeEmailSender()
     result = run(valid_summary_fail, config, sender=sender)
     assert result == {"status": "stored"}
@@ -103,7 +106,10 @@ def test_subject_format(pipeline_config, valid_summary_fail):
 
 def test_warn_notify_disabled_stored(pipeline_config, valid_summary_warn):
     config = {**pipeline_config}
-    config["transformlivedata"] = {**config["transformlivedata"], "notify_on_warn": False}
+    config["transformlivedata"] = {
+        **config["transformlivedata"],
+        "notify_on_warn": False,
+    }
     rows = [
         {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
         {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},

@@ -4,7 +4,11 @@ from src.notifications_evaluator import evaluate_cumulative_warn
 
 
 def make_row(status="WARN", rows_failed=10, acceptance_rate=0.99):
-    return {"status": status, "rows_failed": rows_failed, "acceptance_rate": acceptance_rate}
+    return {
+        "status": status,
+        "rows_failed": rows_failed,
+        "acceptance_rate": acceptance_rate,
+    }
 
 
 def test_empty_rows_returns_false():
