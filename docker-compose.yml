@@ -128,8 +128,16 @@ services:
     container_name: alertservice
     ports:
       - "8000:8000"
+    environment:
+      SMTP_HOST: sandbox.smtp.mailtrap.io
+      SMTP_PORT: "587"
+      SMTP_USER: ${ALERTSERVICE_SMTP_USER}
+      SMTP_PASSWORD: ${ALERTSERVICE_SMTP_PASSWORD}
+      SMTP_USE_TLS: "true"
+      EMAIL_FROM: andre.moreira.engineer@gmail.com
+      EMAIL_TO: andremoreira.focus@gmail.com
+      EMAIL_SUBJECT_PREFIX: "[DQ] status update for pipeline"
     volumes:
-      - ./alertservice/.env:/app/.env
       - alertservice_data:/app/storage
     networks:
       - rede_fia

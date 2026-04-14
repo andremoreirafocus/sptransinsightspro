@@ -46,19 +46,18 @@ def process_notification(
     store_summary(summary)
     notify_on_fail = pipeline_cfg["notify_on_fail"]
     notify_on_warn = pipeline_cfg["notify_on_warn"]
-    subject = f"{subject_prefix} {pipeline} - {status}"
+    subject = f"{subject_prefix} {pipeline}: {status}"
     body = format_summary(summary)
     if status == "FAIL" and notify_on_fail:
         send_email(subject, body)
         return {"status": "sent", "reason": "fail"}
     if status == "WARN" and notify_on_warn:
-        warning_cfg = pipeline_cfg.get("warning_window", {})
-        thresholds = pipeline_cfg.get("warning_thresholds", {})
-        if warning_cfg:
-            window_type = warning_cfg.get("type", "time")
-            window_value = int(warning_cfg.get("value", 24))
-            rows = query_window(pipeline, window_type, window_value)
-            if evaluate_cumulative_warn(rows, thresholds):
-                send_email(subject, body)
-                return {"status": "sent", "reason": "cumulative_warn"}
+        warning_cfg = pipeline_cfg["warning_window"]
+        thresholds = pipeline_cfg["warning_thresholds"]
+        window_type = warning_cfg["type"]
+        window_value = warning_cfg["value"]
+        rows = query_window(pipeline, window_type, window_value)
+        if evaluate_cumulative_warn(rows, thresholds):
+            send_email(subject, body)
+            return {"status": "sent", "reason": "cumulative_warn"}
     return {"status": "stored"}

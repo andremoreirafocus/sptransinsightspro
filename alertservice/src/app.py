@@ -6,11 +6,12 @@ from functools import partial
 from logging.handlers import RotatingFileHandler
 from typing import Any, Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 
 from .infra.config import (
     get_settings,
+    get_email_send_config,
     load_pipeline_config,
 )
 from .infra.storage import init_db, store_summary, query_window
@@ -45,7 +46,7 @@ def on_startup() -> None:
     )
     logging.getLogger().addHandler(file_handler)
     logger.info("Alertservice starting up")
-    load_pipeline_config()
+    app.state.pipeline_config = load_pipeline_config()
     init_db()
 
 
@@ -55,13 +56,13 @@ def on_shutdown() -> None:
 
 
 @app.post("/notify")
-def notify(payload: NotificationPayload) -> Dict[str, Any]:
+def notify(request: Request, payload: NotificationPayload) -> Dict[str, Any]:
     try:
         settings = get_settings()
-        send_email_fn = partial(send_email, email_config=settings)
+        send_email_fn = partial(send_email, email_config=get_email_send_config(settings))
         return process_notification(
             payload.summary,
-            pipeline_config=load_pipeline_config(),
+            pipeline_config=request.app.state.pipeline_config,
             subject_prefix=settings.email_subject_prefix,
             store_summary=store_summary,
             query_window=query_window,

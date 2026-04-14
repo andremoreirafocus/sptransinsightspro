@@ -68,7 +68,9 @@ def store_summary(summary: Dict[str, Any]) -> None:
         conn.close()
 
 
-def query_window(pipeline: str, window_type: str, window_value: int) -> List[sqlite3.Row]:
+def query_window(
+    pipeline: str, window_type: str, window_value: int
+) -> List[sqlite3.Row]:
     conn = get_db()
     try:
         if window_type == "count":

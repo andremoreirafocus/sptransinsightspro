@@ -36,6 +36,8 @@ Payload esperado (exemplo):
 ### Configuração por pipeline
 Arquivo: `alertservice/config/pipelines.yaml`
 
+Todos os campos abaixo são obrigatórios. O serviço falha no startup se algum estiver ausente ou inválido.
+
 Exemplo:
 ```yaml
 transformlivedata:
@@ -51,19 +53,13 @@ transformlivedata:
 ```
 
 ### Variáveis de ambiente (SMTP)
-```
-SMTP_HOST=
-SMTP_PORT=25
-SMTP_USER=
-SMTP_PASSWORD=
-SMTP_USE_TLS=false
-EMAIL_FROM=
-EMAIL_TO=
-EMAIL_SUBJECT_PREFIX=[DQ]
-```
+Todas as variáveis são obrigatórias. Um template está disponível em `.env.example`.
 
-Observação: `SMTP_HOST`, `EMAIL_FROM` e `EMAIL_TO` são obrigatórios.  
-Se estiverem ausentes, o serviço falha no startup.
+O assunto do e-mail é montado dinamicamente: `{EMAIL_SUBJECT_PREFIX} {pipeline}: {status}`
+
+Exemplo: `[DQ] status update for pipeline transformlivedata: FAIL`
+
+Observação: todos os campos são obrigatórios. Se qualquer um estiver ausente, o serviço falha no startup.
 
 ## Testes unitários
 Ainda não implementados.
@@ -76,18 +72,36 @@ Ainda não implementados.
 
 ## Para executar
 ### Execução manual (sem Docker)
+Crie `alertservice/.env` com base em `.env.example` preenchendo todos os campos:
+
+```
+SMTP_HOST=
+SMTP_PORT=
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_USE_TLS=
+EMAIL_FROM=
+EMAIL_TO=
+EMAIL_SUBJECT_PREFIX=
+```
+
 ```bash
+cd alertservice
 uvicorn src.app:app --host 0.0.0.0 --port 8000
 ```
 
-### Docker
+### Docker (via docker-compose)
+As variáveis de configuração não-sensíveis (`SMTP_HOST`, `SMTP_PORT`, etc.) já estão declaradas em `docker-compose.yml`.
+
+As credenciais SMTP são injetadas via variáveis de substituição. Adicione ao `.env` na raiz do projeto:
+
+```
+ALERTSERVICE_SMTP_USER=
+ALERTSERVICE_SMTP_PASSWORD=
+```
+
 ```bash
-docker build -t alertservice ./alertservice
-docker run -p 8000:8000 \
-  -e SMTP_HOST=... \
-  -e EMAIL_FROM=... \
-  -e EMAIL_TO=... \
-  alertservice
+docker-compose up alertservice
 ```
 
 ## Observações
