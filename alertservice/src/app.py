@@ -13,6 +13,7 @@ from .infra.config import (
     get_settings,
     get_email_send_config,
     load_pipeline_config,
+    NotificationDeliveryError,
 )
 from .infra.storage import init_db, store_summary, query_window
 from .infra.notifier import format_summary, send_email
@@ -70,7 +71,10 @@ def notify(request: Request, payload: NotificationPayload) -> Dict[str, Any]:
             format_summary=format_summary,
         )
     except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e))
+    except NotificationDeliveryError as e:
+        logger.error("Email delivery error: %s", e)
+        raise HTTPException(status_code=502, detail="email delivery failed")
     except HTTPException:
         raise
     except Exception as e:

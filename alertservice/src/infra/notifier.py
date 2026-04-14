@@ -4,7 +4,7 @@ import smtplib
 from email.message import EmailMessage
 from typing import Any, Callable, Dict
 
-from .config import EmailSendConfig
+from .config import EmailSendConfig, NotificationDeliveryError
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,22 @@ def send_email(
     msg["Subject"] = subject
     msg.set_content(body)
 
-    with smtp_client_factory(email_config.smtp_host, email_config.smtp_port) as server:
-        if logger.isEnabledFor(logging.DEBUG):
-            server.set_debuglevel(1)
-        if email_config.smtp_use_tls:
-            server.starttls()
-        server.login(email_config.user, email_config.password)
-        server.send_message(msg)
+    try:
+        with smtp_client_factory(email_config.smtp_host, email_config.smtp_port) as server:
+            if logger.isEnabledFor(logging.DEBUG):
+                server.set_debuglevel(1)
+            if email_config.smtp_use_tls:
+                server.starttls()
+            server.login(email_config.user, email_config.password)
+            server.send_message(msg)
+    except (smtplib.SMTPException, OSError) as exc:
+        logger.error(
+            "Email delivery failed: host=%s port=%s error=%s: %s",
+            email_config.smtp_host,
+            email_config.smtp_port,
+            type(exc).__name__,
+            exc,
+        )
+        raise NotificationDeliveryError(
+            f"Failed to deliver email via {email_config.smtp_host}:{email_config.smtp_port}"
+        ) from exc

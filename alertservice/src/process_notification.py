@@ -11,6 +11,8 @@ Formatter = Callable[[Dict[str, Any]], str]
 
 logger = logging.getLogger(__name__)
 
+VALID_STATUSES = {"FAIL", "WARN", "PASS"}
+
 
 def process_notification(
     summary: Dict[str, Any],
@@ -27,6 +29,12 @@ def process_notification(
         raise ValueError("summary.pipeline and summary.status are required")
     pipeline = summary["pipeline"]
     status = summary["status"]
+    if status not in VALID_STATUSES:
+        logger.warning("Unknown status '%s' for pipeline '%s'. Ignoring.", status, pipeline)
+        return {"status": "ignored", "reason": "unknown_status"}
+    if status == "PASS":
+        store_summary(summary)
+        return {"status": "stored", "reason": "pass_status"}
     pipeline_cfg = pipeline_config.get(pipeline)
     if pipeline_cfg is None:
         logger.error("Unknown pipeline config: %s. Ignoring request.", pipeline)

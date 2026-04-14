@@ -9,6 +9,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
+
+class NotificationDeliveryError(Exception):
+    """Raised when email delivery fails."""
+
+
 _SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(os.path.dirname(_SRC_DIR))
 _CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config", "pipelines.yaml")
@@ -68,7 +73,7 @@ def get_email_send_config(settings: Settings) -> EmailSendConfig:
 def load_pipeline_config() -> Dict[str, Any]:
     path = get_settings().pipeline_config_path
     if not os.path.exists(path):
-        return {}
+        raise FileNotFoundError(f"Pipeline config not found: {path}")
     with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     for pipeline, cfg in data.items():
