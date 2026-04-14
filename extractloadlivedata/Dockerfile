@@ -21,9 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # COPY extractlivedata/ .
 COPY ./ .
 
-# COPY extractlivedata/.env-docker ./.env 
-COPY ./.env-docker ./.env 
-
 # Set the entry point. 
 # (Replace 'main.py' with your actual script name, e.g., 'extract.py')
 CMD ["python", "main.py"]

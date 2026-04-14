@@ -1,10 +1,8 @@
-from dotenv import dotenv_values
+import os
+
+from dotenv import load_dotenv
 
 
 def get_config():
-    """
-    Load configuration from .env file using dotenv_values.
-    Returns a dictionary with configuration values.
-    """
-
-    return dotenv_values(".env")
+    load_dotenv(override=False)
+    return os.environ

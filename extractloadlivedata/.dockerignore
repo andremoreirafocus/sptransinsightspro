@@ -7,3 +7,5 @@ venv
 env
 *.log
 livedatafiles/*
+.env
+.env-docker
