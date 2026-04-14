@@ -34,7 +34,9 @@ def send_email(
     msg.set_content(body)
 
     try:
-        with smtp_client_factory(email_config.smtp_host, email_config.smtp_port) as server:
+        with smtp_client_factory(
+            email_config.smtp_host, email_config.smtp_port
+        ) as server:
             if logger.isEnabledFor(logging.DEBUG):
                 server.set_debuglevel(1)
             if email_config.smtp_use_tls:

@@ -30,7 +30,9 @@ def process_notification(
     pipeline = summary["pipeline"]
     status = summary["status"]
     if status not in VALID_STATUSES:
-        logger.warning("Unknown status '%s' for pipeline '%s'. Ignoring.", status, pipeline)
+        logger.warning(
+            "Unknown status '%s' for pipeline '%s'. Ignoring.", status, pipeline
+        )
         return {"status": "ignored", "reason": "unknown_status"}
     if status == "PASS":
         store_summary(summary)

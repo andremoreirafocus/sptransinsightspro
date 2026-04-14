@@ -4,7 +4,10 @@ from typing import Any, Dict, Iterable
 
 logger = logging.getLogger(__name__)
 
-def evaluate_cumulative_warn(rows: Iterable[Dict[str, Any]], thresholds: Dict[str, Any]) -> bool:
+
+def evaluate_cumulative_warn(
+    rows: Iterable[Dict[str, Any]], thresholds: Dict[str, Any]
+) -> bool:
     rows_list = list(rows)
     if not rows_list:
         return False

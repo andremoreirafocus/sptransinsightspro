@@ -60,7 +60,9 @@ def on_shutdown() -> None:
 def notify(request: Request, payload: NotificationPayload) -> Dict[str, Any]:
     try:
         settings = get_settings()
-        send_email_fn = partial(send_email, email_config=get_email_send_config(settings))
+        send_email_fn = partial(
+            send_email, email_config=get_email_send_config(settings)
+        )
         return process_notification(
             payload.summary,
             pipeline_config=request.app.state.pipeline_config,
