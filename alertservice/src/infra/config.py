@@ -1,13 +1,17 @@
+import logging
 import os
-from typing import Any, Dict
+from dataclasses import dataclass
+from typing import Any, Dict, Optional
 
 import yaml
 from dotenv import load_dotenv
 
+logger = logging.getLogger(__name__)
+
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(SRC_DIR)
-CONFIG_PATH = os.path.join(BASE_DIR, "config", "pipelines.yaml")
-ENV_PATH = os.path.join(BASE_DIR, "..", ".env")
+PROJECT_ROOT = os.path.dirname(os.path.dirname(SRC_DIR))
+CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "pipelines.yaml")
+ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
 
 
 def load_env() -> None:
@@ -19,11 +23,48 @@ def get_email_subject_prefix() -> str:
     return os.getenv("EMAIL_SUBJECT_PREFIX", "[DQ]")
 
 
-def validate_required_env() -> None:
-    required_env = ["SMTP_HOST", "EMAIL_FROM", "EMAIL_TO"]
-    missing = [key for key in required_env if not os.getenv(key)]
+@dataclass(frozen=True)
+class EmailConfig:
+    smtp_host: str
+    smtp_port: int
+    smtp_user: Optional[str]
+    smtp_password: Optional[str]
+    email_from: str
+    email_to: str
+    use_tls: bool
+
+
+def get_email_config() -> EmailConfig:
+    smtp_host = os.getenv("SMTP_HOST")
+    smtp_port = int(os.getenv("SMTP_PORT", "25"))
+    smtp_user = os.getenv("SMTP_USER")
+    smtp_password = os.getenv("SMTP_PASSWORD")
+    email_from = os.getenv("EMAIL_FROM")
+    email_to = os.getenv("EMAIL_TO", "")
+    use_tls = os.getenv("SMTP_USE_TLS", "false").lower() == "true"
+
+    required = {
+        "SMTP_HOST": smtp_host,
+        "EMAIL_FROM": email_from,
+        "EMAIL_TO": email_to,
+    }
+    missing = [key for key, value in required.items() if not value]
     if missing:
         raise RuntimeError(f"Missing required env keys: {', '.join(missing)}")
+
+    return EmailConfig(
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        smtp_user=smtp_user,
+        smtp_password=smtp_password,
+        email_from=email_from,
+        email_to=email_to,
+        use_tls=use_tls,
+    )
+
+
+def validate_required_env() -> None:
+    get_email_config()
 
 
 def load_pipeline_config() -> Dict[str, Any]:

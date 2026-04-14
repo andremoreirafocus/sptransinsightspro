@@ -1,20 +1,11 @@
-from typing import Any, Dict
+import logging
+from typing import Any, Dict, Iterable
 
-from .infra.storage import query_window
 
+logger = logging.getLogger(__name__)
 
-def evaluate_cumulative_warn(pipeline: str, config: Dict[str, Any]) -> bool:
-    warning_cfg = config.get(pipeline, {})
-    window_cfg = warning_cfg.get("warning_window", {})
-    thresholds = warning_cfg.get("warning_thresholds", {})
-
-    if not window_cfg:
-        return False
-
-    window_type = window_cfg.get("type", "time")
-    window_value = int(window_cfg.get("value", 24))
-
-    rows = query_window(pipeline, window_type, window_value)
+def evaluate_cumulative_warn(rows: Iterable[Dict[str, Any]], thresholds: Dict[str, Any]) -> bool:
+    rows = list(rows)
     if not rows:
         return False
 

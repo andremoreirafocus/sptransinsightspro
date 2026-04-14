@@ -1,23 +1,30 @@
 import json
 import logging
-from typing import Any, Dict
+from typing import Any, Callable, Dict, Iterable
 
-from .infra.config import get_email_subject_prefix, load_pipeline_config
 from .notifications_evaluator import evaluate_cumulative_warn
-from .infra.notifier import format_summary, send_email
-from .infra.storage import store_summary
+
+SummaryStore = Callable[[Dict[str, Any]], None]
+QueryWindow = Callable[[str, str, int], Iterable[Dict[str, Any]]]
+EmailSender = Callable[[str, str], None]
+Formatter = Callable[[Dict[str, Any]], str]
 
 logger = logging.getLogger(__name__)
 
 
-def process_notification(payload: Any) -> Dict[str, Any]:
-    summary = getattr(payload, "summary", None) if payload is not None else None
+def process_notification(
+    summary: Dict[str, Any],
+    pipeline_config: Dict[str, Any],
+    subject_prefix: str,
+    store_summary: SummaryStore,
+    query_window: QueryWindow,
+    send_email: EmailSender,
+    format_summary: Formatter,
+) -> Dict[str, Any]:
     if not summary:
         raise ValueError("summary is required")
     if "pipeline" not in summary or "status" not in summary:
         raise ValueError("summary.pipeline and summary.status are required")
-    pipeline_config = load_pipeline_config()
-    email_subject_prefix = get_email_subject_prefix()
     pipeline = summary["pipeline"]
     status = summary["status"]
     pipeline_cfg = pipeline_config.get(pipeline)
@@ -31,7 +38,7 @@ def process_notification(payload: Any) -> Dict[str, Any]:
             "Received summary payload:\n%s",
             json.dumps(summary, ensure_ascii=False, indent=2, default=str),
         )
-    else:
+    elif logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Received summary payload:\n%s",
             json.dumps(summary, ensure_ascii=False, indent=2, default=str),
@@ -39,13 +46,19 @@ def process_notification(payload: Any) -> Dict[str, Any]:
     store_summary(summary)
     notify_on_fail = pipeline_cfg["notify_on_fail"]
     notify_on_warn = pipeline_cfg["notify_on_warn"]
-    subject = f"{email_subject_prefix} {pipeline} - {status}"
+    subject = f"{subject_prefix} {pipeline} - {status}"
     body = format_summary(summary)
     if status == "FAIL" and notify_on_fail:
         send_email(subject, body)
         return {"status": "sent", "reason": "fail"}
     if status == "WARN" and notify_on_warn:
-        if evaluate_cumulative_warn(pipeline, pipeline_config):
-            send_email(subject, body)
-            return {"status": "sent", "reason": "cumulative_warn"}
+        warning_cfg = pipeline_cfg.get("warning_window", {})
+        thresholds = pipeline_cfg.get("warning_thresholds", {})
+        if warning_cfg:
+            window_type = warning_cfg.get("type", "time")
+            window_value = int(warning_cfg.get("value", 24))
+            rows = query_window(pipeline, window_type, window_value)
+            if evaluate_cumulative_warn(rows, thresholds):
+                send_email(subject, body)
+                return {"status": "sent", "reason": "cumulative_warn"}
     return {"status": "stored"}

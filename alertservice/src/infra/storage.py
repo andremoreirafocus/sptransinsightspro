@@ -1,7 +1,10 @@
+import logging
 import os
 import sqlite3
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
+
+logger = logging.getLogger(__name__)
 
 SRC_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(SRC_DIR)
