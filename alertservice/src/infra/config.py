@@ -1,76 +1,51 @@
 import logging
 import os
-from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Dict, Optional
 
 import yaml
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SRC_DIR))
-CONFIG_PATH = os.path.join(PROJECT_ROOT, "config", "pipelines.yaml")
-ENV_PATH = os.path.join(PROJECT_ROOT, ".env")
+_SRC_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(_SRC_DIR))
+_DEFAULT_CONFIG_PATH = os.path.join(_PROJECT_ROOT, "config", "pipelines.yaml")
+_DEFAULT_DB_PATH = os.path.join(os.path.dirname(_SRC_DIR), "storage", "alerts.db")
+_DEFAULT_LOG_FILE = os.path.join(_PROJECT_ROOT, "alertservice.log")
+_ENV_PATH = os.path.join(_PROJECT_ROOT, ".env")
 
 
-def load_env() -> None:
-    if os.path.exists(ENV_PATH):
-        load_dotenv(ENV_PATH)
-
-
-def get_email_subject_prefix() -> str:
-    return os.getenv("EMAIL_SUBJECT_PREFIX", "[DQ]")
-
-
-@dataclass(frozen=True)
-class EmailConfig:
+class Settings(BaseSettings):
     smtp_host: str
-    smtp_port: int
-    smtp_user: Optional[str]
-    smtp_password: Optional[str]
+    smtp_port: int = 25
+    smtp_user: Optional[str] = None
+    smtp_password: Optional[str] = None
+    smtp_use_tls: bool = False
     email_from: str
     email_to: str
-    use_tls: bool
+    email_subject_prefix: str = "[DQ]"
+    pipeline_config_path: str = _DEFAULT_CONFIG_PATH
+    alerts_db_path: str = _DEFAULT_DB_PATH
+    log_file: str = _DEFAULT_LOG_FILE
 
-
-def get_email_config() -> EmailConfig:
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "25"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_password = os.getenv("SMTP_PASSWORD")
-    email_from = os.getenv("EMAIL_FROM")
-    email_to = os.getenv("EMAIL_TO", "")
-    use_tls = os.getenv("SMTP_USE_TLS", "false").lower() == "true"
-
-    required = {
-        "SMTP_HOST": smtp_host,
-        "EMAIL_FROM": email_from,
-        "EMAIL_TO": email_to,
-    }
-    missing = [key for key, value in required.items() if not value]
-    if missing:
-        raise RuntimeError(f"Missing required env keys: {', '.join(missing)}")
-
-    return EmailConfig(
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        smtp_user=smtp_user,
-        smtp_password=smtp_password,
-        email_from=email_from,
-        email_to=email_to,
-        use_tls=use_tls,
+    model_config = SettingsConfigDict(
+        env_file=_ENV_PATH,
+        env_file_encoding="utf-8",
+        extra="ignore",
     )
 
 
-def validate_required_env() -> None:
-    get_email_config()
+@lru_cache(maxsize=1)
+def get_settings() -> Settings:
+    return Settings()
 
 
 def load_pipeline_config() -> Dict[str, Any]:
-    if not os.path.exists(CONFIG_PATH):
+    path = get_settings().pipeline_config_path
+    if not os.path.exists(path):
         return {}
-    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     for pipeline, cfg in data.items():
         if not isinstance(cfg, dict):

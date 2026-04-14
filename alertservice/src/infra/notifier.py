@@ -4,7 +4,7 @@ import smtplib
 from email.message import EmailMessage
 from typing import Any, Callable, Dict
 
-from .config import EmailConfig
+from .config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +16,7 @@ def format_summary(summary: Dict[str, Any]) -> str:
 def send_email(
     subject: str,
     body: str,
-    email_config: EmailConfig,
+    email_config: Settings,
     smtp_client_factory: Callable[[str, int], smtplib.SMTP] = smtplib.SMTP,
 ) -> None:
     logger.debug(
@@ -38,7 +38,7 @@ def send_email(
     ) as server:
         if logger.isEnabledFor(logging.DEBUG):
             server.set_debuglevel(1)
-        if email_config.use_tls:
+        if email_config.smtp_use_tls:
             server.starttls()
         if email_config.smtp_user and email_config.smtp_password:
             server.login(email_config.smtp_user, email_config.smtp_password)

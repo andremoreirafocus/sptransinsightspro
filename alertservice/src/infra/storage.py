@@ -4,21 +4,20 @@ import sqlite3
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List
 
-logger = logging.getLogger(__name__)
+from .config import get_settings
 
-SRC_DIR = os.path.dirname(os.path.abspath(__file__))
-BASE_DIR = os.path.dirname(SRC_DIR)
-DB_PATH = os.path.join(BASE_DIR, "storage", "alerts.db")
+logger = logging.getLogger(__name__)
 
 
 def get_db() -> sqlite3.Connection:
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(get_settings().alerts_db_path)
     conn.row_factory = sqlite3.Row
     return conn
 
 
 def init_db() -> None:
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    db_path = get_settings().alerts_db_path
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
     conn = get_db()
     try:
         conn.execute(
