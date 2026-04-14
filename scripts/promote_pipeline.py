@@ -3,6 +3,7 @@ import os
 import argparse
 
 from os_command_helper import run_command
+from deploy_helpers import run_code_validations
 
 
 def promote_pipeline(pipeline_name):
@@ -20,25 +21,13 @@ def promote_pipeline(pipeline_name):
         print(f"❌ Pipeline folder '{pipeline_name}' not found in dags-dev/")
         sys.exit(1)
     print(f"🚀 Promoting pipeline: {pipeline_name}")
-    # 2. Validation (Linting)
+    # 2. Validation (Linting + Tests)
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
-    total_steps = 4 if has_tests else 3
-    print(f"Step 1/{total_steps}: Linting {pipeline_name}...")
-    run_command(
-        ["ruff", "check", pipeline_dev_path], f"Linting failed for {pipeline_name}!"
-    )
-    print("✅ Linting Passed.")
-    # 3. Validation (Unit Tests)
-    if has_tests:
-        print(f"Step 2/{total_steps}: Running tests for {pipeline_name}...")
-        run_command(
-            [sys.executable, "-m", "pytest", test_dir],
-            f"Tests failed for {pipeline_name}!",
-        )
-        print("✅ Unit Tests Passed.")
-    # 4. Atomic Sync Folder
-    sync_step = 3 if has_tests else 2
+    total_steps = (2 if has_tests else 1) + 2
+    steps_consumed = run_code_validations(pipeline_dev_path, pipeline_name, step_offset=1)
+    # 3. Atomic Sync Folder
+    sync_step = steps_consumed + 1
     print(
         f"Step {sync_step}/{total_steps}: Syncing folder '{pipeline_name}' to production..."
     )

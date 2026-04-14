@@ -3,6 +3,7 @@ import os
 import argparse
 
 from os_command_helper import run_command
+from deploy_helpers import run_code_validations
 
 
 def deploy_service(service_name, service_folder):
@@ -16,19 +17,20 @@ def deploy_service(service_name, service_folder):
 
     print(f"🚀 Deploying microservice: {service_name} (folder: {service_folder})")
 
-    # Assuming docker-compose.yml is in the project root
-    compose_file = os.path.join(project_root, "docker-compose.yml")
+    # Validation (Linting + Tests)
+    steps_consumed = run_code_validations(service_path, service_name, step_offset=1)
 
-    # 2. Build Docker Image
-    print(f"Step 1/2: Building {service_name}...")
+    compose_file = os.path.join(project_root, "docker-compose.yml")
+    build_step = steps_consumed + 1
+    total_steps = steps_consumed + 2
+    print(f"Step {build_step}/{total_steps}: Building {service_name}...")
     run_command(
         ["docker", "compose", "-f", compose_file, "build", service_name],
         "Build failed!",
     )
     print("✅ Build Successful.")
 
-    # 3. Restart Container
-    print(f"Step 2/2: Restarting {service_name}...")
+    print(f"Step {build_step + 1}/{total_steps}: Restarting {service_name}...")
     run_command(
         ["docker", "compose", "-f", compose_file, "up", "-d", service_name],
         "Deployment failed!",

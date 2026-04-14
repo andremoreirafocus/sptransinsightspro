@@ -50,8 +50,23 @@ Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, execut
 - ![alertservice](./alertservice/README.md)
 
 Para iniciar o projeto:
- Se o arquivo .env não existir na raiz do projeto, crie-o com o seguinte conteúdo:
-  MINIO_VERSION=RELEASE.2025-02-28T09-55-16Z
+ Se o arquivo `.env` não existir na raiz do projeto, crie-o com o seguinte conteúdo:
+```dotenv
+MINIO_VERSION=RELEASE.2025-02-28T09-55-16Z
+
+# alertservice SMTP credentials
+ALERTSERVICE_SMTP_USER=<seu_usuario_smtp>
+ALERTSERVICE_SMTP_PASSWORD=<sua_senha_smtp>
+
+# extractloadlivedata credentials
+EXTRACTLOADLIVEDATA_TOKEN=<token_sptrans_api>
+EXTRACTLOADLIVEDATA_ACCESS_KEY=<minio_access_key>
+EXTRACTLOADLIVEDATA_SECRET_KEY=<minio_secret_key>
+EXTRACTLOADLIVEDATA_DB_USER=<db_user>
+EXTRACTLOADLIVEDATA_DB_PASSWORD=<db_password>
+EXTRACTLOADLIVEDATA_AIRFLOW_USER=<airflow_user>
+EXTRACTLOADLIVEDATA_AIRFLOW_PASSWORD=<airflow_password>
+```
  
  Execute:
   docker compose up -d 
@@ -108,20 +123,33 @@ python scripts/promote_pipeline.py transformlivedata
 ```
 
 Este script realiza os seguintes passos:
-1.  Análise estática: executa o `ruff` no subdiretório da pipeline.
-2.  Testes de unidade: executa o `pytest` na pasta de testes da pipeline.
-3.  Deploy do código: sincroniza o subdiretório, os arquivos de DAG correspondentes e a pasta compartilhada `infra` para a produção.
+1. Análise estática: executa o `ruff` no subdiretório da pipeline.
+2. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
+3. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
+4. Sincronização de infra compartilhada: sincroniza as pastas `infra` e `pipeline_configurator` para produção.
+
+O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
 ### Deployment de Microserviços
-Para atualizar e reiniciar o microserviço de ingestão (`extractloadlivedata`), utilize o script de deployment:
+Para atualizar e reiniciar um microserviço (ex: `extractloadlivedata`), utilize o script de deployment:
 
 ```shell
 # Sintaxe: python scripts/deploy_service.py <nome_do_servico> <diretorio_do_servico>
 python scripts/deploy_service.py extractloadlivedata extractloadlivedata
 ```
 
-Este script realiza o build da imagem Docker e reinicia o container através do Docker Compose.
+Este script realiza os seguintes passos:
+1. Análise estática: executa o `ruff` no diretório do serviço.
+2. Testes de unidade: executa o `pytest` na pasta `tests/` do serviço (se existir).
+3. Build da imagem Docker via Docker Compose.
+4. Reinício do container via Docker Compose.
+
+### Scripts auxiliares
+Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
+
+| Módulo | Responsabilidade |
+|---|---|
+| `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
 
-
- 
