@@ -2,7 +2,8 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
-A pipeline mais crítica do projeto (`transformlivedata`) aplica um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade.
+A pipeline mais crítica do projeto (`transformlivedata`) aplica um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade.  
+Observação: o resumo de qualidade é enviado via webhook para o microserviço `alertservice`, responsável por emitir notificações e alertas por e-mail.
 
 A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
@@ -31,6 +32,7 @@ Detalhes sobre as DAGS:
     - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
 - extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
+- alertservice: microserviço que recebe resumos de qualidade via webhook e envia notificações por e-mail, com alertas imediatos para falhas e alertas cumulativos para warnings. ![Para mais informações:](./alertservice/README.md)
 - Minio: utilizado para implementar as camadas raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para os dados da camada trusted
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
 - Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
@@ -45,6 +47,7 @@ Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, execut
 - ![refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
 - ![updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
 - ![extractloadlivedata](./extractloadlivedata/README.md)
+- ![alertservice](./alertservice/README.md)
 
 Para iniciar o projeto:
  Se o arquivo .env não existir na raiz do projeto, crie-o com o seguinte conteúdo:

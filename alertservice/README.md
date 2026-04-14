@@ -1,7 +1,19 @@
-## Alert Service
+## Objetivo deste subprojeto
+Receber resumos de qualidade de pipelines via webhook e enviar notificações por e-mail, incluindo alertas imediatos para falhas e alertas cumulativos para warnings.
 
-Serviço mínimo para receber resumos de qualidade via webhook e enviar notificações por e-mail.
+## O que este subprojeto faz
+- expõe um endpoint HTTP `POST /notify` para receber `summary` de qualidade
+- registra todos os eventos em SQLite para análise de histórico
+- envia e-mail imediato quando `status=FAIL`
+- envia e-mail de warning apenas quando limiares cumulativos são atingidos
+- registra logs em arquivo rotativo e stdout
 
+## Pré-requisitos
+- Serviço SMTP configurado e acessível
+- Arquivo `.env` com as credenciais SMTP
+- Arquivo de configuração por pipeline em `alertservice/config/pipelines.yaml`
+
+## Configurações
 ### Endpoint
 `POST /notify`
 
@@ -39,20 +51,36 @@ transformlivedata:
 ```
 
 ### Variáveis de ambiente (SMTP)
-- `SMTP_HOST`
-- `SMTP_PORT` (default: 25)
-- `SMTP_USER`
-- `SMTP_PASSWORD`
-- `SMTP_USE_TLS` (true/false)
-- `EMAIL_FROM`
-- `EMAIL_TO` (lista separada por vírgula)
-- `EMAIL_SUBJECT_PREFIX` (opcional)
+```
+SMTP_HOST=
+SMTP_PORT=25
+SMTP_USER=
+SMTP_PASSWORD=
+SMTP_USE_TLS=false
+EMAIL_FROM=
+EMAIL_TO=
+EMAIL_SUBJECT_PREFIX=[DQ]
+```
 
 Observação: `SMTP_HOST`, `EMAIL_FROM` e `EMAIL_TO` são obrigatórios.  
 Se estiverem ausentes, o serviço falha no startup.
 
-### Como executar
-#### Docker
+## Testes unitários
+Ainda não implementados.
+
+## Para instalar os requisitos
+- cd alertservice
+- python3 -m venv .venv
+- source .venv/bin/activate
+- pip install -r requirements.txt
+
+## Para executar
+### Execução manual (sem Docker)
+```bash
+uvicorn src.app:app --host 0.0.0.0 --port 8000
+```
+
+### Docker
 ```bash
 docker build -t alertservice ./alertservice
 docker run -p 8000:8000 \
@@ -62,16 +90,7 @@ docker run -p 8000:8000 \
   alertservice
 ```
 
-#### Execução manual (sem Docker)
-```bash
-cd alertservice
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn src.app:app --host 0.0.0.0 --port 8000
-```
-
-### Observações
+## Observações
 - Eventos são armazenados em SQLite (`alertservice/storage/alerts.db`).
 - `FAIL` envia alerta imediato.
 - `WARN` envia alerta apenas se regras cumulativas forem atingidas.
