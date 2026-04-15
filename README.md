@@ -155,7 +155,7 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 ![Para mais informações:](./scripts/README.md)
 
 ## Decisões arquiteturais (ADRs)
-As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`.
+As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os sete ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada e o workflow de promoção de pipelines.
 
 ![Índice de ADRs](./docs/adr/README.md)
 

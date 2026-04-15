@@ -7,29 +7,8 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 ## Como usar
 
 - Cada ADR é imutável após aceito. Se uma decisão for revisada, um novo ADR supersede o anterior (marcar o antigo como `Supersedido por ADR-XXXX`).
-- Para propor uma nova decisão, crie um arquivo seguindo o padrão `NNNN-titulo-em-kebab-case.md` com status `Proposto`.
+- Para propor uma nova decisão, crie um arquivo seguindo o padrão `NNNN-titulo-em-kebab-case.md` com status `Proposto`, seguindo a estrutura dos ADRs existentes.
 - Numere sequencialmente a partir do próximo número disponível.
-
-## Template
-
-```markdown
-# ADR-NNNN: Título
-
-**Data:** YYYY-MM-DD  
-**Status:** Proposto | Aceito | Supersedido por ADR-XXXX | Obsoleto
-
-## Contexto
-...
-
-## Decisão
-...
-
-## Alternativas consideradas
-...
-
-## Consequências
-...
-```
 
 ---
 
