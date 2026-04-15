@@ -154,4 +154,8 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 
 ![Para mais informações:](./scripts/README.md)
 
+## Decisões arquiteturais (ADRs)
+As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`.
+
+![Índice de ADRs](./docs/adr/README.md)
 
