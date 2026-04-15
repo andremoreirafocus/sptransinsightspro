@@ -14,8 +14,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_for_all_Lines_and_vehicles_pandas(config):
-    df_recent_positions = get_recent_positions(config)
+def extract_trips_for_all_Lines_and_vehicles_pandas(
+    config,
+    get_positions_fn=get_recent_positions,
+    save_trips_fn=save_finished_trips_to_db,
+):
+    df_recent_positions = get_positions_fn(config)
     if df_recent_positions.empty:
         logger.warning("No position data found for the period.")
         return
@@ -61,4 +65,4 @@ def extract_trips_for_all_Lines_and_vehicles_pandas(config):
     logger.info(f"Progress: {num_processed} vehicle/line combinations processed.")
     logger.info(f"Total finished trips: {len(all_finished_trips)}")
     # save_trips_to_db(config, all_finished_trips)
-    save_finished_trips_to_db(config, all_finished_trips)
+    save_trips_fn(config, all_finished_trips)

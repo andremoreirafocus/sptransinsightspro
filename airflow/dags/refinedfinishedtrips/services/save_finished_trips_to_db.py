@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, text
 logger = logging.getLogger(__name__)
 
 
-def save_finished_trips_to_db(config, trips_tuples):
+def save_finished_trips_to_db(config, trips_tuples, engine_factory=create_engine):
     """
     Saves finished trips to Postgres using SQLAlchemy.
     Input: trips_tuples (List of Tuples)
@@ -30,7 +30,7 @@ def save_finished_trips_to_db(config, trips_tuples):
 
     (table_name, host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-    engine = create_engine(db_uri)
+    engine = engine_factory(db_uri)
     staging_table = f"{table_name}_stg"
     logger.info(f"Using staging table: {staging_table} for batch operations.")
     try:

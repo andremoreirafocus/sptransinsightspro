@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_recent_positions(config):
+def get_recent_positions(config, duckdb_client=None):
     def get_config(config):
         try:
             general = config["general"]
@@ -58,7 +58,7 @@ def get_recent_positions(config):
     s3_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}/year={year}/month={month}/day={day}/**"
     try:
         logger.info("Connecting to DuckDB...")
-        con = get_duckdb_connection(connection)
+        con = duckdb_client or get_duckdb_connection(connection)
         logger.info(
             f"Retrieveing position records for the last {hours_interval} hours in {s3_path}..."
         )

@@ -14,7 +14,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_for_all_Lines_and_vehicles_pandas(config, get_positions_fn=get_recent_positions, save_trips_fn=save_finished_trips_to_db):
+def extract_trips_for_all_Lines_and_vehicles_pandas(
+    config,
+    get_positions_fn=get_recent_positions,
+    save_trips_fn=save_finished_trips_to_db,
+):
     df_recent_positions = get_positions_fn(config)
     if df_recent_positions.empty:
         logger.warning("No position data found for the period.")
