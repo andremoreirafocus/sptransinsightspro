@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_latest_path_for_query(config):
+def get_latest_path_for_query(config, list_objects_fn=list_objects_in_object_storage_bucket):
     def get_config(config):
         try:
             general = config["general"]
@@ -41,7 +41,7 @@ def get_latest_path_for_query(config):
         check_time = now - timedelta(hours=i)
         prefix = f"{app_folder}/{positions_table_name}/{check_time.strftime('year=%Y/month=%m/day=%d/hour=%H')}/"
         logger.info(f"Looking at prefix: {bucket}/{prefix}...")
-        objects = list_objects_in_object_storage_bucket(
+        objects = list_objects_fn(
             connection_data,
             bucket,
             prefix,
