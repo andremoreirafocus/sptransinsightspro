@@ -228,6 +228,7 @@ def create_data_quality_report(
     warn_threshold: float = 0.980,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
+    write_fn=write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     data_quality_report = build_data_quality_report(
         config=config,
@@ -245,7 +246,7 @@ def create_data_quality_report(
     validation_report = format_data_quality_report(data_quality_report)
     logger.info(validation_report)
     save_data_quality_report_to_storage(
-        config, data_quality_report, transform_result["batch_ts"]
+        config, data_quality_report, transform_result["batch_ts"], write_fn=write_fn
     )
     return data_quality_report
 
@@ -264,6 +265,7 @@ def create_failure_quality_report(
     expectations_result: Optional[Dict[str, Any]] = None,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
+    write_fn=write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
     summary = build_quality_summary(
@@ -319,7 +321,7 @@ def create_failure_quality_report(
             "summary": summary,
             "details": details,
         }
-    save_data_quality_report_to_storage(config, data_quality_report, batch_ts_value)
+    save_data_quality_report_to_storage(config, data_quality_report, batch_ts_value, write_fn=write_fn)
     return data_quality_report
 
 
