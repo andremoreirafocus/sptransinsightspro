@@ -8,7 +8,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_latest_positions_table(config):
+def create_latest_positions_table(
+    config,
+    get_path_fn=get_latest_path_for_query,
+    duckdb_client=None,
+    save_fn=update_db_table_with_dataframe,
+):
     def get_config(config):
         try:
             general = config["general"]
@@ -35,12 +40,12 @@ def create_latest_positions_table(config):
         config
     )
     try:
-        latest_path_for_query = get_latest_path_for_query(config)
+        latest_path_for_query = get_path_fn(config)
         if not latest_path_for_query:
             logger.error("No recent data found in the last 2 hours. Scan aborted.")
             return
         logger.info(f"Discovery successful: {latest_path_for_query}")
-        con = get_duckdb_connection(storage_connection)
+        con = duckdb_client or get_duckdb_connection(storage_connection)
         refined_df = con.execute(f"""
             SELECT veiculo_ts, veiculo_id, veiculo_lat, veiculo_long, linha_lt, linha_sentido,
                    linha_lt || '-' || (CASE WHEN linha_sentido = 1 THEN '0' 
@@ -51,9 +56,7 @@ def create_latest_positions_table(config):
         logger.info(
             f"Updating table {latest_positions_table_name} with {total_records} records..."
         )
-        update_db_table_with_dataframe(
-            database_connection, refined_df, latest_positions_table_name
-        )
+        save_fn(database_connection, refined_df, latest_positions_table_name)
         logger.info(f"Updated table {latest_positions_table_name} successfully!")
 
     except Exception as e:
