@@ -6,7 +6,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def get_latest_path_for_query(config, list_objects_fn=list_objects_in_object_storage_bucket):
+def get_latest_path_for_query(
+    config, list_objects_fn=list_objects_in_object_storage_bucket
+):
     def get_config(config):
         try:
             general = config["general"]

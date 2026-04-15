@@ -8,7 +8,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_latest_positions_table(config, get_path_fn=get_latest_path_for_query, duckdb_client=None, save_fn=update_db_table_with_dataframe):
+def create_latest_positions_table(
+    config,
+    get_path_fn=get_latest_path_for_query,
+    duckdb_client=None,
+    save_fn=update_db_table_with_dataframe,
+):
     def get_config(config):
         try:
             general = config["general"]
@@ -51,9 +56,7 @@ def create_latest_positions_table(config, get_path_fn=get_latest_path_for_query,
         logger.info(
             f"Updating table {latest_positions_table_name} with {total_records} records..."
         )
-        save_fn(
-            database_connection, refined_df, latest_positions_table_name
-        )
+        save_fn(database_connection, refined_df, latest_positions_table_name)
         logger.info(f"Updated table {latest_positions_table_name} successfully!")
 
     except Exception as e:
