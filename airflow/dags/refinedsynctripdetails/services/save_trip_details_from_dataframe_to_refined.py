@@ -4,7 +4,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_trip_details_from_dataframe_to_refined(config, df_trip_details):
+def save_trip_details_from_dataframe_to_refined(
+    config, df_trip_details, save_fn=update_db_table_with_dataframe
+):
     def get_config(config):
         try:
             tables = config["general"]["tables"]
@@ -26,5 +28,5 @@ def save_trip_details_from_dataframe_to_refined(config, df_trip_details):
     logger.info(
         f"Updating table {trip_details_table_name} with {df_trip_details.shape[0]} records..."
     )
-    update_db_table_with_dataframe(connection, df_trip_details, trip_details_table_name)
+    save_fn(connection, df_trip_details, trip_details_table_name)
     logger.info(f"Updated table {trip_details_table_name} successfully!")
