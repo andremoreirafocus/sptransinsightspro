@@ -451,7 +451,10 @@ def write_data_quality_report_json(
 
 
 def save_data_quality_report_to_storage(
-    config: Dict[str, Any], data_quality_report: Dict[str, Any], batch_ts: Any
+    config: Dict[str, Any],
+    data_quality_report: Dict[str, Any],
+    batch_ts: Any,
+    write_fn=write_generic_bytes_to_object_storage,
 ) -> None:
     def get_config(config: Dict[str, Any]) -> Tuple[str, str, str, Dict[str, Any]]:
         general = config["general"]
@@ -475,7 +478,7 @@ def save_data_quality_report_to_storage(
     hhmm = batch_ts.strftime("%H%M")
     prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
     object_name = f"{prefix}quality-report-positions_{hhmm}.json"
-    write_generic_bytes_to_object_storage(
+    write_fn(
         connection_data,
         buffer=data_quality_report_to_json(data_quality_report).encode("utf-8"),
         bucket_name=bucket_name,

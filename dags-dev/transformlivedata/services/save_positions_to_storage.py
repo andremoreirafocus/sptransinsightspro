@@ -6,11 +6,11 @@ from infra.duck_db_v3 import get_duckdb_connection
 logger = logging.getLogger(__name__)
 
 
-
 def save_positions_to_storage(
     config: Dict[str, Any],
     positions_df: Optional[pd.DataFrame],
     target_bucket: str,
+    duckdb_client=None,
 ) -> None:
     """
     Storage Layer:
@@ -61,7 +61,7 @@ def save_positions_to_storage(
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
         positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
-        con = get_duckdb_connection(connection_data)
+        con = duckdb_client or get_duckdb_connection(connection_data)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         logger.info(
             f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."

@@ -6,10 +6,8 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def load_trip_details(config: Dict[str, Any]) -> pd.DataFrame:
-    def get_config(
-        config: Dict[str, Any]
-    ) -> Tuple[Dict[str, Any], str, str, str]:
+def load_trip_details(config: Dict[str, Any], duckdb_client=None) -> pd.DataFrame:
+    def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str, str]:
         try:
             general = config["general"]
             connections = config["connections"]
@@ -32,7 +30,7 @@ def load_trip_details(config: Dict[str, Any]) -> pd.DataFrame:
     logger.info(f"Loading trip_details from storage: {s3_path}")
     con = None
     try:
-        con = get_duckdb_connection(connection)
+        con = duckdb_client or get_duckdb_connection(connection)
         df = con.execute(f"SELECT * FROM read_parquet('{s3_path}')").df()
         logger.info(f"Successfully loaded {df.shape[0]} trips from storage.")
         return df
