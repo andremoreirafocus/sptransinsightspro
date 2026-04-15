@@ -77,6 +77,7 @@ EXTRACTLOADLIVEDATA_AIRFLOW_PASSWORD=<airflow_password>
   docker compose up -d postgres
   docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
   docker compose up -d extractloadlivedata
+  docker compose up -d alertservice
   docker compose up -d jupyter
 ```
 
