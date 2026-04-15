@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta, timezone
 
-import pytest
-
 from refinedfinishedtrips.services.extract_trips_from_positions import (
     extract_raw_trips_metadata,
     filter_healthy_trips,

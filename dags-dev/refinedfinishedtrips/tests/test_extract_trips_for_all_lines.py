@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
-import pytest
 
 from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
     extract_trips_for_all_Lines_and_vehicles_pandas,

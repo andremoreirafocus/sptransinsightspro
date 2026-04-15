@@ -41,6 +41,8 @@ def promote_pipeline(pipeline_name):
             "__pycache__",
             "--exclude",
             ".pytest_cache",
+            "--exclude",
+            "tests",
             f"{pipeline_dev_path}/",
             f"{pipeline_prod_path}/",
         ],
