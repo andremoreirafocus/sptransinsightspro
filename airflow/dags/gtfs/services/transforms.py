@@ -11,12 +11,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def transform_csv_table_to_parquet(config, table_name):
+def transform_csv_table_to_parquet(
+    config,
+    table_name,
+    load_fn=load_raw_csv_to_buffer_from_storage,
+    convert_fn=convert_buffer_from_csv_to_parquet,
+    save_fn=save_buffer_to_storage,
+):
     logger.info(f"Transforming {table_name}...")
-    csv_bytes = load_raw_csv_to_buffer_from_storage(config, table_name)
-    parquet_buffer = convert_buffer_from_csv_to_parquet(csv_bytes)
+    csv_bytes = load_fn(config, table_name)
+    parquet_buffer = convert_fn(csv_bytes)
     file_name = f"{table_name}.parquet"
-    save_buffer_to_storage(config, file_name, parquet_buffer)
+    save_fn(config, file_name, parquet_buffer)
     logger.info("Transformation successful.")
 
 

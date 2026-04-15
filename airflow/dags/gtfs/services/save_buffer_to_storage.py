@@ -5,7 +5,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_buffer_to_storage(config, file_name, buffer):
+def save_buffer_to_storage(
+    config, file_name, buffer, write_fn=write_generic_bytes_to_object_storage
+):
     def get_config(config):
         try:
             general = config["general"]
@@ -28,7 +30,7 @@ def save_buffer_to_storage(config, file_name, buffer):
     prefix = f"{app_folder}/{file_name.split('.')[0]}"
     destination_object_name = f"{prefix}/{file_name}"
     try:
-        write_generic_bytes_to_object_storage(
+        write_fn(
             connection_data,
             buffer=buffer,
             bucket_name=destination_bucket,

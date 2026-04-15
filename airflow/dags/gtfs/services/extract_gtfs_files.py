@@ -7,7 +7,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_gtfs_files(config):
+def extract_gtfs_files(config, http_get_fn=requests.get):
     def get_config(config):
         try:
             general = config["general"]
@@ -23,7 +23,7 @@ def extract_gtfs_files(config):
             raise ValueError(f"Missing required configuration key: {e}")
 
     url, login, password, downloads_folder = get_config(config)
-    response = requests.get(url, auth=(login, password))
+    response = http_get_fn(url, auth=(login, password))
     if response.status_code == 404:
         logger.error("Check credentials or portal access")
         return
