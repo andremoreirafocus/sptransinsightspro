@@ -48,10 +48,24 @@ def test_empty_positions_save_not_called():
 
 def test_no_trips_extracted_save_called_with_empty_list():
     # Single vehicle, no direction changes → no trips survive extraction
-    df = make_positions_df([
-        {"veiculo_ts": BASE_TS, "linha_lt": "1234-10", "veiculo_id": 100, "linha_sentido": 1, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=60), "linha_lt": "1234-10", "veiculo_id": 100, "linha_sentido": 1, "is_circular": False},
-    ])
+    df = make_positions_df(
+        [
+            {
+                "veiculo_ts": BASE_TS,
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "linha_sentido": 1,
+                "is_circular": False,
+            },
+            {
+                "veiculo_ts": BASE_TS + timedelta(seconds=60),
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "linha_sentido": 1,
+                "is_circular": False,
+            },
+        ]
+    )
     save = SaveCapture()
     extract_trips_for_all_Lines_and_vehicles_pandas(
         make_config(),
@@ -64,10 +78,24 @@ def test_no_trips_extracted_save_called_with_empty_list():
 
 def test_two_vehicles_save_called_once_with_combined_result():
     # Two distinct vehicles, each with a single position → no trips → save called once with []
-    df = make_positions_df([
-        {"veiculo_ts": BASE_TS, "linha_lt": "1234-10", "veiculo_id": 100, "linha_sentido": 1, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=60), "linha_lt": "5678-20", "veiculo_id": 200, "linha_sentido": 1, "is_circular": False},
-    ])
+    df = make_positions_df(
+        [
+            {
+                "veiculo_ts": BASE_TS,
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "linha_sentido": 1,
+                "is_circular": False,
+            },
+            {
+                "veiculo_ts": BASE_TS + timedelta(seconds=60),
+                "linha_lt": "5678-20",
+                "veiculo_id": 200,
+                "linha_sentido": 1,
+                "is_circular": False,
+            },
+        ]
+    )
     save = SaveCapture()
     extract_trips_for_all_Lines_and_vehicles_pandas(
         make_config(),

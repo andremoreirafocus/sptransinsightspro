@@ -1,0 +1,9 @@
+#!/bin/sh
+STAGED=$(git diff --cached --name-only --diff-filter=ACM | grep '\.py$')
+if [ -z "$STAGED" ]; then
+  exit 0
+fi
+ruff format $STAGED
+ruff check --fix $STAGED
+git add $STAGED
+ruff check $STAGED

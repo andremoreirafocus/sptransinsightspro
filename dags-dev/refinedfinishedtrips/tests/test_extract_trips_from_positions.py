@@ -124,7 +124,9 @@ def test_generate_trips_table_tuple_has_seven_fields():
         {"veiculo_ts": start_ts, "is_circular": False},
         {"veiculo_ts": end_ts, "is_circular": False},
     ]
-    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    trips_metadata = [
+        {"start_position_index": 0, "end_position_index": 1, "sentido": 1}
+    ]
     result = generate_trips_table(records, trips_metadata, "1234-10", 100)
     assert len(result) == 1
     assert len(result[0]) == 7
@@ -135,7 +137,9 @@ def test_generate_trips_table_trip_id_from_linha_sentido():
         {"veiculo_ts": BASE_TS, "is_circular": False},
         {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
     ]
-    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 2}]
+    trips_metadata = [
+        {"start_position_index": 0, "end_position_index": 1, "sentido": 2}
+    ]
     result = generate_trips_table(records, trips_metadata, "1234-10", 100)
     assert result[0][0] == "1234-10-1"
 
@@ -147,7 +151,9 @@ def test_generate_trips_table_duration_equals_end_minus_start():
         {"veiculo_ts": start_ts, "is_circular": False},
         {"veiculo_ts": end_ts, "is_circular": False},
     ]
-    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    trips_metadata = [
+        {"start_position_index": 0, "end_position_index": 1, "sentido": 1}
+    ]
     result = generate_trips_table(records, trips_metadata, "1234-10", 100)
     assert result[0][4] == end_ts - start_ts
 
@@ -157,7 +163,9 @@ def test_generate_trips_table_average_speed_always_zero():
         {"veiculo_ts": BASE_TS, "is_circular": False},
         {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
     ]
-    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    trips_metadata = [
+        {"start_position_index": 0, "end_position_index": 1, "sentido": 1}
+    ]
     result = generate_trips_table(records, trips_metadata, "1234-10", 100)
     assert result[0][6] == 0.0
 
@@ -171,12 +179,18 @@ def test_extract_trips_per_vehicle_empty_positions_returns_none():
 
 def test_extract_trips_per_vehicle_invalid_indices_returns_none():
     positions = [_pos(1)]
-    assert extract_trips_per_line_per_vehicle_pandas(positions, 5, 2, "1234-10", 100) is None
+    assert (
+        extract_trips_per_line_per_vehicle_pandas(positions, 5, 2, "1234-10", 100)
+        is None
+    )
 
 
 def test_extract_trips_per_vehicle_no_direction_change_returns_none():
     positions = [_pos(1, i * 60) for i in range(5)]
-    assert extract_trips_per_line_per_vehicle_pandas(positions, 0, 4, "1234-10", 100) is None
+    assert (
+        extract_trips_per_line_per_vehicle_pandas(positions, 0, 4, "1234-10", 100)
+        is None
+    )
 
 
 def test_extract_trips_per_vehicle_two_direction_changes_returns_one_trip():
@@ -184,7 +198,11 @@ def test_extract_trips_per_vehicle_two_direction_changes_returns_one_trip():
     # extract_raw_trips: change at i=1 (discarded), change at i=3 (kept: {start:1,end:2,sentido:2})
     # filter: duration = positions[2].ts - positions[1].ts = 3600s > 1800 → kept
     positions = [
-        _pos(1, 0), _pos(2, 0), _pos(2, 3600), _pos(1, 3600), _pos(1, 7200),
+        _pos(1, 0),
+        _pos(2, 0),
+        _pos(2, 3600),
+        _pos(1, 3600),
+        _pos(1, 7200),
     ]
     result = extract_trips_per_line_per_vehicle_pandas(positions, 0, 4, "1234-10", 100)
     assert result is not None

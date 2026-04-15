@@ -25,7 +25,9 @@ def promote_pipeline(pipeline_name):
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
     total_steps = (2 if has_tests else 1) + 2
-    steps_consumed = run_code_validations(pipeline_dev_path, pipeline_name, step_offset=1)
+    steps_consumed = run_code_validations(
+        pipeline_dev_path, pipeline_name, step_offset=1
+    )
     # 3. Atomic Sync Folder
     sync_step = steps_consumed + 1
     print(
