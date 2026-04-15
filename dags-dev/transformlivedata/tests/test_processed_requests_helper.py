@@ -26,6 +26,7 @@ def make_config():
 
 # --- get_unprocessed_requests ---
 
+
 def test_get_unprocessed_returns_results():
     def fake_select(connection, query):
         return [{"id": 1, "filename": "f.json", "processed": False}]
@@ -66,6 +67,7 @@ def test_get_unprocessed_table_name_without_dot_returns_empty_list():
 
 
 # --- mark_request_as_processed ---
+
 
 def test_mark_as_processed_returns_true_on_success():
     def fake_update(connection, query, params):
@@ -111,6 +113,7 @@ def test_mark_as_processed_passes_logical_date_as_param():
 
 
 # --- mark_request_as_processed_by_filename ---
+
 
 def test_mark_by_filename_returns_true_on_success():
     def fake_update(connection, query, params):

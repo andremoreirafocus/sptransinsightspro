@@ -64,8 +64,12 @@ def make_transform_result(invalid_count=0, total=100):
     }
 
 
-def make_expectations_result(rows_failed=0, violations=0, exceptions=0, gx_invalid_count=0):
-    invalid_df = pd.DataFrame({"id": range(gx_invalid_count)}) if gx_invalid_count > 0 else None
+def make_expectations_result(
+    rows_failed=0, violations=0, exceptions=0, gx_invalid_count=0
+):
+    invalid_df = (
+        pd.DataFrame({"id": range(gx_invalid_count)}) if gx_invalid_count > 0 else None
+    )
     valid_df = pd.DataFrame({"id": range(10)})
     return {
         "valid_df": valid_df,
@@ -83,6 +87,7 @@ def make_expectations_result(rows_failed=0, violations=0, exceptions=0, gx_inval
 
 
 # --- build_quality_report_path ---
+
 
 def test_path_contains_metadata_bucket():
     config = make_storage_config()
@@ -106,6 +111,7 @@ def test_path_partition_uses_date_components():
 
 
 # --- build_quality_summary (status logic without DataFrames) ---
+
 
 def test_summary_preserves_explicit_pass_status():
     config = make_storage_config()
@@ -181,17 +187,27 @@ def test_summary_contains_required_keys():
         batch_ts="2026-02-15T10:30:00",
         status="PASS",
     )
-    for key in ("contract_version", "pipeline", "execution_id", "status", "acceptance_rate", "rows_failed"):
+    for key in (
+        "contract_version",
+        "pipeline",
+        "execution_id",
+        "status",
+        "acceptance_rate",
+        "rows_failed",
+    ):
         assert key in result
 
 
 # --- save_data_quality_report_to_storage ---
 
+
 def test_write_fn_receives_correct_bucket():
     calls = []
 
     def fake_write(connection_data, buffer, bucket_name, object_name):
-        calls.append({"bucket_name": bucket_name, "object_name": object_name, "buffer": buffer})
+        calls.append(
+            {"bucket_name": bucket_name, "object_name": object_name, "buffer": buffer}
+        )
 
     save_data_quality_report_to_storage(
         make_storage_config(),
@@ -250,6 +266,7 @@ def test_write_fn_object_name_has_correct_partition_path():
 
 
 # --- build_quality_summary with transform_result + expectations_result ---
+
 
 def test_summary_computes_pass_with_clean_results():
     result = build_quality_summary(
@@ -344,6 +361,7 @@ def test_summary_acceptance_rate_zero_when_total_is_zero():
 
 # --- build_data_quality_report ---
 
+
 def test_build_data_quality_report_returns_summary_and_details():
     result = build_data_quality_report(
         config=make_storage_config(),
@@ -437,6 +455,7 @@ def test_build_data_quality_report_zero_total_gives_zero_acceptance_rate():
 
 # --- create_data_quality_report ---
 
+
 def test_create_data_quality_report_returns_report():
     result = create_data_quality_report(
         config=make_storage_config(),
@@ -466,6 +485,7 @@ def test_create_data_quality_report_calls_write_fn():
 
 
 # --- create_failure_quality_report ---
+
 
 def test_create_failure_quality_report_status_is_fail():
     result = create_failure_quality_report(
@@ -520,7 +540,9 @@ def test_create_failure_quality_report_uses_logical_date_when_batch_ts_none():
         failure_phase="load",
         failure_message="err",
         batch_ts=None,
-        write_fn=lambda connection_data, buffer, bucket_name, object_name: calls.append(object_name),
+        write_fn=lambda connection_data, buffer, bucket_name, object_name: calls.append(
+            object_name
+        ),
     )
     assert len(calls) == 1
 
@@ -541,6 +563,7 @@ def test_create_failure_quality_report_calls_write_fn():
 
 # --- build_quarantine_path ---
 
+
 def test_quarantine_path_contains_quarantined_bucket():
     path = build_quarantine_path(make_storage_config(), "2026-02-15T10:30:00")
     assert path.startswith("quarantine-bucket/")
@@ -559,6 +582,7 @@ def test_quarantine_path_ends_with_parquet_glob():
 
 # --- format_data_quality_report ---
 
+
 def _make_full_report(status="PASS"):
     return {
         "summary": {
@@ -573,12 +597,44 @@ def _make_full_report(status="PASS"):
             "execution_id": "exec-1",
             "logical_date_utc": "2026-02-15T10:00:00+00:00",
             "source_file": "f.json",
-            "transformation_row_counts": {"raw_records": 100, "transformed_records": 100, "accepted_records": 100, "rejected_records": 0},
-            "transformation_metrics": {"total_vehicles_processed": 100, "valid_vehicles": 100, "invalid_vehicles": 0, "expected_vehicles": 100, "total_lines_processed": 5},
-            "transformation_issues": {"invalid_trips": [], "invalid_vehicle_ids": [], "distance_calculation_errors": 0, "lines_with_invalid_vehicles": 0},
-            "expectations_summary": {"total_checks": 5, "expectations_successful": 5, "expectations_with_violations": 0, "expectations_failed_due_to_exceptions": 0, "rows_failed": 0, "violation_reasons": [], "exception_reasons": []},
-            "outcome": {"status": status, "acceptance_rate": 1.0, "policy_version": "v1"},
-            "artifacts": {"quality_report_path": "bucket/path.json", "quarantine_path": "bucket/q/", "colum lineage": {}},
+            "transformation_row_counts": {
+                "raw_records": 100,
+                "transformed_records": 100,
+                "accepted_records": 100,
+                "rejected_records": 0,
+            },
+            "transformation_metrics": {
+                "total_vehicles_processed": 100,
+                "valid_vehicles": 100,
+                "invalid_vehicles": 0,
+                "expected_vehicles": 100,
+                "total_lines_processed": 5,
+            },
+            "transformation_issues": {
+                "invalid_trips": [],
+                "invalid_vehicle_ids": [],
+                "distance_calculation_errors": 0,
+                "lines_with_invalid_vehicles": 0,
+            },
+            "expectations_summary": {
+                "total_checks": 5,
+                "expectations_successful": 5,
+                "expectations_with_violations": 0,
+                "expectations_failed_due_to_exceptions": 0,
+                "rows_failed": 0,
+                "violation_reasons": [],
+                "exception_reasons": [],
+            },
+            "outcome": {
+                "status": status,
+                "acceptance_rate": 1.0,
+                "policy_version": "v1",
+            },
+            "artifacts": {
+                "quality_report_path": "bucket/path.json",
+                "quarantine_path": "bucket/q/",
+                "colum lineage": {},
+            },
         },
     }
 
@@ -609,17 +665,22 @@ def test_format_report_includes_exception_reasons_when_present():
 
 def test_format_report_includes_expectations_failed_due_to_exceptions_line():
     report = _make_full_report()
-    report["details"]["expectations_summary"]["expectations_failed_due_to_exceptions"] = 2
+    report["details"]["expectations_summary"][
+        "expectations_failed_due_to_exceptions"
+    ] = 2
     output = format_data_quality_report(report)
     assert "Expectations failed due to exceptions: 2" in output
 
 
 def test_format_report_raises_on_malformed_input():
     with pytest.raises(ValueError, match="Error parsing data_quality_report"):
-        format_data_quality_report({"details": {"outcome": {"acceptance_rate": "not_a_number"}}})
+        format_data_quality_report(
+            {"details": {"outcome": {"acceptance_rate": "not_a_number"}}}
+        )
 
 
 # --- write_data_quality_report_json ---
+
 
 def test_write_data_quality_report_json_writes_valid_json():
     report = {"status": "PASS", "count": 42}

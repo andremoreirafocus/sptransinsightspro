@@ -73,7 +73,10 @@ def test_object_name_built_correctly_uncompressed():
         "posicoes_onibus-202602150936.json",
         read_str_fn=fake_read_str,
     )
-    assert calls[0] == "sptrans/year=2026/month=02/day=15/posicoes_onibus-202602150936.json"
+    assert (
+        calls[0]
+        == "sptrans/year=2026/month=02/day=15/posicoes_onibus-202602150936.json"
+    )
 
 
 def test_object_name_has_compression_extension_when_compressed():

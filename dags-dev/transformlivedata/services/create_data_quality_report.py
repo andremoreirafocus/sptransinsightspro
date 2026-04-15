@@ -321,7 +321,9 @@ def create_failure_quality_report(
             "summary": summary,
             "details": details,
         }
-    save_data_quality_report_to_storage(config, data_quality_report, batch_ts_value, write_fn=write_fn)
+    save_data_quality_report_to_storage(
+        config, data_quality_report, batch_ts_value, write_fn=write_fn
+    )
     return data_quality_report
 
 

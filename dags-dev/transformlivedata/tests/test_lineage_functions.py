@@ -10,6 +10,7 @@ from transformlivedata.lineage.lineage_functions import (
 
 # --- helpers ---
 
+
 def make_schema():
     """Minimal schema with two levels of nesting and a $ref."""
     return {
@@ -44,6 +45,7 @@ def make_schema():
 
 # --- get_json_raw_fields_path_from_schema ---
 
+
 def test_returns_first_level_field_paths():
     result = get_json_raw_fields_path_from_schema(make_schema())
     assert result["line_code"] == "payload.lines[i].line_code"
@@ -66,15 +68,7 @@ def test_returns_empty_dict_when_no_payload():
 
 
 def test_returns_empty_dict_when_no_array_at_first_level():
-    schema = {
-        "properties": {
-            "payload": {
-                "properties": {
-                    "lines": {"type": "object"}
-                }
-            }
-        }
-    }
+    schema = {"properties": {"payload": {"properties": {"lines": {"type": "object"}}}}}
     result = get_json_raw_fields_path_from_schema(schema)
     assert result == {}
 
@@ -126,6 +120,7 @@ def test_returns_empty_dict_when_no_ref():
 
 # --- build_api_lineage ---
 
+
 def test_build_api_lineage_maps_rename():
     df = pd.DataFrame({"vehicle_id": pd.Series([], dtype=str)})
     result = build_api_lineage(
@@ -155,8 +150,11 @@ def test_build_api_lineage_empty_rename_map():
 
 # --- build_join_lineage ---
 
+
 def test_build_join_lineage_maps_columns():
-    df = pd.DataFrame({"trip_id": pd.Series([], dtype=str), "route": pd.Series([], dtype=str)})
+    df = pd.DataFrame(
+        {"trip_id": pd.Series([], dtype=str), "route": pd.Series([], dtype=str)}
+    )
     result = build_join_lineage(df, "trip_details", "trip_id", ["trip_id", "route"])
     assert "route" in result
     assert result["route"]["inputs"] == ["trip_details.route"]
@@ -164,14 +162,18 @@ def test_build_join_lineage_maps_columns():
 
 
 def test_build_join_lineage_excludes_merge_key():
-    df = pd.DataFrame({"trip_id": pd.Series([], dtype=str), "route": pd.Series([], dtype=str)})
+    df = pd.DataFrame(
+        {"trip_id": pd.Series([], dtype=str), "route": pd.Series([], dtype=str)}
+    )
     result = build_join_lineage(df, "trip_details", "trip_id", ["trip_id", "route"])
     assert "trip_id" not in result
 
 
 def test_build_join_lineage_excludes_columns_not_in_df():
     df = pd.DataFrame({"route": pd.Series([], dtype=str)})
-    result = build_join_lineage(df, "trip_details", "trip_id", ["trip_id", "route", "missing_col"])
+    result = build_join_lineage(
+        df, "trip_details", "trip_id", ["trip_id", "route", "missing_col"]
+    )
     assert "missing_col" not in result
 
 
@@ -182,6 +184,7 @@ def test_build_join_lineage_empty_columns():
 
 
 # --- merge_lineage_fragments ---
+
 
 def test_merge_lineage_fragments_combines_dicts():
     a = {"col_a": {"inputs": ["x"]}}
@@ -204,6 +207,7 @@ def test_merge_lineage_fragments_no_args():
 
 
 # --- get_column_type ---
+
 
 def test_get_column_type_int():
     df = pd.DataFrame({"x": pd.array([1, 2], dtype="int64")})
