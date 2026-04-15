@@ -17,6 +17,9 @@
         "compression": {
             "raw_data_compression": true,
             "raw_data_compression_extension": ".zst"
+        },
+        "notifications": {
+            "webhook_url": "http://localhost:8000/notify"
         }
     }
 }

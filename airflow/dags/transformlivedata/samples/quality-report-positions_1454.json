@@ -1,0 +1,215 @@
+{
+  "execution_id": "19b08037-c9dc-4a38-bc0a-ac0dbdff66f5",
+  "logical_date_utc": "2026-04-06T14:54:00+00:00",
+  "source_file": "posicoes_onibus-202604061154.json",
+  "row_counts": {
+    "raw_records": 9951,
+    "transformed_records": 9950,
+    "accepted_records": 9950,
+    "rejected_records": 1
+  },
+  "transformation_metrics": {
+    "total_vehicles_processed": 9951,
+    "valid_vehicles": 9950,
+    "invalid_vehicles": 1,
+    "expected_vehicles": 9951,
+    "total_lines_processed": 2042
+  },
+  "transformation_issues": {
+    "invalid_trips": [
+      "TREI-10-0"
+    ],
+    "invalid_vehicle_ids": [
+      11711
+    ],
+    "distance_calculation_errors": 0,
+    "lines_with_invalid_vehicles": 1
+  },
+  "expectations_summary": {
+    "total_checks": 11,
+    "expectations_successful": 11,
+    "expectations_with_violations": 0,
+    "expectations_failed_due_to_exceptions": 0,
+    "rows_failed": 0,
+    "violation_reasons": [],
+    "exception_reasons": []
+  },
+  "outcome": {
+    "status": "PASS",
+    "acceptance_rate": 1.0,
+    "policy_version": "v1"
+  },
+  "artifacts": {
+    "quality_report_path": "metadata/quality-reports/transformlivedata/year=2026/month=04/day=06/hour=14/quality-report-positions_1454.json",
+    "quarantine_path": "quarantined/sptrans/positions/year=2026/month=04/day=06/hour=14/positions_1454_*.parquet",
+    "colum lineage": {
+      "linha_lt": {
+        "inputs": [
+          "payload.l[i].c"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "linha_code": {
+        "inputs": [
+          "payload.l[i].cl"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "linha_sentido": {
+        "inputs": [
+          "payload.l[i].sl"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "lt_destino": {
+        "inputs": [
+          "payload.l[i].lt0"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "lt_origem": {
+        "inputs": [
+          "payload.l[i].lt1"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "veiculo_id": {
+        "inputs": [
+          "payload.l[i].vs[j].p"
+        ],
+        "type": "string",
+        "transformation": "API rename/cast"
+      },
+      "veiculo_acessivel": {
+        "inputs": [
+          "payload.l[i].vs[j].a"
+        ],
+        "type": "boolean",
+        "transformation": "API rename/cast"
+      },
+      "veiculo_ts": {
+        "inputs": [
+          "payload.l[i].vs[j].ta"
+        ],
+        "type": "timestamp",
+        "transformation": "API rename/cast"
+      },
+      "veiculo_lat": {
+        "inputs": [
+          "payload.l[i].vs[j].py"
+        ],
+        "type": "float",
+        "transformation": "API rename/cast"
+      },
+      "veiculo_long": {
+        "inputs": [
+          "payload.l[i].vs[j].px"
+        ],
+        "type": "float",
+        "transformation": "API rename/cast"
+      },
+      "extracao_ts": {
+        "inputs": [
+          "ingest_service"
+        ],
+        "type": "timestamp",
+        "transformation": "ingest timestamp"
+      },
+      "first_stop_id": {
+        "inputs": [
+          "trip_details.first_stop_id"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "first_stop_name": {
+        "inputs": [
+          "trip_details.first_stop_name"
+        ],
+        "type": "string",
+        "transformation": "trip_details left join"
+      },
+      "first_stop_lat": {
+        "inputs": [
+          "trip_details.first_stop_lat"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "first_stop_lon": {
+        "inputs": [
+          "trip_details.first_stop_lon"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "last_stop_id": {
+        "inputs": [
+          "trip_details.last_stop_id"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "last_stop_name": {
+        "inputs": [
+          "trip_details.last_stop_name"
+        ],
+        "type": "string",
+        "transformation": "trip_details left join"
+      },
+      "last_stop_lat": {
+        "inputs": [
+          "trip_details.last_stop_lat"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "last_stop_lon": {
+        "inputs": [
+          "trip_details.last_stop_lon"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "trip_linear_distance": {
+        "inputs": [
+          "trip_details.trip_linear_distance"
+        ],
+        "type": "float",
+        "transformation": "trip_details left join"
+      },
+      "is_circular": {
+        "inputs": [
+          "trip_details.is_circular"
+        ],
+        "type": "string",
+        "transformation": "trip_details left join"
+      },
+      "distance_to_first_stop": {
+        "inputs": [
+          "veiculo_lat",
+          "veiculo_long",
+          "first_stop_lat",
+          "first_stop_lon"
+        ],
+        "type": "float",
+        "transformation": "calculated based on current position"
+      },
+      "distance_to_last_stop": {
+        "inputs": [
+          "veiculo_lat",
+          "veiculo_long",
+          "last_stop_lat",
+          "last_stop_lon"
+        ],
+        "type": "float",
+        "transformation": "calculated based on current position"
+      }
+    }
+  }
+}

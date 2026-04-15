@@ -30,3 +30,32 @@ python <nome_da_dag-versao-da-dag.py>
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas conforme definido no README de cada subprojeto.
 
+## Testes unitários
+
+Cada pipeline possui uma pasta `tests/` com testes unitários. Os testes seguem o padrão de injeção de dependência via parâmetros opcionais — sem monkeypatching — e utilizam fakes compartilhados em `tests/fakes/`.
+
+Para executar todos os testes a partir da pasta `dags-dev`:
+
+```bash
+cd dags-dev
+pytest
+```
+
+Para executar os testes de uma pipeline específica:
+
+```bash
+pytest <pipeline>/tests/
+```
+
+### Cobertura por pipeline
+
+| Pipeline               | Testes |
+|------------------------|-------:|
+| transformlivedata      | 114    |
+| refinedfinishedtrips   | 34     |
+| gtfs                   | 25     |
+| orchestratetransform   | 12     |
+| updatelatestpositions  | 11     |
+| refinedsynctripdetails | 11     |
+| **Total**              | **207**|
+

@@ -12,10 +12,15 @@ logger = logging.getLogger(__name__)
 
 
 def load_positions(
-    config: Dict[str, Any], partition_path: str, source_file: str
+    config: Dict[str, Any],
+    partition_path: str,
+    source_file: str,
+    read_bytes_fn=read_file_from_object_storage_to_bytesio,
+    read_str_fn=read_file_from_object_storage_to_str,
+    decompress_fn=decompress_data,
 ) -> Dict[str, Any]:
     def get_config(
-        config: Dict[str, Any]
+        config: Dict[str, Any],
     ) -> Tuple[str, str, bool, str, Dict[str, Any]]:
         general = config["general"]
         connections = config["connections"]
@@ -56,16 +61,12 @@ def load_positions(
         f"Loading position data {object_name} from bucket: {source_bucket}, folder: {app_folder}"
     )
     if raw_data_compression:
-        data = read_file_from_object_storage_to_bytesio(
-            connection_data, source_bucket, object_name
-        )
+        data = read_bytes_fn(connection_data, source_bucket, object_name)
         logger.info("Data is compressed, decompressing...")
-        datastr = decompress_data(data.getvalue())
+        datastr = decompress_fn(data.getvalue())
         logger.info("Data decompressed successfully.")
     else:
-        datastr = read_file_from_object_storage_to_str(
-            connection_data, source_bucket, object_name
-        )
+        datastr = read_str_fn(connection_data, source_bucket, object_name)
     logger.info(f"Loaded {len(datastr)} bytes from {object_name}")
     data = json.loads(datastr)
     return data
