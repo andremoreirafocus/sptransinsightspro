@@ -139,7 +139,9 @@ def mark_request_as_processed(config, logical_date, update_fn=execute_update_que
         return False
 
 
-def mark_request_as_processed_by_filename(config, filename, update_fn=execute_update_query):
+def mark_request_as_processed_by_filename(
+    config, filename, update_fn=execute_update_query
+):
     """
     Mark a processing request as processed by updating the processed field to true.
 
