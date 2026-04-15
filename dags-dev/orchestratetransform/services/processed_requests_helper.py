@@ -4,7 +4,7 @@ from infra.sql_db_v2 import execute_select_query, execute_update_query
 logger = logging.getLogger(__name__)
 
 
-def get_unprocessed_requests(config):
+def get_unprocessed_requests(config, select_fn=execute_select_query):
     """
     Get all unprocessed requests from the RAW_EVENTS_TABLE_NAME table.
 
@@ -52,10 +52,9 @@ def get_unprocessed_requests(config):
         query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
 
         logger.info(f"Fetching unprocessed requests from {schema}.{table}")
-        logger.info(f"Fetching unprocessed requests from {schema}.{table}")
 
         # Execute query
-        results = execute_select_query(connection, query)
+        results = select_fn(connection, query)
 
         if results:
             logger.info(f"Found {len(results)} unprocessed request(s)")
@@ -69,7 +68,7 @@ def get_unprocessed_requests(config):
         return []
 
 
-def mark_request_as_processed(config, logical_date):
+def mark_request_as_processed(config, logical_date, update_fn=execute_update_query):
     """
     Mark a processing request as processed by updating the processed field to true.
 
@@ -124,7 +123,7 @@ def mark_request_as_processed(config, logical_date):
         )
 
         # Execute update
-        success = execute_update_query(connection, query, {"logical_date": logical_date})
+        success = update_fn(connection, query, {"logical_date": logical_date})
 
         if success:
             logger.info(f"Request with logical_date={logical_date} marked as processed")
@@ -140,7 +139,7 @@ def mark_request_as_processed(config, logical_date):
         return False
 
 
-def mark_request_as_processed_by_filename(config, filename):
+def mark_request_as_processed_by_filename(config, filename, update_fn=execute_update_query):
     """
     Mark a processing request as processed by updating the processed field to true.
 
@@ -195,7 +194,7 @@ def mark_request_as_processed_by_filename(config, filename):
         )
 
         # Execute update
-        success = execute_update_query(connection, query, {"filename": filename})
+        success = update_fn(connection, query, {"filename": filename})
 
         if success:
             logger.info(f"Request with filename={filename} marked as processed")
