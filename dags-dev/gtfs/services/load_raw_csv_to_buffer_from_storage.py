@@ -6,7 +6,9 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def load_raw_csv_to_buffer_from_storage(config, file_name):
+def load_raw_csv_to_buffer_from_storage(
+    config, file_name, read_fn=read_file_from_object_storage_to_bytesio
+):
     """
     Load position data from source bucket and app folder.
     :param source_bucket: Source bucket name
@@ -36,8 +38,6 @@ def load_raw_csv_to_buffer_from_storage(config, file_name):
     prefix = f"{app_folder}/"
     object_name = f"{prefix}{file_name}/{file_name}.txt"
     logger.info(f"Reading object: {object_name} from bucket: {source_bucket} ...")
-    data = read_file_from_object_storage_to_bytesio(
-        connection_data, source_bucket, object_name
-    )
+    data = read_fn(connection_data, source_bucket, object_name)
     logger.info(f"Loaded {data.getbuffer().nbytes} bytes from {object_name}")
     return data

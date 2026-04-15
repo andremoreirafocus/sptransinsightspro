@@ -4,7 +4,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def create_trip_details_table_and_fill_missing_data(config):
+def create_trip_details_table_and_fill_missing_data(config, duckdb_client=None):
     def get_config(config):
         try:
             general = config["general"]
@@ -25,7 +25,7 @@ def create_trip_details_table_and_fill_missing_data(config):
     con = None
     try:
         bucket_name, app_folder, trip_details, connection = get_config(config)
-        con = get_duckdb_connection(connection)
+        con = duckdb_client or get_duckdb_connection(connection)
         stop_times_table_path = f"{bucket_name}/{app_folder}/stop_times"
         stops_table_path = f"{bucket_name}/{app_folder}/stops"
         con.execute(f"""

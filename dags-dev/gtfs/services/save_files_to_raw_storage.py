@@ -5,7 +5,12 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def save_files_to_raw_storage(config, files_list):
+def save_files_to_raw_storage(
+    config,
+    files_list,
+    read_file_fn=open,
+    write_fn=write_generic_bytes_to_object_storage,
+):
     def get_config(config):
         try:
             general = config["general"]
@@ -27,7 +32,7 @@ def save_files_to_raw_storage(config, files_list):
     for file_name in files_list:
         local_file_path = f"{folder}/{file_name}"
         logger.info(f"Reading file: {local_file_path} ...")
-        with open(local_file_path, "rb") as f:
+        with read_file_fn(local_file_path, "rb") as f:
             data = f.read()
         file_name_no_ext = file_name.split(".")[0]
         prefix = f"{app_folder}/"
@@ -35,7 +40,7 @@ def save_files_to_raw_storage(config, files_list):
         logger.info(
             f"Writing file: {local_file_path} to {bucket_name}/{destination_object_name}..."
         )
-        write_generic_bytes_to_object_storage(
+        write_fn(
             connection_data,
             buffer=data,
             bucket_name=bucket_name,
