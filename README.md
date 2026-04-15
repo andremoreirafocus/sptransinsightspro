@@ -152,4 +152,6 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
 | `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
+![Para mais informações:](./scripts/README.md)
+
 
