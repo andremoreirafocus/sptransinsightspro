@@ -23,3 +23,4 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 | [ADR-0005](./0005-validacao-orientada-a-configuracao.md) | Validação orientada a configuração (JSON Schema + Great Expectations) | Aceito |
 | [ADR-0006](./0006-injecao-de-dependencia-para-testabilidade.md) | Injeção de dependência como estratégia de testabilidade | Aceito |
 | [ADR-0007](./0007-workflow-de-promocao-de-pipelines.md) | Workflow de promoção de pipelines (dags-dev → airflow/dags) | Aceito |
+| [ADR-0008](./0008-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Aceito |
