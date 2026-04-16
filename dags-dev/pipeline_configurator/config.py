@@ -67,7 +67,9 @@ def _get_airflow_config(
     data_validations = general_vars.get("data_validations")
     if data_validations:
         schemas = data_validations.get("json_validation", {}).get("schemas", [])
-        expectations_suites = data_validations.get("expectations_validation", {}).get("expectations_suites", [])
+        expectations_suites = data_validations.get("expectations_validation", {}).get(
+            "expectations_suites", []
+        )
         for name in schemas + expectations_suites:
             config[name] = Variable.get(
                 f"{pipeline}_{name}",
@@ -116,7 +118,9 @@ def _get_local_config(
     data_validations = general_config.get("data_validations")
     if data_validations:
         schemas = data_validations.get("json_validation", {}).get("schemas", [])
-        expectations_suites = data_validations.get("expectations_validation", {}).get("expectations_suites", [])
+        expectations_suites = data_validations.get("expectations_validation", {}).get(
+            "expectations_suites", []
+        )
         for name in schemas + expectations_suites:
             artifact_path = os.path.join(
                 base_dir, "..", pipeline, "config", f"{pipeline}_{name}.json"
