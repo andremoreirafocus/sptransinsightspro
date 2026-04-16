@@ -11,6 +11,12 @@
     },
     "tables": {
       "trip_details_table_name": "trip_details"
+    },
+    "data_validations": {
+      "expectations_validation": {
+          "expectations_suites": 
+          ["data_expectations_trip_details", "data_expectations_stops", "data_expectations_stop_times"]
+      }
     }
   }
 }
