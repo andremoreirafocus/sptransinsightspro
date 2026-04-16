@@ -32,13 +32,12 @@ def _load_pipeline_config():
             None,
             None,
             "airflow_postgres_conn",
-            load_raw_data_json_schema=False,
-            load_data_expectations=False,
         )
     except Exception as e:
         logger.error(f"Pipeline configuration validation failed: {e}")
         raise ValueError(f"Pipeline configuration validation failed: {e}")
     return pipeline_config
+
 
 # Definindo os argumentos padrão para as tarefas do DAG
 default_args = {

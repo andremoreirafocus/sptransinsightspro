@@ -47,8 +47,6 @@ def _load_pipeline_config():
             "gtfs_conn",
             "minio_conn",
             None,
-            load_raw_data_json_schema=False,
-            load_data_expectations=False,
         )
     except Exception as e:
         logging.error(f"Pipeline configuration validation failed: {e}")
