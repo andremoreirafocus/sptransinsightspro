@@ -8,12 +8,12 @@ from transformlivedata.services.save_positions_to_storage import (
 from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
 )
-from transformlivedata.quality.validate_expectations import (
+from quality.validate_expectations import (
     validate_expectations,
 )
 from pipeline_configurator.config import get_config
 from transformlivedata.config.transformlivedata_config_schema import GeneralConfig
-from transformlivedata.quality.validate_json_data_schema import (
+from quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
 from transformlivedata.services.create_data_quality_report import (
