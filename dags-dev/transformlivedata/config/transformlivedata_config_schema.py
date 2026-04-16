@@ -32,12 +32,19 @@ class NotificationsConfig(BaseModel):
     webhook_url: str
 
 
+class DataValidationsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    json_validation: Dict[str, Any]
+    expectations_validation: Dict[str, Any]
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     storage: StorageConfig
     tables: TablesConfig
     compression: CompressionConfig
     notifications: NotificationsConfig
+    data_validations: DataValidationsConfig
 
 
 class ObjectStorageConnection(BaseModel):

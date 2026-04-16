@@ -42,8 +42,6 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
             None,
             "minio_conn",
             "airflow_postgres_conn",
-            load_raw_data_json_schema=True,
-            load_data_expectations=True,
         )
     except Exception as e:
         logger.error(f"Pipeline configuration validation failed: {e}")

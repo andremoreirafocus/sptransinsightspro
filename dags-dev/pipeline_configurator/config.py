@@ -19,8 +19,6 @@ def get_config(
     http_conn_name: str,
     object_storage_conn_name: str,
     database_conn_name: str,
-    load_raw_data_json_schema: bool = False,
-    load_data_expectations: bool = False,
 ) -> Dict[str, Any]:
     """
     Load configuration for a pipeline.
@@ -35,8 +33,6 @@ def get_config(
     if use_airflow:
         return _get_airflow_config(
             pipeline,
-            load_raw_data_json_schema=load_raw_data_json_schema,
-            load_data_expectations=load_data_expectations,
             http_conn_name=http_conn_name,
             object_storage_conn_name=object_storage_conn_name,
             database_conn_name=database_conn_name,
@@ -50,16 +46,12 @@ def get_config(
         http_conn_name=http_conn_name,
         object_storage_conn_name=object_storage_conn_name,
         database_conn_name=database_conn_name,
-        load_raw_data_json_schema=load_raw_data_json_schema,
-        load_data_expectations=load_data_expectations,
         general_schema=general_schema,
     )
 
 
 def _get_airflow_config(
     pipeline: str,
-    load_raw_data_json_schema: bool = False,
-    load_data_expectations: bool = False,
     http_conn_name: str = None,
     object_storage_conn_name: str = None,
     database_conn_name: str = None,
@@ -72,20 +64,16 @@ def _get_airflow_config(
     config = {
         "general": general_vars,
     }
-    if load_raw_data_json_schema:
-        raw_data_json_schema = Variable.get(
-            f"{pipeline}_raw_data_json_schema",
-            deserialize_json=True,
-            default_var={},
-        )
-        config["raw_data_json_schema"] = raw_data_json_schema
-    if load_data_expectations:
-        data_expectations = Variable.get(
-            f"{pipeline}_data_expectations",
-            deserialize_json=True,
-            default_var={},
-        )
-        config["data_expectations"] = data_expectations
+    data_validations = general_vars.get("data_validations")
+    if data_validations:
+        schemas = data_validations.get("json_validation", {}).get("schemas", [])
+        expectations_suites = data_validations.get("expectations_validation", {}).get("expectations_suites", [])
+        for name in schemas + expectations_suites:
+            config[name] = Variable.get(
+                f"{pipeline}_{name}",
+                deserialize_json=True,
+                default_var={},
+            )
     connections = {}
     if http_conn_name is not None:
         http_connection = get_http_connection_from_airflow(http_conn_name)
@@ -108,8 +96,6 @@ def _get_local_config(
     http_conn_name: str = None,
     object_storage_conn_name: str = None,
     database_conn_name: str = None,
-    load_raw_data_json_schema: bool = False,
-    load_data_expectations: bool = False,
     general_schema: Any = None,
 ) -> Dict[str, Any]:
     base_dir = os.path.dirname(os.path.abspath(__file__))
@@ -127,22 +113,15 @@ def _get_local_config(
     config = {
         "general": general_config,
     }
-    if load_raw_data_json_schema:
-        raw_schema_path = os.path.join(
-            base_dir, "..", pipeline, "config", f"{pipeline}_raw_data_json_schema.json"
-        )
-        raw_data_json_schema = _load_json(
-            raw_schema_path, f"{pipeline}_raw_data_json_schema"
-        )
-        config["raw_data_json_schema"] = raw_data_json_schema
-    if load_data_expectations:
-        expectations_path = os.path.join(
-            base_dir, "..", pipeline, "config", f"{pipeline}_data_expectations.json"
-        )
-        data_expectations = _load_json(
-            expectations_path, f"{pipeline}_data_expectations"
-        )
-        config["data_expectations"] = data_expectations
+    data_validations = general_config.get("data_validations")
+    if data_validations:
+        schemas = data_validations.get("json_validation", {}).get("schemas", [])
+        expectations_suites = data_validations.get("expectations_validation", {}).get("expectations_suites", [])
+        for name in schemas + expectations_suites:
+            artifact_path = os.path.join(
+                base_dir, "..", pipeline, "config", f"{pipeline}_{name}.json"
+            )
+            config[name] = _load_json(artifact_path, f"{pipeline}_{name}")
 
     connections = {}
     if http_conn_name is not None:
