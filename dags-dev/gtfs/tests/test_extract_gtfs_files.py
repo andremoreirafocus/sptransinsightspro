@@ -2,6 +2,7 @@ import io
 import zipfile
 import pytest
 from gtfs.services.extract_gtfs_files import extract_gtfs_files
+from gtfs.tests.fakes.fake_http import FakeHttpResponse
 
 
 def make_config():
@@ -31,21 +32,11 @@ def make_zip_bytes(filenames):
     return buf.getvalue()
 
 
-class FakeResponse:
-    def __init__(self, status_code, content=b""):
-        self.status_code = status_code
-        self.content = content
-
-    def raise_for_status(self):
-        if self.status_code >= 400:
-            raise RuntimeError(f"HTTP {self.status_code}")
-
-
 def test_returns_file_list_on_success(tmp_path):
     zip_bytes = make_zip_bytes(["stops.txt", "routes.txt"])
 
     def fake_get(url, auth):
-        return FakeResponse(200, zip_bytes)
+        return FakeHttpResponse(200, zip_bytes)
 
     config = make_config()
     config["general"]["extraction"]["local_downloads_folder"] = str(tmp_path)
@@ -56,7 +47,7 @@ def test_returns_file_list_on_success(tmp_path):
 
 def test_raises_value_error_on_404():
     def fake_get(url, auth):
-        return FakeResponse(404)
+        return FakeHttpResponse(404)
 
     with pytest.raises(
         ValueError, match="GTFS endpoint returned 404: check credentials or portal access."
@@ -66,7 +57,7 @@ def test_raises_value_error_on_404():
 
 def test_raises_on_non_404_http_error():
     def fake_get(url, auth):
-        return FakeResponse(500)
+        return FakeHttpResponse(500)
 
     with pytest.raises(RuntimeError):
         extract_gtfs_files(make_config(), http_get_fn=fake_get)
@@ -83,7 +74,7 @@ def test_files_extracted_to_folder(tmp_path):
     zip_bytes = make_zip_bytes(["agency.txt"])
 
     def fake_get(url, auth):
-        return FakeResponse(200, zip_bytes)
+        return FakeHttpResponse(200, zip_bytes)
 
     config = make_config()
     config["general"]["extraction"]["local_downloads_folder"] = str(tmp_path)
@@ -96,7 +87,7 @@ def test_raises_on_unsafe_zip_entry(tmp_path):
     zip_bytes = make_zip_bytes(["../outside.txt", "agency.txt"])
 
     def fake_get(url, auth):
-        return FakeResponse(200, zip_bytes)
+        return FakeHttpResponse(200, zip_bytes)
 
     config = make_config()
     config["general"]["extraction"]["local_downloads_folder"] = str(tmp_path)

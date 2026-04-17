@@ -80,15 +80,42 @@ def _load_pipeline_config():
 
 def _send_webhook_from_report(report: dict, pipeline_config: dict, path: str):
     summary = report.get("summary", {})
-    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-        logger.info("Webhook notification disabled (%s)", path)
+    execution_id = summary.get("execution_id")
+    status = summary.get("status")
+    failure_phase = summary.get("failure_phase")
+    webhook_url = (
+        pipeline_config.get("general", {})
+        .get("notifications", {})
+        .get("webhook_url")
+    )
+    normalized_webhook_url = str(webhook_url or "").strip()
+    if normalized_webhook_url.lower() in {"", "disabled", "none", "null"}:
+        logger.info(
+            "Webhook notification disabled (%s): execution_id=%s status=%s failure_phase=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+        )
         return
     try:
-        send_webhook(summary, webhook_url)
-        logger.info("Webhook notification sent (%s)", path)
+        send_webhook(summary, normalized_webhook_url)
+        logger.info(
+            "Webhook notification sent (%s): execution_id=%s status=%s failure_phase=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+        )
     except Exception as e:
-        logger.error("Webhook notification failed: %s", e)
+        logger.error(
+            "Webhook notification failed (%s): execution_id=%s status=%s failure_phase=%s error=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+            e,
+        )
 
 
 def _apply_relocation_result(stage_result: dict, relocation: dict):

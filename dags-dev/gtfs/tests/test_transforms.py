@@ -1,5 +1,6 @@
 import io
 
+import gtfs.services.transforms as transforms_module
 from gtfs.services.transforms import transform_and_validate_table
 
 
@@ -103,3 +104,148 @@ def test_transform_and_validate_table_returns_error_when_load_fails():
     assert result["is_valid"] is False
     assert result["staged_written"] is False
     assert result["errors"] == ["load_failed:read error"]
+
+
+def test_transform_and_validate_table_returns_error_when_csv_parse_fails():
+    def fake_load(config, table_name):
+        return io.BytesIO(b"\xff\xfe\x00")
+
+    result = transform_and_validate_table(
+        make_config(),
+        "stops",
+        load_fn=fake_load,
+    )
+
+    assert result["is_valid"] is False
+    assert result["staged_written"] is False
+    assert result["errors"]
+    assert result["errors"][0].startswith("csv_parse_failed:")
+
+
+def test_transform_and_validate_table_marks_valid_when_gx_passes():
+    config = make_config()
+    config["data_expectations_stops"] = {
+        "expectation_suite_name": "gtfs_stops",
+        "expectations": [{"expectation_type": "expect_column_values_to_not_be_null"}],
+    }
+
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A")
+
+    def fake_convert(df):
+        return b"parquet"
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        return None
+
+    def fake_validate_expectations(df, suite):
+        return {
+            "expectations_summary": {
+                "rows_failed": 0,
+                "expectations_with_violations": 0,
+                "expectations_failed_due_to_exceptions": 0,
+            }
+        }
+
+    result = transform_and_validate_table(
+        config,
+        "stops",
+        load_fn=fake_load,
+        convert_fn=fake_convert,
+        save_fn=fake_save,
+        validate_expectations_fn=fake_validate_expectations,
+    )
+
+    assert result["is_valid"] is True
+    assert result["errors"] == []
+    assert result["staged_written"] is True
+
+
+def test_transform_and_validate_table_marks_invalid_when_gx_raises_exception():
+    config = make_config()
+    config["data_expectations_stops"] = {
+        "expectation_suite_name": "gtfs_stops",
+        "expectations": [{"expectation_type": "expect_column_values_to_not_be_null"}],
+    }
+
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A")
+
+    def fake_convert(df):
+        return b"parquet"
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        return None
+
+    def fake_validate_expectations(df, suite):
+        raise RuntimeError("gx boom")
+
+    result = transform_and_validate_table(
+        config,
+        "stops",
+        load_fn=fake_load,
+        convert_fn=fake_convert,
+        save_fn=fake_save,
+        validate_expectations_fn=fake_validate_expectations,
+    )
+
+    assert result["is_valid"] is False
+    assert result["staged_written"] is True
+    assert result["errors"] == ["gx_validation_exception:gx boom"]
+
+
+def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A")
+
+    def fake_convert(df):
+        return b"parquet"
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        raise RuntimeError("save boom")
+
+    result = transform_and_validate_table(
+        make_config(),
+        "routes",
+        load_fn=fake_load,
+        convert_fn=fake_convert,
+        save_fn=fake_save,
+    )
+
+    assert result["is_valid"] is False
+    assert result["staged_written"] is False
+    assert result["errors"] == ["staging_save_failed:save boom"]
+
+
+def test_transform_table_wrappers_delegate_to_transform_and_validate_table():
+    calls = []
+    original = transforms_module.transform_and_validate_table
+
+    def fake_transform(config, table_name, **kwargs):
+        calls.append(table_name)
+        return {"table_name": table_name}
+
+    transforms_module.transform_and_validate_table = fake_transform
+    try:
+        config = make_config()
+        assert transforms_module.transform_routes(config)["table_name"] == "routes"
+        assert transforms_module.transform_trips(config)["table_name"] == "trips"
+        assert (
+            transforms_module.transform_stop_times(config)["table_name"] == "stop_times"
+        )
+        assert transforms_module.transform_stops(config)["table_name"] == "stops"
+        assert transforms_module.transform_calendar(config)["table_name"] == "calendar"
+        assert (
+            transforms_module.transform_frequencies(config)["table_name"] == "frequencies"
+        )
+    finally:
+        transforms_module.transform_and_validate_table = original
+
+    assert calls == [
+        "routes",
+        "trips",
+        "stop_times",
+        "stops",
+        "calendar",
+        "frequencies",
+    ]
