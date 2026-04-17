@@ -1,5 +1,3 @@
-import pytest
-
 from src.notifications_evaluator import evaluate_cumulative_warn
 
 
