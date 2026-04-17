@@ -8,19 +8,14 @@
       "gtfs_folder": "gtfs",
       "raw_bucket": "raw",
       "quarantined_subfolder": "quarantined",
+      "staging_subfolder": "staging",
       "trusted_bucket": "trusted"
     },
     "tables": {
       "trip_details_table_name": "trip_details"
     },
     "notifications": {
-      "webhook_url": "disabled"
-    },
-    "data_validations": {
-      "expectations_validation": {
-          "expectations_suites": 
-          [ "data_expectations_stops", "data_expectations_stop_times"]
-      }
+      "webhook_url": "http://localhost:8000/notify"
     }
   }
 }

@@ -61,17 +61,20 @@ def extract_load_files():
     pipeline_config = _load_pipeline_config()
     execution_id = str(uuid.uuid4())
     files_list = None
-    validation_result = None
+    error_details = None
+    validated_items_count = 0
     quarantine_save_status = "NOT_APPLICABLE"
     quarantine_save_error = None
 
     def write_failure_report(phase, message):
         try:
             failure_report = create_failure_quality_report(
+                stage="extract_load_files",
                 execution_id=execution_id,
                 failure_phase=phase,
                 failure_message=message,
-                validation_result=validation_result,
+                error_details=error_details,
+                validated_items_count=validated_items_count,
                 quarantine_save_status=quarantine_save_status,
                 quarantine_save_error=quarantine_save_error,
             )
@@ -99,9 +102,13 @@ def extract_load_files():
             pipeline_config,
             files_list,
         )
+        error_details = {
+            "errors_by_file": validation_result.get("errors_by_file", {}),
+        }
+        validated_items_count = validation_result.get("validated_files_count", 0)
 
         if not validation_result.get("is_valid", False):
-            errors_by_file = validation_result.get("errors_by_file", {})
+            errors_by_file = error_details.get("errors_by_file", {})
             consolidated_reasons = "; ".join(
                 [f"{file}:{reasons}" for file, reasons in errors_by_file.items()]
             )
@@ -133,10 +140,10 @@ def extract_load_files():
 def transform():
     logging.info("Starting GTFS Transformations...")
     pipeline_config = _load_pipeline_config()
-    transform_routes(pipeline_config)
-    transform_trips(pipeline_config)
     transform_stops(pipeline_config)
     transform_stop_times(pipeline_config)
+    transform_routes(pipeline_config)
+    transform_trips(pipeline_config)
     transform_frequencies(pipeline_config)
     transform_calendar(pipeline_config)
     logger.info("All transformations completed successfully.")
