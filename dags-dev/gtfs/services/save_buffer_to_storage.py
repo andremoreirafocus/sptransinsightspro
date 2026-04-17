@@ -6,7 +6,11 @@ logger = logging.getLogger(__name__)
 
 
 def save_buffer_to_storage(
-    config, file_name, buffer, write_fn=write_generic_bytes_to_object_storage
+    config,
+    file_name,
+    buffer,
+    subfolder=None,
+    write_fn=write_generic_bytes_to_object_storage,
 ):
     def get_config(config):
         try:
@@ -27,8 +31,12 @@ def save_buffer_to_storage(
     logger.info(
         f"Saving data to file {file_name} to bucket: {destination_bucket}, folder: {app_folder}"
     )
-    prefix = f"{app_folder}/{file_name.split('.')[0]}"
-    destination_object_name = f"{prefix}/{file_name}"
+    if subfolder is None:
+        prefix = f"{app_folder}/{file_name.split('.')[0]}"
+        destination_object_name = f"{prefix}/{file_name}"
+    else:
+        normalized_subfolder = str(subfolder).strip("/")
+        destination_object_name = f"{app_folder}/{normalized_subfolder}/{file_name}"
     try:
         write_fn(
             connection_data,

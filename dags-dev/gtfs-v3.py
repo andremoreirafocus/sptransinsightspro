@@ -11,14 +11,8 @@ from infra.notifications import send_webhook
 from gtfs.services.create_save_trip_details import (
     create_trip_details_table_and_fill_missing_data,
 )
-from gtfs.services.transforms import (
-    transform_calendar,
-    transform_frequencies,
-    transform_routes,
-    transform_stop_times,
-    transform_stops,
-    transform_trips,
-)
+from gtfs.services.transforms import transform_and_validate_table
+from gtfs.services.relocate_staged_trusted_files import relocate_staged_trusted_files
 import logging
 from logging.handlers import RotatingFileHandler
 import uuid
@@ -63,8 +57,8 @@ def extract_load_files():
     files_list = None
     error_details = None
     validated_items_count = 0
-    quarantine_save_status = "NOT_APPLICABLE"
-    quarantine_save_error = None
+    relocation_status = "NOT_APPLICABLE"
+    relocation_error = None
 
     def write_failure_report(phase, message):
         try:
@@ -75,8 +69,8 @@ def extract_load_files():
                 failure_message=message,
                 error_details=error_details,
                 validated_items_count=validated_items_count,
-                quarantine_save_status=quarantine_save_status,
-                quarantine_save_error=quarantine_save_error,
+                relocation_status=relocation_status,
+                relocation_error=relocation_error,
             )
             summary = failure_report.get("summary", {})
             webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
@@ -118,11 +112,11 @@ def extract_load_files():
                 save_files_to_raw_storage(
                     pipeline_config, files_list, failed=True
                 )
-                quarantine_save_status = "SUCCESS"
+                relocation_status = "SUCCESS"
                 logger.info("All extracted files saved to quarantine.")
             except Exception as e:
-                quarantine_save_status = "FAILED"
-                quarantine_save_error = str(e)
+                relocation_status = "FAILED"
+                relocation_error = str(e)
                 logger.error("Failed to save files to quarantine: %s", e)
                 raise ValueError(f"Validation failed and quarantine save failed: {e}")
             raise ValueError(f"Raw GTFS validation failed: {consolidated_reasons}")
@@ -138,15 +132,121 @@ def extract_load_files():
 
 
 def transform():
-    logging.info("Starting GTFS Transformations...")
+    logger.info("=== TRANSFORMATION STAGE: transform_and_validate_table ===")
     pipeline_config = _load_pipeline_config()
-    transform_stops(pipeline_config)
-    transform_stop_times(pipeline_config)
-    transform_routes(pipeline_config)
-    transform_trips(pipeline_config)
-    transform_frequencies(pipeline_config)
-    transform_calendar(pipeline_config)
-    logger.info("All transformations completed successfully.")
+    execution_id = str(uuid.uuid4())
+    validated_items_count = 0
+    relocation_status = "NOT_APPLICABLE"
+    relocation_error = None
+    table_results = []
+    error_details = None
+    table_names = [
+        "stops",
+        "stop_times",
+        "routes",
+        "trips",
+        "frequencies",
+        "calendar",
+    ]
+
+    def write_failure_report(phase, message):
+        try:
+            failure_report = create_failure_quality_report(
+                stage="transformation",
+                execution_id=execution_id,
+                failure_phase=phase,
+                failure_message=message,
+                error_details=error_details,
+                validated_items_count=validated_items_count,
+                relocation_status=relocation_status,
+                relocation_error=relocation_error,
+            )
+            summary = failure_report.get("summary", {})
+            webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
+            if webhook_url.strip().lower() in {"disabled", "none", "null"}:
+                logger.info("Webhook notification disabled (failure path)")
+            else:
+                try:
+                    send_webhook(summary, webhook_url)
+                    logger.info("Webhook notification sent (failure path)")
+                except Exception as e:
+                    logger.error("Webhook notification failed: %s", e)
+        except Exception as e:
+            logger.error("Failed to build/send failure report: %s", e)
+
+    try:
+        for table_name in table_names:
+            result = transform_and_validate_table(pipeline_config, table_name)
+            table_results.append(result)
+        validated_items_count = len(table_results)
+        errors_by_table = {
+            row["table_name"]: row["errors"]
+            for row in table_results
+            if not row.get("is_valid", False)
+        }
+        error_details = {
+            "errors_by_table": errors_by_table,
+            "table_results": [
+                {
+                    "table_name": row["table_name"],
+                    "staged_written": row["staged_written"],
+                }
+                for row in table_results
+            ],
+        }
+
+        staged_results = [row for row in table_results if row.get("staged_written")]
+        if errors_by_table:
+            relocation = relocate_staged_trusted_files(
+                pipeline_config,
+                staged_results,
+                target="quarantine",
+            )
+            relocation_status = relocation["status"]
+            if relocation.get("errors"):
+                relocation_error = str(relocation["errors"])
+                error_details["relocation_errors"] = relocation["errors"]
+            consolidated_reasons = "; ".join(
+                [f"{table}:{reasons}" for table, reasons in errors_by_table.items()]
+            )
+            error_message = (
+                "TRANSFORMATION STAGE failed: "
+                f"Validation failures detected: {consolidated_reasons}"
+            )
+            if relocation_error:
+                error_message = f"{error_message}; relocation_error:{relocation_error}"
+            raise ValueError(error_message)
+
+        relocation = relocate_staged_trusted_files(
+            pipeline_config,
+            staged_results,
+            target="final",
+        )
+        relocation_status = relocation["status"]
+        if relocation.get("errors"):
+            relocation_error = str(relocation["errors"])
+            error_details = {
+                "errors_by_table": {},
+                "table_results": [
+                    {
+                        "table_name": row["table_name"],
+                        "staged_written": row["staged_written"],
+                    }
+                    for row in table_results
+                ],
+                "relocation_errors": relocation["errors"],
+            }
+            raise ValueError(
+                "TRANSFORMATION STAGE failed: "
+                f"staging_to_final_relocation_error:{relocation_error}"
+            )
+
+        logger.info("TRANSFORMATION STAGE completed successfully.")
+    except Exception as e:
+        error_msg = f"TRANSFORMATION STAGE failed: {e}"
+        logger.error(error_msg)
+        write_failure_report("transform", error_msg)
+        raise
 
 
 def create_trip_details():

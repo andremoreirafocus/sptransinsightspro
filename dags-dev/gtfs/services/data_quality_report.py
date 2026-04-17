@@ -16,8 +16,8 @@ def create_failure_quality_report(
     failure_message: str,
     error_details: Dict[str, Any] | None = None,
     validated_items_count: int | None = None,
-    quarantine_save_status: str | None = None,
-    quarantine_save_error: str | None = None,
+    relocation_status: str | None = None,
+    relocation_error: str | None = None,
 ) -> Dict[str, Any]:
     """Build an in-memory failure report for GTFS orchestration.
 
@@ -37,8 +37,8 @@ def create_failure_quality_report(
         "failure_message": failure_message,
         "rows_failed": rows_failed,
         "acceptance_rate": 0.0,
-        "quarantine_save_status": quarantine_save_status,
-        "quarantine_save_error": quarantine_save_error,
+        "relocation_status": relocation_status,
+        "relocation_error": relocation_error,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
     }
 

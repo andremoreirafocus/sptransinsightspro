@@ -59,3 +59,19 @@ def test_write_error_raises_value_error():
         save_buffer_to_storage(
             make_config(), "stops.parquet", b"data", write_fn=fake_write
         )
+
+
+def test_write_to_explicit_subfolder():
+    calls = []
+
+    def fake_write(connection, buffer, bucket_name, object_name):
+        calls.append(object_name)
+
+    save_buffer_to_storage(
+        make_config(),
+        "stops.parquet",
+        b"data",
+        subfolder="staging",
+        write_fn=fake_write,
+    )
+    assert calls[0] == "gtfs/staging/stops.parquet"

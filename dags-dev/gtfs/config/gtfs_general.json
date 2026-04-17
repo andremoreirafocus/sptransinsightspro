@@ -8,6 +8,7 @@
       "gtfs_folder": "gtfs",
       "raw_bucket": "raw",
       "quarantined_subfolder": "quarantined",
+      "staging_subfolder": "staging",
       "trusted_bucket": "trusted"
     },
     "tables": {

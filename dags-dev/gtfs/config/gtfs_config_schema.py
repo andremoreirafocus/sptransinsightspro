@@ -14,15 +14,41 @@ class StorageConfig(BaseModel):
     gtfs_folder: str
     raw_bucket: str
     quarantined_subfolder: str
+    staging_subfolder: str
     trusted_bucket: str
 
-    @field_validator("quarantined_subfolder")
+    @field_validator("quarantined_subfolder", "staging_subfolder")
     @classmethod
-    def validate_quarantined_subfolder(cls, value: str) -> str:
+    def validate_storage_subfolder(cls, value: str) -> str:
         normalized = value.strip().strip("/")
         if not normalized:
-            raise ValueError("quarantined_subfolder must be non-empty")
+            raise ValueError("storage subfolder must be non-empty")
         return normalized
+
+
+class ExpectationsValidationConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expectations_suites: list[str]
+
+    @field_validator("expectations_suites")
+    @classmethod
+    def validate_expectations_suites(cls, value: list[str]) -> list[str]:
+        expected_values = {
+            "data_expectations_stops",
+            "data_expectations_stop_times",
+        }
+        provided_values = [item.strip() for item in value]
+        if len(provided_values) != 2 or set(provided_values) != expected_values:
+            raise ValueError(
+                "expectations_suites must contain only "
+                "['data_expectations_stops', 'data_expectations_stop_times']"
+            )
+        return provided_values
+
+
+class DataValidationsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expectations_validation: ExpectationsValidationConfig
 
 
 class TablesConfig(BaseModel):
@@ -41,6 +67,7 @@ class GeneralConfig(BaseModel):
     storage: StorageConfig
     tables: TablesConfig
     notifications: NotificationsConfig
+    data_validations: DataValidationsConfig | None = None
 
 
 def validate_general_input(

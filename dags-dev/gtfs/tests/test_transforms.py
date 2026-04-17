@@ -1,5 +1,6 @@
 import io
-from gtfs.services.transforms import transform_csv_table_to_parquet
+
+from gtfs.services.transforms import transform_and_validate_table
 
 
 def make_config():
@@ -9,6 +10,7 @@ def make_config():
                 "raw_bucket": "raw",
                 "trusted_bucket": "trusted",
                 "gtfs_folder": "gtfs",
+                "staging_subfolder": "staging",
             },
         },
         "connections": {
@@ -21,93 +23,83 @@ def make_config():
     }
 
 
-def test_load_convert_save_called_in_order():
-    call_log = []
+def test_transform_and_validate_table_skips_validation_when_suite_missing():
+    calls = []
 
     def fake_load(config, table_name):
-        call_log.append(("load", table_name))
-        return io.BytesIO(b"csv")
+        return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(buffer):
-        call_log.append(("convert",))
+    def fake_convert(df):
         return b"parquet"
 
-    def fake_save(config, file_name, buffer):
-        call_log.append(("save", file_name))
+    def fake_save(config, file_name, buffer, subfolder=None):
+        calls.append((file_name, subfolder))
 
-    transform_csv_table_to_parquet(
-        make_config(),
-        "stops",
-        load_fn=fake_load,
-        convert_fn=fake_convert,
-        save_fn=fake_save,
-    )
-    assert call_log == [("load", "stops"), ("convert",), ("save", "stops.parquet")]
-
-
-def test_csv_buffer_passed_to_convert():
-    csv_data = io.BytesIO(b"stop_id,stop_name\n1,A")
-    received = {}
-
-    def fake_load(config, table_name):
-        return csv_data
-
-    def fake_convert(buffer):
-        received["buffer"] = buffer
-        return b"parquet"
-
-    def fake_save(config, file_name, buffer):
-        pass
-
-    transform_csv_table_to_parquet(
-        make_config(),
-        "stops",
-        load_fn=fake_load,
-        convert_fn=fake_convert,
-        save_fn=fake_save,
-    )
-    assert received["buffer"] is csv_data
-
-
-def test_parquet_buffer_passed_to_save():
-    received = {}
-
-    def fake_load(config, table_name):
-        return io.BytesIO(b"csv")
-
-    def fake_convert(buffer):
-        return b"parquet-output"
-
-    def fake_save(config, file_name, buffer):
-        received["buffer"] = buffer
-
-    transform_csv_table_to_parquet(
-        make_config(),
-        "stops",
-        load_fn=fake_load,
-        convert_fn=fake_convert,
-        save_fn=fake_save,
-    )
-    assert received["buffer"] == b"parquet-output"
-
-
-def test_file_name_has_parquet_extension():
-    received = {}
-
-    def fake_load(config, table_name):
-        return io.BytesIO(b"csv")
-
-    def fake_convert(buffer):
-        return b"parquet"
-
-    def fake_save(config, file_name, buffer):
-        received["file_name"] = file_name
-
-    transform_csv_table_to_parquet(
+    result = transform_and_validate_table(
         make_config(),
         "routes",
         load_fn=fake_load,
         convert_fn=fake_convert,
         save_fn=fake_save,
     )
-    assert received["file_name"] == "routes.parquet"
+
+    assert result["table_name"] == "routes"
+    assert result["is_valid"] is True
+    assert result["errors"] == []
+    assert result["expectations_summary"] is None
+    assert result["staged_written"] is True
+    assert calls[0] == ("routes.parquet", "staging")
+
+
+def test_transform_and_validate_table_marks_invalid_when_gx_fails():
+    config = make_config()
+    config["data_expectations_stops"] = {
+        "expectation_suite_name": "gtfs_stops",
+        "expectations": [{"expectation_type": "expect_column_values_to_not_be_null"}],
+    }
+
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A")
+
+    def fake_convert(df):
+        return b"parquet"
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        return None
+
+    def fake_validate_expectations(df, suite):
+        return {
+            "expectations_summary": {
+                "rows_failed": 1,
+                "expectations_with_violations": 1,
+                "expectations_failed_due_to_exceptions": 0,
+            }
+        }
+
+    result = transform_and_validate_table(
+        config,
+        "stops",
+        load_fn=fake_load,
+        convert_fn=fake_convert,
+        save_fn=fake_save,
+        validate_expectations_fn=fake_validate_expectations,
+    )
+
+    assert result["is_valid"] is False
+    assert result["staged_written"] is True
+    assert any(err.startswith("gx_validation_failed:") for err in result["errors"])
+
+
+def test_transform_and_validate_table_returns_error_when_load_fails():
+    def fake_load(config, table_name):
+        raise RuntimeError("read error")
+
+    result = transform_and_validate_table(
+        make_config(),
+        "stops",
+        load_fn=fake_load,
+    )
+
+    assert result["is_valid"] is False
+    assert result["staged_written"] is False
+    assert result["errors"] == ["load_failed:read error"]
