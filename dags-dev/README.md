@@ -19,7 +19,7 @@ Os pacotes python utilizados são gerenciados de forma unificada da mesma maneir
 
 Para instalar os requisitos de todos os subprojetos:
 - cd dags-dev
-- python3 -m venv .env
+- python3 -m venv .venv
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
@@ -47,15 +47,14 @@ Para executar os testes de uma pipeline específica:
 pytest <pipeline>/tests/
 ```
 
-### Cobertura por pipeline
+### Cobertura (exemplo GTFS)
 
-| Pipeline               | Testes |
-|------------------------|-------:|
-| transformlivedata      | 114    |
-| refinedfinishedtrips   | 34     |
-| gtfs                   | 25     |
-| orchestratetransform   | 12     |
-| updatelatestpositions  | 11     |
-| refinedsynctripdetails | 11     |
-| **Total**              | **207**|
+Para obter cobertura da pipeline GTFS:
 
+```bash
+pytest gtfs/tests --cov=gtfs --cov-report=term-missing
+```
+
+Status atual da GTFS:
+- 73 testes passando
+- cobertura total: 99%

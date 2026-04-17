@@ -117,6 +117,13 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
   - artefatos de `column_lineage` no estágio de enrichment
 - O resumo (`summary`) é enviado via webhook quando `notifications.webhook_url` não estiver como `disabled`/`none`/`null`.
 
+### Regras de teste
+- Os testes da pipeline GTFS usam fakes em `gtfs/tests/fakes/` e injeção de dependências.
+- Não usar `monkeypatch`: os cenários devem ser cobertos com doubles explícitos (fakes/stubs) reutilizáveis.
+- Para executar:
+  - `pytest gtfs/tests`
+  - `pytest gtfs/tests --cov=gtfs --cov-report=term-missing`
+
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `gtfs_general` (JSON)

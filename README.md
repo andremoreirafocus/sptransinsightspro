@@ -133,6 +133,8 @@ Este script realiza os seguintes passos:
 
 O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
+Para a pipeline `gtfs`, a suíte de testes segue padrão de injeção de dependências com fakes reutilizáveis em `dags-dev/gtfs/tests/fakes/` (sem `monkeypatch`) e atualmente cobre os serviços centrais de transformação, relocação, schema e webhook.
+
 ### Deployment de Microserviços
 Para atualizar e reiniciar um microserviço (ex: `extractloadlivedata`), utilize o script de deployment:
 
