@@ -15,7 +15,13 @@ As configurações são carregadas de forma automática via `pipeline_configurat
   - salva primeiro em staging na camada trusted
   - em caso de falha de validação: move artefatos staged para quarentena e gera diagnóstico consolidado
   - em caso de sucesso: move artefatos staged para o caminho final para cada tabela
-- a partir de joins efetuados entre as tabelas gtfs criadas na camada trusted, gera uma tabela de detalhes das viagens (trip_details), a ser utilizada  para enriquecer os dados de posição dos veículos durante sua transformação, implementada pelo subprojeto transformlivedata, visando as análises de dados efetuadas no subprojeto refinelivedata
+- executa a **ENRICHMENT STAGE** para `trip_details` com abordagem staging-first:
+  - cria `trip_details` em `trusted/<gtfs_folder>/<staging_subfolder>/trip_details.parquet`
+  - valida `trip_details` com Great Expectations quando houver suite configurada
+  - em caso de falha de validação: move para `trusted/<gtfs_folder>/<quarantined_subfolder>/trip_details.parquet`
+  - em caso de sucesso: move para `trusted/<gtfs_folder>/trip_details/trip_details.parquet`
+- gera um único relatório consolidado de qualidade por execução da pipeline (`EXTRACT & LOAD`, `TRANSFORMATION`, `ENRICHMENT`)
+- inclui artefato de linhagem de colunas de `trip_details` com detecção de drift (`warning: "lineage drift detected"`) quando a saída divergir do mapeamento declarado
 
 ## Pré-requisitos
 - Obter as credenciais cadastre-se no portal do desenvolvedor da SPTRANS
@@ -50,6 +56,8 @@ Chaves esperadas em `general`
     "app_folder": "sptrans",
     "gtfs_folder": "gtfs",
     "raw_bucket": "raw",
+    "metadata_bucket": "metadata",
+    "quality_report_folder": "quality-reports",
     "quarantined_subfolder": "quarantined",
     "staging_subfolder": "staging",
     "trusted_bucket": "trusted"
@@ -64,7 +72,8 @@ Chaves esperadas em `general`
     "expectations_validation": {
       "expectations_suites": [
         "data_expectations_stops",
-        "data_expectations_stop_times"
+        "data_expectations_stop_times",
+        "data_expectations_trip_details"
       ]
     }
   }
@@ -74,6 +83,7 @@ Chaves esperadas em `general`
 Artefatos de expectations carregados automaticamente via `pipeline_configurator`:
 - `dags-dev/gtfs/config/gtfs_data_expectations_stops.json`
 - `dags-dev/gtfs/config/gtfs_data_expectations_stop_times.json`
+- `dags-dev/gtfs/config/gtfs_data_expectations_trip_details.json`
 
 ### Fluxo da TRANSFORMATION STAGE
 - Tabelas processadas: `stops`, `stop_times`, `routes`, `trips`, `frequencies`, `calendar`
@@ -82,14 +92,29 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
   - Quarentena: `trusted/<gtfs_folder>/<quarantined_subfolder>/<table>.parquet`
   - Final: `trusted/<gtfs_folder>/<table>/<table>.parquet`
 
+### Fluxo da ENRICHMENT STAGE (`trip_details`)
+- Caminho de staging: `trusted/<gtfs_folder>/<staging_subfolder>/trip_details.parquet`
+- Caminho de quarentena: `trusted/<gtfs_folder>/<quarantined_subfolder>/trip_details.parquet`
+- Caminho final: `trusted/<gtfs_folder>/trip_details/trip_details.parquet`
+- A validação GX de `trip_details` usa a suite `data_expectations_trip_details` quando configurada.
+- Em falhas após escrita em staging, a pipeline tenta quarentenar o artefato staged para evitar resíduos órfãos.
+
+### Relatório consolidado de qualidade
+- Há exatamente um relatório por execução de `gtfs-v3.py`, com `summary` + `details`.
+- O relatório consolida o resultado das três fases:
+  - `extract_load_files`
+  - `transformation`
+  - `enrichment`
+- Caminho do relatório:
+  - `<metadata_bucket>/<quality_report_folder>/gtfs/year=YYYY/month=MM/day=DD/hour=HH/quality-report-gtfs_<HHMM>_<execution_suffix>.json`
+
 ### Relato de falha e webhook
-- Em falhas de extração/carga ou transformação, a pipeline gera um failure report em memória com:
-  - `stage`
+- Em falhas de qualquer fase, a pipeline gera e persiste um relatório consolidado com:
   - `failure_phase`
   - `failure_message`
-  - `validated_items_count`
-  - `error_details`
-  - `relocation_status` / `relocation_error`
+  - resultados de cada fase em `details.stages`
+  - `validated_items_count`, `error_details`, `relocation_status`, `relocation_error` por fase
+  - artefatos de `column_lineage` no estágio de enrichment
 - O resumo (`summary`) é enviado via webhook quando `notifications.webhook_url` não estiver como `disabled`/`none`/`null`.
 
 ### Airflow (produção)

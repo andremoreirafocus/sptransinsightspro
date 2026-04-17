@@ -16,6 +16,10 @@ from gtfs.services.relocate_staged_trusted_files import relocate_staged_trusted_
 from gtfs.services.save_files_to_raw_storage import save_files_to_raw_storage
 from gtfs.services.transforms import transform_and_validate_table
 from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
+from gtfs.lineage.trip_details_lineage import (
+    get_trip_details_lineage,
+    validate_trip_details_lineage,
+)
 from infra.object_storage import read_file_from_object_storage_to_bytesio
 from quality.validate_expectations import validate_expectations
 from infra.notifications import send_webhook
@@ -218,6 +222,7 @@ def create_trip_details(pipeline_config=None):
         "status": "FAIL",
         "validated_items_count": 1,
         "error_details": {"errors_by_table": {}},
+        "artifacts": {"column_lineage": get_trip_details_lineage()},
         "relocation_status": "NOT_APPLICABLE",
         "relocation_error": None,
     }
@@ -251,6 +256,10 @@ def create_trip_details(pipeline_config=None):
                 object_name=staging_object_name,
             )
             trip_details_df = pd.read_parquet(parquet_buffer)
+            stage_result["artifacts"]["column_lineage"] = validate_trip_details_lineage(
+                stage_result["artifacts"]["column_lineage"],
+                trip_details_df.columns,
+            )
             expectations_result = validate_expectations(trip_details_df, suite)
             summary = expectations_result.get("expectations_summary", {})
             stage_result["expectations_summary"] = summary

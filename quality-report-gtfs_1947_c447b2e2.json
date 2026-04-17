@@ -1,0 +1,210 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "gtfs",
+    "stage": "pipeline",
+    "execution_id": "c447b2e2-a749-48b3-a79d-a4f6fb2ca683",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "acceptance_rate": 1.0,
+    "rows_failed": 0,
+    "validated_items_count": 17,
+    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1947_c447b2e2.json",
+    "relocation_status": null,
+    "relocation_error": null,
+    "generated_at_utc": "2026-04-17T19:48:01.020074+00:00"
+  },
+  "details": {
+    "execution_id": "c447b2e2-a749-48b3-a79d-a4f6fb2ca683",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "stages": {
+      "extract_load_files": {
+        "status": "PASS",
+        "validated_items_count": 10,
+        "error_details": {
+          "errors_by_file": {}
+        },
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": null
+      },
+      "transformation": {
+        "status": "PASS",
+        "validated_items_count": 6,
+        "error_details": {
+          "errors_by_table": {},
+          "table_results": [
+            {
+              "table_name": "stops",
+              "staged_written": true
+            },
+            {
+              "table_name": "stop_times",
+              "staged_written": true
+            },
+            {
+              "table_name": "routes",
+              "staged_written": true
+            },
+            {
+              "table_name": "trips",
+              "staged_written": true
+            },
+            {
+              "table_name": "frequencies",
+              "staged_written": true
+            },
+            {
+              "table_name": "calendar",
+              "staged_written": true
+            }
+          ]
+        },
+        "relocation_status": "SUCCESS",
+        "relocation_error": null
+      },
+      "enrichment": {
+        "status": "PASS",
+        "validated_items_count": 1,
+        "error_details": {
+          "errors_by_table": {}
+        },
+        "artifacts": {
+          "column_lineage": {
+            "table_name": "trip_details",
+            "columns": {
+              "trip_id": {
+                "sources": [
+                  "stop_times.trip_id"
+                ],
+                "derivation": "base trip id; missing '-1' patched from '-0' via replace"
+              },
+              "first_stop_id": {
+                "sources": [
+                  "stop_times.stop_id",
+                  "stop_times.stop_sequence",
+                  "stops.stop_id"
+                ],
+                "derivation": "first stop by min(stop_sequence); swapped with last for non-circular missing patch"
+              },
+              "first_stop_name": {
+                "sources": [
+                  "stops.stop_name",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "name from first stop id; swapped with last for non-circular missing patch"
+              },
+              "first_stop_lat": {
+                "sources": [
+                  "stops.stop_lat",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "lat from first stop id; swapped with last for non-circular missing patch"
+              },
+              "first_stop_lon": {
+                "sources": [
+                  "stops.stop_lon",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "lon from first stop id; swapped with last for non-circular missing patch"
+              },
+              "last_stop_id": {
+                "sources": [
+                  "stop_times.stop_id",
+                  "stop_times.stop_sequence",
+                  "stops.stop_id"
+                ],
+                "derivation": "last stop by max(stop_sequence); swapped with first for non-circular missing patch"
+              },
+              "last_stop_name": {
+                "sources": [
+                  "stops.stop_name",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "name from last stop id; swapped with first for non-circular missing patch"
+              },
+              "last_stop_lat": {
+                "sources": [
+                  "stops.stop_lat",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "lat from last stop id; swapped with first for non-circular missing patch"
+              },
+              "last_stop_lon": {
+                "sources": [
+                  "stops.stop_lon",
+                  "stop_times.stop_sequence"
+                ],
+                "derivation": "lon from last stop id; swapped with first for non-circular missing patch"
+              },
+              "trip_linear_distance": {
+                "sources": [
+                  "first_stop_lat",
+                  "first_stop_lon",
+                  "last_stop_lat",
+                  "last_stop_lon"
+                ],
+                "derivation": "round(sqrt((last_lat-first_lat)^2 + (last_lon-first_lon)^2) * 106428)"
+              },
+              "is_circular": {
+                "sources": [
+                  "first_stop_id",
+                  "last_stop_id"
+                ],
+                "derivation": "first_stop_id == last_stop_id"
+              }
+            },
+            "drift_detected": false,
+            "warning": null,
+            "validation": {
+              "expected_columns": [
+                "first_stop_id",
+                "first_stop_lat",
+                "first_stop_lon",
+                "first_stop_name",
+                "is_circular",
+                "last_stop_id",
+                "last_stop_lat",
+                "last_stop_lon",
+                "last_stop_name",
+                "trip_id",
+                "trip_linear_distance"
+              ],
+              "actual_columns": [
+                "first_stop_id",
+                "first_stop_lat",
+                "first_stop_lon",
+                "first_stop_name",
+                "is_circular",
+                "last_stop_id",
+                "last_stop_lat",
+                "last_stop_lon",
+                "last_stop_name",
+                "trip_id",
+                "trip_linear_distance"
+              ],
+              "missing_in_lineage": [],
+              "missing_in_dataframe": []
+            }
+          }
+        },
+        "relocation_status": "SUCCESS",
+        "relocation_error": null,
+        "expectations_summary": {
+          "total_checks": 7,
+          "expectations_successful": 7,
+          "expectations_with_violations": 0,
+          "expectations_failed_due_to_exceptions": 0,
+          "rows_failed": 0,
+          "violation_reasons": [],
+          "exception_reasons": []
+        }
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1947_c447b2e2.json"
+    }
+  }
+}
