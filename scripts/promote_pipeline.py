@@ -23,10 +23,10 @@ def promote_pipeline(pipeline_name):
         print(f"❌ Pipeline folder '{pipeline_name}' not found in dags-dev/")
         sys.exit(1)
     print(f"🚀 Promoting pipeline: {pipeline_name}")
-    # 2. Validation (Linting + Tests)
+    # 2. Validation (Linting + SAST + Tests)
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
-    total_steps = (2 if has_tests else 1) + 2
+    total_steps = (3 if has_tests else 2) + 2
     steps_consumed = run_code_validations(
         pipeline_dev_path, pipeline_name, step_offset=1
     )
