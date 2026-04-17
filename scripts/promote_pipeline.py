@@ -14,6 +14,8 @@ def promote_pipeline(pipeline_name):
     pipeline_prod_path = os.path.join(prod_dir, pipeline_name)
     infra_dev_path = os.path.join(dev_dir, "infra")
     infra_prod_path = os.path.join(prod_dir, "infra")
+    quality_dev_path = os.path.join(dev_dir, "quality")
+    quality_prod_path = os.path.join(prod_dir, "quality")
     pipeline_configurator_dev_path = os.path.join(dev_dir, "pipeline_configurator")
     pipeline_configurator_prod_path = os.path.join(prod_dir, "pipeline_configurator")
     # 1. Check if pipeline exists
@@ -51,7 +53,7 @@ def promote_pipeline(pipeline_name):
         "Folder sync failed!",
     )
     print(
-        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra and pipeline_configurator files..."
+        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality and pipeline_configurator files..."
     )
     os.makedirs(infra_prod_path, exist_ok=True)
     run_command(
@@ -65,6 +67,19 @@ def promote_pipeline(pipeline_name):
             f"{infra_prod_path}/",
         ],
         "Infra sync failed!",
+    )
+    os.makedirs(quality_prod_path, exist_ok=True)
+    run_command(
+        [
+            "rsync",
+            "-av",
+            "--delete",
+            "--exclude",
+            "__pycache__",
+            f"{quality_dev_path}/",
+            f"{quality_prod_path}/",
+        ],
+        "quality sync failed!",
     )
     os.makedirs(pipeline_configurator_prod_path, exist_ok=True)
     run_command(
