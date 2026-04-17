@@ -1,0 +1,80 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "gtfs",
+    "stage": "pipeline",
+    "execution_id": "d17661ba-c1b0-4a0d-b749-ede8e8aafa36",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "acceptance_rate": 1.0,
+    "rows_failed": 0,
+    "validated_items_count": 16,
+    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1925_d17661ba.json",
+    "relocation_status": null,
+    "relocation_error": null,
+    "generated_at_utc": "2026-04-17T19:25:21.250861+00:00"
+  },
+  "details": {
+    "execution_id": "d17661ba-c1b0-4a0d-b749-ede8e8aafa36",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "stages": {
+      "extract_load_files": {
+        "status": "PASS",
+        "validated_items_count": 10,
+        "error_details": {
+          "errors_by_file": {}
+        },
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": null
+      },
+      "transformation": {
+        "status": "PASS",
+        "validated_items_count": 6,
+        "error_details": {
+          "errors_by_table": {},
+          "table_results": [
+            {
+              "table_name": "stops",
+              "staged_written": true
+            },
+            {
+              "table_name": "stop_times",
+              "staged_written": true
+            },
+            {
+              "table_name": "routes",
+              "staged_written": true
+            },
+            {
+              "table_name": "trips",
+              "staged_written": true
+            },
+            {
+              "table_name": "frequencies",
+              "staged_written": true
+            },
+            {
+              "table_name": "calendar",
+              "staged_written": true
+            }
+          ]
+        },
+        "relocation_status": "SUCCESS",
+        "relocation_error": null
+      },
+      "enrichment": {
+        "status": "PASS",
+        "validated_items_count": 0,
+        "error_details": {},
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": null
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1925_d17661ba.json"
+    }
+  }
+}

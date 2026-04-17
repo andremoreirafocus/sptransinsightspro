@@ -13,16 +13,23 @@ class StorageConfig(BaseModel):
     app_folder: str
     gtfs_folder: str
     raw_bucket: str
+    metadata_bucket: str
+    quality_report_folder: str
     quarantined_subfolder: str
     staging_subfolder: str
     trusted_bucket: str
 
-    @field_validator("quarantined_subfolder", "staging_subfolder")
+    @field_validator(
+        "metadata_bucket",
+        "quality_report_folder",
+        "quarantined_subfolder",
+        "staging_subfolder",
+    )
     @classmethod
-    def validate_storage_subfolder(cls, value: str) -> str:
+    def validate_storage_fields(cls, value: str) -> str:
         normalized = value.strip().strip("/")
         if not normalized:
-            raise ValueError("storage subfolder must be non-empty")
+            raise ValueError("storage field must be non-empty")
         return normalized
 
 
@@ -67,7 +74,7 @@ class GeneralConfig(BaseModel):
     storage: StorageConfig
     tables: TablesConfig
     notifications: NotificationsConfig
-    data_validations: DataValidationsConfig | None = None
+    data_validations: DataValidationsConfig
 
 
 def validate_general_input(

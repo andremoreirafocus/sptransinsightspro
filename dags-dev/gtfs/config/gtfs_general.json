@@ -7,6 +7,8 @@
       "app_folder": "sptrans",
       "gtfs_folder": "gtfs",
       "raw_bucket": "raw",
+      "metadata_bucket": "metadata",
+      "quality_report_folder": "quality-reports",
       "quarantined_subfolder": "quarantined",
       "staging_subfolder": "staging",
       "trusted_bucket": "trusted"

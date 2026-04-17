@@ -10,6 +10,8 @@ def make_general():
             "app_folder": "sptrans",
             "gtfs_folder": "gtfs",
             "raw_bucket": "raw",
+            "metadata_bucket": "metadata",
+            "quality_report_folder": "quality-reports",
             "quarantined_subfolder": "quarantined",
             "staging_subfolder": "staging",
             "trusted_bucket": "trusted",
@@ -38,5 +40,19 @@ def test_general_config_rejects_invalid_expectations_suites():
         "data_expectations_stops",
         "data_expectations_trip_details",
     ]
+    with pytest.raises(ValueError):
+        GeneralConfig.model_validate(data)
+
+
+def test_general_config_rejects_missing_metadata_bucket():
+    data = make_general()
+    del data["storage"]["metadata_bucket"]
+    with pytest.raises(ValueError):
+        GeneralConfig.model_validate(data)
+
+
+def test_general_config_rejects_missing_data_validations():
+    data = make_general()
+    del data["data_validations"]
     with pytest.raises(ValueError):
         GeneralConfig.model_validate(data)

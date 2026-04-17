@@ -1,32 +1,32 @@
-from gtfs.services.extract_gtfs_files import extract_gtfs_files
-from gtfs.services.save_files_to_raw_storage import (
-    save_files_to_raw_storage,
-)
-from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
-from gtfs.services.data_quality_report import create_failure_quality_report
-from gtfs.config.gtfs_config_schema import GeneralConfig
-from pipeline_configurator.config import get_config
-from infra.notifications import send_webhook
-
-from gtfs.services.create_save_trip_details import (
-    create_trip_details_table_and_fill_missing_data,
-)
-from gtfs.services.transforms import transform_and_validate_table
-from gtfs.services.relocate_staged_trusted_files import relocate_staged_trusted_files
+from datetime import datetime, timezone
 import logging
 from logging.handlers import RotatingFileHandler
 import uuid
 
+from gtfs.config.gtfs_config_schema import GeneralConfig
+from gtfs.services.create_data_quality_report import (
+    create_data_quality_report,
+    create_failure_quality_report,
+)
+from gtfs.services.create_save_trip_details import (
+    create_trip_details_table_and_fill_missing_data,
+)
+from gtfs.services.extract_gtfs_files import extract_gtfs_files
+from gtfs.services.relocate_staged_trusted_files import relocate_staged_trusted_files
+from gtfs.services.save_files_to_raw_storage import save_files_to_raw_storage
+from gtfs.services.transforms import transform_and_validate_table
+from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
+from infra.notifications import send_webhook
+from pipeline_configurator.config import get_config
+
 LOG_FILENAME = "gtfs.log"
 
-# In Airflow just remove this logging configuration block
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        # Rotation: 5MB per file, keeping the last 5 files
         RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
-        logging.StreamHandler(),  # Also keeps console output
+        logging.StreamHandler(),
     ],
 )
 
@@ -35,9 +35,16 @@ logger = logging.getLogger(__name__)
 PIPELINE_NAME = "gtfs"
 
 
+class StageExecutionError(ValueError):
+    def __init__(self, stage: str, message: str, stage_result: dict):
+        super().__init__(message)
+        self.stage = stage
+        self.stage_result = stage_result
+
+
 def _load_pipeline_config():
     try:
-        pipeline_config = get_config(
+        return get_config(
             PIPELINE_NAME,
             None,
             GeneralConfig,
@@ -46,100 +53,80 @@ def _load_pipeline_config():
             None,
         )
     except Exception as e:
-        logger.error(f"Pipeline configuration validation failed: {e}")
+        logger.error("Pipeline configuration validation failed: %s", e)
         raise ValueError(f"Pipeline configuration validation failed: {e}")
-    return pipeline_config
 
 
-def extract_load_files():
-    pipeline_config = _load_pipeline_config()
-    execution_id = str(uuid.uuid4())
-    files_list = None
-    error_details = None
-    validated_items_count = 0
-    relocation_status = "NOT_APPLICABLE"
-    relocation_error = None
+def _send_webhook_from_report(report: dict, pipeline_config: dict, path: str):
+    summary = report.get("summary", {})
+    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
+    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
+        logger.info("Webhook notification disabled (%s)", path)
+        return
+    try:
+        send_webhook(summary, webhook_url)
+        logger.info("Webhook notification sent (%s)", path)
+    except Exception as e:
+        logger.error("Webhook notification failed: %s", e)
 
-    def write_failure_report(phase, message):
-        try:
-            failure_report = create_failure_quality_report(
-                stage="extract_load_files",
-                execution_id=execution_id,
-                failure_phase=phase,
-                failure_message=message,
-                error_details=error_details,
-                validated_items_count=validated_items_count,
-                relocation_status=relocation_status,
-                relocation_error=relocation_error,
-            )
-            summary = failure_report.get("summary", {})
-            webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-            if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-                logger.info("Webhook notification disabled (failure path)")
-            else:
-                try:
-                    send_webhook(summary, webhook_url)
-                    logger.info("Webhook notification sent (failure path)")
-                except Exception as e:
-                    logger.error("Webhook notification failed: %s", e)
-        except Exception as e:
-            logger.error("Failed to build/send failure report: %s", e)
 
+def extract_load_files(pipeline_config=None):
+    stage_result = {
+        "status": "FAIL",
+        "validated_items_count": 0,
+        "error_details": {},
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": None,
+    }
+    cfg = pipeline_config or _load_pipeline_config()
     try:
         logger.info("=== EXTRACT & LOAD STAGE: extract_gtfs_files ===")
-        files_list = extract_gtfs_files(pipeline_config)
+        files_list = extract_gtfs_files(cfg)
         if not files_list:
             raise ValueError("No GTFS files extracted.")
 
         logger.info("=== EXTRACT & LOAD STAGE: validate_raw_gtfs_files ===")
-        validation_result = validate_raw_gtfs_files(
-            pipeline_config,
-            files_list,
+        validation_result = validate_raw_gtfs_files(cfg, files_list)
+        errors_by_file = validation_result.get("errors_by_file", {})
+        stage_result["validated_items_count"] = validation_result.get(
+            "validated_files_count", 0
         )
-        error_details = {
-            "errors_by_file": validation_result.get("errors_by_file", {}),
-        }
-        validated_items_count = validation_result.get("validated_files_count", 0)
+        stage_result["error_details"] = {"errors_by_file": errors_by_file}
 
         if not validation_result.get("is_valid", False):
-            errors_by_file = error_details.get("errors_by_file", {})
             consolidated_reasons = "; ".join(
                 [f"{file}:{reasons}" for file, reasons in errors_by_file.items()]
             )
             logger.error("Raw GTFS validation failed: %s", consolidated_reasons)
-            logger.info("Saving all extracted files to quarantine...")
             try:
-                save_files_to_raw_storage(
-                    pipeline_config, files_list, failed=True
-                )
-                relocation_status = "SUCCESS"
+                save_files_to_raw_storage(cfg, files_list, failed=True)
+                stage_result["relocation_status"] = "SUCCESS"
                 logger.info("All extracted files saved to quarantine.")
             except Exception as e:
-                relocation_status = "FAILED"
-                relocation_error = str(e)
-                logger.error("Failed to save files to quarantine: %s", e)
+                stage_result["relocation_status"] = "FAILED"
+                stage_result["relocation_error"] = str(e)
                 raise ValueError(f"Validation failed and quarantine save failed: {e}")
             raise ValueError(f"Raw GTFS validation failed: {consolidated_reasons}")
 
-        logger.info("All raw GTFS files passed validation.")
-        save_files_to_raw_storage(pipeline_config, files_list)
-        logger.info("Stage 1 completed successfully.")
+        save_files_to_raw_storage(cfg, files_list)
+        stage_result["status"] = "PASS"
+        logger.info("EXTRACT & LOAD STAGE completed successfully.")
+        return stage_result
     except Exception as e:
-        error_msg = f"Stage-1 extract/load failed: {e}"
-        logger.error(error_msg)
-        write_failure_report("extract_load_files", error_msg)
-        raise
+        if not stage_result.get("error_details"):
+            stage_result["error_details"] = {"errors": [str(e)]}
+        raise StageExecutionError("extract_load_files", str(e), stage_result)
 
 
-def transform():
-    logger.info("=== TRANSFORMATION STAGE: transform_and_validate_table ===")
-    pipeline_config = _load_pipeline_config()
-    execution_id = str(uuid.uuid4())
-    validated_items_count = 0
-    relocation_status = "NOT_APPLICABLE"
-    relocation_error = None
-    table_results = []
-    error_details = None
+def transform(pipeline_config=None):
+    cfg = pipeline_config or _load_pipeline_config()
+    stage_result = {
+        "status": "FAIL",
+        "validated_items_count": 0,
+        "error_details": {},
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": None,
+    }
     table_names = [
         "stops",
         "stop_times",
@@ -148,43 +135,19 @@ def transform():
         "frequencies",
         "calendar",
     ]
-
-    def write_failure_report(phase, message):
-        try:
-            failure_report = create_failure_quality_report(
-                stage="transformation",
-                execution_id=execution_id,
-                failure_phase=phase,
-                failure_message=message,
-                error_details=error_details,
-                validated_items_count=validated_items_count,
-                relocation_status=relocation_status,
-                relocation_error=relocation_error,
-            )
-            summary = failure_report.get("summary", {})
-            webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-            if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-                logger.info("Webhook notification disabled (failure path)")
-            else:
-                try:
-                    send_webhook(summary, webhook_url)
-                    logger.info("Webhook notification sent (failure path)")
-                except Exception as e:
-                    logger.error("Webhook notification failed: %s", e)
-        except Exception as e:
-            logger.error("Failed to build/send failure report: %s", e)
-
+    table_results = []
     try:
+        logger.info("=== TRANSFORMATION STAGE: transform_and_validate_table ===")
         for table_name in table_names:
-            result = transform_and_validate_table(pipeline_config, table_name)
-            table_results.append(result)
-        validated_items_count = len(table_results)
+            table_results.append(transform_and_validate_table(cfg, table_name))
+        stage_result["validated_items_count"] = len(table_results)
+
         errors_by_table = {
             row["table_name"]: row["errors"]
             for row in table_results
             if not row.get("is_valid", False)
         }
-        error_details = {
+        stage_result["error_details"] = {
             "errors_by_table": errors_by_table,
             "table_results": [
                 {
@@ -198,68 +161,100 @@ def transform():
         staged_results = [row for row in table_results if row.get("staged_written")]
         if errors_by_table:
             relocation = relocate_staged_trusted_files(
-                pipeline_config,
+                cfg,
                 staged_results,
                 target="quarantine",
             )
-            relocation_status = relocation["status"]
+            stage_result["relocation_status"] = relocation["status"]
             if relocation.get("errors"):
-                relocation_error = str(relocation["errors"])
-                error_details["relocation_errors"] = relocation["errors"]
+                stage_result["relocation_error"] = str(relocation["errors"])
+                stage_result["error_details"]["relocation_errors"] = relocation["errors"]
             consolidated_reasons = "; ".join(
                 [f"{table}:{reasons}" for table, reasons in errors_by_table.items()]
             )
             error_message = (
-                "TRANSFORMATION STAGE failed: "
-                f"Validation failures detected: {consolidated_reasons}"
+                "Validation failures detected: "
+                f"{consolidated_reasons}"
             )
-            if relocation_error:
-                error_message = f"{error_message}; relocation_error:{relocation_error}"
+            if stage_result["relocation_error"]:
+                error_message = (
+                    f"{error_message}; "
+                    f"relocation_error:{stage_result['relocation_error']}"
+                )
             raise ValueError(error_message)
 
         relocation = relocate_staged_trusted_files(
-            pipeline_config,
+            cfg,
             staged_results,
             target="final",
         )
-        relocation_status = relocation["status"]
+        stage_result["relocation_status"] = relocation["status"]
         if relocation.get("errors"):
-            relocation_error = str(relocation["errors"])
-            error_details = {
-                "errors_by_table": {},
-                "table_results": [
-                    {
-                        "table_name": row["table_name"],
-                        "staged_written": row["staged_written"],
-                    }
-                    for row in table_results
-                ],
-                "relocation_errors": relocation["errors"],
-            }
+            stage_result["relocation_error"] = str(relocation["errors"])
+            stage_result["error_details"]["relocation_errors"] = relocation["errors"]
             raise ValueError(
-                "TRANSFORMATION STAGE failed: "
-                f"staging_to_final_relocation_error:{relocation_error}"
+                "staging_to_final_relocation_error:"
+                f"{stage_result['relocation_error']}"
             )
 
+        stage_result["status"] = "PASS"
         logger.info("TRANSFORMATION STAGE completed successfully.")
+        return stage_result
     except Exception as e:
-        error_msg = f"TRANSFORMATION STAGE failed: {e}"
-        logger.error(error_msg)
-        write_failure_report("transform", error_msg)
-        raise
+        if not stage_result.get("error_details"):
+            stage_result["error_details"] = {"errors": [str(e)]}
+        raise StageExecutionError("transformation", str(e), stage_result)
 
 
-def create_trip_details():
-    logger.info("Creating trip details...")
-    pipeline_config = _load_pipeline_config()
-    create_trip_details_table_and_fill_missing_data(pipeline_config)
-    logger.info("Trip details transformation completed successfully.")
+def create_trip_details(pipeline_config=None):
+    cfg = pipeline_config or _load_pipeline_config()
+    stage_result = {
+        "status": "FAIL",
+        "validated_items_count": 0,
+        "error_details": {},
+        "relocation_status": "NOT_APPLICABLE",
+        "relocation_error": None,
+    }
+    try:
+        logger.info("=== ENRICHMENT STAGE: create_trip_details ===")
+        create_trip_details_table_and_fill_missing_data(cfg)
+        stage_result["status"] = "PASS"
+        logger.info("ENRICHMENT STAGE completed successfully.")
+        return stage_result
+    except Exception as e:
+        stage_result["error_details"] = {"errors": [str(e)]}
+        raise StageExecutionError("enrichment", str(e), stage_result)
 
 
 def main():
-    extract_load_files()
-    transform()
-    create_trip_details()
+    pipeline_config = _load_pipeline_config()
+    execution_id = str(uuid.uuid4())
+    batch_ts = datetime.now(timezone.utc).isoformat()
+    stage_results = {}
+    try:
+        stage_results["extract_load_files"] = extract_load_files(pipeline_config)
+        stage_results["transformation"] = transform(pipeline_config)
+        stage_results["enrichment"] = create_trip_details(pipeline_config)
+        report = create_data_quality_report(
+            config=pipeline_config,
+            execution_id=execution_id,
+            stage_results=stage_results,
+            batch_ts=batch_ts,
+        )
+        _send_webhook_from_report(report, pipeline_config, "success path")
+    except StageExecutionError as e:
+        stage_results[e.stage] = e.stage_result
+        logger.error("%s failed: %s", e.stage, e)
+        report = create_failure_quality_report(
+            config=pipeline_config,
+            execution_id=execution_id,
+            failure_phase=e.stage,
+            failure_message=str(e),
+            stage_results=stage_results,
+            batch_ts=batch_ts,
+        )
+        _send_webhook_from_report(report, pipeline_config, "failure path")
+        raise
 
 
 if __name__ == "__main__":
