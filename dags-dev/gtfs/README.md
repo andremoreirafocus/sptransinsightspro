@@ -45,10 +45,14 @@ Chaves esperadas em `general`
     "app_folder": "sptrans",
     "gtfs_folder": "gtfs",
     "raw_bucket": "raw",
+    "quarantined_subfolder": "quarantined",
     "trusted_bucket": "trusted"
   },
   "tables": {
     "trip_details_table_name": "trip_details"
+  },
+  "notifications": {
+    "webhook_url": "disabled"
   }
 }
 ```
@@ -61,11 +65,11 @@ No Airflow, as configurações e credenciais são gerenciadas utilzando-se os re
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
-- python3 -m venv .env
+- python3 -m venv .venv
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python gtfs-v2.py
+python gtfs-v3.py
 
 Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima

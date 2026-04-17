@@ -10,6 +10,7 @@ def make_config():
             },
             "storage": {
                 "raw_bucket": "raw",
+                "quarantined_subfolder": "quarantined",
                 "gtfs_folder": "gtfs",
             },
         },
@@ -70,7 +71,7 @@ def test_object_name_formatted_correctly():
         read_file_fn=make_fake_open(),
         write_fn=fake_write,
     )
-    assert write_calls[0] == "gtfs/stops/stops.txt"
+    assert write_calls[0] == "gtfs/stops.txt"
 
 
 def test_correct_bucket_used():
@@ -86,6 +87,22 @@ def test_correct_bucket_used():
         write_fn=fake_write,
     )
     assert write_calls[0] == "raw"
+
+
+def test_object_name_uses_quarantine_subfolder_when_failed_true():
+    write_calls = []
+
+    def fake_write(connection, buffer, bucket_name, object_name):
+        write_calls.append(object_name)
+
+    save_files_to_raw_storage(
+        make_config(),
+        ["stops.txt"],
+        failed=True,
+        read_file_fn=make_fake_open(),
+        write_fn=fake_write,
+    )
+    assert write_calls[0] == "gtfs/quarantined/stops.txt"
 
 
 def test_file_content_passed_to_write():

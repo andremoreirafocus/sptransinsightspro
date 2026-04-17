@@ -51,11 +51,11 @@ def test_missing_config_key_raises_value_error():
         save_buffer_to_storage(config, "stops.parquet", b"data")
 
 
-def test_write_error_is_swallowed():
-    """save_buffer_to_storage catches exceptions internally and does not re-raise."""
-
+def test_write_error_raises_value_error():
     def fake_write(connection, buffer, bucket_name, object_name):
         raise RuntimeError("write failed")
 
-    # Should not raise
-    save_buffer_to_storage(make_config(), "stops.parquet", b"data", write_fn=fake_write)
+    with pytest.raises(ValueError, match="Failed to save parquet buffer"):
+        save_buffer_to_storage(
+            make_config(), "stops.parquet", b"data", write_fn=fake_write
+        )

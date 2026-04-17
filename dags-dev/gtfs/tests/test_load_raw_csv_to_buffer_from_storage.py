@@ -45,7 +45,7 @@ def test_object_name_uses_correct_path():
     load_raw_csv_to_buffer_from_storage(make_config(), "stops", read_fn=fake_read)
     bucket, object_name = calls[0]
     assert bucket == "raw"
-    assert object_name == "gtfs/stops/stops.txt"
+    assert object_name == "gtfs/stops.txt"
 
 
 def test_missing_config_key_raises_value_error():

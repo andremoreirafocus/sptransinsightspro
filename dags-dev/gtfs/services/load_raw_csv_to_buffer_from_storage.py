@@ -35,8 +35,7 @@ def load_raw_csv_to_buffer_from_storage(
     logger.info(
         f"Loading {file_name} csv data from bucket: {source_bucket}, folder: {app_folder}"
     )
-    prefix = f"{app_folder}/"
-    object_name = f"{prefix}{file_name}/{file_name}.txt"
+    object_name = f"{app_folder}/{file_name}.txt"
     logger.info(f"Reading object: {object_name} from bucket: {source_bucket} ...")
     data = read_fn(connection_data, source_bucket, object_name)
     logger.info(f"Loaded {data.getbuffer().nbytes} bytes from {object_name}")

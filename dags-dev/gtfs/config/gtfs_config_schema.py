@@ -1,6 +1,6 @@
 from typing import Any, Dict, Type
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 
 class ExtractionConfig(BaseModel):
@@ -13,7 +13,16 @@ class StorageConfig(BaseModel):
     app_folder: str
     gtfs_folder: str
     raw_bucket: str
+    quarantined_subfolder: str
     trusted_bucket: str
+
+    @field_validator("quarantined_subfolder")
+    @classmethod
+    def validate_quarantined_subfolder(cls, value: str) -> str:
+        normalized = value.strip().strip("/")
+        if not normalized:
+            raise ValueError("quarantined_subfolder must be non-empty")
+        return normalized
 
 
 class TablesConfig(BaseModel):
@@ -21,11 +30,17 @@ class TablesConfig(BaseModel):
     trip_details_table_name: str
 
 
+class NotificationsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    webhook_url: str
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     extraction: ExtractionConfig
     storage: StorageConfig
     tables: TablesConfig
+    notifications: NotificationsConfig
 
 
 def validate_general_input(

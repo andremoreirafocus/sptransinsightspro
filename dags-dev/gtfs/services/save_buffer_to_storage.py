@@ -36,10 +36,14 @@ def save_buffer_to_storage(
             bucket_name=destination_bucket,
             object_name=destination_object_name,
         )
+        logger.info("Save data successful!")
     except Exception as e:
         logger.error(
             "Error writing data to MinIO bucket "
             f"'{destination_bucket}' with object name '{destination_object_name}'."
         )
         logger.error(f"Exception details: {e}")
-    logger.info("Save data successful!")
+        raise ValueError(
+            "Failed to save parquet buffer to object storage: "
+            f"bucket='{destination_bucket}', object='{destination_object_name}', error='{e}'"
+        )

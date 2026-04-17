@@ -54,12 +54,14 @@ def test_returns_file_list_on_success(tmp_path):
     assert sorted(result) == ["routes.txt", "stops.txt"]
 
 
-def test_returns_none_on_404():
+def test_raises_value_error_on_404():
     def fake_get(url, auth):
         return FakeResponse(404)
 
-    result = extract_gtfs_files(make_config(), http_get_fn=fake_get)
-    assert result is None
+    with pytest.raises(
+        ValueError, match="GTFS endpoint returned 404: check credentials or portal access."
+    ):
+        extract_gtfs_files(make_config(), http_get_fn=fake_get)
 
 
 def test_raises_on_non_404_http_error():
@@ -88,3 +90,16 @@ def test_files_extracted_to_folder(tmp_path):
 
     extract_gtfs_files(config, http_get_fn=fake_get)
     assert (tmp_path / "agency.txt").exists()
+
+
+def test_raises_on_unsafe_zip_entry(tmp_path):
+    zip_bytes = make_zip_bytes(["../outside.txt", "agency.txt"])
+
+    def fake_get(url, auth):
+        return FakeResponse(200, zip_bytes)
+
+    config = make_config()
+    config["general"]["extraction"]["local_downloads_folder"] = str(tmp_path)
+
+    with pytest.raises(ValueError, match="Unsafe zip entry detected"):
+        extract_gtfs_files(config, http_get_fn=fake_get)
