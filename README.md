@@ -116,7 +116,7 @@ Esse padrão reduz acoplamento entre serviços e garante consistência entre tod
 Para garantir a estabilidade do ambiente de produção, o projeto adota um fluxo de Promotion-based Development. No caso dos pipelines, todo o código é desenvolvido e testado no diretório `dags-dev` e, após validado, é "promovido" para o diretório de produção do Airflow (`airflow/dags`).
 
 ### Promoção de Pipelines (DAGs)
-Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting) e executa os testes unitários antes de sincronizar os arquivos com a produção:
+Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting), SAST e testes unitários antes de sincronizar os arquivos com a produção:
 
 ```shell
 # Sintaxe: python scripts/promote_pipeline.py <nome_da_pipeline>
@@ -125,9 +125,10 @@ python scripts/promote_pipeline.py transformlivedata
 
 Este script realiza os seguintes passos:
 1. Análise estática: executa o `ruff` no subdiretório da pipeline.
-2. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
-3. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
-4. Sincronização de infra compartilhada: sincroniza as pastas `infra` e `pipeline_configurator` para produção.
+2. SAST: executa o `bandit` (alta severidade) no subdiretório da pipeline.
+3. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
+4. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
+5. Sincronização de infraestrutura compartilhada: sincroniza as pastas `infra`, `quality` e `pipeline_configurator` para produção.
 
 O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
@@ -141,9 +142,10 @@ python scripts/deploy_service.py extractloadlivedata extractloadlivedata
 
 Este script realiza os seguintes passos:
 1. Análise estática: executa o `ruff` no diretório do serviço.
-2. Testes de unidade: executa o `pytest` na pasta `tests/` do serviço (se existir).
-3. Build da imagem Docker via Docker Compose.
-4. Reinício do container via Docker Compose.
+2. SAST: executa o `bandit` (alta severidade) no diretório do serviço.
+3. Testes de unidade: executa o `pytest` na pasta `tests/` do serviço (se existir).
+4. Build da imagem Docker via Docker Compose.
+5. Reinício do container via Docker Compose.
 
 ### Scripts auxiliares
 Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
@@ -151,7 +153,7 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 | Módulo | Responsabilidade |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
-| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
 ![Para mais informações:](./scripts/README.md)
 
@@ -159,4 +161,3 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os oito ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada, o design do alertservice e o workflow de promoção de pipelines.
 
 ![Índice de ADRs](./docs/adr/README.md)
-
