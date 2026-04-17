@@ -23,6 +23,7 @@ def make_general():
                 "expectations_suites": [
                     "data_expectations_stop_times",
                     "data_expectations_stops",
+                    "data_expectations_trip_details",
                 ]
             }
         },

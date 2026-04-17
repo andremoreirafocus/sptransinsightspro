@@ -22,7 +22,7 @@
     "data_validations": {
       "expectations_validation": {
           "expectations_suites": 
-          [ "data_expectations_stops", "data_expectations_stop_times"]
+          [ "data_expectations_stops", "data_expectations_stop_times", "data_expectations_trip_details"]
       }
     }
   }

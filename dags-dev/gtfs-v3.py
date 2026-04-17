@@ -16,8 +16,11 @@ from gtfs.services.relocate_staged_trusted_files import relocate_staged_trusted_
 from gtfs.services.save_files_to_raw_storage import save_files_to_raw_storage
 from gtfs.services.transforms import transform_and_validate_table
 from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
+from infra.object_storage import read_file_from_object_storage_to_bytesio
+from quality.validate_expectations import validate_expectations
 from infra.notifications import send_webhook
 from pipeline_configurator.config import get_config
+import pandas as pd
 
 LOG_FILENAME = "gtfs.log"
 
@@ -208,21 +211,116 @@ def transform(pipeline_config=None):
 
 def create_trip_details(pipeline_config=None):
     cfg = pipeline_config or _load_pipeline_config()
+    table_name = cfg["general"]["tables"]["trip_details_table_name"]
+    staged_result = []
+    relocation_target = None
     stage_result = {
         "status": "FAIL",
-        "validated_items_count": 0,
-        "error_details": {},
+        "validated_items_count": 1,
+        "error_details": {"errors_by_table": {}},
         "relocation_status": "NOT_APPLICABLE",
         "relocation_error": None,
     }
     try:
         logger.info("=== ENRICHMENT STAGE: create_trip_details ===")
-        create_trip_details_table_and_fill_missing_data(cfg)
+        creation_result = create_trip_details_table_and_fill_missing_data(cfg)
+        staging_object_name = creation_result["staging_object_name"]
+        staged_result = [
+            {
+                "table_name": table_name,
+                "staging_object_name": staging_object_name,
+                "staged_written": True,
+            }
+        ]
+
+        suite = cfg.get("data_expectations_trip_details")
+        if isinstance(suite, dict) and len(suite.get("expectations", [])) > 0:
+            logger.info(
+                "ENRICHMENT STAGE - Running expectations validation for table '%s'",
+                table_name,
+            )
+            storage = cfg["general"]["storage"]
+            trusted_bucket = storage["trusted_bucket"]
+            connection_data = {
+                **cfg["connections"]["object_storage"],
+                "secure": False,
+            }
+            parquet_buffer = read_file_from_object_storage_to_bytesio(
+                connection_data,
+                bucket_name=trusted_bucket,
+                object_name=staging_object_name,
+            )
+            trip_details_df = pd.read_parquet(parquet_buffer)
+            expectations_result = validate_expectations(trip_details_df, suite)
+            summary = expectations_result.get("expectations_summary", {})
+            stage_result["expectations_summary"] = summary
+            if (
+                summary.get("rows_failed", 0) > 0
+                or summary.get("expectations_with_violations", 0) > 0
+                or summary.get("expectations_failed_due_to_exceptions", 0) > 0
+            ):
+                stage_result["error_details"]["errors_by_table"][table_name] = [
+                    f"gx_validation_failed:{summary}"
+                ]
+                relocation_target = "quarantine"
+                relocation = relocate_staged_trusted_files(
+                    cfg,
+                    staged_result,
+                    target="quarantine",
+                )
+                stage_result["relocation_status"] = relocation["status"]
+                if relocation.get("errors"):
+                    stage_result["relocation_error"] = str(relocation["errors"])
+                    stage_result["error_details"]["relocation_errors"] = relocation[
+                        "errors"
+                    ]
+                raise ValueError(f"Validation failures detected: {table_name}:{summary}")
+        else:
+            logger.info(
+                "Validation not required and skipped for table %s",
+                table_name,
+            )
+
+        relocation_target = "final"
+        relocation = relocate_staged_trusted_files(
+            cfg,
+            staged_result,
+            target="final",
+        )
+        stage_result["relocation_status"] = relocation["status"]
+        if relocation.get("errors"):
+            stage_result["relocation_error"] = str(relocation["errors"])
+            stage_result["error_details"]["relocation_errors"] = relocation["errors"]
+            raise ValueError(
+                "staging_to_final_relocation_error:"
+                f"{stage_result['relocation_error']}"
+            )
         stage_result["status"] = "PASS"
         logger.info("ENRICHMENT STAGE completed successfully.")
         return stage_result
     except Exception as e:
-        stage_result["error_details"] = {"errors": [str(e)]}
+        if not stage_result["error_details"].get("errors_by_table"):
+            stage_result["error_details"]["errors_by_table"] = {table_name: [str(e)]}
+        if (
+            staged_result
+            and relocation_target is None
+            and stage_result["relocation_status"] == "NOT_APPLICABLE"
+        ):
+            try:
+                relocation = relocate_staged_trusted_files(
+                    cfg,
+                    staged_result,
+                    target="quarantine",
+                )
+                stage_result["relocation_status"] = relocation["status"]
+                if relocation.get("errors"):
+                    stage_result["relocation_error"] = str(relocation["errors"])
+                    stage_result["error_details"]["relocation_errors"] = relocation[
+                        "errors"
+                    ]
+            except Exception as relocation_exception:
+                stage_result["relocation_status"] = "FAILED"
+                stage_result["relocation_error"] = str(relocation_exception)
         raise StageExecutionError("enrichment", str(e), stage_result)
 
 

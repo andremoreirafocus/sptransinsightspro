@@ -43,12 +43,15 @@ class ExpectationsValidationConfig(BaseModel):
         expected_values = {
             "data_expectations_stops",
             "data_expectations_stop_times",
+            "data_expectations_trip_details",
         }
         provided_values = [item.strip() for item in value]
-        if len(provided_values) != 2 or set(provided_values) != expected_values:
+        if len(provided_values) != 3 or set(provided_values) != expected_values:
             raise ValueError(
                 "expectations_suites must contain only "
-                "['data_expectations_stops', 'data_expectations_stop_times']"
+                "['data_expectations_stops', "
+                "'data_expectations_stop_times', "
+                "'data_expectations_trip_details']"
             )
         return provided_values
 

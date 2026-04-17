@@ -1,0 +1,65 @@
+{
+  "gtfs_data_expectations_trip_details": {
+    "expectation_suite_name": "gtfs_trip_details",
+    "meta": {
+      "great_expectations_version": "0.17.0",
+      "description": "Validation rules for GTFS trip_details table."
+    },
+    "expectations": [
+      {
+        "expectation_type": "expect_table_columns_to_match_set",
+        "kwargs": {
+          "column_set": [
+            "trip_id",
+            "first_stop_id",
+            "first_stop_name",
+            "first_stop_lat",
+            "first_stop_lon",
+            "last_stop_id",
+            "last_stop_name",
+            "last_stop_lat",
+            "last_stop_lon",
+            "trip_linear_distance",
+            "is_circular"
+          ]
+        },
+        "meta": {
+          "rule_type": "output_columns_exist"
+        }
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "trip_id"},
+        "meta": {"rule_type": "trip_id_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_unique",
+        "kwargs": {"column": "trip_id"},
+        "meta": {"rule_type": "trip_id_unique"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "first_stop_id"},
+        "meta": {"rule_type": "first_stop_id_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "last_stop_id"},
+        "meta": {"rule_type": "last_stop_id_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "column": "trip_linear_distance",
+          "min_value": 0
+        },
+        "meta": {"rule_type": "trip_linear_distance_non_negative"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_in_set",
+        "kwargs": {"column": "is_circular", "value_set": [true, false]},
+        "meta": {"rule_type": "is_circular_boolean"}
+      }
+    ]
+  }
+}

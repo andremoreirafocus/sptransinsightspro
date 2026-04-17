@@ -11,6 +11,7 @@ def make_config():
             "storage": {
                 "trusted_bucket": "trusted",
                 "gtfs_folder": "gtfs",
+                "staging_subfolder": "staging",
             },
             "tables": {
                 "trip_details_table_name": "trip_details",
@@ -50,3 +51,18 @@ def test_connection_closed_after_error():
     except ValueError:
         pass
     assert fake_con.closed
+
+
+def test_trip_details_exported_to_staging_path():
+    fake_con = FakeDuckDBConnection()
+    result = create_trip_details_table_and_fill_missing_data(
+        make_config(),
+        duckdb_client=fake_con,
+    )
+    assert result["table_name"] == "trip_details"
+    assert result["staging_object_name"] == "gtfs/staging/trip_details.parquet"
+    assert result["staged_written"] is True
+    assert any(
+        "s3://trusted/gtfs/staging/trip_details.parquet" in command
+        for command in fake_con.executed_sql
+    )

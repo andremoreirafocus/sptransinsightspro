@@ -3,20 +3,20 @@
     "contract_version": "v1",
     "pipeline": "gtfs",
     "stage": "pipeline",
-    "execution_id": "d17661ba-c1b0-4a0d-b749-ede8e8aafa36",
+    "execution_id": "a33b879c-78ce-40e7-ad73-4370fe358d88",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
     "acceptance_rate": 1.0,
     "rows_failed": 0,
-    "validated_items_count": 16,
-    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1925_d17661ba.json",
+    "validated_items_count": 17,
+    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1941_a33b879c.json",
     "relocation_status": null,
     "relocation_error": null,
-    "generated_at_utc": "2026-04-17T19:25:21.250861+00:00"
+    "generated_at_utc": "2026-04-17T19:41:44.817693+00:00"
   },
   "details": {
-    "execution_id": "d17661ba-c1b0-4a0d-b749-ede8e8aafa36",
+    "execution_id": "a33b879c-78ce-40e7-ad73-4370fe358d88",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
@@ -67,14 +67,25 @@
       },
       "enrichment": {
         "status": "PASS",
-        "validated_items_count": 0,
-        "error_details": {},
-        "relocation_status": "NOT_APPLICABLE",
-        "relocation_error": null
+        "validated_items_count": 1,
+        "error_details": {
+          "errors_by_table": {}
+        },
+        "relocation_status": "SUCCESS",
+        "relocation_error": null,
+        "expectations_summary": {
+          "total_checks": 7,
+          "expectations_successful": 7,
+          "expectations_with_violations": 0,
+          "expectations_failed_due_to_exceptions": 0,
+          "rows_failed": 0,
+          "violation_reasons": [],
+          "exception_reasons": []
+        }
       }
     },
     "artifacts": {
-      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1925_d17661ba.json"
+      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1941_a33b879c.json"
     }
   }
 }
