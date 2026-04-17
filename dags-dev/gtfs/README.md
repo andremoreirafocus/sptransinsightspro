@@ -7,9 +7,14 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 
 ## O que este subprojeto faz
 - download de arquivos GTFS do portal do desenvolvedor da SPTrans utilizados para enriquecer dados das posicoes dos onibus obtidas via API
+- valida os arquivos extraídos antes da carga na camada raw verificando sua existência e se o formato é CSV, além de um número mínimo de linhas mínimas)
 - salva cada um dos arquivos na "pasta" gtfs do bucket raw no serviço de object storage
-- para cada arquivo gtfs relevante para as análises a serem feitas na camada refined, extraido e salvo no bucket "raw", efetua transformações uma tabela com o mesmo nome que o arquivo, no formato Parquet
-- salva os dados transformados no bucket "trusted"
+- executa a **TRANSFORMATION STAGE** para as tabelas base do GTFS:
+  - transforma CSV em Parquet
+  - valida com Great Expectations quando houver suite configurada para a tabela
+  - salva primeiro em staging na camada trusted
+  - em caso de falha de validação: move artefatos staged para quarentena e gera diagnóstico consolidado
+  - em caso de sucesso: move artefatos staged para o caminho final para cada tabela
 - a partir de joins efetuados entre as tabelas gtfs criadas na camada trusted, gera uma tabela de detalhes das viagens (trip_details), a ser utilizada  para enriquecer os dados de posição dos veículos durante sua transformação, implementada pelo subprojeto transformlivedata, visando as análises de dados efetuadas no subprojeto refinelivedata
 
 ## Pré-requisitos
@@ -46,6 +51,7 @@ Chaves esperadas em `general`
     "gtfs_folder": "gtfs",
     "raw_bucket": "raw",
     "quarantined_subfolder": "quarantined",
+    "staging_subfolder": "staging",
     "trusted_bucket": "trusted"
   },
   "tables": {
@@ -53,9 +59,38 @@ Chaves esperadas em `general`
   },
   "notifications": {
     "webhook_url": "disabled"
+  },
+  "data_validations": {
+    "expectations_validation": {
+      "expectations_suites": [
+        "data_expectations_stops",
+        "data_expectations_stop_times"
+      ]
+    }
   }
 }
 ```
+
+Artefatos de expectations carregados automaticamente via `pipeline_configurator`:
+- `dags-dev/gtfs/config/gtfs_data_expectations_stops.json`
+- `dags-dev/gtfs/config/gtfs_data_expectations_stop_times.json`
+
+### Fluxo da TRANSFORMATION STAGE
+- Tabelas processadas: `stops`, `stop_times`, `routes`, `trips`, `frequencies`, `calendar`
+- Caminhos na camada trusted:
+  - Staging: `trusted/<gtfs_folder>/<staging_subfolder>/<table>.parquet`
+  - Quarentena: `trusted/<gtfs_folder>/<quarantined_subfolder>/<table>.parquet`
+  - Final: `trusted/<gtfs_folder>/<table>/<table>.parquet`
+
+### Relato de falha e webhook
+- Em falhas de extração/carga ou transformação, a pipeline gera um failure report em memória com:
+  - `stage`
+  - `failure_phase`
+  - `failure_message`
+  - `validated_items_count`
+  - `error_details`
+  - `relocation_status` / `relocation_error`
+- O resumo (`summary`) é enviado via webhook quando `notifications.webhook_url` não estiver como `disabled`/`none`/`null`.
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.

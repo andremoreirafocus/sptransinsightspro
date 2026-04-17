@@ -54,6 +54,11 @@ def transform_and_validate_table(
     suite_key = f"data_expectations_{table_name}"
     suite = config.get(suite_key)
     if isinstance(suite, dict) and len(suite.get("expectations", [])) > 0:
+        logger.info(
+            "TRANSFORMATION STAGE - Running expectations validation for table '%s' using suite key '%s'",
+            table_name,
+            suite_key,
+        )
         try:
             expectations_result = validate_expectations_fn(df, suite)
             summary = expectations_result.get("expectations_summary", {})
@@ -65,9 +70,24 @@ def transform_and_validate_table(
             ):
                 result["is_valid"] = False
                 result["errors"].append(f"gx_validation_failed:{summary}")
+                logger.error(
+                    "TRANSFORMATION STAGE - Validation failed for table '%s': %s",
+                    table_name,
+                    summary,
+                )
+            else:
+                logger.info(
+                    "TRANSFORMATION STAGE - Validation passed for table '%s'",
+                    table_name,
+                )
         except Exception as e:
             result["is_valid"] = False
             result["errors"].append(f"gx_validation_exception:{e}")
+            logger.error(
+                "TRANSFORMATION STAGE - Validation exception for table '%s': %s",
+                table_name,
+                e,
+            )
     else:
         logger.info("Validation not required and skipped for table %s", table_name)
 

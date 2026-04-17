@@ -15,7 +15,7 @@
       "trip_details_table_name": "trip_details"
     },
     "notifications": {
-      "webhook_url": "disabled"
+      "webhook_url": "http://localhost:8000/notify"
     },
     "data_validations": {
       "expectations_validation": {

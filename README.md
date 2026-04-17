@@ -16,9 +16,9 @@ O ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informa
 Detalhes sobre as DAGS:
     - DAG gtfs: processo composto de 3 etapas principais.   
         - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS e salva na camada raw. 
-        - transformação: cria tabelas na camada trusted, a partir dos dados brutos extraído do GTFS da SPTRANS e armazenados na camada raw
+        - transformação: executa a **TRANSFORMATION STAGE** com validação de qualidade (Great Expectations quando aplicável), staging de artefatos (tabelas) em formato Parquet, quarentena em caso de falha e promoção para caminho final em caso de sucesso.
         - criação de uma tabela de dados de viagens, a partir dos dados das diversas tabelas GTFS, utilizada para enriquecer os dados de posição extraídos da API SPTrans. 
-        - Esta DAG envia um sinal ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens seja iniciada automaticamente.
+        - Esta DAG emite um sinal (dataset do Airflow) ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens para a camada refined seja iniciada automaticamente.
         ![Para mais informações:](./dags-dev/gtfs/README.md)
     - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. 
         - Validação do JSON bruto via JSON Schema (configuração externa)
