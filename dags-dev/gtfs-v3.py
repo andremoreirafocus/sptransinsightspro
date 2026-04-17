@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
+from dataclasses import dataclass, field
 import logging
 from logging.handlers import RotatingFileHandler
+from typing import Any
 import uuid
 
 from gtfs.config.gtfs_config_schema import GeneralConfig
@@ -49,6 +51,18 @@ class StageExecutionError(ValueError):
         self.stage_result = stage_result
 
 
+@dataclass
+class RelocationDetails:
+    moved: list[Any] = field(default_factory=list)
+    errors: list[Any] = field(default_factory=list)
+
+    def to_dict(self) -> dict:
+        return {
+            "moved": list(self.moved),
+            "errors": list(self.errors),
+        }
+
+
 def _load_pipeline_config():
     try:
         return get_config(
@@ -77,6 +91,17 @@ def _send_webhook_from_report(report: dict, pipeline_config: dict, path: str):
         logger.error("Webhook notification failed: %s", e)
 
 
+def _apply_relocation_result(stage_result: dict, relocation: dict):
+    stage_result["relocation_status"] = relocation.get("status", "FAILED")
+    stage_result["relocation_details"] = {
+        "moved": relocation.get("moved", []),
+        "errors": relocation.get("errors", []),
+    }
+    if relocation.get("errors"):
+        stage_result["relocation_error"] = str(relocation["errors"])
+        stage_result["error_details"]["relocation_errors"] = relocation["errors"]
+
+
 def extract_load_files(pipeline_config=None):
     stage_result = {
         "status": "FAIL",
@@ -84,6 +109,7 @@ def extract_load_files(pipeline_config=None):
         "error_details": {},
         "relocation_status": "NOT_APPLICABLE",
         "relocation_error": None,
+        "relocation_details": RelocationDetails().to_dict(),
     }
     cfg = pipeline_config or _load_pipeline_config()
     try:
@@ -108,10 +134,18 @@ def extract_load_files(pipeline_config=None):
             try:
                 save_files_to_raw_storage(cfg, files_list, failed=True)
                 stage_result["relocation_status"] = "SUCCESS"
+                stage_result["relocation_details"] = {
+                    "moved": [{"scope": "all_extracted_files", "target": "quarantine"}],
+                    "errors": [],
+                }
                 logger.info("All extracted files saved to quarantine.")
             except Exception as e:
                 stage_result["relocation_status"] = "FAILED"
                 stage_result["relocation_error"] = str(e)
+                stage_result["relocation_details"] = {
+                    "moved": [],
+                    "errors": [str(e)],
+                }
                 raise ValueError(f"Validation failed and quarantine save failed: {e}")
             raise ValueError(f"Raw GTFS validation failed: {consolidated_reasons}")
 
@@ -133,6 +167,7 @@ def transform(pipeline_config=None):
         "error_details": {},
         "relocation_status": "NOT_APPLICABLE",
         "relocation_error": None,
+        "relocation_details": RelocationDetails().to_dict(),
     }
     table_names = [
         "stops",
@@ -172,10 +207,7 @@ def transform(pipeline_config=None):
                 staged_results,
                 target="quarantine",
             )
-            stage_result["relocation_status"] = relocation["status"]
-            if relocation.get("errors"):
-                stage_result["relocation_error"] = str(relocation["errors"])
-                stage_result["error_details"]["relocation_errors"] = relocation["errors"]
+            _apply_relocation_result(stage_result, relocation)
             consolidated_reasons = "; ".join(
                 [f"{table}:{reasons}" for table, reasons in errors_by_table.items()]
             )
@@ -195,10 +227,8 @@ def transform(pipeline_config=None):
             staged_results,
             target="final",
         )
-        stage_result["relocation_status"] = relocation["status"]
+        _apply_relocation_result(stage_result, relocation)
         if relocation.get("errors"):
-            stage_result["relocation_error"] = str(relocation["errors"])
-            stage_result["error_details"]["relocation_errors"] = relocation["errors"]
             raise ValueError(
                 "staging_to_final_relocation_error:"
                 f"{stage_result['relocation_error']}"
@@ -225,6 +255,7 @@ def create_trip_details(pipeline_config=None):
         "artifacts": {"column_lineage": get_trip_details_lineage()},
         "relocation_status": "NOT_APPLICABLE",
         "relocation_error": None,
+        "relocation_details": RelocationDetails().to_dict(),
     }
     try:
         logger.info("=== ENRICHMENT STAGE: create_trip_details ===")
@@ -277,12 +308,7 @@ def create_trip_details(pipeline_config=None):
                     staged_result,
                     target="quarantine",
                 )
-                stage_result["relocation_status"] = relocation["status"]
-                if relocation.get("errors"):
-                    stage_result["relocation_error"] = str(relocation["errors"])
-                    stage_result["error_details"]["relocation_errors"] = relocation[
-                        "errors"
-                    ]
+                _apply_relocation_result(stage_result, relocation)
                 raise ValueError(f"Validation failures detected: {table_name}:{summary}")
         else:
             logger.info(
@@ -296,10 +322,8 @@ def create_trip_details(pipeline_config=None):
             staged_result,
             target="final",
         )
-        stage_result["relocation_status"] = relocation["status"]
+        _apply_relocation_result(stage_result, relocation)
         if relocation.get("errors"):
-            stage_result["relocation_error"] = str(relocation["errors"])
-            stage_result["error_details"]["relocation_errors"] = relocation["errors"]
             raise ValueError(
                 "staging_to_final_relocation_error:"
                 f"{stage_result['relocation_error']}"
@@ -321,15 +345,14 @@ def create_trip_details(pipeline_config=None):
                     staged_result,
                     target="quarantine",
                 )
-                stage_result["relocation_status"] = relocation["status"]
-                if relocation.get("errors"):
-                    stage_result["relocation_error"] = str(relocation["errors"])
-                    stage_result["error_details"]["relocation_errors"] = relocation[
-                        "errors"
-                    ]
+                _apply_relocation_result(stage_result, relocation)
             except Exception as relocation_exception:
                 stage_result["relocation_status"] = "FAILED"
                 stage_result["relocation_error"] = str(relocation_exception)
+                stage_result["relocation_details"] = {
+                    "moved": [],
+                    "errors": [str(relocation_exception)],
+                }
         raise StageExecutionError("enrichment", str(e), stage_result)
 
 

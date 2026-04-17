@@ -88,7 +88,7 @@ def test_transformation_stage_quarantines_staged_files_on_validation_failure():
     module.transform_and_validate_table = deps.transform_and_validate_table
     module.relocate_staged_trusted_files = deps.relocate_staged_trusted_files
 
-    with pytest.raises(ValueError, match="Validation failures detected"):
+    with pytest.raises(Exception, match="Validation failures detected") as excinfo:
         module.transform()
 
     assert len(deps.relocation_calls) == 1
@@ -96,6 +96,10 @@ def test_transformation_stage_quarantines_staged_files_on_validation_failure():
     staged_tables = {row["table_name"] for row in deps.relocation_calls[0][1]}
     assert "routes" not in staged_tables
     assert "stops" in staged_tables
+    stage_result = excinfo.value.stage_result
+    assert "relocation_details" in stage_result
+    assert "moved" in stage_result["relocation_details"]
+    assert "errors" in stage_result["relocation_details"]
 
 
 def test_transformation_stage_moves_staged_files_to_final_on_success():
@@ -127,3 +131,5 @@ def test_transformation_stage_moves_staged_files_to_final_on_success():
     assert result["status"] == "PASS"
     assert result["validated_items_count"] == 6
     assert result["relocation_status"] == "SUCCESS"
+    assert "relocation_details" in result
+    assert result["relocation_details"]["errors"] == []

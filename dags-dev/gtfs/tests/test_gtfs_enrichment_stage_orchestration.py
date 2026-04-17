@@ -120,6 +120,8 @@ def test_create_trip_details_moves_to_final_on_success():
     assert result["status"] == "PASS"
     assert result["relocation_status"] == "SUCCESS"
     assert result["artifacts"]["column_lineage"]["warning"] is None
+    assert "relocation_details" in result
+    assert result["relocation_details"]["errors"] == []
     assert relocate_calls == ["final"]
 
 
@@ -156,6 +158,8 @@ def test_create_trip_details_sets_lineage_warning_on_drift():
 
     assert result["status"] == "PASS"
     assert result["artifacts"]["column_lineage"]["warning"] == "lineage drift detected"
+    assert "relocation_details" in result
+    assert result["relocation_details"]["errors"] == []
     assert relocate_calls == ["final"]
 
 
@@ -188,9 +192,12 @@ def test_create_trip_details_quarantines_on_gx_failure():
         or {"status": "SUCCESS", "moved": [], "errors": []}
     )
 
-    with pytest.raises(module.StageExecutionError):
+    with pytest.raises(module.StageExecutionError) as excinfo:
         module.create_trip_details(config)
 
+    stage_result = excinfo.value.stage_result
+    assert "relocation_details" in stage_result
+    assert stage_result["relocation_details"]["errors"] == []
     assert relocate_calls == ["quarantine"]
 
 
@@ -216,7 +223,10 @@ def test_create_trip_details_quarantines_when_validation_raises_after_staging():
         or {"status": "SUCCESS", "moved": [], "errors": []}
     )
 
-    with pytest.raises(module.StageExecutionError):
+    with pytest.raises(module.StageExecutionError) as excinfo:
         module.create_trip_details(config)
 
+    stage_result = excinfo.value.stage_result
+    assert "relocation_details" in stage_result
+    assert stage_result["relocation_details"]["errors"] == []
     assert relocate_calls == ["quarantine"]
