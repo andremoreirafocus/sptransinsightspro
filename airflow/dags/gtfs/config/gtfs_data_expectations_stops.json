@@ -1,0 +1,77 @@
+{
+  "gtfs_data_expectations_stops": {
+    "expectation_suite_name": "gtfs_stops",
+    "meta": {
+      "great_expectations_version": "0.17.0",
+      "description": "Validation rules for GTFS stops table."
+    },
+    "evaluation_parameters": {
+      "lat_min_value": -23.916334,
+      "lat_max_value": -23.189743,
+      "long_min_value": -46.984037,
+      "long_max_value": -46.184930
+    },
+    "expectations": [
+      {
+        "expectation_type": "expect_table_columns_to_match_set",
+        "kwargs": {
+          "column_set": ["stop_id", "stop_name", "stop_desc", "stop_lat", "stop_lon"]
+        },
+        "meta": {"rule_type": "input_columns_exist"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "stop_id"},
+        "meta": {"rule_type": "ids_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_unique",
+        "kwargs": {"column": "stop_id"},
+        "meta": {"rule_type": "stop_id_unique"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_of_type",
+        "kwargs": {"column": "stop_id", "type_": "int"},
+        "meta": {"rule_type": "stop_id_type"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "stop_lat"},
+        "meta": {"rule_type": "lat_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "stop_lon"},
+        "meta": {"rule_type": "lon_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_of_type",
+        "kwargs": {"column": "stop_lat", "type_": "float"},
+        "meta": {"rule_type": "lat_type"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_of_type",
+        "kwargs": {"column": "stop_lon", "type_": "float"},
+        "meta": {"rule_type": "lon_type"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "column": "stop_lat",
+          "min_value": {"$PARAMETER": "lat_min_value"},
+          "max_value": {"$PARAMETER": "lat_max_value"}
+        },
+        "meta": {"rule_type": "lat_in_rmsp"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "column": "stop_lon",
+          "min_value": {"$PARAMETER": "long_min_value"},
+          "max_value": {"$PARAMETER": "long_max_value"}
+        },
+        "meta": {"rule_type": "lon_in_rmsp"}
+      }
+    ]
+  }
+}

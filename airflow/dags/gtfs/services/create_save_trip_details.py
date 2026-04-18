@@ -92,13 +92,29 @@ def create_trip_details_table_and_fill_missing_data(config, duckdb_client=None):
         con.execute(sql_command)
         count = con.execute(f"SELECT COUNT(*) FROM {trip_details}").fetchone()[0]
         logger.info(f"Table created successfully with {count} records!")
-        trip_details_table_path = f"{bucket_name}/{app_folder}/{trip_details}"
+        storage = config["general"]["storage"]
+        staging_subfolder = storage.get("staging_subfolder")
+        if staging_subfolder:
+            normalized_staging = str(staging_subfolder).strip("/")
+            destination_object_name = f"{app_folder}/{normalized_staging}/{trip_details}.parquet"
+        else:
+            destination_object_name = f"{app_folder}/{trip_details}/{trip_details}.parquet"
         export_query = f"""
-            COPY {trip_details} 
-            TO 's3://{trip_details_table_path}/{trip_details}.parquet' (FORMAT PARQUET);
+            COPY {trip_details}
+            TO 's3://{bucket_name}/{destination_object_name}' (FORMAT PARQUET);
         """
         con.execute(export_query)
-        logger.info(f"Table successfully exported to s3://{trip_details_table_path}/")
+        logger.info(
+            "Table successfully exported to s3://%s/%s",
+            bucket_name,
+            destination_object_name,
+        )
+        return {
+            "table_name": trip_details,
+            "staging_object_name": destination_object_name,
+            "row_count": count,
+            "staged_written": bool(staging_subfolder),
+        }
     except Exception as e:
         logger.error(f"An unexpected error occurred: {e}")
         raise ValueError(f"An unexpected error occurred: {e}")

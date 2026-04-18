@@ -1,0 +1,73 @@
+{
+  "gtfs_data_expectations_stop_times": {
+    "expectation_suite_name": "gtfs_stop_times",
+    "meta": {
+      "great_expectations_version": "0.17.0",
+      "description": "Validation rules for GTFS stop_times table."
+    },
+    "expectations": [
+      {
+        "expectation_type": "expect_table_columns_to_match_set",
+        "kwargs": {
+          "column_set": [
+            "trip_id",
+            "arrival_time",
+            "departure_time",
+            "stop_id",
+            "stop_sequence"
+          ]
+        },
+        "meta": {"rule_type": "input_columns_exist"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "trip_id"},
+        "meta": {"rule_type": "trip_id_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "stop_id"},
+        "meta": {"rule_type": "stop_id_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_of_type",
+        "kwargs": {"column": "stop_id", "type_": "int"},
+        "meta": {"rule_type": "stop_id_type"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "stop_sequence"},
+        "meta": {"rule_type": "stop_sequence_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_of_type",
+        "kwargs": {"column": "stop_sequence", "type_": "int"},
+        "meta": {"rule_type": "stop_sequence_type"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_be_between",
+        "kwargs": {
+          "column": "stop_sequence",
+          "min_value": 0,
+          "strict_min": true
+        },
+        "meta": {"rule_type": "stop_sequence_positive"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "arrival_time"},
+        "meta": {"rule_type": "arrival_time_not_null"}
+      },
+      {
+        "expectation_type": "expect_column_values_to_not_be_null",
+        "kwargs": {"column": "departure_time"},
+        "meta": {"rule_type": "departure_time_not_null"}
+      },
+      {
+        "expectation_type": "expect_compound_columns_to_be_unique",
+        "kwargs": {"column_list": ["trip_id", "stop_sequence"]},
+        "meta": {"rule_type": "trip_id_stop_sequence_unique"}
+      }
+    ]
+  }
+}

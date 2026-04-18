@@ -38,9 +38,17 @@ Para importar conexões e variáveis de ambiente usadas pelas DAGS
 docker exec -it airflow_webserver bash
 airflow connections import variables_and_connections/connections.json 
 airflow variables import variables_and_connections/variables.json 
+
+# transformlivedata
 airflow variables import variables_and_connections/transformlivedata_general.json 
 airflow variables import variables_and_connections/transformlivedata_data_expectations.json
-airflow variables import variables_and_connections/transformlivedata_data_expectations.json
+airflow variables import variables_and_connections/transformlivedata_raw_data_json_schema.json
+
+# gtfs
+airflow variables import variables_and_connections/gtfs_general.json
+airflow variables import variables_and_connections/gtfs_data_expectations_stops.json
+airflow variables import variables_and_connections/gtfs_data_expectations_stop_times.json
+airflow variables import variables_and_connections/gtfs_data_expectations_trip_details.json
 ```
 
 
@@ -64,7 +72,6 @@ airflow users create \
 
  ## Para acessar o Airflow:
  http://localhost:8080/
-
 
 
 

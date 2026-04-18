@@ -3,20 +3,20 @@
     "contract_version": "v1",
     "pipeline": "gtfs",
     "stage": "pipeline",
-    "execution_id": "aef0081d-60a7-449f-96a6-290a997873c0",
+    "execution_id": "b84a520c-82e7-49e1-996c-9b34b4d5a4fe",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
     "acceptance_rate": 1.0,
     "rows_failed": 0,
     "validated_items_count": 17,
-    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1958_aef0081d.json",
+    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=18/hour=11/quality-report-gtfs_1157_b84a520c.json",
     "relocation_status": null,
     "relocation_error": null,
-    "generated_at_utc": "2026-04-17T19:58:16.737931+00:00"
+    "generated_at_utc": "2026-04-18T11:57:44.332425+00:00"
   },
   "details": {
-    "execution_id": "aef0081d-60a7-449f-96a6-290a997873c0",
+    "execution_id": "b84a520c-82e7-49e1-996c-9b34b4d5a4fe",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
@@ -28,7 +28,11 @@
           "errors_by_file": {}
         },
         "relocation_status": "NOT_APPLICABLE",
-        "relocation_error": null
+        "relocation_error": null,
+        "relocation_details": {
+          "moved": [],
+          "errors": []
+        }
       },
       "transformation": {
         "status": "PASS",
@@ -63,7 +67,42 @@
           ]
         },
         "relocation_status": "SUCCESS",
-        "relocation_error": null
+        "relocation_error": null,
+        "relocation_details": {
+          "moved": [
+            {
+              "table_name": "stops",
+              "source_object_name": "gtfs/staging/stops.parquet",
+              "destination_object_name": "gtfs/stops/stops.parquet"
+            },
+            {
+              "table_name": "stop_times",
+              "source_object_name": "gtfs/staging/stop_times.parquet",
+              "destination_object_name": "gtfs/stop_times/stop_times.parquet"
+            },
+            {
+              "table_name": "routes",
+              "source_object_name": "gtfs/staging/routes.parquet",
+              "destination_object_name": "gtfs/routes/routes.parquet"
+            },
+            {
+              "table_name": "trips",
+              "source_object_name": "gtfs/staging/trips.parquet",
+              "destination_object_name": "gtfs/trips/trips.parquet"
+            },
+            {
+              "table_name": "frequencies",
+              "source_object_name": "gtfs/staging/frequencies.parquet",
+              "destination_object_name": "gtfs/frequencies/frequencies.parquet"
+            },
+            {
+              "table_name": "calendar",
+              "source_object_name": "gtfs/staging/calendar.parquet",
+              "destination_object_name": "gtfs/calendar/calendar.parquet"
+            }
+          ],
+          "errors": []
+        }
       },
       "enrichment": {
         "status": "PASS",
@@ -192,6 +231,16 @@
         },
         "relocation_status": "SUCCESS",
         "relocation_error": null,
+        "relocation_details": {
+          "moved": [
+            {
+              "table_name": "trip_details",
+              "source_object_name": "gtfs/staging/trip_details.parquet",
+              "destination_object_name": "gtfs/trip_details/trip_details.parquet"
+            }
+          ],
+          "errors": []
+        },
         "expectations_summary": {
           "total_checks": 7,
           "expectations_successful": 7,
@@ -204,7 +253,7 @@
       }
     },
     "artifacts": {
-      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=17/hour=19/quality-report-gtfs_1958_aef0081d.json"
+      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=18/hour=11/quality-report-gtfs_1157_b84a520c.json"
     }
   }
 }

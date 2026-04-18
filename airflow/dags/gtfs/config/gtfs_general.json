@@ -7,10 +7,23 @@
       "app_folder": "sptrans",
       "gtfs_folder": "gtfs",
       "raw_bucket": "raw",
+      "metadata_bucket": "metadata",
+      "quality_report_folder": "quality-reports",
+      "quarantined_subfolder": "quarantined",
+      "staging_subfolder": "staging",
       "trusted_bucket": "trusted"
     },
     "tables": {
       "trip_details_table_name": "trip_details"
+    },
+    "notifications": {
+      "webhook_url": "http://localhost:8000/notify"
+    },
+    "data_validations": {
+      "expectations_validation": {
+          "expectations_suites": 
+          [ "data_expectations_stops", "data_expectations_stop_times", "data_expectations_trip_details"]
+      }
     }
   }
 }
