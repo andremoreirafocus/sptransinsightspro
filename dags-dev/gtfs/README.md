@@ -107,6 +107,9 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
   - `enrichment`
 - Caminho do relatório:
   - `<metadata_bucket>/<quality_report_folder>/gtfs/year=YYYY/month=MM/day=DD/hour=HH/quality-report-gtfs_<HHMM>_<execution_suffix>.json`
+- A construção e persistência do relatório delegam para `quality.reporting` (`build_quality_report_path`, `build_quality_summary`, `save_quality_report`).
+- A seção `summary` segue o contrato padrão definido em `quality.reporting`, com os campos adicionais específicos da pipeline GTFS: `stage`, `validated_items_count`, `relocation_status`, `relocation_error`.
+- `acceptance_rate` é um valor contínuo entre 0.0 e 1.0, calculado como `(validated_items_count - rows_failed) / validated_items_count` sobre o total de itens processados em todas as fases. Antes era binário (0.0 ou 1.0).
 
 ### Relato de falha e webhook
 - Em falhas de qualquer fase, a pipeline gera e persiste um relatório consolidado com:
@@ -116,6 +119,7 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
   - `validated_items_count`, `error_details`, `relocation_status`, `relocation_error` por fase
   - artefatos de `column_lineage` no estágio de enrichment
 - O resumo (`summary`) é enviado via webhook quando `notifications.webhook_url` não estiver como `disabled`/`none`/`null`.
+- A notificação é disparada pela DAG (`_send_webhook_from_report`) após a persistência do relatório, de forma separada do serviço de construção do relatório.
 
 ### Regras de teste
 - Os testes da pipeline GTFS usam fakes em `gtfs/tests/fakes/` e injeção de dependências.

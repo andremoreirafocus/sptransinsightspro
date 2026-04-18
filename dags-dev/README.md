@@ -56,5 +56,5 @@ pytest gtfs/tests --cov=gtfs --cov-report=term-missing
 ```
 
 Status atual da GTFS:
-- 73 testes passando
+- 75 testes passando
 - cobertura total: 99%
