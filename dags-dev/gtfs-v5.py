@@ -23,38 +23,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def extract_load_files_task():
+def extract_load_files_wrapper():
     run_context = build_run_context()
     stage_results = {}
     stage_results = extract_load_files(run_context, stage_results)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
-def transform_task(input):
+def transform_wrapper(input):
     run_context = input["run_context"]
     stage_results = input["stage_results"]
     stage_results = transform(run_context, stage_results)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
-def create_trip_details_task(input):
+def create_trip_details_wrapper(input):
     run_context = input["run_context"]
     stage_results = input["stage_results"]
     stage_results = create_trip_details(run_context, stage_results)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
-def build_quality_report_task(input):
+def build_quality_report_wrapper(input):
     run_context = input["run_context"]
     stage_results = input["stage_results"]
     build_quality_report_and_send_webhook(run_context, stage_results)
 
 
 def main():
-    output = extract_load_files_task()
-    output = transform_task(output)
-    output = create_trip_details_task(output)
-    build_quality_report_task(output)
+    output = extract_load_files_wrapper()
+    output = transform_wrapper(output)
+    output = create_trip_details_wrapper(output)
+    build_quality_report_wrapper(output)
 
 
 if __name__ == "__main__":
