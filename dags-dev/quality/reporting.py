@@ -15,20 +15,28 @@ def build_quality_report_path(
     pipeline_name: str,
     batch_ts: Any,
     filename_suffix: str = "",
+    filename_label: Optional[str] = None,
 ) -> str:
     """Build the partitioned MinIO path for a quality report.
 
     Args:
         metadata_bucket: Bucket where quality reports are stored.
         quality_report_folder: Top-level folder inside the bucket (e.g. "quality-reports").
-        pipeline_name: Pipeline identifier used for the sub-directory and filename.
+        pipeline_name: Pipeline identifier used for the sub-directory.
         batch_ts: ISO-8601 string or datetime used to derive the partition components.
         filename_suffix: Optional suffix appended to the filename before ".json"
                          (e.g. "_exec1234" for the execution-ID shorthand used by GTFS).
+        filename_label: Label used in the filename instead of ``pipeline_name`` when
+                        the two differ (e.g. "positions" for transformlivedata, whose
+                        reports live under the ``transformlivedata/`` directory but are
+                        named ``quality-report-positions_{HHMM}.json``).
+                        Defaults to ``pipeline_name``.
 
     Returns:
-        Full path as "{bucket}/{folder}/{pipeline}/year=.../…/quality-report-{pipeline}_{HHMM}{suffix}.json"
+        Full path as
+        "{bucket}/{folder}/{pipeline}/year=.../…/quality-report-{label}_{HHMM}{suffix}.json"
     """
+    label = filename_label if filename_label is not None else pipeline_name
     batch_dt = datetime.fromisoformat(str(batch_ts))
     year = batch_dt.strftime("%Y")
     month = batch_dt.strftime("%m")
@@ -39,7 +47,7 @@ def build_quality_report_path(
         f"{quality_report_folder}/{pipeline_name}/"
         f"year={year}/month={month}/day={day}/hour={hour}/"
     )
-    filename = f"quality-report-{pipeline_name}_{hhmm}{filename_suffix}.json"
+    filename = f"quality-report-{label}_{hhmm}{filename_suffix}.json"
     return f"{metadata_bucket}/{prefix}{filename}"
 
 
@@ -95,13 +103,16 @@ def create_failure_quality_report(
     failure_phase: str,
     failure_message: str,
     quality_report_path: str,
+    details: Optional[Dict[str, Any]] = None,
     **extra_fields: Any,
 ) -> Dict[str, Any]:
-    """Build a minimal failure report for use in exception handlers.
+    """Build a failure report for use in exception handlers.
 
     Produces the standard ``{summary, details}`` envelope with status forced to
-    "FAIL" and an empty details block. Callers that have partial stage results
-    should replace or augment ``details`` before saving.
+    "FAIL". When ``details`` is omitted a minimal block is used; callers that
+    collected partial pipeline results (e.g. transform metrics before a late-stage
+    failure) should pass their own assembled ``details`` dict so that diagnostic
+    information is preserved in the report.
 
     Args:
         pipeline: Pipeline identifier.
@@ -109,6 +120,10 @@ def create_failure_quality_report(
         failure_phase: Stage name where the hard failure occurred.
         failure_message: Human-readable error description.
         quality_report_path: Full MinIO path for the report.
+        details: Optional caller-supplied details block. When provided it is used
+                 as-is, allowing pipelines to include partial results collected
+                 before the failure. When omitted a minimal
+                 ``{"execution_id": ..., "status": "FAIL"}`` block is used.
         **extra_fields: Additional pipeline-specific summary fields.
 
     Returns:
@@ -125,11 +140,12 @@ def create_failure_quality_report(
         failure_message=failure_message,
         **extra_fields,
     )
-    details: Dict[str, Any] = {
-        "execution_id": execution_id,
-        "status": "FAIL",
-    }
-    return {"summary": summary, "details": details}
+    resolved_details: Dict[str, Any] = (
+        details
+        if details is not None
+        else {"execution_id": execution_id, "status": "FAIL"}
+    )
+    return {"summary": summary, "details": resolved_details}
 
 
 def save_quality_report(

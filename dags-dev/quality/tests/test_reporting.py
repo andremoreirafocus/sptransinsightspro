@@ -77,6 +77,47 @@ def test_path_without_suffix_ends_with_json():
     assert "_" not in path.split("/")[-1].replace("quality-report-mypipeline_0000.json", "")
 
 
+def test_path_filename_label_overrides_pipeline_name_in_filename():
+    path = build_quality_report_path(
+        metadata_bucket="meta",
+        quality_report_folder="quality-reports",
+        pipeline_name="transformlivedata",
+        batch_ts="2026-02-15T10:30:00",
+        filename_label="positions",
+    )
+    assert "quality-reports/transformlivedata/" in path
+    assert "quality-report-positions_1030.json" in path
+
+
+def test_path_filename_label_does_not_affect_directory():
+    path = build_quality_report_path(
+        metadata_bucket="meta",
+        quality_report_folder="quality-reports",
+        pipeline_name="transformlivedata",
+        batch_ts="2026-02-15T10:30:00",
+        filename_label="positions",
+    )
+    assert "/transformlivedata/" in path
+    assert "/positions/" not in path
+
+
+def test_path_filename_label_defaults_to_pipeline_name():
+    path_default = build_quality_report_path(
+        metadata_bucket="meta",
+        quality_report_folder="quality-reports",
+        pipeline_name="gtfs",
+        batch_ts="2026-02-15T10:30:00",
+    )
+    path_explicit = build_quality_report_path(
+        metadata_bucket="meta",
+        quality_report_folder="quality-reports",
+        pipeline_name="gtfs",
+        batch_ts="2026-02-15T10:30:00",
+        filename_label="gtfs",
+    )
+    assert path_default == path_explicit
+
+
 # --- build_quality_summary ---
 
 
@@ -228,6 +269,49 @@ def test_failure_report_details_contains_execution_id_and_status():
     )
     assert report["details"]["execution_id"] == "exec-42"
     assert report["details"]["status"] == "FAIL"
+
+
+def test_failure_report_uses_minimal_details_when_none_provided():
+    report = create_failure_quality_report(
+        pipeline="gtfs",
+        execution_id="exec-1",
+        failure_phase="load",
+        failure_message="err",
+        quality_report_path="meta/report.json",
+    )
+    assert report["details"] == {"execution_id": "exec-1", "status": "FAIL"}
+
+
+def test_failure_report_uses_caller_details_when_provided():
+    partial_details = {
+        "execution_id": "exec-1",
+        "source_file": "positions.json",
+        "transformation_row_counts": {"raw_records": 50},
+        "outcome": {"status": "FAIL"},
+    }
+    report = create_failure_quality_report(
+        pipeline="transformlivedata",
+        execution_id="exec-1",
+        failure_phase="expectations",
+        failure_message="GX failed",
+        quality_report_path="meta/report.json",
+        details=partial_details,
+    )
+    assert report["details"] is partial_details
+    assert report["details"]["transformation_row_counts"]["raw_records"] == 50
+
+
+def test_failure_report_summary_status_is_fail_regardless_of_details():
+    partial_details = {"execution_id": "exec-1", "outcome": {"status": "WARN"}}
+    report = create_failure_quality_report(
+        pipeline="transformlivedata",
+        execution_id="exec-1",
+        failure_phase="save",
+        failure_message="write error",
+        quality_report_path="meta/report.json",
+        details=partial_details,
+    )
+    assert report["summary"]["status"] == "FAIL"
 
 
 def test_failure_report_extra_fields_merged_into_summary():

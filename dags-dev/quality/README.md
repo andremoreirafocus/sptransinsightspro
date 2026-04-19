@@ -34,9 +34,10 @@ Returns a dict with:
 
 Shared quality reporting infrastructure used by all pipelines. Provides the common contract for building, persisting, and notifying quality reports.
 
-**`build_quality_report_path(metadata_bucket, quality_report_folder, pipeline_name, batch_ts, filename_suffix="")`**
+**`build_quality_report_path(metadata_bucket, quality_report_folder, pipeline_name, batch_ts, filename_suffix="", filename_label=None)`**
 Builds the partitioned MinIO path for a quality report.
-Returns `"{bucket}/{folder}/{pipeline}/year=.../month=.../day=.../hour=.../quality-report-{pipeline}_{HHMM}{suffix}.json"`.
+`pipeline_name` controls the sub-directory; `filename_label` controls the name token in the filename (defaults to `pipeline_name` when omitted). Use `filename_label` when the two differ — for example `transformlivedata` reports live under `transformlivedata/` but are named `quality-report-positions_{HHMM}.json`.
+Returns `"{bucket}/{folder}/{pipeline}/year=.../month=.../day=.../hour=.../quality-report-{label}_{HHMM}{suffix}.json"`.
 
 **`build_quality_summary(pipeline, execution_id, status, acceptance_rate, rows_failed, quality_report_path, failure_phase=None, failure_message=None, **extra_fields)`**
 Builds the standardised summary block consumed by the alertservice.
@@ -44,9 +45,10 @@ Mandatory fields form the common contract (`contract_version`, `pipeline`, `exec
 Pipeline-specific fields are passed as `**extra_fields` and merged flat.
 `status` must be one of `"PASS"`, `"WARN"`, or `"FAIL"`. `acceptance_rate` is always a continuous float (0.0–1.0).
 
-**`create_failure_quality_report(pipeline, execution_id, failure_phase, failure_message, quality_report_path, **extra_fields)`**
-Builds a minimal `{summary, details}` envelope with `status` forced to `"FAIL"` and an empty `details` block.
-Callers that have partial stage results should augment `details` before saving.
+**`create_failure_quality_report(pipeline, execution_id, failure_phase, failure_message, quality_report_path, details=None, **extra_fields)`**
+Builds a `{summary, details}` envelope with `status` forced to `"FAIL"`.
+When `details` is omitted a minimal `{"execution_id": ..., "status": "FAIL"}` block is used.
+Pass a caller-assembled `details` dict to preserve partial pipeline results collected before the failure (e.g. transform metrics captured before a late-stage GX exception).
 
 **`save_quality_report(report, path, connection_data, write_fn=...)`**
 Persists a quality report to object storage. `path` format is `"{bucket}/{object_name}"`.
