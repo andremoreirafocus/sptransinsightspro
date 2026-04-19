@@ -1,6 +1,5 @@
 from quality.reporting import build_quality_report_path, save_quality_report
 from gtfs.services.create_data_quality_report import (
-    build_data_quality_report,
     create_data_quality_report,
     create_failure_quality_report,
 )
