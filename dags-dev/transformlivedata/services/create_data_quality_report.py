@@ -9,6 +9,63 @@ from quality.reporting import build_quality_summary, build_quality_report_path, 
 logger = logging.getLogger(__name__)
 
 
+def _build_quality_details(
+    execution_id: str,
+    logical_date_utc: str,
+    source_file: str,
+    transform_result: Dict[str, Any],
+    valid_df: Any,
+    expectations_summary: Dict[str, Any],
+    computed_metrics: Dict[str, Any],
+    quality_report_path: str,
+    batch_ts: Any,
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    metrics = transform_result.get("metrics", {})
+    issues = transform_result.get("issues", {})
+    total_vehicles = metrics.get("total_vehicles_processed", 0)
+    return {
+        "execution_id": execution_id,
+        "logical_date_utc": logical_date_utc,
+        "source_file": source_file,
+        "transformation_row_counts": {
+            "raw_records": total_vehicles,
+            "transformed_records": transform_result.get("positions").shape[0],
+            "accepted_records": valid_df.shape[0],
+            "rejected_records": transform_result.get("invalid_positions").shape[0],
+        },
+        "transformation_metrics": {
+            "total_vehicles_processed": total_vehicles,
+            "valid_vehicles": metrics.get("valid_vehicles", 0),
+            "invalid_vehicles": metrics.get("invalid_vehicles", 0),
+            "expected_vehicles": metrics.get("expected_vehicles", 0),
+            "total_lines_processed": metrics.get("total_lines_processed", 0),
+        },
+        "transformation_issues": {
+            "invalid_trips": issues.get("invalid_trips", []),
+            "invalid_vehicle_ids": issues.get("invalid_vehicle_ids", []),
+            "number_of_distance_calculation_errors": len(issues.get("distance_calculation_errors", [])),
+            "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
+        },
+        "expectations_summary": {
+            **expectations_summary,
+            "number_of_distance_calculation_errors": len(
+                issues.get("distance_calculation_errors", [])
+            ),
+        },
+        "outcome": {
+            "status": computed_metrics["status"],
+            "acceptance_rate": computed_metrics["acceptance_rate"],
+            "policy_version": "v1",
+        },
+        "artifacts": {
+            "quality_report_path": quality_report_path,
+            "quarantine_path": build_quarantine_path(config, batch_ts),
+            "column_lineage": transform_result.get("lineage", {}),
+        },
+    }
+
+
 def _compute_quality_metrics(
     transform_result: Optional[Dict[str, Any]] = None,
     expectations_result: Optional[Dict[str, Any]] = None,
@@ -99,43 +156,11 @@ def build_data_quality_report(
     except Exception as e:
         logger.error("Error parsing expectations_result: %s", e)
         raise ValueError(f"Error parsing expectations_result: {e}")
-    metrics = transform_result.get("metrics", {})
-    issues = transform_result.get("issues", {})
-    transformed_records = transform_result.get("positions").shape[0]
-    transform_invalid_records = transform_result.get("invalid_positions").shape[0]
-    accepted_records = valid_df.shape[0]
-    rejected_records = transform_invalid_records
-    total_raw_records = metrics.get("total_vehicles_processed", 0)
-    rows_failed_total = rejected_records + expectations_summary.get("rows_failed", 0)
-    acceptance_rate = (
-        (total_raw_records - rows_failed_total) / total_raw_records
-        if total_raw_records > 0
-        else 0.0
-    )
-    expectations_with_violations = expectations_summary.get(
-        "expectations_with_violations", 0
-    )
-    expectations_failed_due_to_exceptions = expectations_summary.get(
-        "expectations_failed_due_to_exceptions", 0
-    )
-    if (
-        acceptance_rate >= pass_threshold
-        and expectations_with_violations == 0
-        and expectations_failed_due_to_exceptions == 0
-    ):
-        status = "PASS"
-    elif acceptance_rate >= warn_threshold:
-        status = "WARN"
-    else:
-        status = "FAIL"
     computed_metrics = _compute_quality_metrics(
         transform_result=transform_result,
         expectations_result=expectations_result,
         pass_threshold=pass_threshold,
         warn_threshold=warn_threshold,
-        rows_failed=rows_failed_total,
-        acceptance_rate=acceptance_rate,
-        status=status,
     )
     quality_report_path = build_quality_report_path(
         metadata_bucket=config["general"]["storage"]["metadata_bucket"],
@@ -159,53 +184,18 @@ def build_data_quality_report(
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
-    details = {
-        "execution_id": execution_id,
-        "logical_date_utc": logical_date_utc,
-        "source_file": source_file,
-        "transformation_row_counts": {
-            "raw_records": metrics.get("total_vehicles_processed", 0),
-            "transformed_records": transformed_records,
-            "accepted_records": accepted_records,
-            "rejected_records": rejected_records,
-        },
-        "transformation_metrics": {
-            "total_vehicles_processed": metrics.get("total_vehicles_processed", 0),
-            "valid_vehicles": metrics.get("valid_vehicles", 0),
-            "invalid_vehicles": metrics.get("invalid_vehicles", 0),
-            "expected_vehicles": metrics.get("expected_vehicles", 0),
-            "total_lines_processed": metrics.get("total_lines_processed", 0),
-        },
-        "transformation_issues": {
-            "invalid_trips": issues.get("invalid_trips", []),
-            "invalid_vehicle_ids": issues.get("invalid_vehicle_ids", []),
-            "distance_calculation_errors": len(
-                issues.get("distance_calculation_errors", [])
-            ),
-            "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
-        },
-        "expectations_summary": {
-            "total_checks": expectations_summary.get("total_checks", 0),
-            "expectations_successful": expectations_summary.get(
-                "expectations_successful", 0
-            ),
-            "expectations_with_violations": expectations_with_violations,
-            "expectations_failed_due_to_exceptions": expectations_failed_due_to_exceptions,
-            "rows_failed": expectations_summary.get("rows_failed", 0),
-            "violation_reasons": expectations_summary.get("violation_reasons", []),
-            "exception_reasons": expectations_summary.get("exception_reasons", []),
-        },
-        "outcome": {
-            "status": status,
-            "acceptance_rate": acceptance_rate,
-            "policy_version": "v1",
-        },
-        "artifacts": {
-            "quality_report_path": quality_report_path,
-            "quarantine_path": build_quarantine_path(config, batch_ts),
-            "colum lineage": transform_result.get("lineage", {}),
-        },
-    }
+    details = _build_quality_details(
+        execution_id=execution_id,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        transform_result=transform_result,
+        valid_df=valid_df,
+        expectations_summary=expectations_summary,
+        computed_metrics=computed_metrics,
+        quality_report_path=quality_report_path,
+        batch_ts=batch_ts,
+        config=config,
+    )
     return {
         "summary": summary,
         "details": details,
@@ -320,7 +310,7 @@ def create_failure_quality_report(
             "artifacts": {
                 "quality_report_path": quality_report_path,
                 "quarantine_path": build_quarantine_path(config, batch_ts_value),
-                "colum lineage": {},
+                "column_lineage": {},
             },
         }
         data_quality_report = {
@@ -376,7 +366,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
         )
         source_file = details.get("source_file", summary.get("source_file"))
         artifacts = details.get("artifacts", {})
-        column_lineage = artifacts.get("colum lineage", {})
+        column_lineage = artifacts.get("column_lineage", {})
         lines = [
             "data_quality_report SUMMARY",
             "-" * 80,
@@ -400,7 +390,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             "Transformation Processing Issues",
             f"- Invalid trips: {len(transform_issues.get('invalid_trips', []))} - {transform_issues.get('invalid_trips', [])}",
             f"- Invalid vehicle IDs: {len(transform_issues.get('invalid_vehicle_ids', []))} - {transform_issues.get('invalid_vehicle_ids', [])}",
-            f"- Distance calculation errors: {transform_issues.get('distance_calculation_errors', 0)}",
+            f"- Distance calculation errors: {transform_issues.get('number_of_distance_calculation_errors', 0)}",
             f"- Lines with invalid vehicles: {transform_issues.get('lines_with_invalid_vehicles', 0)}",
             "",
             "Post Transformation Validation Summary",
@@ -423,7 +413,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             )
         lines.extend(
             [
-                f"- Colum lineage: {column_lineage}",
+                f"- Column lineage: {column_lineage}",
                 "",
                 "Outcome",
                 f"- Status: {outcome.get('status', summary.get('status'))}",
