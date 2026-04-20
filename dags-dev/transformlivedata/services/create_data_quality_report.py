@@ -1,30 +1,24 @@
 from typing import Any, Dict, Tuple, Optional
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from infra.object_storage import write_generic_bytes_to_object_storage
+from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def build_quality_summary(
-    config: Dict[str, Any],
-    execution_id: str,
-    logical_date_utc: str,
-    source_file: str,
-    pass_threshold: float,
-    warn_threshold: float,
-    batch_ts: Any,
+def _compute_quality_metrics(
     transform_result: Optional[Dict[str, Any]] = None,
     expectations_result: Optional[Dict[str, Any]] = None,
-    status: Optional[str] = None,
-    acceptance_rate: Optional[float] = None,
+    pass_threshold: float = 1.0,
+    warn_threshold: float = 0.98,
     rows_failed: Optional[int] = None,
+    acceptance_rate: Optional[float] = None,
+    status: Optional[str] = None,
     failure_phase: Optional[str] = None,
     failure_message: Optional[str] = None,
-    quarantine_save_status: Optional[str] = None,
-    quarantine_save_error: Optional[str] = None,
 ) -> Dict[str, Any]:
     expectations_with_violations = 0
     expectations_failed_due_to_exceptions = 0
@@ -78,23 +72,11 @@ def build_quality_summary(
         ),
         "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
     }
-    generated_at = datetime.now(timezone.utc).isoformat()
     return {
-        "contract_version": "v1",
-        "pipeline": "transformlivedata",
-        "execution_id": execution_id,
-        "logical_date_utc": logical_date_utc,
-        "source_file": source_file,
         "status": status,
-        "failure_phase": failure_phase,
-        "failure_message": failure_message,
+        "rows_failed": rows_failed,
         "acceptance_rate": acceptance_rate,
-        "items_failed": rows_failed,
         "issue_counts": issue_counts,
-        "quality_report_path": build_quality_report_path(config, batch_ts),
-        "quarantine_save_status": quarantine_save_status,
-        "quarantine_save_error": quarantine_save_error,
-        "generated_at_utc": generated_at,
     }
 
 
@@ -146,21 +128,34 @@ def build_data_quality_report(
         status = "WARN"
     else:
         status = "FAIL"
-    summary = build_quality_summary(
-        config=config,
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        source_file=source_file,
-        pass_threshold=pass_threshold,
-        warn_threshold=warn_threshold,
-        batch_ts=batch_ts,
+    computed_metrics = _compute_quality_metrics(
         transform_result=transform_result,
         expectations_result=expectations_result,
-        status=status,
-        acceptance_rate=acceptance_rate,
+        pass_threshold=pass_threshold,
+        warn_threshold=warn_threshold,
         rows_failed=rows_failed_total,
+        acceptance_rate=acceptance_rate,
+        status=status,
+    )
+    quality_report_path = build_quality_report_path(
+        metadata_bucket=config["general"]["storage"]["metadata_bucket"],
+        quality_report_folder=config["general"]["storage"]["quality_report_folder"],
+        pipeline_name="transformlivedata",
+        batch_ts=batch_ts,
+        filename_label="positions",
+    )
+    summary = build_quality_summary(
+        pipeline="transformlivedata",
+        execution_id=execution_id,
+        status=computed_metrics["status"],
+        items_failed=computed_metrics["rows_failed"],
+        quality_report_path=quality_report_path,
+        acceptance_rate=computed_metrics["acceptance_rate"],
         failure_phase=None,
         failure_message=None,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        issue_counts=computed_metrics["issue_counts"],
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
@@ -206,7 +201,7 @@ def build_data_quality_report(
             "policy_version": "v1",
         },
         "artifacts": {
-            "quality_report_path": build_quality_report_path(config, batch_ts),
+            "quality_report_path": quality_report_path,
             "quarantine_path": build_quarantine_path(config, batch_ts),
             "colum lineage": transform_result.get("lineage", {}),
         },
@@ -245,8 +240,15 @@ def create_data_quality_report(
     )
     validation_report = format_data_quality_report(data_quality_report)
     logger.info(validation_report)
-    save_data_quality_report_to_storage(
-        config, data_quality_report, transform_result["batch_ts"], write_fn=write_fn
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report=data_quality_report,
+        path=data_quality_report["summary"]["quality_report_path"],
+        connection_data=connection_data,
+        write_fn=write_fn,
     )
     return data_quality_report
 
@@ -268,19 +270,25 @@ def create_failure_quality_report(
     write_fn=write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
-    summary = build_quality_summary(
-        config=config,
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        source_file=source_file,
-        pass_threshold=pass_threshold,
-        warn_threshold=warn_threshold,
+    quality_report_path = build_quality_report_path(
+        metadata_bucket=config["general"]["storage"]["metadata_bucket"],
+        quality_report_folder=config["general"]["storage"]["quality_report_folder"],
+        pipeline_name="transformlivedata",
         batch_ts=batch_ts_value,
-        transform_result=transform_result,
-        expectations_result=expectations_result,
+        filename_label="positions",
+    )
+    summary = build_quality_summary(
+        pipeline="transformlivedata",
+        execution_id=execution_id,
         status="FAIL",
+        items_failed=0,
+        quality_report_path=quality_report_path,
+        acceptance_rate=0.0,
         failure_phase=failure_phase,
         failure_message=failure_message,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        issue_counts={},
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
@@ -310,9 +318,7 @@ def create_failure_quality_report(
             "expectations_summary": {},
             "outcome": {"status": "FAIL"},
             "artifacts": {
-                "quality_report_path": build_quality_report_path(
-                    config, batch_ts_value
-                ),
+                "quality_report_path": quality_report_path,
                 "quarantine_path": build_quarantine_path(config, batch_ts_value),
                 "colum lineage": {},
             },
@@ -321,29 +327,17 @@ def create_failure_quality_report(
             "summary": summary,
             "details": details,
         }
-    save_data_quality_report_to_storage(
-        config, data_quality_report, batch_ts_value, write_fn=write_fn
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report=data_quality_report,
+        path=data_quality_report["summary"]["quality_report_path"],
+        connection_data=connection_data,
+        write_fn=write_fn,
     )
     return data_quality_report
-
-
-def build_quality_report_path(config: Dict[str, Any], batch_ts: Any) -> str:
-    def get_config(config: Dict[str, Any]) -> Tuple[str, str]:
-        general = config["general"]
-        storage = general["storage"]
-        bucket_name = storage["metadata_bucket"]
-        report_folder = storage["quality_report_folder"]
-        return bucket_name, report_folder
-
-    bucket_name, report_folder = get_config(config)
-    batch_ts = datetime.fromisoformat(str(batch_ts))
-    year = batch_ts.strftime("%Y")
-    month = batch_ts.strftime("%m")
-    day = batch_ts.strftime("%d")
-    hour = batch_ts.strftime("%H")
-    hhmm = batch_ts.strftime("%H%M")
-    prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
-    return f"{bucket_name}/{prefix}quality-report-positions_{hhmm}.json"
 
 
 def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
@@ -418,7 +412,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             lines.append(
                 f"- Expectations failed due to exceptions: {expectations_summary.get('expectations_failed_due_to_exceptions', 0)}"
             )
-        lines.append(f"- Records failed: {summary.get('rows_failed', 0)}")
+        lines.append(f"- Records failed: {summary.get('items_failed', 0)}")
         if expectations_summary.get("violation_reasons"):
             lines.append(
                 f"- Expectation violation reasons: {expectations_summary.get('violation_reasons')}"
@@ -452,39 +446,3 @@ def write_data_quality_report_json(
 ) -> None:
     with open(output_path, "w") as f:
         f.write(data_quality_report_to_json(data_quality_report))
-
-
-def save_data_quality_report_to_storage(
-    config: Dict[str, Any],
-    data_quality_report: Dict[str, Any],
-    batch_ts: Any,
-    write_fn=write_generic_bytes_to_object_storage,
-) -> None:
-    def get_config(config: Dict[str, Any]) -> Tuple[str, str, str, Dict[str, Any]]:
-        general = config["general"]
-        connections = config["connections"]
-        storage = general["storage"]
-        bucket_name = storage["metadata_bucket"]
-        report_folder = storage["quality_report_folder"]
-        app_folder = storage["app_folder"]
-        connection_data = {
-            **connections["object_storage"],
-            "secure": False,
-        }
-        return bucket_name, report_folder, app_folder, connection_data
-
-    bucket_name, report_folder, app_folder, connection_data = get_config(config)
-    batch_ts = datetime.fromisoformat(str(batch_ts))
-    year = batch_ts.strftime("%Y")
-    month = batch_ts.strftime("%m")
-    day = batch_ts.strftime("%d")
-    hour = batch_ts.strftime("%H")
-    hhmm = batch_ts.strftime("%H%M")
-    prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
-    object_name = f"{prefix}quality-report-positions_{hhmm}.json"
-    write_fn(
-        connection_data,
-        buffer=data_quality_report_to_json(data_quality_report).encode("utf-8"),
-        bucket_name=bucket_name,
-        object_name=object_name,
-    )

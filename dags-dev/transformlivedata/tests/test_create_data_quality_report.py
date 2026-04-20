@@ -4,16 +4,27 @@ import tempfile
 import pandas as pd
 import pytest
 from transformlivedata.services.create_data_quality_report import (
+    _compute_quality_metrics,
     build_data_quality_report,
-    build_quality_report_path,
-    build_quality_summary,
     build_quarantine_path,
     create_data_quality_report,
     create_failure_quality_report,
     format_data_quality_report,
-    save_data_quality_report_to_storage,
     write_data_quality_report_json,
 )
+from quality.reporting import build_quality_report_path, save_quality_report
+
+
+@pytest.fixture
+def shared_report_path_args(request):
+    """Extracted args for calling shared build_quality_report_path()."""
+    config = make_storage_config()
+    return {
+        "metadata_bucket": config["general"]["storage"]["metadata_bucket"],
+        "quality_report_folder": config["general"]["storage"]["quality_report_folder"],
+        "pipeline_name": "transformlivedata",
+        "filename_label": "positions",
+    }
 
 
 def make_storage_config():
@@ -89,40 +100,29 @@ def make_expectations_result(
 # --- build_quality_report_path ---
 
 
-def test_path_contains_metadata_bucket():
-    config = make_storage_config()
-    path = build_quality_report_path(config, "2026-02-15T10:30:00")
+def test_path_contains_metadata_bucket(shared_report_path_args):
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
     assert path.startswith("meta-bucket/")
 
 
-def test_path_uses_hhmm_from_batch_ts():
-    config = make_storage_config()
-    path = build_quality_report_path(config, "2026-02-15T10:30:00")
+def test_path_uses_hhmm_from_batch_ts(shared_report_path_args):
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
     assert "quality-report-positions_1030.json" in path
 
 
-def test_path_partition_uses_date_components():
-    config = make_storage_config()
-    path = build_quality_report_path(config, "2026-02-15T10:30:00")
+def test_path_partition_uses_date_components(shared_report_path_args):
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
     assert "year=2026" in path
     assert "month=02" in path
     assert "day=15" in path
     assert "hour=10" in path
 
 
-# --- build_quality_summary (status logic without DataFrames) ---
+# --- _compute_quality_metrics (status logic without DataFrames) ---
 
 
-def test_summary_preserves_explicit_pass_status():
-    config = make_storage_config()
-    result = build_quality_summary(
-        config=config,
-        execution_id="exec-1",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="file.json.zst",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_preserves_explicit_pass_status():
+    result = _compute_quality_metrics(
         status="PASS",
         acceptance_rate=1.0,
         rows_failed=0,
@@ -130,62 +130,37 @@ def test_summary_preserves_explicit_pass_status():
     assert result["status"] == "PASS"
 
 
-def test_summary_preserves_explicit_fail_status():
-    config = make_storage_config()
-    result = build_quality_summary(
-        config=config,
-        execution_id="exec-1",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="file.json.zst",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_preserves_explicit_fail_status():
+    result = _compute_quality_metrics(
         status="FAIL",
     )
     assert result["status"] == "FAIL"
 
 
-def test_summary_defaults_to_fail_when_failure_phase_set():
-    config = make_storage_config()
-    result = build_quality_summary(
-        config=config,
-        execution_id="exec-1",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="file.json.zst",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_defaults_to_fail_when_failure_phase_set():
+    result = _compute_quality_metrics(
         failure_phase="transform",
         failure_message="Something broke",
     )
     assert result["status"] == "FAIL"
 
 
-def test_summary_defaults_to_warn_when_no_result_and_no_failure():
-    config = make_storage_config()
-    result = build_quality_summary(
-        config=config,
-        execution_id="exec-1",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="file.json.zst",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
-    )
+def test_compute_metrics_defaults_to_warn_when_no_result_and_no_failure():
+    result = _compute_quality_metrics()
     assert result["status"] == "WARN"
 
 
 def test_summary_contains_required_keys():
-    config = make_storage_config()
-    result = build_quality_summary(
-        config=config,
+    result = build_data_quality_report(
+        config=make_storage_config(),
         execution_id="exec-1",
         logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="file.json.zst",
+        source_file="file.json",
+        transform_result=make_transform_result(invalid_count=0, total=100),
+        expectations_result=make_expectations_result(),
         pass_threshold=1.0,
         warn_threshold=0.98,
         batch_ts="2026-02-15T10:30:00",
-        status="PASS",
     )
     for key in (
         "contract_version",
@@ -195,13 +170,13 @@ def test_summary_contains_required_keys():
         "acceptance_rate",
         "items_failed",
     ):
-        assert key in result
+        assert key in result["summary"]
 
 
-# --- save_data_quality_report_to_storage ---
+# --- save_quality_report (shared) ---
 
 
-def test_write_fn_receives_correct_bucket():
+def test_write_fn_receives_correct_bucket(shared_report_path_args):
     calls = []
 
     def fake_write(connection_data, buffer, bucket_name, object_name):
@@ -209,152 +184,146 @@ def test_write_fn_receives_correct_bucket():
             {"bucket_name": bucket_name, "object_name": object_name, "buffer": buffer}
         )
 
-    save_data_quality_report_to_storage(
-        make_storage_config(),
-        {"key": "value"},
-        "2026-02-15T10:30:00",
+    config = make_storage_config()
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report={"key": "value"},
+        path=path,
+        connection_data=connection_data,
         write_fn=fake_write,
     )
     assert calls[0]["bucket_name"] == "meta-bucket"
 
 
-def test_write_fn_object_name_contains_hhmm():
+def test_write_fn_object_name_contains_hhmm(shared_report_path_args):
     calls = []
 
     def fake_write(connection_data, buffer, bucket_name, object_name):
         calls.append(object_name)
 
-    save_data_quality_report_to_storage(
-        make_storage_config(),
-        {"key": "value"},
-        "2026-02-15T10:30:00",
+    config = make_storage_config()
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report={"key": "value"},
+        path=path,
+        connection_data=connection_data,
         write_fn=fake_write,
     )
     assert "quality-report-positions_1030.json" in calls[0]
 
 
-def test_write_fn_buffer_is_valid_json():
+def test_write_fn_buffer_is_valid_json(shared_report_path_args):
     calls = []
 
     def fake_write(connection_data, buffer, bucket_name, object_name):
         calls.append(buffer)
 
+    config = make_storage_config()
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
     report = {"status": "PASS", "value": 42}
-    save_data_quality_report_to_storage(
-        make_storage_config(),
-        report,
-        "2026-02-15T10:30:00",
+    save_quality_report(
+        report=report,
+        path=path,
+        connection_data=connection_data,
         write_fn=fake_write,
     )
     parsed = json.loads(calls[0].decode("utf-8"))
     assert parsed["status"] == "PASS"
 
 
-def test_write_fn_object_name_has_correct_partition_path():
+def test_write_fn_object_name_has_correct_partition_path(shared_report_path_args):
     calls = []
 
     def fake_write(connection_data, buffer, bucket_name, object_name):
         calls.append(object_name)
 
-    save_data_quality_report_to_storage(
-        make_storage_config(),
-        {},
-        "2026-02-15T10:30:00",
+    config = make_storage_config()
+    path = build_quality_report_path(**shared_report_path_args, batch_ts="2026-02-15T10:30:00")
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report={},
+        path=path,
+        connection_data=connection_data,
         write_fn=fake_write,
     )
     assert "year=2026/month=02/day=15/hour=10/" in calls[0]
 
 
-# --- build_quality_summary with transform_result + expectations_result ---
+# --- _compute_quality_metrics with transform_result + expectations_result ---
 
 
-def test_summary_computes_pass_with_clean_results():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_pass_with_clean_results():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=0, total=100),
         expectations_result=make_expectations_result(),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
     )
     assert result["status"] == "PASS"
     assert result["acceptance_rate"] == 1.0
 
 
-def test_summary_computes_warn_when_acceptance_between_thresholds():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_warn_when_acceptance_between_thresholds():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=1, total=100),
         expectations_result=make_expectations_result(),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
     )
     assert result["status"] == "WARN"
 
 
-def test_summary_computes_fail_when_acceptance_below_warn_threshold():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_fail_when_acceptance_below_warn_threshold():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=10, total=100),
         expectations_result=make_expectations_result(),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
     )
     assert result["status"] == "FAIL"
 
 
-def test_summary_computes_warn_when_violations_present():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_warn_when_violations_present():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=0, total=100),
         expectations_result=make_expectations_result(violations=1),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
     )
     assert result["status"] == "WARN"
 
 
-def test_summary_items_failed_includes_gx_invalid():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
-        pass_threshold=1.0,
-        warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+def test_compute_metrics_rows_failed_includes_gx_invalid():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=2, total=100),
         expectations_result=make_expectations_result(gx_invalid_count=3),
-    )
-    assert result["items_failed"] == 5
-
-
-def test_summary_acceptance_rate_zero_when_total_is_zero():
-    result = build_quality_summary(
-        config=make_storage_config(),
-        execution_id="x",
-        logical_date_utc="2026-02-15T10:00:00+00:00",
-        source_file="f.json",
         pass_threshold=1.0,
         warn_threshold=0.98,
-        batch_ts="2026-02-15T10:30:00",
+    )
+    assert result["rows_failed"] == 5
+
+
+def test_compute_metrics_acceptance_rate_zero_when_total_is_zero():
+    result = _compute_quality_metrics(
         transform_result=make_transform_result(invalid_count=0, total=0),
         expectations_result=make_expectations_result(),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
     )
     assert result["acceptance_rate"] == 0.0
 
