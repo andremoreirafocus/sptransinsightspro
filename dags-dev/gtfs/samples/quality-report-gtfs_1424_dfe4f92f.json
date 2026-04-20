@@ -2,21 +2,20 @@
   "summary": {
     "contract_version": "v1",
     "pipeline": "gtfs",
-    "execution_id": "ee962755-7273-49c5-8f4c-7c92ee23e867",
+    "execution_id": "dfe4f92f-18f7-41fb-9475-dc3b8a1ffe54",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
-    "acceptance_rate": 1.0,
-    "rows_failed": 0,
-    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=18/hour=22/quality-report-gtfs_2227_ee962755.json",
-    "generated_at_utc": "2026-04-18T22:27:13.301233+00:00",
+    "items_failed": 0,
+    "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=20/hour=14/quality-report-gtfs_1424_dfe4f92f.json",
+    "generated_at_utc": "2026-04-20T14:24:46.366419+00:00",
     "stage": "pipeline",
     "validated_items_count": 17,
     "relocation_status": null,
     "relocation_error": null
   },
   "details": {
-    "execution_id": "ee962755-7273-49c5-8f4c-7c92ee23e867",
+    "execution_id": "dfe4f92f-18f7-41fb-9475-dc3b8a1ffe54",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
@@ -253,7 +252,7 @@
       }
     },
     "artifacts": {
-      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=18/hour=22/quality-report-gtfs_2227_ee962755.json"
+      "quality_report_path": "metadata/quality-reports/gtfs/year=2026/month=04/day=20/hour=14/quality-report-gtfs_1424_dfe4f92f.json"
     }
   }
 }

@@ -55,9 +55,9 @@ def build_quality_summary(
     pipeline: str,
     execution_id: str,
     status: Literal["PASS", "WARN", "FAIL"],
-    acceptance_rate: float,
-    rows_failed: int,
+    items_failed: int,
     quality_report_path: str,
+    acceptance_rate: Optional[float] = None,
     failure_phase: Optional[str] = None,
     failure_message: Optional[str] = None,
     **extra_fields: Any,
@@ -71,9 +71,10 @@ def build_quality_summary(
         pipeline: Pipeline identifier (e.g. "gtfs", "transformlivedata").
         execution_id: UUID for the current pipeline run.
         status: One of "PASS", "WARN", or "FAIL".
-        acceptance_rate: Fraction of records that passed all validations (0.0–1.0).
-        rows_failed: Absolute count of records that failed validation.
+        items_failed: Count of items (tables/files/records) that failed validation.
         quality_report_path: Full MinIO path where the report is stored.
+        acceptance_rate: Fraction of records that passed all validations (0.0–1.0).
+                         Omit for pipelines using all-or-nothing status logic.
         failure_phase: Name of the stage where a hard failure occurred, or None.
         failure_message: Human-readable description of the failure, or None.
         **extra_fields: Additional pipeline-specific fields merged at the top level.
@@ -88,11 +89,12 @@ def build_quality_summary(
         "status": status,
         "failure_phase": failure_phase,
         "failure_message": failure_message,
-        "acceptance_rate": acceptance_rate,
-        "rows_failed": rows_failed,
+        "items_failed": items_failed,
         "quality_report_path": quality_report_path,
         "generated_at_utc": datetime.now(timezone.utc).isoformat(),
     }
+    if acceptance_rate is not None:
+        summary["acceptance_rate"] = acceptance_rate
     summary.update(extra_fields)
     return summary
 
