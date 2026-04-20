@@ -12,15 +12,15 @@ def evaluate_cumulative_warn(
     if not rows_list:
         return False
 
-    total_failed_rows = sum((r["rows_failed"] or 0) for r in rows_list)
+    total_failed_items = sum((r["items_failed"] or 0) for r in rows_list)
     failed_ratios = [1 - (r["acceptance_rate"] or 0.0) for r in rows_list]
     avg_failed_ratio = sum(failed_ratios) / len(failed_ratios)
 
-    max_failed_rows = thresholds.get("max_failed_rows")
+    max_failed_items = thresholds.get("max_failed_items")
     max_failed_ratio = thresholds.get("max_failed_ratio")
     max_consecutive_warn = thresholds.get("max_consecutive_warn")
 
-    if max_failed_rows is not None and total_failed_rows >= max_failed_rows:
+    if max_failed_items is not None and total_failed_items >= max_failed_items:
         return True
     if max_failed_ratio is not None and avg_failed_ratio >= max_failed_ratio:
         return True

@@ -28,7 +28,7 @@ def init_db() -> None:
                 execution_id TEXT,
                 status TEXT,
                 acceptance_rate REAL,
-                rows_failed INTEGER,
+                items_failed INTEGER,
                 failure_phase TEXT,
                 failure_message TEXT,
                 generated_at_utc TEXT,
@@ -47,7 +47,7 @@ def store_summary(summary: Dict[str, Any]) -> None:
         conn.execute(
             """
             INSERT INTO alerts (
-                pipeline, execution_id, status, acceptance_rate, rows_failed,
+                pipeline, execution_id, status, acceptance_rate, items_failed,
                 failure_phase, failure_message, generated_at_utc, received_at_utc
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
@@ -56,7 +56,7 @@ def store_summary(summary: Dict[str, Any]) -> None:
                 summary.get("execution_id"),
                 summary.get("status"),
                 summary.get("acceptance_rate"),
-                summary.get("rows_failed"),
+                summary.get("items_failed"),
                 summary.get("failure_phase"),
                 summary.get("failure_message"),
                 summary.get("generated_at_utc"),
@@ -76,7 +76,7 @@ def query_window(
         if window_type == "count":
             rows = conn.execute(
                 """
-                SELECT status, rows_failed, acceptance_rate, received_at_utc
+                SELECT status, items_failed, acceptance_rate, received_at_utc
                 FROM alerts
                 WHERE pipeline = ?
                 ORDER BY received_at_utc DESC
@@ -88,7 +88,7 @@ def query_window(
             since = datetime.now(timezone.utc) - timedelta(hours=window_value)
             rows = conn.execute(
                 """
-                SELECT status, rows_failed, acceptance_rate, received_at_utc
+                SELECT status, items_failed, acceptance_rate, received_at_utc
                 FROM alerts
                 WHERE pipeline = ? AND received_at_utc >= ?
                 ORDER BY received_at_utc DESC

@@ -54,7 +54,7 @@ def test_send_email_raises_delivery_error_on_os_error(email_config):
 
 
 def test_format_summary_is_valid_json():
-    summary = {"pipeline": "test", "status": "FAIL", "rows_failed": 5}
+    summary = {"pipeline": "test", "status": "FAIL", "items_failed": 5}
     result = format_summary(summary)
     parsed = json.loads(result)
     assert parsed["pipeline"] == "test"

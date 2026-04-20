@@ -87,9 +87,9 @@ def test_warn_below_threshold_stored(pipeline_config, valid_summary_warn):
 def test_warn_above_threshold_sends_email(pipeline_config, valid_summary_warn):
     sender = FakeEmailSender()
     rows = [
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
     ]
     query = FakeQueryWindow(rows=rows)
     result = run(valid_summary_warn, pipeline_config, query=query, sender=sender)
@@ -111,9 +111,9 @@ def test_warn_notify_disabled_stored(pipeline_config, valid_summary_warn):
         "notify_on_warn": False,
     }
     rows = [
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
-        {"status": "WARN", "rows_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
+        {"status": "WARN", "items_failed": 200, "acceptance_rate": 0.98},
     ]
     query = FakeQueryWindow(rows=rows)
     sender = FakeEmailSender()

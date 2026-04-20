@@ -25,7 +25,7 @@ Payload esperado (exemplo):
     "execution_id": "...",
     "status": "WARN",
     "acceptance_rate": 0.99,
-    "rows_failed": 9,
+    "items_failed": 9,
     "failure_phase": null,
     "failure_message": null,
     "generated_at_utc": "2026-04-13T12:34:56Z"
@@ -45,7 +45,7 @@ transformlivedata:
     type: "time"
     value: 24
   warning_thresholds:
-    max_failed_rows: 500
+    max_failed_items: 500
     max_failed_ratio: 0.02
     max_consecutive_warn: 3
   notify_on_fail: true

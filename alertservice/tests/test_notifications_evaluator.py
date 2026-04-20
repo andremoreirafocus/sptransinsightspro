@@ -1,10 +1,10 @@
 from src.notifications_evaluator import evaluate_cumulative_warn
 
 
-def make_row(status="WARN", rows_failed=10, acceptance_rate=0.99):
+def make_row(status="WARN", items_failed=10, acceptance_rate=0.99):
     return {
         "status": status,
-        "rows_failed": rows_failed,
+        "items_failed": items_failed,
         "acceptance_rate": acceptance_rate,
     }
 
@@ -13,14 +13,14 @@ def test_empty_rows_returns_false():
     assert evaluate_cumulative_warn([], {}) is False
 
 
-def test_max_failed_rows_exceeded():
-    rows = [make_row(rows_failed=300), make_row(rows_failed=300)]
-    assert evaluate_cumulative_warn(rows, {"max_failed_rows": 500}) is True
+def test_max_failed_items_exceeded():
+    rows = [make_row(items_failed=300), make_row(items_failed=300)]
+    assert evaluate_cumulative_warn(rows, {"max_failed_items": 500}) is True
 
 
-def test_max_failed_rows_not_exceeded():
-    rows = [make_row(rows_failed=100), make_row(rows_failed=100)]
-    assert evaluate_cumulative_warn(rows, {"max_failed_rows": 500}) is False
+def test_max_failed_items_not_exceeded():
+    rows = [make_row(items_failed=100), make_row(items_failed=100)]
+    assert evaluate_cumulative_warn(rows, {"max_failed_items": 500}) is False
 
 
 def test_max_failed_ratio_exceeded():
@@ -49,5 +49,5 @@ def test_consecutive_warn_broken_by_pass():
 
 
 def test_no_thresholds_returns_false():
-    rows = [make_row(rows_failed=1000, acceptance_rate=0.0)]
+    rows = [make_row(items_failed=1000, acceptance_rate=0.0)]
     assert evaluate_cumulative_warn(rows, {}) is False
