@@ -89,7 +89,7 @@ def build_quality_summary(
         "failure_phase": failure_phase,
         "failure_message": failure_message,
         "acceptance_rate": acceptance_rate,
-        "rows_failed": rows_failed,
+        "items_failed": rows_failed,
         "issue_counts": issue_counts,
         "quality_report_path": build_quality_report_path(config, batch_ts),
         "quarantine_save_status": quarantine_save_status,

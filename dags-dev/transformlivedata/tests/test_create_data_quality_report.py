@@ -193,7 +193,7 @@ def test_summary_contains_required_keys():
         "execution_id",
         "status",
         "acceptance_rate",
-        "rows_failed",
+        "items_failed",
     ):
         assert key in result
 
@@ -329,7 +329,7 @@ def test_summary_computes_warn_when_violations_present():
     assert result["status"] == "WARN"
 
 
-def test_summary_rows_failed_includes_gx_invalid():
+def test_summary_items_failed_includes_gx_invalid():
     result = build_quality_summary(
         config=make_storage_config(),
         execution_id="x",
@@ -341,7 +341,7 @@ def test_summary_rows_failed_includes_gx_invalid():
         transform_result=make_transform_result(invalid_count=2, total=100),
         expectations_result=make_expectations_result(gx_invalid_count=3),
     )
-    assert result["rows_failed"] == 5
+    assert result["items_failed"] == 5
 
 
 def test_summary_acceptance_rate_zero_when_total_is_zero():
@@ -591,7 +591,7 @@ def _make_full_report(status="PASS"):
             "source_file": "f.json",
             "status": status,
             "acceptance_rate": 1.0,
-            "rows_failed": 0,
+            "items_failed": 0,
         },
         "details": {
             "execution_id": "exec-1",
