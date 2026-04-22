@@ -9,13 +9,6 @@ from quality.reporting import (
 )
 
 
-def _count_failed_items(error_details: Dict[str, Any]) -> int:
-    for value in error_details.values():
-        if isinstance(value, dict):
-            return len(value)
-    return 0
-
-
 def build_data_quality_report(
     execution_id: str,
     status: str,
@@ -27,22 +20,18 @@ def build_data_quality_report(
     validated_items_count = sum(
         int(stage.get("validated_items_count", 0)) for stage in stage_results.values()
     )
-    rows_failed = sum(
-        _count_failed_items(stage.get("error_details", {}))
-        for stage in stage_results.values()
-    )
-    acceptance_rate = (
-        (validated_items_count - rows_failed) / validated_items_count
-        if validated_items_count > 0
-        else 0.0
-    )
+    if failure_phase:
+        failure_stage_data = stage_results.get(failure_phase, {})
+        error_details = failure_stage_data.get("error_details", {})
+        items_failed = sum(len(v) for v in error_details.values() if isinstance(v, dict))
+    else:
+        items_failed = 0
     failure_stage_data = stage_results.get(failure_phase, {}) if failure_phase else {}
     summary = build_quality_summary(
         pipeline="gtfs",
         execution_id=execution_id,
         status=status,
-        acceptance_rate=acceptance_rate,
-        rows_failed=rows_failed,
+        items_failed=items_failed,
         quality_report_path=quality_report_path,
         failure_phase=failure_phase,
         failure_message=failure_message,
