@@ -81,13 +81,14 @@ Isso permite identificar exatamente em qual fase o processamento parou e quais m
 As configurações são centralizadas no módulo `pipeline_configurator` e expostas como um objeto canônico com:
 - `general`
 - `connections`
-- `raw_data_json_schema` (opcional)
-- `data_expectations` (opcional)
+- `raw_data_json_schema` (carregado automaticamente via `data_validations`)
+- `data_expectations` (carregado automaticamente via `data_validations`)
 
 ### Local/dev
 - `general` vem do arquivo `dags-dev/transformlivedata/config/transformlivedata_general.json`
 - `raw_data_json_schema` vem de `dags-dev/transformlivedata/config/transformlivedata_raw_data_json_schema.json`
 - `data_expectations` vem de `dags-dev/transformlivedata/config/transformlivedata_data_expectations.json`
+- os artefatos acima são carregados automaticamente pelo `pipeline_configurator` com base na seção `data_validations` do `general`
 - `.env` em `dags-dev/transformlivedata/.env` é usado apenas para credenciais de conexão
 
 Credenciais esperadas no `.env`:
@@ -124,6 +125,14 @@ Chaves esperadas em `general`
   },
   "notifications": {
     "webhook_url": "http://localhost:8000/notify"
+  },
+  "data_validations": {
+    "json_validation": {
+      "schemas": ["raw_data_json_schema"]
+    },
+    "expectations_validation": {
+      "expectations_suites": ["data_expectations"]
+    }
   }
 }
 ```
@@ -133,7 +142,7 @@ Para desativar notificações, use o valor `"disabled"`.
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
-- Variable `transformlivedata_general` (JSON)
+- Variable `transformlivedata_general` (JSON, inclui a seção `data_validations`)
 - Variable `transformlivedata_raw_data_json_schema` (JSON)
 - Variable `transformlivedata_data_expectations` (JSON)
 - Credenciais via Connections (MinIO e Postgres)

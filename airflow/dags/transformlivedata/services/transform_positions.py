@@ -156,6 +156,31 @@ def compute_distances(
     return df, distance_errors, lineage
 
 
+def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
+    return {
+        "distance_to_first_stop": {
+            "inputs": [
+                "veiculo_lat",
+                "veiculo_long",
+                "first_stop_lat",
+                "first_stop_lon",
+            ],
+            "type": get_column_type(df, "distance_to_first_stop"),
+            "transformation": "calculated based on current position",
+        },
+        "distance_to_last_stop": {
+            "inputs": [
+                "veiculo_lat",
+                "veiculo_long",
+                "last_stop_lat",
+                "last_stop_lon",
+            ],
+            "type": get_column_type(df, "distance_to_last_stop"),
+            "transformation": "calculated based on current position",
+        },
+    }
+
+
 def split_enriched_valid_invalid(df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
     invalid_mask = df["_merge"] == "left_only"
     valid_df = df.loc[~invalid_mask].copy()
@@ -370,28 +395,3 @@ def transform_positions(
         f"Total invalid vehicles ids: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids']}"
     )
     return result
-
-
-def build_calc_lineage(df: pd.DataFrame) -> Dict[str, Any]:
-    return {
-        "distance_to_first_stop": {
-            "inputs": [
-                "veiculo_lat",
-                "veiculo_long",
-                "first_stop_lat",
-                "first_stop_lon",
-            ],
-            "type": get_column_type(df, "distance_to_first_stop"),
-            "transformation": "calculated based on current position",
-        },
-        "distance_to_last_stop": {
-            "inputs": [
-                "veiculo_lat",
-                "veiculo_long",
-                "last_stop_lat",
-                "last_stop_lon",
-            ],
-            "type": get_column_type(df, "distance_to_last_stop"),
-            "transformation": "calculated based on current position",
-        },
-    }

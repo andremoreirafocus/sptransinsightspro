@@ -1,30 +1,81 @@
 from typing import Any, Dict, Tuple, Optional
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from infra.object_storage import write_generic_bytes_to_object_storage
+from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def build_quality_summary(
-    config: Dict[str, Any],
+def _build_quality_details(
     execution_id: str,
     logical_date_utc: str,
     source_file: str,
-    pass_threshold: float,
-    warn_threshold: float,
+    transform_result: Dict[str, Any],
+    valid_df: Any,
+    expectations_summary: Dict[str, Any],
+    computed_metrics: Dict[str, Any],
+    quality_report_path: str,
     batch_ts: Any,
+    config: Dict[str, Any],
+) -> Dict[str, Any]:
+    metrics = transform_result.get("metrics", {})
+    issues = transform_result.get("issues", {})
+    total_vehicles = metrics.get("total_vehicles_processed", 0)
+    return {
+        "execution_id": execution_id,
+        "logical_date_utc": logical_date_utc,
+        "source_file": source_file,
+        "transformation_row_counts": {
+            "raw_records": total_vehicles,
+            "transformed_records": transform_result.get("positions").shape[0],
+            "accepted_records": valid_df.shape[0],
+            "rejected_records": transform_result.get("invalid_positions").shape[0],
+        },
+        "transformation_metrics": {
+            "total_vehicles_processed": total_vehicles,
+            "valid_vehicles": metrics.get("valid_vehicles", 0),
+            "invalid_vehicles": metrics.get("invalid_vehicles", 0),
+            "expected_vehicles": metrics.get("expected_vehicles", 0),
+            "total_lines_processed": metrics.get("total_lines_processed", 0),
+        },
+        "transformation_issues": {
+            "invalid_trips": issues.get("invalid_trips", []),
+            "invalid_vehicle_ids": issues.get("invalid_vehicle_ids", []),
+            "number_of_distance_calculation_errors": len(issues.get("distance_calculation_errors", [])),
+            "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
+        },
+        "expectations_summary": {
+            **expectations_summary,
+            "number_of_distance_calculation_errors": len(
+                issues.get("distance_calculation_errors", [])
+            ),
+        },
+        "outcome": {
+            "status": computed_metrics["status"],
+            "acceptance_rate": computed_metrics["acceptance_rate"],
+            "policy_version": "v1",
+        },
+        "artifacts": {
+            "quality_report_path": quality_report_path,
+            "quarantine_path": build_quarantine_path(config, batch_ts),
+            "column_lineage": transform_result.get("lineage", {}),
+        },
+    }
+
+
+def _compute_quality_metrics(
     transform_result: Optional[Dict[str, Any]] = None,
     expectations_result: Optional[Dict[str, Any]] = None,
-    status: Optional[str] = None,
-    acceptance_rate: Optional[float] = None,
+    pass_threshold: float = 1.0,
+    warn_threshold: float = 0.98,
     rows_failed: Optional[int] = None,
+    acceptance_rate: Optional[float] = None,
+    status: Optional[str] = None,
     failure_phase: Optional[str] = None,
     failure_message: Optional[str] = None,
-    quarantine_save_status: Optional[str] = None,
-    quarantine_save_error: Optional[str] = None,
 ) -> Dict[str, Any]:
     expectations_with_violations = 0
     expectations_failed_due_to_exceptions = 0
@@ -78,23 +129,11 @@ def build_quality_summary(
         ),
         "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
     }
-    generated_at = datetime.now(timezone.utc).isoformat()
     return {
-        "contract_version": "v1",
-        "pipeline": "transformlivedata",
-        "execution_id": execution_id,
-        "logical_date_utc": logical_date_utc,
-        "source_file": source_file,
         "status": status,
-        "failure_phase": failure_phase,
-        "failure_message": failure_message,
-        "acceptance_rate": acceptance_rate,
         "rows_failed": rows_failed,
+        "acceptance_rate": acceptance_rate,
         "issue_counts": issue_counts,
-        "quality_report_path": build_quality_report_path(config, batch_ts),
-        "quarantine_save_status": quarantine_save_status,
-        "quarantine_save_error": quarantine_save_error,
-        "generated_at_utc": generated_at,
     }
 
 
@@ -117,100 +156,46 @@ def build_data_quality_report(
     except Exception as e:
         logger.error("Error parsing expectations_result: %s", e)
         raise ValueError(f"Error parsing expectations_result: {e}")
-    metrics = transform_result.get("metrics", {})
-    issues = transform_result.get("issues", {})
-    transformed_records = transform_result.get("positions").shape[0]
-    transform_invalid_records = transform_result.get("invalid_positions").shape[0]
-    accepted_records = valid_df.shape[0]
-    rejected_records = transform_invalid_records
-    total_raw_records = metrics.get("total_vehicles_processed", 0)
-    rows_failed_total = rejected_records + expectations_summary.get("rows_failed", 0)
-    acceptance_rate = (
-        (total_raw_records - rows_failed_total) / total_raw_records
-        if total_raw_records > 0
-        else 0.0
-    )
-    expectations_with_violations = expectations_summary.get(
-        "expectations_with_violations", 0
-    )
-    expectations_failed_due_to_exceptions = expectations_summary.get(
-        "expectations_failed_due_to_exceptions", 0
-    )
-    if (
-        acceptance_rate >= pass_threshold
-        and expectations_with_violations == 0
-        and expectations_failed_due_to_exceptions == 0
-    ):
-        status = "PASS"
-    elif acceptance_rate >= warn_threshold:
-        status = "WARN"
-    else:
-        status = "FAIL"
-    summary = build_quality_summary(
-        config=config,
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        source_file=source_file,
-        pass_threshold=pass_threshold,
-        warn_threshold=warn_threshold,
-        batch_ts=batch_ts,
+    computed_metrics = _compute_quality_metrics(
         transform_result=transform_result,
         expectations_result=expectations_result,
-        status=status,
-        acceptance_rate=acceptance_rate,
-        rows_failed=rows_failed_total,
+        pass_threshold=pass_threshold,
+        warn_threshold=warn_threshold,
+    )
+    quality_report_path = build_quality_report_path(
+        metadata_bucket=config["general"]["storage"]["metadata_bucket"],
+        quality_report_folder=config["general"]["storage"]["quality_report_folder"],
+        pipeline_name="transformlivedata",
+        batch_ts=batch_ts,
+        filename_label="positions",
+    )
+    summary = build_quality_summary(
+        pipeline="transformlivedata",
+        execution_id=execution_id,
+        status=computed_metrics["status"],
+        items_failed=computed_metrics["rows_failed"],
+        quality_report_path=quality_report_path,
+        acceptance_rate=computed_metrics["acceptance_rate"],
         failure_phase=None,
         failure_message=None,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        issue_counts=computed_metrics["issue_counts"],
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
-    details = {
-        "execution_id": execution_id,
-        "logical_date_utc": logical_date_utc,
-        "source_file": source_file,
-        "transformation_row_counts": {
-            "raw_records": metrics.get("total_vehicles_processed", 0),
-            "transformed_records": transformed_records,
-            "accepted_records": accepted_records,
-            "rejected_records": rejected_records,
-        },
-        "transformation_metrics": {
-            "total_vehicles_processed": metrics.get("total_vehicles_processed", 0),
-            "valid_vehicles": metrics.get("valid_vehicles", 0),
-            "invalid_vehicles": metrics.get("invalid_vehicles", 0),
-            "expected_vehicles": metrics.get("expected_vehicles", 0),
-            "total_lines_processed": metrics.get("total_lines_processed", 0),
-        },
-        "transformation_issues": {
-            "invalid_trips": issues.get("invalid_trips", []),
-            "invalid_vehicle_ids": issues.get("invalid_vehicle_ids", []),
-            "distance_calculation_errors": len(
-                issues.get("distance_calculation_errors", [])
-            ),
-            "lines_with_invalid_vehicles": issues.get("lines_with_invalid_vehicles", 0),
-        },
-        "expectations_summary": {
-            "total_checks": expectations_summary.get("total_checks", 0),
-            "expectations_successful": expectations_summary.get(
-                "expectations_successful", 0
-            ),
-            "expectations_with_violations": expectations_with_violations,
-            "expectations_failed_due_to_exceptions": expectations_failed_due_to_exceptions,
-            "rows_failed": expectations_summary.get("rows_failed", 0),
-            "violation_reasons": expectations_summary.get("violation_reasons", []),
-            "exception_reasons": expectations_summary.get("exception_reasons", []),
-        },
-        "outcome": {
-            "status": status,
-            "acceptance_rate": acceptance_rate,
-            "policy_version": "v1",
-        },
-        "artifacts": {
-            "quality_report_path": build_quality_report_path(config, batch_ts),
-            "quarantine_path": build_quarantine_path(config, batch_ts),
-            "colum lineage": transform_result.get("lineage", {}),
-        },
-    }
+    details = _build_quality_details(
+        execution_id=execution_id,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        transform_result=transform_result,
+        valid_df=valid_df,
+        expectations_summary=expectations_summary,
+        computed_metrics=computed_metrics,
+        quality_report_path=quality_report_path,
+        batch_ts=batch_ts,
+        config=config,
+    )
     return {
         "summary": summary,
         "details": details,
@@ -245,8 +230,15 @@ def create_data_quality_report(
     )
     validation_report = format_data_quality_report(data_quality_report)
     logger.info(validation_report)
-    save_data_quality_report_to_storage(
-        config, data_quality_report, transform_result["batch_ts"], write_fn=write_fn
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report=data_quality_report,
+        path=data_quality_report["summary"]["quality_report_path"],
+        connection_data=connection_data,
+        write_fn=write_fn,
     )
     return data_quality_report
 
@@ -268,19 +260,25 @@ def create_failure_quality_report(
     write_fn=write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
-    summary = build_quality_summary(
-        config=config,
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        source_file=source_file,
-        pass_threshold=pass_threshold,
-        warn_threshold=warn_threshold,
+    quality_report_path = build_quality_report_path(
+        metadata_bucket=config["general"]["storage"]["metadata_bucket"],
+        quality_report_folder=config["general"]["storage"]["quality_report_folder"],
+        pipeline_name="transformlivedata",
         batch_ts=batch_ts_value,
-        transform_result=transform_result,
-        expectations_result=expectations_result,
+        filename_label="positions",
+    )
+    summary = build_quality_summary(
+        pipeline="transformlivedata",
+        execution_id=execution_id,
         status="FAIL",
+        items_failed=0,
+        quality_report_path=quality_report_path,
+        acceptance_rate=0.0,
         failure_phase=failure_phase,
         failure_message=failure_message,
+        logical_date_utc=logical_date_utc,
+        source_file=source_file,
+        issue_counts={},
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
@@ -310,40 +308,26 @@ def create_failure_quality_report(
             "expectations_summary": {},
             "outcome": {"status": "FAIL"},
             "artifacts": {
-                "quality_report_path": build_quality_report_path(
-                    config, batch_ts_value
-                ),
+                "quality_report_path": quality_report_path,
                 "quarantine_path": build_quarantine_path(config, batch_ts_value),
-                "colum lineage": {},
+                "column_lineage": {},
             },
         }
         data_quality_report = {
             "summary": summary,
             "details": details,
         }
-    save_data_quality_report_to_storage(
-        config, data_quality_report, batch_ts_value, write_fn=write_fn
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report=data_quality_report,
+        path=data_quality_report["summary"]["quality_report_path"],
+        connection_data=connection_data,
+        write_fn=write_fn,
     )
     return data_quality_report
-
-
-def build_quality_report_path(config: Dict[str, Any], batch_ts: Any) -> str:
-    def get_config(config: Dict[str, Any]) -> Tuple[str, str]:
-        general = config["general"]
-        storage = general["storage"]
-        bucket_name = storage["metadata_bucket"]
-        report_folder = storage["quality_report_folder"]
-        return bucket_name, report_folder
-
-    bucket_name, report_folder = get_config(config)
-    batch_ts = datetime.fromisoformat(str(batch_ts))
-    year = batch_ts.strftime("%Y")
-    month = batch_ts.strftime("%m")
-    day = batch_ts.strftime("%d")
-    hour = batch_ts.strftime("%H")
-    hhmm = batch_ts.strftime("%H%M")
-    prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
-    return f"{bucket_name}/{prefix}quality-report-positions_{hhmm}.json"
 
 
 def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
@@ -382,7 +366,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
         )
         source_file = details.get("source_file", summary.get("source_file"))
         artifacts = details.get("artifacts", {})
-        column_lineage = artifacts.get("colum lineage", {})
+        column_lineage = artifacts.get("column_lineage", {})
         lines = [
             "data_quality_report SUMMARY",
             "-" * 80,
@@ -406,7 +390,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             "Transformation Processing Issues",
             f"- Invalid trips: {len(transform_issues.get('invalid_trips', []))} - {transform_issues.get('invalid_trips', [])}",
             f"- Invalid vehicle IDs: {len(transform_issues.get('invalid_vehicle_ids', []))} - {transform_issues.get('invalid_vehicle_ids', [])}",
-            f"- Distance calculation errors: {transform_issues.get('distance_calculation_errors', 0)}",
+            f"- Distance calculation errors: {transform_issues.get('number_of_distance_calculation_errors', 0)}",
             f"- Lines with invalid vehicles: {transform_issues.get('lines_with_invalid_vehicles', 0)}",
             "",
             "Post Transformation Validation Summary",
@@ -418,7 +402,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             lines.append(
                 f"- Expectations failed due to exceptions: {expectations_summary.get('expectations_failed_due_to_exceptions', 0)}"
             )
-        lines.append(f"- Records failed: {summary.get('rows_failed', 0)}")
+        lines.append(f"- Records failed: {summary.get('items_failed', 0)}")
         if expectations_summary.get("violation_reasons"):
             lines.append(
                 f"- Expectation violation reasons: {expectations_summary.get('violation_reasons')}"
@@ -429,7 +413,7 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
             )
         lines.extend(
             [
-                f"- Colum lineage: {column_lineage}",
+                f"- Column lineage: {column_lineage}",
                 "",
                 "Outcome",
                 f"- Status: {outcome.get('status', summary.get('status'))}",
@@ -452,39 +436,3 @@ def write_data_quality_report_json(
 ) -> None:
     with open(output_path, "w") as f:
         f.write(data_quality_report_to_json(data_quality_report))
-
-
-def save_data_quality_report_to_storage(
-    config: Dict[str, Any],
-    data_quality_report: Dict[str, Any],
-    batch_ts: Any,
-    write_fn=write_generic_bytes_to_object_storage,
-) -> None:
-    def get_config(config: Dict[str, Any]) -> Tuple[str, str, str, Dict[str, Any]]:
-        general = config["general"]
-        connections = config["connections"]
-        storage = general["storage"]
-        bucket_name = storage["metadata_bucket"]
-        report_folder = storage["quality_report_folder"]
-        app_folder = storage["app_folder"]
-        connection_data = {
-            **connections["object_storage"],
-            "secure": False,
-        }
-        return bucket_name, report_folder, app_folder, connection_data
-
-    bucket_name, report_folder, app_folder, connection_data = get_config(config)
-    batch_ts = datetime.fromisoformat(str(batch_ts))
-    year = batch_ts.strftime("%Y")
-    month = batch_ts.strftime("%m")
-    day = batch_ts.strftime("%d")
-    hour = batch_ts.strftime("%H")
-    hhmm = batch_ts.strftime("%H%M")
-    prefix = f"{report_folder}/transformlivedata/year={year}/month={month}/day={day}/hour={hour}/"
-    object_name = f"{prefix}quality-report-positions_{hhmm}.json"
-    write_fn(
-        connection_data,
-        buffer=data_quality_report_to_json(data_quality_report).encode("utf-8"),
-        bucket_name=bucket_name,
-        object_name=object_name,
-    )

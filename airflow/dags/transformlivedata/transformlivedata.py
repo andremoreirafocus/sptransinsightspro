@@ -8,12 +8,12 @@ from transformlivedata.services.save_positions_to_storage import (
 from transformlivedata.services.processed_requests_helper import (
     mark_request_as_processed,
 )
-from transformlivedata.quality.validate_expectations import (
+from quality.validate_expectations import (
     validate_expectations,
 )
 from pipeline_configurator.config import get_config
 from transformlivedata.config.transformlivedata_config_schema import GeneralConfig
-from transformlivedata.quality.validate_json_data_schema import (
+from quality.validate_json_data_schema import (
     validate_json_data_schema,
 )
 from transformlivedata.services.create_data_quality_report import (
@@ -30,6 +30,20 @@ import uuid
 
 
 logger = logging.getLogger(__name__)
+
+
+def _send_quality_summary_webhook(summary: dict, pipeline_config: dict) -> None:
+    """Send quality summary via webhook if enabled."""
+    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
+    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
+        logger.info("Webhook notification disabled")
+        return
+
+    try:
+        send_webhook(summary, webhook_url)
+        logger.info("Webhook notification sent")
+    except Exception as e:
+        logger.error("Webhook notification failed: %s", e)
 
 
 def load_transform_save_positions(pipeline_name, logical_date_string):
@@ -74,15 +88,7 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
                 quarantine_save_error=quarantine_save_error,
             )
             summary = failure_report.get("summary", {})
-            webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-            if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-                logger.info("Webhook notification disabled (failure path)")
-            else:
-                try:
-                    send_webhook(summary, webhook_url)
-                    logger.info("Webhook notification sent (failure path)")
-                except Exception as e:
-                    logger.error("Webhook notification failed: %s", e)
+            _send_quality_summary_webhook(summary, pipeline_config)
         except Exception as e:
             logger.error("Failed to write quality report on failure: %s", e)
 
@@ -143,13 +149,13 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
         logger.error(error_msg)
         write_failure_report("expectations", error_msg)
         raise
-    valid_postions_df = expectations_result["valid_df"]
+    valid_positions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
     logger.info("=== SAVE STAGE: save_positions_to_storage ===")
     logger.info("Saving valid positions to storage...")
     try:
-        save_positions_to_storage(pipeline_config, valid_postions_df, "trusted")
-        logger.info(f"Saved {valid_postions_df.shape[0]} records to trusted layer")
+        save_positions_to_storage(pipeline_config, valid_positions_df, "trusted")
+        logger.info(f"Saved {valid_positions_df.shape[0]} records to trusted layer")
     except Exception as e:
         error_msg = f"Failed to save trusted positions: {e}"
         logger.error(error_msg)
@@ -203,13 +209,5 @@ def load_transform_save_positions(pipeline_name, logical_date_string):
         quarantine_save_error=quarantine_save_error,
     )
     summary = report.get("summary", {})
-    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-        logger.info("Webhook notification disabled (success path)")
-    else:
-        try:
-            send_webhook(summary, webhook_url)
-            logger.info("Webhook notification sent (success path)")
-        except Exception as e:
-            logger.error("Webhook notification failed: %s", e)
+    _send_quality_summary_webhook(summary, pipeline_config)
     logger.info(f"Execution {execution_id} completed successfully")
