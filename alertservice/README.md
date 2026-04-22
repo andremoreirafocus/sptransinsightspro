@@ -62,7 +62,19 @@ Exemplo: `[DQ] status update for pipeline transformlivedata: FAIL`
 Observação: todos os campos são obrigatórios. Se qualquer um estiver ausente, o serviço falha no startup.
 
 ## Testes unitários
-Ainda não implementados.
+O subprojeto já possui testes unitários focados nas regras centrais de notificação e formatação, usando fakes para isolar dependências externas.
+
+Cobertura atual:
+- `tests/test_process_notification.py`: fluxo principal de processamento, persistência e envio de alertas
+- `tests/test_notifications_evaluator.py`: avaliação cumulativa de warnings
+- `tests/test_notifier.py`: formatação do resumo e integração com o envio de e-mail
+
+Para executar:
+
+```bash
+cd alertservice
+pytest tests/
+```
 
 ## Para instalar os requisitos
 - cd alertservice
