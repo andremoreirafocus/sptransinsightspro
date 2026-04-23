@@ -115,7 +115,7 @@ def apply_relocation_result(stage_result: dict, relocation: dict):
         stage_result["error_details"]["relocation_errors"] = relocation["errors"]
 
 
-def extract_load_files(run_context, stage_results):
+def extract_load_files(run_context, stage_results, write_fn=None):
     pipeline_config = load_pipeline_config()
     stage_result = {
         "status": "FAIL",
@@ -175,7 +175,7 @@ def extract_load_files(run_context, stage_results):
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("extract_load_files", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 
@@ -261,7 +261,7 @@ def transform(run_context, stage_results, write_fn=None):
         raise err from e
 
 
-def create_trip_details(run_context, stage_results):
+def create_trip_details(run_context, stage_results, write_fn=None):
     pipeline_config = load_pipeline_config()
     table_name = pipeline_config["general"]["tables"]["trip_details_table_name"]
     staged_result = []
@@ -380,7 +380,7 @@ def create_trip_details(run_context, stage_results):
                     "errors": [str(relocation_exception)],
                 }
         err = StageExecutionError("enrichment", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 

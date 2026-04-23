@@ -2,8 +2,12 @@ from io import BytesIO
 
 import pandas as pd
 import pytest
+import gtfs.gtfs
 from gtfs.gtfs import create_trip_details, StageExecutionError
-from unittest.mock import patch
+from gtfs.tests.fakes.fake_orchestration_dependencies import (
+    FakeTripDetailsDependencies,
+    FakeStorageReaderThatFails,
+)
 
 
 def make_pipeline_config():
@@ -81,43 +85,51 @@ def build_trip_details_parquet_buffer_with_drift():
 
 
 def test_create_trip_details_moves_to_final_on_success():
-    config = make_pipeline_config()
-    relocate_calls = []
-
-    with patch("gtfs.gtfs.load_pipeline_config", return_value=config):
-        with patch(
-            "gtfs.gtfs.create_trip_details_table_and_fill_missing_data",
-            return_value={
-                "table_name": "trip_details",
-                "staging_object_name": "gtfs/staging/trip_details.parquet",
-                "row_count": 1,
-                "staged_written": True,
+    deps = FakeTripDetailsDependencies(
+        pipeline_config=make_pipeline_config(),
+        creation_result={
+            "table_name": "trip_details",
+            "staging_object_name": "gtfs/staging/trip_details.parquet",
+            "row_count": 1,
+            "staged_written": True,
+        },
+        storage_buffer=build_trip_details_parquet_buffer(),
+        expectations_result={
+            "valid_df": pd.DataFrame(),
+            "invalid_df": None,
+            "expectations_summary": {
+                "rows_failed": 0,
+                "expectations_with_violations": 0,
+                "expectations_failed_due_to_exceptions": 0,
             },
-        ):
-            with patch(
-                "gtfs.gtfs.read_file_from_object_storage_to_bytesio",
-                return_value=build_trip_details_parquet_buffer(),
-            ):
-                with patch(
-                    "gtfs.gtfs.validate_expectations",
-                    return_value={
-                        "valid_df": pd.DataFrame(),
-                        "invalid_df": None,
-                        "expectations_summary": {
-                            "rows_failed": 0,
-                            "expectations_with_violations": 0,
-                            "expectations_failed_due_to_exceptions": 0,
-                        },
-                    },
-                ):
-                    with patch(
-                        "gtfs.gtfs.relocate_staged_trusted_files",
-                        side_effect=lambda cfg, sr, target: (
-                            relocate_calls.append(target),
-                            {"status": "SUCCESS", "moved": [], "errors": []},
-                        )[1],
-                    ):
-                        result = create_trip_details(make_run_context(), {})
+        },
+        relocation_result={"status": "SUCCESS", "moved": [], "errors": []},
+    )
+
+    orig_load_config = gtfs.gtfs.load_pipeline_config
+    orig_create_trip = gtfs.gtfs.create_trip_details_table_and_fill_missing_data
+    orig_read_storage = gtfs.gtfs.read_file_from_object_storage_to_bytesio
+    orig_validate = gtfs.gtfs.validate_expectations
+    orig_relocate = gtfs.gtfs.relocate_staged_trusted_files
+
+    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
+    gtfs.gtfs.create_trip_details_table_and_fill_missing_data = (
+        deps.create_trip_details_table_and_fill_missing_data
+    )
+    gtfs.gtfs.read_file_from_object_storage_to_bytesio = (
+        deps.read_file_from_object_storage_to_bytesio
+    )
+    gtfs.gtfs.validate_expectations = deps.validate_expectations
+    gtfs.gtfs.relocate_staged_trusted_files = deps.relocate_staged_trusted_files
+
+    try:
+        result = create_trip_details(make_run_context(), {})
+    finally:
+        gtfs.gtfs.load_pipeline_config = orig_load_config
+        gtfs.gtfs.create_trip_details_table_and_fill_missing_data = orig_create_trip
+        gtfs.gtfs.read_file_from_object_storage_to_bytesio = orig_read_storage
+        gtfs.gtfs.validate_expectations = orig_validate
+        gtfs.gtfs.relocate_staged_trusted_files = orig_relocate
 
     stage = result["enrichment"]
     assert stage["status"] == "PASS"
@@ -125,133 +137,163 @@ def test_create_trip_details_moves_to_final_on_success():
     assert stage["artifacts"]["column_lineage"]["warning"] is None
     assert "relocation_details" in stage
     assert stage["relocation_details"]["errors"] == []
-    assert relocate_calls == ["final"]
+    assert deps.relocation_calls == [("final", [{"table_name": "trip_details", "staging_object_name": "gtfs/staging/trip_details.parquet", "staged_written": True}])]
 
 
 def test_create_trip_details_sets_lineage_warning_on_drift():
-    config = make_pipeline_config()
-    relocate_calls = []
-
-    with patch("gtfs.gtfs.load_pipeline_config", return_value=config):
-        with patch(
-            "gtfs.gtfs.create_trip_details_table_and_fill_missing_data",
-            return_value={
-                "table_name": "trip_details",
-                "staging_object_name": "gtfs/staging/trip_details.parquet",
-                "row_count": 1,
-                "staged_written": True,
+    deps = FakeTripDetailsDependencies(
+        pipeline_config=make_pipeline_config(),
+        creation_result={
+            "table_name": "trip_details",
+            "staging_object_name": "gtfs/staging/trip_details.parquet",
+            "row_count": 1,
+            "staged_written": True,
+        },
+        storage_buffer=build_trip_details_parquet_buffer_with_drift(),
+        expectations_result={
+            "valid_df": pd.DataFrame(),
+            "invalid_df": None,
+            "expectations_summary": {
+                "rows_failed": 0,
+                "expectations_with_violations": 0,
+                "expectations_failed_due_to_exceptions": 0,
             },
-        ):
-            with patch(
-                "gtfs.gtfs.read_file_from_object_storage_to_bytesio",
-                return_value=build_trip_details_parquet_buffer_with_drift(),
-            ):
-                with patch(
-                    "gtfs.gtfs.validate_expectations",
-                    return_value={
-                        "valid_df": pd.DataFrame(),
-                        "invalid_df": None,
-                        "expectations_summary": {
-                            "rows_failed": 0,
-                            "expectations_with_violations": 0,
-                            "expectations_failed_due_to_exceptions": 0,
-                        },
-                    },
-                ):
-                    with patch(
-                        "gtfs.gtfs.relocate_staged_trusted_files",
-                        side_effect=lambda cfg, sr, target: (
-                            relocate_calls.append(target),
-                            {"status": "SUCCESS", "moved": [], "errors": []},
-                        )[1],
-                    ):
-                        result = create_trip_details(make_run_context(), {})
+        },
+        relocation_result={"status": "SUCCESS", "moved": [], "errors": []},
+    )
+
+    orig_load_config = gtfs.gtfs.load_pipeline_config
+    orig_create_trip = gtfs.gtfs.create_trip_details_table_and_fill_missing_data
+    orig_read_storage = gtfs.gtfs.read_file_from_object_storage_to_bytesio
+    orig_validate = gtfs.gtfs.validate_expectations
+    orig_relocate = gtfs.gtfs.relocate_staged_trusted_files
+
+    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
+    gtfs.gtfs.create_trip_details_table_and_fill_missing_data = (
+        deps.create_trip_details_table_and_fill_missing_data
+    )
+    gtfs.gtfs.read_file_from_object_storage_to_bytesio = (
+        deps.read_file_from_object_storage_to_bytesio
+    )
+    gtfs.gtfs.validate_expectations = deps.validate_expectations
+    gtfs.gtfs.relocate_staged_trusted_files = deps.relocate_staged_trusted_files
+
+    try:
+        result = create_trip_details(make_run_context(), {})
+    finally:
+        gtfs.gtfs.load_pipeline_config = orig_load_config
+        gtfs.gtfs.create_trip_details_table_and_fill_missing_data = orig_create_trip
+        gtfs.gtfs.read_file_from_object_storage_to_bytesio = orig_read_storage
+        gtfs.gtfs.validate_expectations = orig_validate
+        gtfs.gtfs.relocate_staged_trusted_files = orig_relocate
 
     stage = result["enrichment"]
     assert stage["status"] == "PASS"
     assert stage["artifacts"]["column_lineage"]["warning"] == "lineage drift detected"
     assert "relocation_details" in stage
     assert stage["relocation_details"]["errors"] == []
-    assert relocate_calls == ["final"]
+    assert deps.relocation_calls == [("final", [{"table_name": "trip_details", "staging_object_name": "gtfs/staging/trip_details.parquet", "staged_written": True}])]
 
 
 def test_create_trip_details_quarantines_on_gx_failure():
-    config = make_pipeline_config()
-    relocate_calls = []
-
-    with patch("gtfs.gtfs.load_pipeline_config", return_value=config):
-        with patch(
-            "gtfs.gtfs.create_trip_details_table_and_fill_missing_data",
-            return_value={
-                "table_name": "trip_details",
-                "staging_object_name": "gtfs/staging/trip_details.parquet",
-                "row_count": 1,
-                "staged_written": True,
+    deps = FakeTripDetailsDependencies(
+        pipeline_config=make_pipeline_config(),
+        creation_result={
+            "table_name": "trip_details",
+            "staging_object_name": "gtfs/staging/trip_details.parquet",
+            "row_count": 1,
+            "staged_written": True,
+        },
+        storage_buffer=build_trip_details_parquet_buffer(),
+        expectations_result={
+            "valid_df": pd.DataFrame(),
+            "invalid_df": pd.DataFrame({"col": [1]}),
+            "expectations_summary": {
+                "rows_failed": 1,
+                "expectations_with_violations": 1,
+                "expectations_failed_due_to_exceptions": 0,
             },
-        ):
-            with patch(
-                "gtfs.gtfs.read_file_from_object_storage_to_bytesio",
-                return_value=build_trip_details_parquet_buffer(),
-            ):
-                with patch(
-                    "gtfs.gtfs.validate_expectations",
-                    return_value={
-                        "valid_df": pd.DataFrame(),
-                        "invalid_df": pd.DataFrame({"col": [1]}),
-                        "expectations_summary": {
-                            "rows_failed": 1,
-                            "expectations_with_violations": 1,
-                            "expectations_failed_due_to_exceptions": 0,
-                        },
-                    },
-                ):
-                    with patch(
-                        "gtfs.gtfs.relocate_staged_trusted_files",
-                        side_effect=lambda cfg, sr, target: (
-                            relocate_calls.append(target),
-                            {"status": "SUCCESS", "moved": [], "errors": []},
-                        )[1],
-                    ):
-                        with patch("gtfs.gtfs.handle_unexpected_error"):
-                            with pytest.raises(StageExecutionError) as excinfo:
-                                create_trip_details(make_run_context(), {})
+        },
+        relocation_result={"status": "SUCCESS", "moved": [], "errors": []},
+    )
+
+    orig_load_config = gtfs.gtfs.load_pipeline_config
+    orig_create_trip = gtfs.gtfs.create_trip_details_table_and_fill_missing_data
+    orig_read_storage = gtfs.gtfs.read_file_from_object_storage_to_bytesio
+    orig_validate = gtfs.gtfs.validate_expectations
+    orig_relocate = gtfs.gtfs.relocate_staged_trusted_files
+    orig_handle_error = gtfs.gtfs.handle_unexpected_error
+
+    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
+    gtfs.gtfs.create_trip_details_table_and_fill_missing_data = (
+        deps.create_trip_details_table_and_fill_missing_data
+    )
+    gtfs.gtfs.read_file_from_object_storage_to_bytesio = (
+        deps.read_file_from_object_storage_to_bytesio
+    )
+    gtfs.gtfs.validate_expectations = deps.validate_expectations
+    gtfs.gtfs.relocate_staged_trusted_files = deps.relocate_staged_trusted_files
+    gtfs.gtfs.handle_unexpected_error = lambda e, run_context, stage_results, write_fn=None: None
+
+    try:
+        with pytest.raises(StageExecutionError) as excinfo:
+            create_trip_details(make_run_context(), {})
+    finally:
+        gtfs.gtfs.load_pipeline_config = orig_load_config
+        gtfs.gtfs.create_trip_details_table_and_fill_missing_data = orig_create_trip
+        gtfs.gtfs.read_file_from_object_storage_to_bytesio = orig_read_storage
+        gtfs.gtfs.validate_expectations = orig_validate
+        gtfs.gtfs.relocate_staged_trusted_files = orig_relocate
+        gtfs.gtfs.handle_unexpected_error = orig_handle_error
 
     stage_result = excinfo.value.stage_result
     assert "relocation_details" in stage_result
     assert stage_result["relocation_details"]["errors"] == []
-    assert relocate_calls == ["quarantine"]
+    assert deps.relocation_calls == [("quarantine", [{"table_name": "trip_details", "staging_object_name": "gtfs/staging/trip_details.parquet", "staged_written": True}])]
 
 
 def test_create_trip_details_quarantines_when_validation_raises_after_staging():
-    config = make_pipeline_config()
-    relocate_calls = []
+    deps = FakeTripDetailsDependencies(
+        pipeline_config=make_pipeline_config(),
+        creation_result={
+            "table_name": "trip_details",
+            "staging_object_name": "gtfs/staging/trip_details.parquet",
+            "row_count": 1,
+            "staged_written": True,
+        },
+        storage_buffer=None,
+        expectations_result=None,
+        relocation_result={"status": "SUCCESS", "moved": [], "errors": []},
+    )
+    deps.storage_reader = FakeStorageReaderThatFails()
 
-    with patch("gtfs.gtfs.load_pipeline_config", return_value=config):
-        with patch(
-            "gtfs.gtfs.create_trip_details_table_and_fill_missing_data",
-            return_value={
-                "table_name": "trip_details",
-                "staging_object_name": "gtfs/staging/trip_details.parquet",
-                "row_count": 1,
-                "staged_written": True,
-            },
-        ):
-            with patch(
-                "gtfs.gtfs.read_file_from_object_storage_to_bytesio",
-                side_effect=RuntimeError("read failed"),
-            ):
-                with patch(
-                    "gtfs.gtfs.relocate_staged_trusted_files",
-                    side_effect=lambda cfg, sr, target: (
-                        relocate_calls.append(target),
-                        {"status": "SUCCESS", "moved": [], "errors": []},
-                    )[1],
-                ):
-                    with patch("gtfs.gtfs.handle_unexpected_error"):
-                        with pytest.raises(StageExecutionError) as excinfo:
-                            create_trip_details(make_run_context(), {})
+    orig_load_config = gtfs.gtfs.load_pipeline_config
+    orig_create_trip = gtfs.gtfs.create_trip_details_table_and_fill_missing_data
+    orig_read_storage = gtfs.gtfs.read_file_from_object_storage_to_bytesio
+    orig_relocate = gtfs.gtfs.relocate_staged_trusted_files
+    orig_handle_error = gtfs.gtfs.handle_unexpected_error
+
+    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
+    gtfs.gtfs.create_trip_details_table_and_fill_missing_data = (
+        deps.create_trip_details_table_and_fill_missing_data
+    )
+    gtfs.gtfs.read_file_from_object_storage_to_bytesio = (
+        deps.read_file_from_object_storage_to_bytesio
+    )
+    gtfs.gtfs.relocate_staged_trusted_files = deps.relocate_staged_trusted_files
+    gtfs.gtfs.handle_unexpected_error = lambda e, run_context, stage_results, write_fn=None: None
+
+    try:
+        with pytest.raises(StageExecutionError) as excinfo:
+            create_trip_details(make_run_context(), {})
+    finally:
+        gtfs.gtfs.load_pipeline_config = orig_load_config
+        gtfs.gtfs.create_trip_details_table_and_fill_missing_data = orig_create_trip
+        gtfs.gtfs.read_file_from_object_storage_to_bytesio = orig_read_storage
+        gtfs.gtfs.relocate_staged_trusted_files = orig_relocate
+        gtfs.gtfs.handle_unexpected_error = orig_handle_error
 
     stage_result = excinfo.value.stage_result
     assert "relocation_details" in stage_result
     assert stage_result["relocation_details"]["errors"] == []
-    assert relocate_calls == ["quarantine"]
+    assert deps.relocation_calls == [("quarantine", [{"table_name": "trip_details", "staging_object_name": "gtfs/staging/trip_details.parquet", "staged_written": True}])]
