@@ -179,7 +179,7 @@ def extract_load_files(run_context, stage_results):
         raise err from e
 
 
-def transform(run_context, stage_results):
+def transform(run_context, stage_results, write_fn=None):
     pipeline_config = load_pipeline_config()
     stage_result = {
         "status": "FAIL",
@@ -257,7 +257,7 @@ def transform(run_context, stage_results):
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("transformation", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 
@@ -406,7 +406,7 @@ def build_quality_report_and_send_webhook(run_context, stage_results):
         raise
 
 
-def handle_unexpected_error(e, run_context, stage_results: dict):
+def handle_unexpected_error(e, run_context, stage_results: dict, write_fn=None):
     pipeline_config = load_pipeline_config()
     stage_results[e.stage] = e.stage_result
     logger.error("%s failed: %s", e.stage, e)
@@ -417,5 +417,6 @@ def handle_unexpected_error(e, run_context, stage_results: dict):
         failure_message=str(e),
         stage_results=stage_results,
         batch_ts=run_context["batch_ts"],
+        write_fn=write_fn,
     )
     send_webhook_from_report(report, pipeline_config, "failure path")
