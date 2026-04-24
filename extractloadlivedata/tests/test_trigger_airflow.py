@@ -86,3 +86,22 @@ def test_trigger_pending_airflow_dag_invokations_removes_on_success():
         config, cache_factory=fake_cache_factory
     )
     assert pending_after == []
+
+
+def test_trigger_pending_airflow_dag_invokations_returns_metrics():
+    config = {
+        "INVOKATIONS_CACHE_DIR": "/tmp/cache",
+        "AIRFLOW_USER": "user",
+        "AIRFLOW_PASSWORD": "pass",
+        "AIRFLOW_WEBSERVER": "localhost",
+        "AIRFLOW_DAG_NAME": "dag",
+    }
+    marker = "posicoes_onibus-202604090910.json"
+    create_pending_invokation(config, marker, cache_factory=fake_cache_factory)
+    http_ok = FakeHttp(status_code=200, text="true")
+    result = trigger_pending_airflow_dag_invokations(
+        config, post_fn=http_ok.post, cache_factory=fake_cache_factory, with_metrics=True
+    )
+    assert result["metrics"]["success"] == 1
+    assert result["metrics"]["failed"] == 0
+    assert result["metrics"]["retries"] == 0

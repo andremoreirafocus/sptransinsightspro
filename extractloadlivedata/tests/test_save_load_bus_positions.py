@@ -112,6 +112,23 @@ def test_save_bus_positions_to_storage_with_retries_success():
     assert result is True
 
 
+def test_save_bus_positions_to_storage_with_retries_success_with_metrics():
+    data = build_sample_data()
+    config = {"STORAGE_MAX_RETRIES": 2}
+
+    def fake_save(*_args, **_kwargs):
+        return None
+
+    def fake_sleep(_):
+        return None
+
+    result = save_bus_positions_to_storage_with_retries(
+        config, data, sleep_fn=fake_sleep, save_fn=fake_save, with_metrics=True
+    )
+    assert result["result"] is None
+    assert result["metrics"]["retries"] == 0
+
+
 def test_save_bus_positions_to_storage_with_retries_exhausts():
     data = build_sample_data()
     config = {"STORAGE_MAX_RETRIES": 2}
@@ -126,11 +143,12 @@ def test_save_bus_positions_to_storage_with_retries_exhausts():
 
     with pytest.raises(
         SavePositionsToRawError, match="max retries reached while saving positions"
-    ):
+    ) as exc_info:
         save_bus_positions_to_storage_with_retries(
             config, data, sleep_fn=fake_sleep, save_fn=fake_save
         )
     assert calls["count"] == 2
+    assert getattr(exc_info.value, "retries", None) == 2
 
 
 def test_save_data_to_raw_object_storage_calls_object_storage():

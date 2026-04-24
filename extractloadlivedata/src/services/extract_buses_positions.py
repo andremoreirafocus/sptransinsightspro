@@ -8,7 +8,9 @@ from src.services.exceptions import PositionsDownloadError
 logger = logging.getLogger(__name__)
 
 
-def extract_buses_positions_with_retries(config, session=None, sleep_fn=None):
+def extract_buses_positions_with_retries(
+    config, session=None, sleep_fn=None, with_metrics=False
+):
     def get_config(config):
         token = config["TOKEN"]
         api_base_url = config["API_BASE_URL"]
@@ -35,6 +37,13 @@ def extract_buses_positions_with_retries(config, session=None, sleep_fn=None):
                 logger.info(
                     f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}."
                 )
+            if with_metrics:
+                return {
+                    "result": buses_positions_payload,
+                    "metrics": {
+                        "retries": retries,
+                    },
+                }
             return buses_positions_payload
         retries += 1
         logger.warning(
@@ -47,9 +56,11 @@ def extract_buses_positions_with_retries(config, session=None, sleep_fn=None):
             logger.error(
                 "Max retries reached. Download failed. Skipping this extraction cycle."
             )
-            raise PositionsDownloadError(
+            error = PositionsDownloadError(
                 "max retries reached while downloading positions"
             )
+            setattr(error, "retries", retries)
+            raise error
 
 
 def get_buses_positions_with_metadata(buses_positions_payload):

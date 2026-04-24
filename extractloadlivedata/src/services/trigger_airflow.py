@@ -54,21 +54,40 @@ def get_pending_invokations(config, cache_factory=None):
     return pending_markers
 
 
-def trigger_pending_airflow_dag_invokations(config, post_fn=None, cache_factory=None):
+def trigger_pending_airflow_dag_invokations(
+    config, post_fn=None, cache_factory=None, with_metrics=False
+):
     """Trigger all pending invocations and remove them if successful."""
     pending_markers = get_pending_invokations(config, cache_factory=cache_factory)
+    success_count = 0
+    failure_count = 0
     if pending_markers:
         for pending_marker in pending_markers:
             logger.info(f"Pending invokation found: {pending_marker}")
             logger.info(
                 f"Found {len(pending_markers)} pending invokation(s). Processing..."
             )
-            if trigger_airflow_dag_run(config, pending_marker, post_fn=post_fn):
-                remove_pending_invokation(
-                    config, pending_marker, cache_factory=cache_factory
+            try:
+                if trigger_airflow_dag_run(config, pending_marker, post_fn=post_fn):
+                    remove_pending_invokation(
+                        config, pending_marker, cache_factory=cache_factory
+                    )
+                    success_count += 1
+            except IngestNotificationError as e:
+                failure_count += 1
+                setattr(
+                    e,
+                    "metrics",
+                    {"success": success_count, "failed": failure_count, "retries": 0},
                 )
+                raise
     else:
         logger.info("No pending invokations found.")
+    if with_metrics:
+        return {
+            "result": None,
+            "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
+        }
 
 
 def get_utc_logical_date_from_file(pending_marker):

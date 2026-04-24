@@ -18,6 +18,30 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow. Caso a criação do do registro falhe, o mesmo continua salvo localmente até que a operação seja concluída com sucesso. Caso o Airflow esteja indisponível, ao retornar ao funcionamento, a DAG orquestradora identifica os registros de arquivos pendentes de transformação e dispara a DAG de transformação para cada arquivo, um por vez e na ordem de criação dos arquivos de posição dos ônibus, garantindo uma entrega ordenada das posições ao longo do tempo.
 - alternativamente, pode disparar diretamente a DAG de transformação via API do Airflow, sem criar registro no banco, dependendo da configuração
 
+## Execution Reporting (Alertservice)
+- Escopo: o serviço publica **somente resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
+- Contrato de resumo enviado:
+  - `contract_version`, `pipeline`, `execution_id`, `status`
+  - `items_total`, `items_failed`, `retries`
+  - `failure_phase`, `failure_message` (apenas em `FAIL`)
+  - `quality_report_path` com valor `"null"` por compatibilidade de contrato.
+- Enum de fase de falha (orquestração):
+  - `positions_download`
+  - `local_ingest_buffer_save_positions`
+  - `save_positions_to_raw`
+  - `ingest_notification`
+  - fallback: `unknown`
+- Mensagens fixas por fase:
+  - `positions_download`: `[SEVERE] non recoverable api get failed`
+  - `local_ingest_buffer_save_positions`: `[SEVERE] non recoverable save to local buffer failed`
+  - `save_positions_to_raw`: `save to raw storage failed`
+  - `ingest_notification`: `ingest notification failed`
+  - `unknown`: `ingest execution failed`
+- Regra de severidade: apenas `positions_download` e `local_ingest_buffer_save_positions` recebem prefixo `[SEVERE] non recoverable `.
+- Regra de envio webhook:
+  - webhook ausente/`disabled`/`none`/`null` -> envio é pulado com log informativo.
+  - erro de envio não interrompe o serviço (com log de erro).
+
 
 ## Pré-requisitos
 - Disponibilidade do serviço de object storage para salvamento dos dados extraídos da API da SPTrans 

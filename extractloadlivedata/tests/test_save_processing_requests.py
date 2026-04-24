@@ -108,6 +108,22 @@ def test_trigger_pending_processing_requests_removes_on_success():
     assert pending_after == []
 
 
+def test_trigger_pending_processing_requests_returns_metrics():
+    config = {"PROCESSING_REQUESTS_CACHE_DIR": "/tmp/cache"}
+    marker = "posicoes_onibus-202604090910.json"
+    create_pending_processing_request(config, marker, cache_factory=fake_cache_factory)
+
+    def fake_save_fn(_config, _marker):
+        return True
+
+    result = trigger_pending_processing_requests(
+        config, cache_factory=fake_cache_factory, save_fn=fake_save_fn, with_metrics=True
+    )
+    assert result["metrics"]["success"] == 1
+    assert result["metrics"]["failed"] == 0
+    assert result["metrics"]["retries"] == 0
+
+
 def test_trigger_pending_processing_requests_keeps_on_failure():
     config = {"PROCESSING_REQUESTS_CACHE_DIR": "/tmp/cache"}
     marker = "posicoes_onibus-202604090910.json"
@@ -119,9 +135,13 @@ def test_trigger_pending_processing_requests_keeps_on_failure():
     def fake_save_fn(_config, _marker):
         return False
 
-    trigger_pending_processing_requests(
-        config, cache_factory=fake_cache_factory, save_fn=fake_save_fn
-    )
+    with pytest.raises(IngestNotificationError) as exc_info:
+        trigger_pending_processing_requests(
+            config, cache_factory=fake_cache_factory, save_fn=fake_save_fn
+        )
+    metrics = getattr(exc_info.value, "metrics", {})
+    assert metrics.get("success") == 0
+    assert metrics.get("failed") == 1
     pending_after = get_pending_processing_requests(
         config, cache_factory=fake_cache_factory
     )

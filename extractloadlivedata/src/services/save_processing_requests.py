@@ -171,7 +171,7 @@ def save_processing_request(
 
 
 def trigger_pending_processing_requests(
-    config, cache_factory=None, save_fn=None
+    config, cache_factory=None, save_fn=None, with_metrics=False
 ):
     """
     Process all pending processing requests and save them to the database.
@@ -185,6 +185,8 @@ def trigger_pending_processing_requests(
         config, cache_factory=cache_factory
     )
     cache_dir = get_config(config)
+    success_count = 0
+    failure_count = 0
     if pending_markers:
         for pending_marker_key in pending_markers:
             logger.info(f"Processing pending request: {pending_marker_key}")
@@ -194,13 +196,51 @@ def trigger_pending_processing_requests(
 
             if pending_marker_value:
                 save_fn = save_fn or save_processing_request
-                if save_fn(config, pending_marker_value):
-                    remove_pending_processing_request(
-                        config, pending_marker_key, cache_factory=cache_factory
+                try:
+                    save_successful = save_fn(config, pending_marker_value)
+                    if save_successful:
+                        remove_pending_processing_request(
+                            config, pending_marker_key, cache_factory=cache_factory
+                        )
+                        success_count += 1
+                    else:
+                        failure_count += 1
+                        logger.warning(
+                            f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
+                        )
+                        error = IngestNotificationError(
+                            f"failed to save processing request for marker '{pending_marker_value}'"
+                        )
+                        setattr(
+                            error,
+                            "metrics",
+                            {
+                                "success": success_count,
+                                "failed": failure_count,
+                                "retries": 0,
+                            },
+                        )
+                        raise error
+                except IngestNotificationError as e:
+                    if not getattr(e, "metrics", None):
+                        failure_count += 1
+                        logger.warning(
+                            f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
+                        )
+                    setattr(
+                        e,
+                        "metrics",
+                        {
+                            "success": success_count,
+                            "failed": failure_count,
+                            "retries": 0,
+                        },
                     )
-                else:
-                    logger.warning(
-                        f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
-                    )
+                    raise
     else:
         logger.info("No pending processing requests found.")
+    if with_metrics:
+        return {
+            "result": None,
+            "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
+        }

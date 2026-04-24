@@ -137,7 +137,7 @@ def get_pending_storage_save_list(config, listdir_fn=None):
 
 
 def save_bus_positions_to_storage_with_retries(
-    config, data, sleep_fn=None, save_fn=None
+    config, data, sleep_fn=None, save_fn=None, with_metrics=False
 ):
     def get_config(config):
         # Usamos uma chave específica para retries de storage,
@@ -158,6 +158,13 @@ def save_bus_positions_to_storage_with_retries(
             save_successful = True
             if retries > 0:
                 logger.info(f"Storage save successful after {retries} retries.")
+            if with_metrics:
+                return {
+                    "result": None,
+                    "metrics": {
+                        "retries": retries,
+                    },
+                }
             return True
         except Exception as e:
             retries += 1
@@ -165,9 +172,11 @@ def save_bus_positions_to_storage_with_retries(
                 logger.error(
                     f"Max retries reached for Storage. Persistence failed. Error: {e}"
                 )
-                raise SavePositionsToRawError(
+                error = SavePositionsToRawError(
                     "max retries reached while saving positions to raw storage"
-                ) from e
+                )
+                setattr(error, "retries", retries)
+                raise error from e
             logger.warning(
                 f"Storage save failed! Retrying in {back_off} seconds... Error: {e}"
             )
