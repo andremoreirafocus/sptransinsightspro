@@ -26,7 +26,7 @@ def save_row(connection, schema, table, row_tuple, columns, engine_factory=None)
         password = connection["password"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
@@ -51,7 +51,7 @@ def save_row(connection, schema, table, row_tuple, columns, engine_factory=None)
             f"Database error while saving row to {schema}.{table}: {e}",
             exc_info=True,
         )
-        return False
+        raise ValueError(f"Database error while saving row to {schema}.{table}: {e}")
 
 
 def execute_select_query(connection, query, engine_factory=None):
@@ -66,7 +66,7 @@ def execute_select_query(connection, query, engine_factory=None):
         password = connection["password"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
@@ -82,7 +82,7 @@ def execute_select_query(connection, query, engine_factory=None):
         return rows_as_dicts
     except Exception as e:
         logger.error(f"Database error while executing SELECT query: {e}", exc_info=True)
-        return []
+        raise ValueError(f"Database error while executing SELECT query: {e}")
 
 
 def execute_update_query(connection, query, params=None, engine_factory=None):
@@ -97,7 +97,7 @@ def execute_update_query(connection, query, params=None, engine_factory=None):
         password = connection["password"]
     except KeyError as e:
         logger.error(f"Missing required connection key: {e}")
-        raise
+        raise ValueError(f"Missing required connection key: {e}")
 
     try:
         db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
@@ -115,4 +115,4 @@ def execute_update_query(connection, query, params=None, engine_factory=None):
         return True
     except Exception as e:
         logger.error(f"Database error while executing UPDATE query: {e}", exc_info=True)
-        return False
+        raise ValueError(f"Database error while executing UPDATE query: {e}")

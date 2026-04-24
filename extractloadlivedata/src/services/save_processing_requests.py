@@ -9,6 +9,7 @@ from src.infra.cache import (
     get_cache_value,
     remove_from_cache,
 )
+from src.services.exceptions import IngestNotificationError
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -150,17 +151,23 @@ def save_processing_request(
             logger.info(
                 f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
             )
-        else:
-            logger.error(
-                f"Failed to save processing request for marker '{pending_marker}'"
-            )
-        return success
+            return True
+        logger.error(
+            f"Failed to save processing request for marker '{pending_marker}'"
+        )
+        raise IngestNotificationError(
+            f"failed to save processing request for marker '{pending_marker}'"
+        )
     except Exception as e:
         logger.error(
             f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
             exc_info=True,
         )
-        return False
+        if isinstance(e, IngestNotificationError):
+            raise
+        raise IngestNotificationError(
+            f"failed to save processing request for marker '{pending_marker}'"
+        ) from e
 
 
 def trigger_pending_processing_requests(

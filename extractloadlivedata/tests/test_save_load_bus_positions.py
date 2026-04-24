@@ -1,4 +1,5 @@
 import json
+import pytest
 
 from src.services.save_load_bus_positions import (
     data_structure_is_valid,
@@ -11,6 +12,7 @@ from src.services.save_load_bus_positions import (
     save_bus_positions_to_storage_with_retries,
     save_data_to_raw_object_storage,
 )
+from src.services.exceptions import SavePositionsToRawError
 from src.infra.compression import compress_data
 from tests.fakes.object_storage_client import FakeObjectStorageClient
 
@@ -122,10 +124,12 @@ def test_save_bus_positions_to_storage_with_retries_exhausts():
     def fake_sleep(_):
         return None
 
-    result = save_bus_positions_to_storage_with_retries(
-        config, data, sleep_fn=fake_sleep, save_fn=fake_save
-    )
-    assert result is False
+    with pytest.raises(
+        SavePositionsToRawError, match="max retries reached while saving positions"
+    ):
+        save_bus_positions_to_storage_with_retries(
+            config, data, sleep_fn=fake_sleep, save_fn=fake_save
+        )
     assert calls["count"] == 2
 
 

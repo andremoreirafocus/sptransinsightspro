@@ -10,6 +10,10 @@ import json
 import os
 import glob
 import logging
+from src.services.exceptions import (
+    LocalIngestBufferSaveError,
+    SavePositionsToRawError,
+)
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -47,12 +51,20 @@ def save_bus_positions_to_local_volume(config, data):
     ingest_buffer_folder, compression = get_config(config)
     data_json = json.dumps(data)
     filename, _ = get_file_name_from_data(data)
-    save_data_to_json_file(
-        data_json,
-        ingest_buffer_folder,
-        filename,
-        compression,
-    )
+    try:
+        save_data_to_json_file(
+            data_json,
+            ingest_buffer_folder,
+            filename,
+            compression,
+        )
+    except Exception as e:
+        logger.error(
+            f"Failed to save buses positions to local volume for file '{filename}': {e}"
+        )
+        raise LocalIngestBufferSaveError(
+            "failed to save buses positions to local volume"
+        ) from e
 
 
 def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
@@ -153,14 +165,14 @@ def save_bus_positions_to_storage_with_retries(
                 logger.error(
                     f"Max retries reached for Storage. Persistence failed. Error: {e}"
                 )
-                # Aqui você decide se levanta a exceção ou apenas retorna False
-                return False
+                raise SavePositionsToRawError(
+                    "max retries reached while saving positions to raw storage"
+                ) from e
             logger.warning(
                 f"Storage save failed! Retrying in {back_off} seconds... Error: {e}"
             )
             sleep_fn(back_off)
             back_off *= 2
-    return False
 
 
 def save_bus_positions_to_storage(config, data):

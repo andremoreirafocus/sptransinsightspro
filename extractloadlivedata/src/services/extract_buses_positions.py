@@ -2,12 +2,13 @@ import requests
 import time
 from datetime import datetime
 import logging
+from src.services.exceptions import PositionsDownloadError
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def extract_buses_positions_with_retries(config, session=None):
+def extract_buses_positions_with_retries(config, session=None, sleep_fn=None):
     def get_config(config):
         token = config["TOKEN"]
         api_base_url = config["API_BASE_URL"]
@@ -17,6 +18,7 @@ def extract_buses_positions_with_retries(config, session=None):
 
     api_max_retries, token, api_base_url = get_config(config)
 
+    sleep_fn = sleep_fn or time.sleep
     retries = 0
     back_off = 1
     buses_positions_payload = None
@@ -38,15 +40,16 @@ def extract_buses_positions_with_retries(config, session=None):
         logger.warning(
             f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
         )
-        time.sleep(back_off)
+        sleep_fn(back_off)
         back_off *= 2
         if retries >= api_max_retries:
             download_successful = False
             logger.error(
                 "Max retries reached. Download failed. Skipping this extraction cycle."
             )
-            break
-    return None
+            raise PositionsDownloadError(
+                "max retries reached while downloading positions"
+            )
 
 
 def get_buses_positions_with_metadata(buses_positions_payload):

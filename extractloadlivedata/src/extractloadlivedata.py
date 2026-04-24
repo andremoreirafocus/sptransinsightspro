@@ -18,6 +18,12 @@ from src.services.save_processing_requests import (
     create_pending_processing_request,
     trigger_pending_processing_requests,
 )
+from src.services.exceptions import (
+    IngestNotificationError,
+    LocalIngestBufferSaveError,
+    PositionsDownloadError,
+    SavePositionsToRawError,
+)
 from dataclasses import dataclass
 from typing import Callable, Optional, Tuple, Any
 
@@ -76,61 +82,95 @@ def extractloadlivedata(
 ) -> None:
     services = services or _build_services()
     config = config or get_config()
-    ingest_buffer_folder, notification_engine = _get_config_values(config)
-    logger.info(f"Notification engine set to: {notification_engine}")
-    buses_positions_payload = services.extract_buses_positions_with_retries(config)
-    download_successful = buses_positions_payload is not None
-    if download_successful:
-        buses_positions, _ = services.get_buses_positions_with_metadata(
-            buses_positions_payload
+    try:
+        ingest_buffer_folder, notification_engine = _get_config_values(config)
+    except Exception as e:
+        logger.error(
+            "Configuration error in extractloadlivedata execution: %s", e, exc_info=True
         )
-        services.save_bus_positions_to_local_volume(config, buses_positions)
-    pending_storage_save_list = services.get_pending_storage_save_list(config)
+        return
+    logger.info(f"Notification engine set to: {notification_engine}")
+    download_successful = False
+    try:
+        buses_positions_payload = services.extract_buses_positions_with_retries(config)
+        download_successful = buses_positions_payload is not None
+    except PositionsDownloadError as e:
+        logger.error("Positions download failed: %s", e, exc_info=True)
+    except Exception as e:
+        logger.error("Unexpected positions download error: %s", e, exc_info=True)
+    if download_successful:
+        try:
+            buses_positions, _ = services.get_buses_positions_with_metadata(
+                buses_positions_payload
+            )
+            services.save_bus_positions_to_local_volume(config, buses_positions)
+        except LocalIngestBufferSaveError as e:
+            logger.error("Local ingest buffer save failed: %s", e, exc_info=True)
+        except Exception as e:
+            logger.error(
+                "Unexpected error while saving current positions locally: %s",
+                e,
+                exc_info=True,
+            )
+    try:
+        pending_storage_save_list = services.get_pending_storage_save_list(config)
+    except Exception as e:
+        logger.error("Failed to list pending storage save files: %s", e, exc_info=True)
+        return
     if pending_storage_save_list:
         logger.warning(
             f"There are {len(pending_storage_save_list)} pending files to be saved to storage: {pending_storage_save_list}"
         )
+        save_on_storage_failure = False
         for pending_storage_save_file in pending_storage_save_list:
             logger.info(
                 f"Attempting to save pending file '{pending_storage_save_file}' to storage."
             )
-            save_on_storage_failure = False
             try:
                 pending_storage_save_file_content = (
                     services.load_bus_positions_from_local_volume_file(
                         ingest_buffer_folder, pending_storage_save_file
                     )
                 )
-                if services.save_bus_positions_to_storage_with_retries(
+                services.save_bus_positions_to_storage_with_retries(
                     config, pending_storage_save_file_content
-                ):
-                    logger.info("Pending file saved to storage successfully.")
-                    services.remove_local_file(
-                        config, pending_storage_save_file_content
+                )
+                logger.info("Pending file saved to storage successfully.")
+                services.remove_local_file(
+                    config, pending_storage_save_file_content
+                )
+                if notification_engine == "airflow":
+                    services.create_pending_invokation(
+                        config, pending_storage_save_file
                     )
-                    if notification_engine == "airflow":
-                        services.create_pending_invokation(
-                            config, pending_storage_save_file
-                        )
-                    else:
-                        services.create_pending_processing_request(
-                            config, pending_storage_save_file
-                        )
                 else:
-                    logger.error(
-                        f"Failed to save pending file '{pending_storage_save_file}' to storage after retries."
+                    services.create_pending_processing_request(
+                        config, pending_storage_save_file
                     )
-                    save_on_storage_failure = True
-                    break
+            except SavePositionsToRawError as e:
+                logger.error(
+                    "Raw storage save failed for pending file '%s': %s",
+                    pending_storage_save_file,
+                    e,
+                    exc_info=True,
+                )
+                save_on_storage_failure = True
+                break
             except Exception as e:
                 logger.error(
-                    f"Error processing pending file '{pending_storage_save_file}': {e}"
+                    f"Error processing pending file '{pending_storage_save_file}': {e}",
+                    exc_info=True,
                 )
         if save_on_storage_failure:
             logger.error(
                 "One or more pending files failed to save to storage. Waiting for the next execution to retry."
             )
-        if notification_engine == "airflow":
-            services.trigger_pending_airflow_dag_invokations(config)
-        else:
-            services.trigger_pending_processing_requests(config)
+        try:
+            if notification_engine == "airflow":
+                services.trigger_pending_airflow_dag_invokations(config)
+            else:
+                services.trigger_pending_processing_requests(config)
+        except IngestNotificationError as e:
+            logger.error("Ingest notification failed: %s", e, exc_info=True)
+        except Exception as e:
+            logger.error("Unexpected ingest notification error: %s", e, exc_info=True)

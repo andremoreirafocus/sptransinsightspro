@@ -1,10 +1,14 @@
+import pytest
+
 from src.services.extract_buses_positions import (
     buses_positions_response_is_valid,
     extract_buses_positions,
     extract_buses_positions_with_retries,
     get_buses_positions_summary,
 )
+from src.services.exceptions import PositionsDownloadError
 from tests.fakes.http_session import FakeHttpSession
+from tests.fakes.sleep import FakeSleep
 
 
 def test_buses_positions_response_is_valid_ok():
@@ -40,26 +44,32 @@ def test_extract_buses_positions_success():
     assert result == payload
 
 
-def test_extract_buses_positions_with_retries_success(monkeypatch):
+def test_extract_buses_positions_with_retries_success():
     payload = {"hr": "09:00", "l": []}
     session = FakeHttpSession(auth_ok=True, pos_ok=True, payload=payload)
+    fake_sleep = FakeSleep()
     config = {
         "TOKEN": "token",
         "API_BASE_URL": "http://api",
         "API_MAX_RETRIES": 3,
     }
-    monkeypatch.setattr("src.services.extract_buses_positions.time.sleep", lambda *_: None)
-    result = extract_buses_positions_with_retries(config, session=session)
+    result = extract_buses_positions_with_retries(
+        config, session=session, sleep_fn=fake_sleep
+    )
     assert result == payload
+    assert fake_sleep.calls == []
 
 
-def test_extract_buses_positions_with_retries_max(monkeypatch):
+def test_extract_buses_positions_with_retries_max():
     session = FakeHttpSession(auth_ok=True, pos_ok=False)
+    fake_sleep = FakeSleep()
     config = {
         "TOKEN": "token",
         "API_BASE_URL": "http://api",
         "API_MAX_RETRIES": 2,
     }
-    monkeypatch.setattr("src.services.extract_buses_positions.time.sleep", lambda *_: None)
-    result = extract_buses_positions_with_retries(config, session=session)
-    assert result is None
+    with pytest.raises(PositionsDownloadError, match="max retries reached"):
+        extract_buses_positions_with_retries(
+            config, session=session, sleep_fn=fake_sleep
+        )
+    assert fake_sleep.calls == [1, 2]

@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo
 import logging
 
 from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
+from src.services.exceptions import IngestNotificationError
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -132,14 +133,22 @@ def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
             f"Airflow API response for marker '{pending_marker}': {r.status_code} - {r.text}"
         )
         # 200 = Success, 409 = Already exists (safe to proceed)
-        return r.status_code in [200, 409, 201]
+        if r.status_code in [200, 409, 201]:
+            return True
+        raise IngestNotificationError(
+            f"airflow dag trigger failed for marker '{pending_marker}' with status {r.status_code}"
+        )
     except Exception as e:
         logger.error(
             f"Error triggering Airflow DAG for marker '{pending_marker}':",
             exc_info=True,
         )
         logger.error(f"Exception details: {e}")
-        return False
+        if isinstance(e, IngestNotificationError):
+            raise
+        raise IngestNotificationError(
+            f"airflow dag trigger failed for marker '{pending_marker}'"
+        ) from e
 
 
 def main():

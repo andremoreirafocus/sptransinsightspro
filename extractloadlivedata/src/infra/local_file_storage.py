@@ -35,4 +35,4 @@ def save_data_to_json_file(
         return True
     except Exception as e:
         logger.error(f"Failed to save file: {e}")
-        return False
+        raise

@@ -1,3 +1,5 @@
+import pytest
+
 from src.infra.sql_db_v2 import (
     execute_select_query,
     execute_update_query,
@@ -19,12 +21,8 @@ def build_connection():
 def test_save_row_missing_connection_key_raises():
     connection = build_connection()
     connection.pop("host")
-    try:
+    with pytest.raises(ValueError, match="Missing required connection key"):
         save_row(connection, "schema", "table", ("v",), ["col"])
-    except KeyError:
-        assert True
-    else:
-        assert False, "Expected KeyError for missing connection key"
 
 
 def test_save_row_success_calls_engine():
@@ -45,19 +43,19 @@ def test_save_row_success_calls_engine():
     assert state["execute_calls"][0]["params"] == {"col": "value"}
 
 
-def test_save_row_returns_false_on_execute_error():
+def test_save_row_raises_on_execute_error():
     state = {}
     engine_factory = build_engine_factory(state, raise_on_execute=True)
     connection = build_connection()
-    result = save_row(
-        connection,
-        "schema",
-        "table",
-        ("value",),
-        ["col"],
-        engine_factory=engine_factory,
-    )
-    assert result is False
+    with pytest.raises(ValueError, match="Database error while saving row"):
+        save_row(
+            connection,
+            "schema",
+            "table",
+            ("value",),
+            ["col"],
+            engine_factory=engine_factory,
+        )
 
 
 def test_execute_select_query_success_returns_rows():
@@ -73,14 +71,14 @@ def test_execute_select_query_success_returns_rows():
     assert len(state.get("execute_calls", [])) == 1
 
 
-def test_execute_select_query_returns_empty_on_error():
+def test_execute_select_query_raises_on_error():
     state = {}
     engine_factory = build_engine_factory(state, raise_on_execute=True)
     connection = build_connection()
-    result = execute_select_query(
-        connection, "SELECT * FROM table", engine_factory=engine_factory
-    )
-    assert result == []
+    with pytest.raises(ValueError, match="Database error while executing SELECT query"):
+        execute_select_query(
+            connection, "SELECT * FROM table", engine_factory=engine_factory
+        )
 
 
 def test_execute_update_query_success_with_params():
@@ -109,13 +107,13 @@ def test_execute_update_query_success_without_params():
     assert result is True
 
 
-def test_execute_update_query_returns_false_on_error():
+def test_execute_update_query_raises_on_error():
     state = {}
     engine_factory = build_engine_factory(state, raise_on_execute=True)
     connection = build_connection()
-    result = execute_update_query(
-        connection,
-        "DELETE FROM table",
-        engine_factory=engine_factory,
-    )
-    assert result is False
+    with pytest.raises(ValueError, match="Database error while executing UPDATE query"):
+        execute_update_query(
+            connection,
+            "DELETE FROM table",
+            engine_factory=engine_factory,
+        )

@@ -1,3 +1,5 @@
+import pytest
+
 from src.services.trigger_airflow import (
     create_pending_invokation,
     get_pending_invokations,
@@ -6,6 +8,7 @@ from src.services.trigger_airflow import (
     trigger_airflow_dag_run,
     trigger_pending_airflow_dag_invokations,
 )
+from src.services.exceptions import IngestNotificationError
 from tests.fakes.cache import fake_cache_factory
 from tests.fakes.http_post import FakeHttp
 
@@ -52,14 +55,12 @@ def test_trigger_airflow_dag_run_success_and_failure():
         is True
     )
     http_fail = FakeHttp(status_code=500, text="false")
-    assert (
+    with pytest.raises(IngestNotificationError, match="airflow dag trigger failed"):
         trigger_airflow_dag_run(
             config,
             "posicoes_onibus-202604090910.json",
             post_fn=http_fail.post,
         )
-        is False
-    )
 
 
 def test_trigger_pending_airflow_dag_invokations_removes_on_success():

@@ -1,4 +1,5 @@
 from datetime import datetime
+import pytest
 
 from src.services.save_processing_requests import (
     create_pending_processing_request,
@@ -8,6 +9,7 @@ from src.services.save_processing_requests import (
     save_processing_request,
     trigger_pending_processing_requests,
 )
+from src.services.exceptions import IngestNotificationError
 from tests.fakes.cache import fake_cache_factory
 
 
@@ -77,13 +79,13 @@ def test_save_processing_request_failure():
     def fake_engine_factory(_uri):
         return None
 
-    result = save_processing_request(
-        config,
-        "posicoes_onibus-202604090910.json",
-        save_row_fn=fake_save_row,
-        engine_factory=fake_engine_factory,
-    )
-    assert result is False
+    with pytest.raises(IngestNotificationError, match="failed to save processing request"):
+        save_processing_request(
+            config,
+            "posicoes_onibus-202604090910.json",
+            save_row_fn=fake_save_row,
+            engine_factory=fake_engine_factory,
+        )
 
 
 def test_trigger_pending_processing_requests_removes_on_success():
