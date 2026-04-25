@@ -18,3 +18,13 @@ gtfs:
     max_consecutive_warn: 3
   notify_on_fail: true
   notify_on_warn: true
+extractloadlivedata:
+  warning_window:
+    type: "time"
+    value: 24
+  warning_thresholds:
+    max_failed_items: 1
+    max_failed_ratio: 1
+    max_consecutive_warn: 3
+  notify_on_fail: true
+  notify_on_warn: true

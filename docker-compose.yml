@@ -114,6 +114,7 @@ services:
       INGEST_BUFFER_PATH: /app/data/staging
       INVOKATIONS_CACHE_DIR: /app/data/.diskcache_pending_invocations
       PROCESSING_REQUESTS_CACHE_DIR: /app/data/.diskcache_pending_processing_requests
+      NOTIFICATIONS_WEBHOOK_URL: ${EXTRACTLOADLIVEDATA_NOTIFICATIONS_WEBHOOK_URL}
     volumes:
       - ./ingest_buffer:/app/data/staging
       - ./.diskcache_pending_invocations:/app/data/.diskcache_pending_invocations

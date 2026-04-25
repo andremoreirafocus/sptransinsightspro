@@ -22,9 +22,14 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - Escopo: o serviço publica **somente resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
 - Contrato de resumo enviado:
   - `contract_version`, `pipeline`, `execution_id`, `status`
-  - `items_total`, `items_failed`, `retries`
+  - `items_total`, `items_failed`, `retries`, `acceptance_rate`
+  - `generated_at_utc` (timestamp UTC da geração do resumo)
   - `failure_phase`, `failure_message` (apenas em `FAIL`)
   - `quality_report_path` com valor `"null"` por compatibilidade de contrato.
+- Enum de status de execução:
+  - `PASS`: nenhuma falha, zero retries
+  - `WARN`: nenhuma falha mas com retries detectados
+  - `FAIL`: uma ou mais fases falharam
 - Enum de fase de falha (orquestração):
   - `positions_download`
   - `local_ingest_buffer_save_positions`
@@ -106,6 +111,7 @@ AIRFLOW_PASSWORD = "ingest_password"  # senha para autenticação na API do Airf
 AIRFLOW_WEBSERVER = "localhost"  # hostname do webserver do Airflow
 AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
 INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
+NOTIFICATIONS_WEBHOOK_URL="http://localhost:8000/notify" # url para envio de alertas através do alertservice
 
 ## Testes unitários
 Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas. A cobertura atual inclui:
@@ -113,7 +119,9 @@ Os testes são focados em comportamento relevante e invariantes de negócio, usa
 - `tests/test_save_load_bus_positions.py`: validação de estrutura, compressão, leitura de arquivos, persistência com retries, remoção de arquivos locais e filtros de pendências.
 - `tests/test_save_processing_requests.py`: criação e disparo de requests de processamento com cache e persistência no banco.
 - `tests/test_trigger_airflow.py`: criação e disparo de invocações do Airflow via HTTP e cache.
-- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, e validação de configuração.
+- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, validação de configuração, e testes de orquestração com alertservice integrado.
+- `tests/test_alertservice.py`: construção de payload, envio de alertas com webhook enabled/disabled, e comportamento não-bloqueante em falhas.
+- `tests/test_reporting.py`: construção de sumário de execução com contrato validado (success e failure paths).
 - `tests/test_sql_db_v2.py`: contratos de persistência, seleção e atualização com engine injetado.
 - `tests/test_object_storage.py`: leitura, listagem e escrita no object storage com cliente injetado.
 
