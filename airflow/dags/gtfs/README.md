@@ -27,6 +27,8 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 - Obter as credenciais cadastre-se no portal do desenvolvedor da SPTRANS
 - Disponibilidade de dois buckets: uma para a camada raw e outro para a camada trusted, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura e escrita aos bucket das camadas raw e trusted 
+- Arquivo `.env` com as credenciais necessárias
+- Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
 
 ## Configurações
@@ -111,14 +113,15 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
 - A seção `summary` segue o contrato padrão definido em `quality.reporting`, com os campos adicionais específicos da pipeline GTFS: `stage`, `validated_items_count`, `relocation_status`, `relocation_error`.
 - `acceptance_rate` é um valor contínuo entre 0.0 e 1.0, calculado como `(validated_items_count - rows_failed) / validated_items_count` sobre o total de itens processados em todas as fases. Antes era binário (0.0 ou 1.0).
 
-### Relato de falha e webhook
+### Relato de qualidade e notificação (alertservice)
 - Em falhas de qualquer fase, a pipeline gera e persiste um relatório consolidado com:
   - `failure_phase`
   - `failure_message`
   - resultados de cada fase em `details.stages`
   - `validated_items_count`, `error_details`, `relocation_status`, `relocation_error` por fase
   - artefatos de `column_lineage` no estágio de enrichment
-- O resumo (`summary`) é enviado via webhook quando `notifications.webhook_url` não estiver como `disabled`/`none`/`null`.
+- O resumo (`summary`) é enviado via webhook para o microserviço `alertservice` quando este está habilitado.
+- O resumo contém informações de status, fases de falha e métricas de validação para disparar alertas imediatos (FAIL) ou cumulativos (WARN) configurados no alertservice.
 - A notificação é disparada pela DAG (`_send_webhook_from_report`) após a persistência do relatório, de forma separada do serviço de construção do relatório.
 
 ### Regras de teste
@@ -141,6 +144,8 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python gtfs-v3.py
+Crie `dags-dev/gtfs/.env` com base em `.env.example` preenchendo todos os campos:
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+```shell
+python gtfs-v3.py
+```

@@ -50,7 +50,8 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 
 ## Pré-requisitos
 - Disponibilidade do serviço de object storage para salvamento dos dados extraídos da API da SPTrans 
-- Criação do arquivo de configurações
+- Arquivo `.env` com as configurações necessárias
+- Um template está disponível em `.env.example`
 - Criação de schema e tabela no banco de dados para armazenamento dos reequests de processamento de arquivos de posição de ônibus extraídos da API
 
 ```sql
@@ -134,10 +135,11 @@ Os testes são focados em comportamento relevante e invariantes de negócio, usa
 
 ## Para executar: 
 Localmente:
+Crie `extractloadlivedata/.env` com base em `.env.example` preenchendo todos os campos:
+
 ```shell
     python ./main.py
 ```
-    Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
 
 Para buildar e rodar o container em standalone:
     copie o arquivo .env para .env-docker e ajuste hostname e porta adequadamente

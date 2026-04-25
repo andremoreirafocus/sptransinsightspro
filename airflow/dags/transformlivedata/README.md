@@ -71,10 +71,18 @@ Isso permite identificar exatamente em qual fase o processamento parou e quais m
 }
 ```
 
+### Notificação e observabilidade (alertservice)
+O resumo (`summary`) do relatório é enviado via webhook para o microserviço `alertservice` quando este está habilitado.
+O resumo contém informações de status, fases de falha e métricas de transformação para disparar alertas imediatos (FAIL) ou cumulativos (WARN) configurados no alertservice.
+O alertservice envia notificações por e-mail com base em limiares configuráveis por pipeline:
+- **FAIL (imediato)**: qualquer status FAIL gera e-mail imediato
+- **WARN (cumulativo)**: alertas de warning são aggregados dentro de uma janela de tempo configurável (ex.: 24 horas) e enviados quando limiares são atingidos
 
 ## Pré-requisitos
 - Disponibilidade de quatro buckets: para a camada raw, para a camada trusted, para os registros em quarentena e para os relatórios de qualidade, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw e leitura e escrita na camada trusted
+- Arquivo `.env` com as credenciais necessárias
+- Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
 
 ## Configurações
@@ -124,7 +132,7 @@ Chaves esperadas em `general`
     "raw_data_compression_extension": ".zst"
   },
   "notifications": {
-    "webhook_url": "http://localhost:8000/notify"
+    "webhook_url": "http://localhost:8000/notify"  // URL do microserviço alertservice
   },
   "data_validations": {
     "json_validation": {
@@ -137,8 +145,8 @@ Chaves esperadas em `general`
 }
 ```
 
-Observação: `webhook_url` é obrigatório.  
-Para desativar notificações, use o valor `"disabled"`.
+Observação: `webhook_url` é a URL do microserviço `alertservice` e é obrigatório.  
+Para desativar notificações para o alertservice, use o valor `"disabled"`.
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
@@ -163,9 +171,11 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python transformlivedata-v2.py
+Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo todos os campos:
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+```shell
+python transformlivedata-v2.py
+```
 
 ## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
 

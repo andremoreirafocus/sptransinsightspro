@@ -81,6 +81,8 @@ O alertservice envia notificações por e-mail com base em limiares configuráve
 ## Pré-requisitos
 - Disponibilidade de quatro buckets: para a camada raw, para a camada trusted, para os registros em quarentena e para os relatórios de qualidade, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket da camada raw e leitura e escrita na camada trusted
+- Arquivo `.env` com as credenciais necessárias
+- Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
 
 ## Configurações
@@ -169,9 +171,11 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python transformlivedata-v2.py
+Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo todos os campos:
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+```shell
+python transformlivedata-v2.py
+```
 
 ## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
 

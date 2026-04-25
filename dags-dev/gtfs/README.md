@@ -27,6 +27,8 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 - Obter as credenciais cadastre-se no portal do desenvolvedor da SPTRANS
 - Disponibilidade de dois buckets: uma para a camada raw e outro para a camada trusted, previamente criados no serviço de object storage
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura e escrita aos bucket das camadas raw e trusted 
+- Arquivo `.env` com as credenciais necessárias
+- Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
 
 ## Configurações
@@ -142,6 +144,8 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-python gtfs-v3.py
+Crie `dags-dev/gtfs/.env` com base em `.env.example` preenchendo todos os campos:
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+```shell
+python gtfs-v3.py
+```

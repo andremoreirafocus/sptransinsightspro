@@ -14,6 +14,8 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 - Disponibiliadde da tabela trip_details na camada trusted 
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket na camada trusted
 - Disponibilidade do serviço de banco de dados analítico, atualmente o PostgreSQL, para armazenamento dos dados na camada refined
+- Arquivo `.env` com as credenciais necessárias
+- Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
 
 ## Configurações
@@ -62,10 +64,12 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Instruções para execução em modo local
-Criar tabelas conforme instruções abaixo
-python ./refinedsynctripdetails-v1.py
+Crie `dags-dev/refinedsynctripdetails/.env` com base em `.env.example` preenchendo todos os campos.
+Criar tabelas conforme instruções abaixo:
 
-Se o arquivo .env não existir na raiz do projeto, crie-o com as variáveis enumeradas acima
+```shell
+python ./refinedsynctripdetails-v1.py
+```
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
 ## Para criar as tabelas e índices necessários ao subprojeto:

@@ -40,6 +40,9 @@ Detalhes sobre as DAGS:
 - PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
 - PowerBI: utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL. ![Para mais informações:](./powerbi/README.md)
 
+## Configuração
+Um template de configuração está disponível em `.env.example` na raiz do projeto. Este arquivo contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata).
+
 ## Para executar o Sptransinsights
 Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, executar alguns comandos de inicialização que estão discriminados em cada subprojeto, especialmente:
 - ![Airflow](./airflow/README.md)
@@ -51,22 +54,11 @@ Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, execut
 - ![alertservice](./alertservice/README.md)
 
 Para iniciar o projeto:
- Se o arquivo `.env` não existir na raiz do projeto, crie-o com o seguinte conteúdo:
-```dotenv
-MINIO_VERSION=RELEASE.2025-02-28T09-55-16Z
+Crie `.env` na raiz do projeto com base em `.env.example` preenchendo todos os campos:
 
-# alertservice SMTP credentials
-ALERTSERVICE_SMTP_USER=<seu_usuario_smtp>
-ALERTSERVICE_SMTP_PASSWORD=<sua_senha_smtp>
-
-# extractloadlivedata credentials
-EXTRACTLOADLIVEDATA_TOKEN=<token_sptrans_api>
-EXTRACTLOADLIVEDATA_ACCESS_KEY=<minio_access_key>
-EXTRACTLOADLIVEDATA_SECRET_KEY=<minio_secret_key>
-EXTRACTLOADLIVEDATA_DB_USER=<db_user>
-EXTRACTLOADLIVEDATA_DB_PASSWORD=<db_password>
-EXTRACTLOADLIVEDATA_AIRFLOW_USER=<airflow_user>
-EXTRACTLOADLIVEDATA_AIRFLOW_PASSWORD=<airflow_password>
+```bash
+cp .env.example .env
+# Edite .env e preencha as credenciais necessárias
 ```
  
  Execute:
