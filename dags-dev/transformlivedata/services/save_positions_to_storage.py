@@ -1,3 +1,5 @@
+from zoneinfo import ZoneInfo
+
 import pandas as pd
 import logging
 from typing import Any, Dict, Optional, Tuple
@@ -54,8 +56,8 @@ def save_positions_to_storage(
         logger.warning("No positions to save. DataFrame is empty.")
         return
     try:
-        positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"])
-        batch_ts = positions_df["extracao_ts"].iloc[0]
+        positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"], utc=True).dt.tz_convert(ZoneInfo("America/Sao_Paulo"))
+        batch_ts = positions_df["extracao_ts"].iloc[0] 
         file_name = batch_ts.strftime("positions_%H%M.parquet")
         positions_df["year"] = positions_df["extracao_ts"].dt.strftime("%Y")
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
