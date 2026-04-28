@@ -127,7 +127,7 @@ def test_summary_contains_all_required_fields():
         execution_id="exec-1",
         status="PASS",
         acceptance_rate=1.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path="meta/report.json",
     )
     required = {
@@ -136,7 +136,7 @@ def test_summary_contains_all_required_fields():
         "execution_id",
         "status",
         "acceptance_rate",
-        "rows_failed",
+        "items_failed",
         "quality_report_path",
         "failure_phase",
         "failure_message",
@@ -151,7 +151,7 @@ def test_summary_contract_version_is_v1():
         execution_id="exec-1",
         status="PASS",
         acceptance_rate=1.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path="meta/report.json",
     )
     assert summary["contract_version"] == "v1"
@@ -163,7 +163,7 @@ def test_summary_extra_fields_are_merged_flat():
         execution_id="exec-1",
         status="PASS",
         acceptance_rate=1.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path="meta/report.json",
         stage="pipeline",
         validated_items_count=42,
@@ -178,7 +178,7 @@ def test_summary_failure_phase_and_message_default_to_none():
         execution_id="exec-1",
         status="PASS",
         acceptance_rate=1.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path="meta/report.json",
     )
     assert summary["failure_phase"] is None
@@ -192,7 +192,7 @@ def test_summary_accepts_all_three_status_values():
             execution_id="e",
             status=status,
             acceptance_rate=0.9,
-            rows_failed=1,
+            items_failed=1,
             quality_report_path="p",
         )
         assert summary["status"] == status
@@ -204,7 +204,7 @@ def test_summary_pipeline_field_matches_input():
         execution_id="e",
         status="PASS",
         acceptance_rate=1.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path="p",
     )
     assert summary["pipeline"] == "transformlivedata"
@@ -389,7 +389,7 @@ def _make_report(status="PASS"):
             "execution_id": "exec-1",
             "status": status,
             "acceptance_rate": 1.0,
-            "rows_failed": 0,
+            "items_failed": 0,
             "quality_report_path": "meta/quality-reports/gtfs/report.json",
             "failure_phase": None,
             "failure_message": None,
