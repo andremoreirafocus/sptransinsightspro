@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     logical_date_string = (
-        "2026-02-26T20:36:00+00:00"  # Replace with the actual logical_date_string
+        "2026-04-27T15:14:00+00:00"  # Replace with the actual logical_date_string
     )
     result = load_transform_save_positions(PIPELINE_NAME, logical_date_string)
     logger.info(f"Pipeline result: {result}")

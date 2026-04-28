@@ -6,8 +6,8 @@ from refinedfinishedtrips.services.extract_trips_from_positions import (
     generate_trips_table,
     get_trip_id,
 )
-from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle_pandas import (
-    extract_trips_per_line_per_vehicle_pandas,
+from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
+    extract_trips_per_line_per_vehicle,
 )
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
@@ -170,17 +170,17 @@ def test_generate_trips_table_average_speed_always_zero():
     assert result[0][6] == 0.0
 
 
-# --- extract_trips_per_line_per_vehicle_pandas ---
+# --- extract_trips_per_line_per_vehicle ---
 
 
 def test_extract_trips_per_vehicle_empty_positions_returns_none():
-    assert extract_trips_per_line_per_vehicle_pandas([], 0, 0, "1234-10", 100) is None
+    assert extract_trips_per_line_per_vehicle([], 0, 0, "1234-10", 100) is None
 
 
 def test_extract_trips_per_vehicle_invalid_indices_returns_none():
     positions = [_pos(1)]
     assert (
-        extract_trips_per_line_per_vehicle_pandas(positions, 5, 2, "1234-10", 100)
+        extract_trips_per_line_per_vehicle(positions, 5, 2, "1234-10", 100)
         is None
     )
 
@@ -188,7 +188,7 @@ def test_extract_trips_per_vehicle_invalid_indices_returns_none():
 def test_extract_trips_per_vehicle_no_direction_change_returns_none():
     positions = [_pos(1, i * 60) for i in range(5)]
     assert (
-        extract_trips_per_line_per_vehicle_pandas(positions, 0, 4, "1234-10", 100)
+        extract_trips_per_line_per_vehicle(positions, 0, 4, "1234-10", 100)
         is None
     )
 
@@ -204,6 +204,6 @@ def test_extract_trips_per_vehicle_two_direction_changes_returns_one_trip():
         _pos(1, 3600),
         _pos(1, 7200),
     ]
-    result = extract_trips_per_line_per_vehicle_pandas(positions, 0, 4, "1234-10", 100)
+    result = extract_trips_per_line_per_vehicle(positions, 0, 4, "1234-10", 100)
     assert result is not None
     assert len(result) == 1

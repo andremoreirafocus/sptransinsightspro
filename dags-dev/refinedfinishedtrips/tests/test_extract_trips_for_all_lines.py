@@ -2,8 +2,8 @@ from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 
-from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
-    extract_trips_for_all_Lines_and_vehicles_pandas,
+from refinedfinishedtrips.extract_trips_for_all_Lines_and_vehicles import (
+    extract_trips_for_all_Lines_and_vehicles,
 )
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
@@ -38,9 +38,9 @@ def make_positions_df(rows):
 
 def test_empty_positions_save_not_called():
     save = SaveCapture()
-    extract_trips_for_all_Lines_and_vehicles_pandas(
+    extract_trips_for_all_Lines_and_vehicles(
         make_config(),
-        get_positions_fn=lambda c: pd.DataFrame(),
+        get_recent_positions_fn=lambda c: pd.DataFrame(),
         save_trips_fn=save,
     )
     assert save.calls == []
@@ -67,9 +67,9 @@ def test_no_trips_extracted_save_called_with_empty_list():
         ]
     )
     save = SaveCapture()
-    extract_trips_for_all_Lines_and_vehicles_pandas(
+    extract_trips_for_all_Lines_and_vehicles(
         make_config(),
-        get_positions_fn=lambda c: df,
+        get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
     )
     assert len(save.calls) == 1
@@ -97,9 +97,9 @@ def test_two_vehicles_save_called_once_with_combined_result():
         ]
     )
     save = SaveCapture()
-    extract_trips_for_all_Lines_and_vehicles_pandas(
+    extract_trips_for_all_Lines_and_vehicles(
         make_config(),
-        get_positions_fn=lambda c: df,
+        get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
     )
     assert len(save.calls) == 1

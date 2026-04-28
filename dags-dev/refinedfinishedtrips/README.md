@@ -80,8 +80,10 @@ python ./refinedfinishedtrips-v2.py
 
 Database commands:
 
+```
 docker exec -it postgres bash
 psql -U postgres -W
+```
 
 ```sql
 CREATE DATABASE sptrans_insights;
@@ -89,13 +91,7 @@ CREATE DATABASE sptrans_insights;
 
 \c sptrans_insights
 
-
-
-
-
-
 Com particonamemto:
-
 
 ```sql
 CREATE SCHEMA partman;

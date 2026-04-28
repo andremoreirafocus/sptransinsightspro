@@ -1,10 +1,7 @@
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle_pandas import (
     extract_trips_per_line_per_vehicle_pandas,
 )
-
 from refinedfinishedtrips.services.get_recent_positions import get_recent_positions
-
-# from refinedfinishedtrips.services.save_trips_to_db import save_trips_to_db
 from refinedfinishedtrips.services.save_finished_trips_to_db import (
     save_finished_trips_to_db,
 )
@@ -64,5 +61,4 @@ def extract_trips_for_all_Lines_and_vehicles_pandas(
             num_processed += 1
     logger.info(f"Progress: {num_processed} vehicle/line combinations processed.")
     logger.info(f"Total finished trips: {len(all_finished_trips)}")
-    # save_trips_to_db(config, all_finished_trips)
     save_trips_fn(config, all_finished_trips)

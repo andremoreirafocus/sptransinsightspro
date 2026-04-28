@@ -36,9 +36,7 @@ def _load_pipeline_config():
             GeneralConfig,
             None,
             "minio_conn",
-            "postgres_conn",
-            load_raw_data_json_schema=False,
-            load_data_expectations=False,
+            "postgres_conn"
         )
     except Exception as e:
         logger.error(f"Pipeline configuration validation failed: {e}")

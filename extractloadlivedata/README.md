@@ -54,6 +54,11 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - Um template está disponível em `.env.example`
 - Criação de schema e tabela no banco de dados para armazenamento dos reequests de processamento de arquivos de posição de ônibus extraídos da API
 
+```sh
+docker exec -it airflow_postgres bash
+psql -U airflow -W
+```
+
 ```sql
 CREATE DATABASE sptrans_insights;
 

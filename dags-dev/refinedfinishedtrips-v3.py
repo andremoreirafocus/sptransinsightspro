@@ -1,5 +1,5 @@
-from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
-    extract_trips_for_all_Lines_and_vehicles_pandas as extract_trips_for_all_Lines_and_vehicles,
+from refinedfinishedtrips.extract_trips_for_all_Lines_and_vehicles import (
+    extract_trips_for_all_Lines_and_vehicles,
 )
 from pipeline_configurator.config import get_config
 from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
@@ -36,8 +36,6 @@ def _load_pipeline_config():
             None,
             "minio_conn",
             "postgres_conn",
-            load_raw_data_json_schema=False,
-            load_data_expectations=False,
         )
     except Exception as e:
         logger.error(f"Pipeline configuration validation failed: {e}")
