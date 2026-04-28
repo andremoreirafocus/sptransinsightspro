@@ -136,7 +136,7 @@ def create_failure_quality_report(
         execution_id=execution_id,
         status="FAIL",
         acceptance_rate=0.0,
-        rows_failed=0,
+        items_failed=0,
         quality_report_path=quality_report_path,
         failure_phase=failure_phase,
         failure_message=failure_message,

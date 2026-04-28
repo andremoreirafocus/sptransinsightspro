@@ -9,7 +9,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def extract_trips_per_line_per_vehicle_pandas(
+def extract_trips_per_line_per_vehicle(
     positions_list, start_idx, end_idx, linha_lt, veiculo_id
 ):
     try:

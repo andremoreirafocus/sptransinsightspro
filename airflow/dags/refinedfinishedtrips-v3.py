@@ -1,8 +1,8 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from refinedfinishedtrips.services.extract_trips_for_all_Lines_and_vehicles_pandas import (
-    extract_trips_for_all_Lines_and_vehicles_pandas as extract_trips_for_all_Lines_and_vehicles,
+from refinedfinishedtrips.extract_trips_for_all_Lines_and_vehicles import (
+    extract_trips_for_all_Lines_and_vehicles,
 )
 
 from pipeline_configurator.config import get_config
