@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from refinedfinishedtrips.services.create_quality_report import (
     build_quality_report,
     create_failure_quality_report,
+    create_final_quality_report,
     create_quality_report,
 )
 
@@ -267,3 +268,133 @@ def test_create_quality_report_path_contains_execution_id_prefix():
         write_fn=write,
     )
     assert "aaaabbbb" in write.calls[0]["object_name"]
+
+
+# ---------------------------------------------------------------------------
+# create_final_quality_report
+# ---------------------------------------------------------------------------
+
+
+def make_trips_result(status="PASS", trips_extracted=10):
+    return {
+        "status": status,
+        "effective_window_minutes": 180.0,
+        "trips_extracted": trips_extracted,
+        "checks": [],
+    }
+
+
+def make_persistence_result(status="PASS", new_rows=10, skipped_rows=0):
+    return {
+        "status": status,
+        "new_rows": new_rows,
+        "skipped_rows": skipped_rows,
+    }
+
+
+def test_create_final_quality_report_saves_to_minio():
+    write = WriteCapture()
+    create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    assert len(write.calls) == 1
+    assert write.calls[0]["bucket_name"] == "metadata"
+
+
+def test_create_final_quality_report_overall_pass_when_all_pass():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(status="PASS"),
+        trips_result=make_trips_result(status="PASS"),
+        persistence_result=make_persistence_result(status="PASS"),
+        write_fn=write,
+    )
+    assert report["summary"]["status"] == "PASS"
+
+
+def test_create_final_quality_report_overall_warn_when_any_warn():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(status="PASS"),
+        trips_result=make_trips_result(status="WARN"),
+        persistence_result=make_persistence_result(status="PASS"),
+        write_fn=write,
+    )
+    assert report["summary"]["status"] == "WARN"
+
+
+def test_create_final_quality_report_summary_contains_all_metrics():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(count=150000),
+        trips_result=make_trips_result(trips_extracted=1247),
+        persistence_result=make_persistence_result(new_rows=245, skipped_rows=1002),
+        write_fn=write,
+    )
+    summary = report["summary"]
+    assert summary["positions_in_time_window_count"] == 150000
+    assert summary["trips_extracted"] == 1247
+    assert summary["new_trips_saved"] == 245
+    assert summary["skipped_trips"] == 1002
+
+
+def test_create_final_quality_report_details_contains_all_phases():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    phases = report["details"]["phases"]
+    assert "positions" in phases
+    assert "trip_extraction" in phases
+    assert "persistence" in phases
+
+
+def test_create_final_quality_report_path_contains_execution_id_prefix():
+    write = WriteCapture()
+    create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    assert "aaaabbbb" in write.calls[0]["object_name"]
+
+
+def test_create_final_quality_report_saved_json_matches_returned_report():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    saved = write.calls[0]["data"]
+    assert saved["summary"]["execution_id"] == report["summary"]["execution_id"]
+    assert saved["summary"]["status"] == report["summary"]["status"]

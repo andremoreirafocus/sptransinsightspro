@@ -73,10 +73,6 @@ def positions_fail_stub(df, config):
     }
 
 
-def noop_create_failure_report(config, execution_id, run_ts, failure_phase, failure_message, positions_result, write_fn=None):
-    return {"summary": {"status": "FAIL"}, "details": {}}
-
-
 def trips_pass_stub(df, trips, config):
     return {
         "status": "PASS",
@@ -86,8 +82,30 @@ def trips_pass_stub(df, trips, config):
     }
 
 
+def persistence_pass_stub(save_result):
+    return {
+        "status": "PASS",
+        "new_rows": save_result.get("new_rows", 0),
+        "skipped_rows": save_result.get("skipped_rows", 0),
+    }
+
+
+def noop_create_failure_report(config, execution_id, run_ts, failure_phase, failure_message, positions_result, write_fn=None):
+    return {"summary": {"status": "FAIL"}, "details": {}}
+
+
+def noop_create_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
+    statuses = [r["status"] for r in (positions_result, trips_result, persistence_result)]
+    status = "WARN" if "WARN" in statuses else "PASS"
+    return {"summary": {"status": status, "execution_id": execution_id}, "details": {}}
+
+
 def noop_send_webhook(summary, webhook_url):
     pass
+
+
+def noop_save_trips(config, trips):
+    return {"new_rows": len(trips), "skipped_rows": 0}
 
 
 class SaveCapture:
@@ -96,6 +114,7 @@ class SaveCapture:
 
     def __call__(self, config, trips):
         self.calls.append(trips)
+        return {"new_rows": len(trips), "skipped_rows": 0}
 
 
 def make_positions_df(rows):
@@ -103,7 +122,7 @@ def make_positions_df(rows):
 
 
 # ---------------------------------------------------------------------------
-# Positions FAIL → pipeline stops, save not called
+# Positions FAIL → pipeline stops, phases 2 and 3 not executed
 # ---------------------------------------------------------------------------
 
 
@@ -156,12 +175,32 @@ def test_positions_fail_calls_send_webhook():
     assert len(webhooks) == 1
 
 
+def test_positions_fail_final_report_not_called():
+    final_report_calls = []
+
+    def capturing_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
+        final_report_calls.append(True)
+        return {"summary": {"status": "PASS"}, "details": {}}
+
+    with pytest.raises(ValueError):
+        extract_trips_for_all_Lines_and_vehicles(
+            make_config(),
+            get_recent_positions_fn=lambda c: pd.DataFrame(),
+            validate_positions_fn=positions_fail_stub,
+            create_failure_report_fn=noop_create_failure_report,
+            create_final_report_fn=capturing_final_report,
+            send_webhook_fn=noop_send_webhook,
+        )
+
+    assert final_report_calls == []
+
+
 # ---------------------------------------------------------------------------
-# Positions WARN → report + webhook sent, pipeline continues
+# Positions WARN → early report + webhook, pipeline continues to Phase 3
 # ---------------------------------------------------------------------------
 
 
-def test_positions_warn_calls_create_report_and_webhook():
+def test_positions_warn_calls_create_report_and_early_webhook():
     reports = []
     webhooks = []
 
@@ -172,14 +211,16 @@ def test_positions_warn_calls_create_report_and_webhook():
         ),
         validate_positions_fn=positions_warn_stub,
         validate_trips_fn=trips_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
         create_report_fn=lambda config, exec_id, run_ts, positions_result, write_fn=None: reports.append(positions_result) or {"summary": {"status": "WARN"}, "details": {}},
+        create_final_report_fn=noop_create_final_report,
         send_webhook_fn=lambda summary, url: webhooks.append(summary),
-        save_trips_fn=lambda config, trips: None,
+        save_trips_fn=noop_save_trips,
         extract_trips_fn=lambda df: [],
     )
 
     assert len(reports) == 1
-    assert len(webhooks) == 1
+    assert len(webhooks) == 2  # early WARN webhook + final report webhook
 
 
 def test_positions_warn_pipeline_continues_and_save_called():
@@ -192,7 +233,9 @@ def test_positions_warn_pipeline_continues_and_save_called():
         ),
         validate_positions_fn=positions_warn_stub,
         validate_trips_fn=trips_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
         create_report_fn=lambda config, exec_id, run_ts, positions_result, write_fn=None: {"summary": {"status": "WARN"}, "details": {}},
+        create_final_report_fn=noop_create_final_report,
         send_webhook_fn=noop_send_webhook,
         save_trips_fn=save,
         extract_trips_fn=lambda df: [],
@@ -202,12 +245,84 @@ def test_positions_warn_pipeline_continues_and_save_called():
 
 
 # ---------------------------------------------------------------------------
-# Positions PASS → extraction and save proceed
+# All phases PASS → final report saved, webhook sent once
+# ---------------------------------------------------------------------------
+
+
+def test_all_phases_pass_final_webhook_sent_once():
+    webhooks = []
+    df = make_positions_df(
+        [
+            {
+                "veiculo_ts": BASE_TS,
+                "extracao_ts": BASE_TS,
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "linha_sentido": 1,
+                "is_circular": False,
+            }
+        ]
+    )
+    extract_trips_for_all_Lines_and_vehicles(
+        make_config(),
+        get_recent_positions_fn=lambda c: df,
+        validate_positions_fn=positions_pass_stub,
+        validate_trips_fn=trips_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
+        create_final_report_fn=noop_create_final_report,
+        send_webhook_fn=lambda summary, url: webhooks.append(summary),
+        save_trips_fn=noop_save_trips,
+        extract_trips_fn=lambda df: [],
+    )
+
+    assert len(webhooks) == 1
+    assert webhooks[0]["status"] == "PASS"
+
+
+def test_all_phases_pass_final_report_status_pass():
+    final_reports = []
+    df = make_positions_df(
+        [
+            {
+                "veiculo_ts": BASE_TS,
+                "extracao_ts": BASE_TS,
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "linha_sentido": 1,
+                "is_circular": False,
+            }
+        ]
+    )
+
+    def capturing_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
+        final_reports.append((positions_result, trips_result, persistence_result))
+        return {"summary": {"status": "PASS"}, "details": {}}
+
+    extract_trips_for_all_Lines_and_vehicles(
+        make_config(),
+        get_recent_positions_fn=lambda c: df,
+        validate_positions_fn=positions_pass_stub,
+        validate_trips_fn=trips_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
+        create_final_report_fn=capturing_final_report,
+        send_webhook_fn=noop_send_webhook,
+        save_trips_fn=noop_save_trips,
+        extract_trips_fn=lambda df: [],
+    )
+
+    assert len(final_reports) == 1
+    positions_result, trips_result, persistence_result = final_reports[0]
+    assert positions_result["status"] == "PASS"
+    assert trips_result["status"] == "PASS"
+    assert persistence_result["status"] == "PASS"
+
+
+# ---------------------------------------------------------------------------
+# Positions PASS → extraction and save proceed (existing behaviour)
 # ---------------------------------------------------------------------------
 
 
 def test_no_trips_extracted_save_called_with_empty_list():
-    # Single vehicle, no direction changes → no trips survive extraction
     df = make_positions_df(
         [
             {
@@ -234,6 +349,9 @@ def test_no_trips_extracted_save_called_with_empty_list():
         get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
         validate_positions_fn=positions_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
+        create_final_report_fn=noop_create_final_report,
+        send_webhook_fn=noop_send_webhook,
     )
     assert len(save.calls) == 1
     assert save.calls[0] == []
@@ -266,5 +384,8 @@ def test_two_vehicles_save_called_once_with_combined_result():
         get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
         validate_positions_fn=positions_pass_stub,
+        validate_persistence_fn=persistence_pass_stub,
+        create_final_report_fn=noop_create_final_report,
+        send_webhook_fn=noop_send_webhook,
     )
     assert len(save.calls) == 1

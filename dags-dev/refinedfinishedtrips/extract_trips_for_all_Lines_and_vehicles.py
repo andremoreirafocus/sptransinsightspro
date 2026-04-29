@@ -3,6 +3,7 @@ import uuid
 
 from refinedfinishedtrips.services.create_quality_report import (
     create_failure_quality_report,
+    create_final_quality_report,
     create_quality_report,
 )
 from refinedfinishedtrips.services.get_all_finished_trips import (
@@ -15,6 +16,7 @@ from refinedfinishedtrips.services.save_finished_trips_to_db import (
 from refinedfinishedtrips.services.validate_positions_quality import (
     validate_positions_quality,
 )
+from refinedfinishedtrips.services.validate_persistence_quality import validate_persistence_quality
 from refinedfinishedtrips.services.validate_trips_quality import validate_trips_quality
 from infra.notifications import send_webhook
 import logging
@@ -63,6 +65,11 @@ def _handle_trips_result(trips_result):
         logger.warning(f"Trip extraction quality WARN: {warn_notes}")
 
 
+def _handle_persistence_result(persistence_result):
+    if persistence_result["status"] == "WARN":
+        logger.warning(f"Persistence quality WARN: {persistence_result.get('note', 'all trips were duplicates')}")
+
+
 def extract_trips_for_all_Lines_and_vehicles(
     config,
     get_recent_positions_fn=get_recent_positions,
@@ -70,8 +77,10 @@ def extract_trips_for_all_Lines_and_vehicles(
     extract_trips_fn=get_all_finished_trips,
     validate_positions_fn=validate_positions_quality,
     validate_trips_fn=validate_trips_quality,
+    validate_persistence_fn=validate_persistence_quality,
     create_report_fn=create_quality_report,
     create_failure_report_fn=create_failure_quality_report,
+    create_final_report_fn=create_final_quality_report,
     send_webhook_fn=send_webhook,
 ):
     def get_config(config):
@@ -97,4 +106,11 @@ def extract_trips_for_all_Lines_and_vehicles(
     all_finished_trips = extract_trips_fn(df_recent_positions)
     trips_result = validate_trips_fn(df_recent_positions, all_finished_trips, config)
     _handle_trips_result(trips_result)
-    save_trips_fn(config, all_finished_trips)
+    save_result = save_trips_fn(config, all_finished_trips)
+    persistence_result = validate_persistence_fn(save_result)
+    _handle_persistence_result(persistence_result)
+    report = create_final_report_fn(
+        config, execution_id, run_ts, positions_result, trips_result, persistence_result
+    )
+    send_webhook_fn(report["summary"], webhook_url)
+    logger.info(f"Pipeline run complete. execution_id={execution_id}, status={report['summary']['status']}")
