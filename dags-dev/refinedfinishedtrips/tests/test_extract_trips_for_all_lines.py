@@ -15,6 +15,10 @@ def make_config():
         "general": {
             "tables": {"finished_trips_table_name": "finished_trips"},
             "notifications": {"webhook_url": "disabled"},
+            "quality": {
+                "trips_effective_window_threshold_minutes": 60,
+                "trips_min_trips_threshold": 5,
+            },
         },
         "connections": {
             "database": {
@@ -71,6 +75,15 @@ def positions_fail_stub(df, config):
 
 def noop_create_failure_report(config, execution_id, run_ts, failure_phase, failure_message, positions_result, write_fn=None):
     return {"summary": {"status": "FAIL"}, "details": {}}
+
+
+def trips_pass_stub(df, trips, config):
+    return {
+        "status": "PASS",
+        "effective_window_minutes": 0.0,
+        "trips_extracted": len(trips),
+        "checks": [],
+    }
 
 
 def noop_send_webhook(summary, webhook_url):
@@ -158,6 +171,7 @@ def test_positions_warn_calls_create_report_and_webhook():
             [{"veiculo_ts": 1, "linha_lt": "x", "veiculo_id": 1, "linha_sentido": 1, "is_circular": False}]
         ),
         validate_positions_fn=positions_warn_stub,
+        validate_trips_fn=trips_pass_stub,
         create_report_fn=lambda config, exec_id, run_ts, positions_result, write_fn=None: reports.append(positions_result) or {"summary": {"status": "WARN"}, "details": {}},
         send_webhook_fn=lambda summary, url: webhooks.append(summary),
         save_trips_fn=lambda config, trips: None,
@@ -177,6 +191,7 @@ def test_positions_warn_pipeline_continues_and_save_called():
             [{"veiculo_ts": 1, "linha_lt": "x", "veiculo_id": 1, "linha_sentido": 1, "is_circular": False}]
         ),
         validate_positions_fn=positions_warn_stub,
+        validate_trips_fn=trips_pass_stub,
         create_report_fn=lambda config, exec_id, run_ts, positions_result, write_fn=None: {"summary": {"status": "WARN"}, "details": {}},
         send_webhook_fn=noop_send_webhook,
         save_trips_fn=save,
@@ -197,6 +212,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
         [
             {
                 "veiculo_ts": BASE_TS,
+                "extracao_ts": BASE_TS,
                 "linha_lt": "1234-10",
                 "veiculo_id": 100,
                 "linha_sentido": 1,
@@ -204,6 +220,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
             },
             {
                 "veiculo_ts": BASE_TS + timedelta(seconds=60),
+                "extracao_ts": BASE_TS + timedelta(seconds=60),
                 "linha_lt": "1234-10",
                 "veiculo_id": 100,
                 "linha_sentido": 1,
@@ -227,6 +244,7 @@ def test_two_vehicles_save_called_once_with_combined_result():
         [
             {
                 "veiculo_ts": BASE_TS,
+                "extracao_ts": BASE_TS,
                 "linha_lt": "1234-10",
                 "veiculo_id": 100,
                 "linha_sentido": 1,
@@ -234,6 +252,7 @@ def test_two_vehicles_save_called_once_with_combined_result():
             },
             {
                 "veiculo_ts": BASE_TS + timedelta(seconds=60),
+                "extracao_ts": BASE_TS + timedelta(seconds=60),
                 "linha_lt": "5678-20",
                 "veiculo_id": 200,
                 "linha_sentido": 1,

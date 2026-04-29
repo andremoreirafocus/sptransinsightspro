@@ -12,7 +12,10 @@ Para cada linha e veículo:
   - **gaps de extração**: valida se não há lacunas significativas entre os timestamps de extração na janela recente
 - em caso de falha nas verificações de qualidade: interrompe o pipeline, salva um relatório de qualidade no bucket de metadata e notifica via webhook
 - em caso de aviso nas verificações de qualidade: salva um relatório de qualidade no bucket de metadata, notifica via webhook e continua o processamento
-- calcula as viagens finalizadas durante este período de tempo de análise 
+- calcula as viagens finalizadas durante este período de tempo de análise
+- verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
+  - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
+  - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 
 ## Pré-requisitos
@@ -66,7 +69,9 @@ Chaves esperadas em `general`
     "freshness_fail_staleness_minutes": 30,
     "gaps_warn_gap_minutes": 5,
     "gaps_fail_gap_minutes": 15,
-    "gaps_recent_window_minutes": 60
+    "gaps_recent_window_minutes": 60,
+    "trips_effective_window_threshold_minutes": 60,
+    "trips_min_trips_threshold": 5
   },
   "notifications": {
     "webhook_url": "disabled"

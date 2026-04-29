@@ -29,6 +29,8 @@ class QualityConfig(BaseModel):
     gaps_warn_gap_minutes: int
     gaps_fail_gap_minutes: int
     gaps_recent_window_minutes: int
+    trips_effective_window_threshold_minutes: int
+    trips_min_trips_threshold: int
 
 
 class NotificationsConfig(BaseModel):

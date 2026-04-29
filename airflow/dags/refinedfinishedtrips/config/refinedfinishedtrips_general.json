@@ -18,7 +18,9 @@
       "freshness_fail_staleness_minutes": 30,
       "gaps_warn_gap_minutes": 5,
       "gaps_fail_gap_minutes": 15,
-      "gaps_recent_window_minutes": 60
+      "gaps_recent_window_minutes": 60,
+      "trips_effective_window_threshold_minutes": 60,
+      "trips_min_trips_threshold": 5
     },
     "notifications": {
       "webhook_url": "disabled"
