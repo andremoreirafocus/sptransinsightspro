@@ -6,6 +6,7 @@ from src.services.exceptions import PositionsDownloadError
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+DEFAULT_API_TIMEOUT_SECONDS = 10
 
 
 def extract_buses_positions_with_retries(
@@ -21,18 +22,14 @@ def extract_buses_positions_with_retries(
     api_max_retries, token, api_base_url = get_config(config)
 
     sleep_fn = sleep_fn or time.sleep
-    retries = 0
     back_off = 1
-    buses_positions_payload = None
-    download_successful = False
-    while not download_successful:
+    for retries in range(api_max_retries + 1):
         buses_positions_payload = extract_buses_positions(
             token=token,
             base_url=api_base_url,
             session=session,
         )
         if buses_positions_response_is_valid(buses_positions_payload):
-            download_successful = True
             if retries > 0:
                 logger.info(
                     f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}."
@@ -45,14 +42,7 @@ def extract_buses_positions_with_retries(
                     },
                 }
             return buses_positions_payload
-        retries += 1
-        logger.warning(
-            f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
-        )
-        sleep_fn(back_off)
-        back_off *= 2
         if retries >= api_max_retries:
-            download_successful = False
             logger.error(
                 "Max retries reached. Download failed. Skipping this extraction cycle."
             )
@@ -61,6 +51,11 @@ def extract_buses_positions_with_retries(
             )
             setattr(error, "retries", retries)
             raise error
+        logger.warning(
+            f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
+        )
+        sleep_fn(back_off)
+        back_off *= 2
 
 
 def get_buses_positions_with_metadata(buses_positions_payload):
@@ -85,7 +80,7 @@ def extract_buses_positions(base_url, token, session=None):
     session = session or requests.Session()
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
     try:
-        response_auth = session.post(auth_url)
+        response_auth = session.post(auth_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
             logger.info(
                 f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!"
@@ -100,7 +95,7 @@ def extract_buses_positions(base_url, token, session=None):
     try:
         posicao_url = f"{base_url}/Posicao"
         logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!")
-        response = session.get(posicao_url)
+        response = session.get(posicao_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response.status_code == 200:
             logger.info(
                 f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!"

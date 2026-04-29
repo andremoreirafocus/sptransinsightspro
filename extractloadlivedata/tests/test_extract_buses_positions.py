@@ -90,3 +90,19 @@ def test_extract_buses_positions_with_retries_max():
         )
     assert fake_sleep.calls == [1, 2]
     assert getattr(exc_info.value, "retries", None) == 2
+
+
+def test_extract_buses_positions_with_retries_max_on_connection_error():
+    session = FakeHttpSession(raise_on_post=ConnectionError("network unreachable"))
+    fake_sleep = FakeSleep()
+    config = {
+        "TOKEN": "token",
+        "API_BASE_URL": "http://api",
+        "API_MAX_RETRIES": 2,
+    }
+    with pytest.raises(PositionsDownloadError, match="max retries reached") as exc_info:
+        extract_buses_positions_with_retries(
+            config, session=session, sleep_fn=fake_sleep
+        )
+    assert fake_sleep.calls == [1, 2]
+    assert getattr(exc_info.value, "retries", None) == 2
