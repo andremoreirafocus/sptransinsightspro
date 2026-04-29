@@ -12,6 +12,8 @@ class StorageConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     app_folder: str
     trusted_bucket: str
+    metadata_bucket: str
+    quality_report_folder: str
 
 
 class TablesConfig(BaseModel):
@@ -20,11 +22,27 @@ class TablesConfig(BaseModel):
     finished_trips_table_name: str
 
 
+class QualityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    freshness_warn_staleness_minutes: int
+    freshness_fail_staleness_minutes: int
+    gaps_warn_gap_minutes: int
+    gaps_fail_gap_minutes: int
+    gaps_recent_window_minutes: int
+
+
+class NotificationsConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    webhook_url: str
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     analysis: AnalysisConfig
     storage: StorageConfig
     tables: TablesConfig
+    quality: QualityConfig
+    notifications: NotificationsConfig
 
 
 def validate_general_input(

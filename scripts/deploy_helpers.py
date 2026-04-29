@@ -5,9 +5,10 @@ from os_command_helper import run_command
 
 
 def _resolve_python_executable(folder: str) -> str:
-    local_venv_python = os.path.join(folder, ".venv", "bin", "python")
-    if os.path.isfile(local_venv_python) and os.access(local_venv_python, os.X_OK):
-        return local_venv_python
+    for base in (folder, os.path.dirname(folder)):
+        candidate = os.path.join(base, ".venv", "bin", "python")
+        if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
+            return candidate
     return sys.executable
 
 

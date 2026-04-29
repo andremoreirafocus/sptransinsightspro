@@ -5,11 +5,23 @@
     },
     "storage": {
       "app_folder": "sptrans",
-      "trusted_bucket": "trusted"
+      "trusted_bucket": "trusted",
+      "metadata_bucket": "metadata",
+      "quality_report_folder": "quality-reports"
     },
     "tables": {
       "positions_table_name": "positions",
       "finished_trips_table_name": "refined.finished_trips"
+    },
+    "quality": {
+      "freshness_warn_staleness_minutes": 10,
+      "freshness_fail_staleness_minutes": 30,
+      "gaps_warn_gap_minutes": 5,
+      "gaps_fail_gap_minutes": 15,
+      "gaps_recent_window_minutes": 60
+    },
+    "notifications": {
+      "webhook_url": "disabled"
     }
   }
 }

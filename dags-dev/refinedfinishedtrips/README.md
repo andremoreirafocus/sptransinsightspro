@@ -7,13 +7,20 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 ## O que este subprojeto faz
 Para cada linha e veículo: 
 - lê as posições instantâneas armazenadas na tabela de posições armazendas sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora, correspondentes a um período de tempo de análise
+- verifica a qualidade dos dados de posição antes de processar as viagens, executando duas verificações:
+  - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado
+  - **gaps de extração**: valida se não há lacunas significativas entre os timestamps de extração na janela recente
+- em caso de falha nas verificações de qualidade: interrompe o pipeline, salva um relatório de qualidade no bucket de metadata e notifica via webhook
+- em caso de aviso nas verificações de qualidade: salva um relatório de qualidade no bucket de metadata, notifica via webhook e continua o processamento
 - calcula as viagens finalizadas durante este período de tempo de análise 
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
-- Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket na camada trusted
+- Disponibilidade do bucket da camada metadata no serviço de object storage para armazenamento dos relatórios de qualidade
+- Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket na camada trusted e escrita ao bucket na camada metadata
 - Disponibilidade do serviço de banco de dados analítico, atualmente o PostgreSQL, para armazenamento dos dados na camada refined
+- alertservice disponível e configurado para receber notificações de qualidade (configurável via `webhook_url`; use `"disabled"` para desativar)
 - Arquivo `.env` com as credenciais necessárias
 - Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
@@ -46,11 +53,23 @@ Chaves esperadas em `general`
   },
   "storage": {
     "app_folder": "sptrans",
-    "trusted_bucket": "trusted"
+    "trusted_bucket": "trusted",
+    "metadata_bucket": "metadata",
+    "quality_report_folder": "quality-reports"
   },
   "tables": {
     "positions_table_name": "positions",
     "finished_trips_table_name": "refined.finished_trips"
+  },
+  "quality": {
+    "freshness_warn_staleness_minutes": 10,
+    "freshness_fail_staleness_minutes": 30,
+    "gaps_warn_gap_minutes": 5,
+    "gaps_fail_gap_minutes": 15,
+    "gaps_recent_window_minutes": 60
+  },
+  "notifications": {
+    "webhook_url": "disabled"
   }
 }
 ```
@@ -72,7 +91,7 @@ Crie `dags-dev/refinedfinishedtrips/.env` com base em `.env.example` preenchendo
 Criar tabelas conforme instruções abaixo:
 
 ```shell
-python ./refinedfinishedtrips-v2.py
+python ./refinedfinishedtrips-v4.py
 ```
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:

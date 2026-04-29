@@ -1,0 +1,47 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "refinedfinishedtrips",
+    "execution_id": "f865bffa-82d9-4c98-8c97-709bf93d10c9",
+    "status": "FAIL",
+    "failure_phase": "positions",
+    "failure_message": "fewer than 2 distinct extraction timestamps in recent window",
+    "items_failed": 1,
+    "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=04/day=28/hour=21/quality-report-refinedfinishedtrips_2157_f865bffa.json",
+    "generated_at_utc": "2026-04-28T21:57:54.021007+00:00",
+    "positions_in_time_window_count": 1040674
+  },
+  "details": {
+    "execution_id": "f865bffa-82d9-4c98-8c97-709bf93d10c9",
+    "status": "FAIL",
+    "failure_phase": "positions",
+    "failure_message": "fewer than 2 distinct extraction timestamps in recent window",
+    "phases": {
+      "positions": {
+        "status": "FAIL",
+        "positions_in_time_window_count": 1040674,
+        "checks": [
+          {
+            "check": "freshness",
+            "status": "PASS",
+            "observed_lag_minutes": 1.92,
+            "warn_threshold_minutes": 10,
+            "fail_threshold_minutes": 30
+          },
+          {
+            "check": "recent_gaps",
+            "status": "FAIL",
+            "max_gap_minutes": null,
+            "warn_threshold_minutes": 5,
+            "fail_threshold_minutes": 15,
+            "recent_window_minutes": 60,
+            "note": "fewer than 2 distinct extraction timestamps in recent window"
+          }
+        ]
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=04/day=28/hour=21/quality-report-refinedfinishedtrips_2157_f865bffa.json"
+    }
+  }
+}
