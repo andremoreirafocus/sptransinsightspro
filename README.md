@@ -3,7 +3,7 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
 A pipeline mais crítica do projeto (`transformlivedata`) aplica um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade.  
-Observação: os resumos de qualidade das pipelines `transformlivedata`, `gtfs` e do microserviço `extractloadlivedata` são enviados via webhook para o microserviço `alertservice`, responsável por emitir notificações e alertas por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings.
+Observação: os resumos de qualidade das pipelines `transformlivedata`, `gtfs`, `refinedfinishedtrips` e do microserviço `extractloadlivedata` são enviados via webhook para o microserviço `alertservice`, responsável por emitir notificações e alertas por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings.
 
 A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
@@ -28,7 +28,12 @@ Detalhes sobre as DAGS:
         - Relatório de qualidade em JSON com `summary` e `details`, incluindo métricas, issues e informações parciais em caso de falha
         ![Para mais informações:](./dags-dev/transformlivedata/README.md)
     - DAG orchestratetransform: processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.  ![Para mais informações:](./dags-dev/orchestratetransform/README.md)
-    - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
+    - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada enriquecidos da camada trusted, incluindo checagem de qualidade com as seguintes etapas:
+        - Verificação de qualidade das posições (freshness e gaps de extração); falha interrompe o pipeline com relatório e notificação imediata
+        - Verificação de qualidade da extração de viagens (zero trips e low trip count) baseada na janela efetiva de extração
+        - Verificação de duplicatas na persistência
+        - Relatório de qualidade consolidado com status das três fases ao final de cada execução, persistido no bucket de metadata e enviado ao `alertservice` via webhook
+        ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
     - DAG refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
     - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
