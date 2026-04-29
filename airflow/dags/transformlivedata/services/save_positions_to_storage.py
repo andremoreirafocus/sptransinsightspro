@@ -12,7 +12,7 @@ def save_positions_to_storage(
     config: Dict[str, Any],
     positions_df: Optional[pd.DataFrame],
     target_bucket: str,
-    duckdb_client=None,
+    duckdb_client: Optional[Any] = None,
 ) -> None:
     """
     Storage Layer:

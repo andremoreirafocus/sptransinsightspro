@@ -1,4 +1,4 @@
-from typing import Any, Dict, Tuple, Optional
+from typing import Any, Callable, Dict, Optional, Tuple
 import json
 import logging
 from datetime import datetime
@@ -213,7 +213,7 @@ def create_data_quality_report(
     warn_threshold: float = 0.980,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     data_quality_report = build_data_quality_report(
         config=config,
@@ -257,7 +257,7 @@ def create_failure_quality_report(
     expectations_result: Optional[Dict[str, Any]] = None,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
     quality_report_path = build_quality_report_path(

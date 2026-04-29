@@ -5,7 +5,7 @@ from infra.object_storage import (
 from infra.compression import decompress_data
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -15,9 +15,9 @@ def load_positions(
     config: Dict[str, Any],
     partition_path: str,
     source_file: str,
-    read_bytes_fn=read_file_from_object_storage_to_bytesio,
-    read_str_fn=read_file_from_object_storage_to_str,
-    decompress_fn=decompress_data,
+    read_bytes_fn: Callable[..., Any] = read_file_from_object_storage_to_bytesio,
+    read_str_fn: Callable[..., Any] = read_file_from_object_storage_to_str,
+    decompress_fn: Callable[..., Any] = decompress_data,
 ) -> Dict[str, Any]:
     def get_config(
         config: Dict[str, Any],

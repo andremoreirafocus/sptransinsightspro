@@ -46,7 +46,7 @@ def _send_quality_summary_webhook(summary: dict, pipeline_config: dict) -> None:
         logger.error("Webhook notification failed: %s", e)
 
 
-def load_transform_save_positions(pipeline_name, logical_date_string):
+def load_transform_save_positions(pipeline_name: str, logical_date_string: str) -> None:
     logical_date_context = build_logical_date_context(logical_date_string)
     try:
         pipeline_config = get_config(

@@ -1,12 +1,12 @@
 from infra.duck_db_v3 import get_duckdb_connection
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, Optional, Tuple
 import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-def load_trip_details(config: Dict[str, Any], duckdb_client=None) -> pd.DataFrame:
+def load_trip_details(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str, str]:
         try:
             general = config["general"]

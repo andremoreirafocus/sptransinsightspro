@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Tuple
 from infra.sql_db_v2 import execute_select_query, execute_update_query
 
 logger = logging.getLogger(__name__)
@@ -39,7 +39,7 @@ def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], st
 
 
 def get_unprocessed_requests(
-    config: Dict[str, Any], select_fn=execute_select_query
+    config: Dict[str, Any], select_fn: Callable[..., Any] = execute_select_query
 ) -> List[Dict[str, Any]]:
     """
     Get all unprocessed requests from the RAW_EVENTS_TABLE_NAME table.
@@ -71,7 +71,7 @@ def get_unprocessed_requests(
 
 
 def mark_request_as_processed(
-    config: Dict[str, Any], logical_date: str, update_fn=execute_update_query
+    config: Dict[str, Any], logical_date: str, update_fn: Callable[..., Any] = execute_update_query
 ) -> bool:
     """
     Mark a processing request as processed by updating the processed field to true.
@@ -110,7 +110,7 @@ def mark_request_as_processed(
 
 
 def mark_request_as_processed_by_filename(
-    config: Dict[str, Any], filename: str, update_fn=execute_update_query
+    config: Dict[str, Any], filename: str, update_fn: Callable[..., Any] = execute_update_query
 ) -> bool:
     """
     Mark a processing request as processed by updating the processed field to true.
