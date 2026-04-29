@@ -8,19 +8,20 @@ from gtfs.services.save_buffer_to_storage import save_buffer_to_storage
 from quality.validate_expectations import validate_expectations
 import pandas as pd
 import logging
+from typing import Any, Callable, Dict
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
 def transform_and_validate_table(
-    config,
-    table_name,
-    load_fn=load_raw_csv_to_buffer_from_storage,
-    convert_fn=convert_df_to_parquet_buffer,
-    save_fn=save_buffer_to_storage,
-    validate_expectations_fn=validate_expectations,
-):
+    config: Dict[str, Any],
+    table_name: str,
+    load_fn: Callable[..., Any] = load_raw_csv_to_buffer_from_storage,
+    convert_fn: Callable[..., Any] = convert_df_to_parquet_buffer,
+    save_fn: Callable[..., Any] = save_buffer_to_storage,
+    validate_expectations_fn: Callable[..., Any] = validate_expectations,
+) -> Dict[str, Any]:
     logger.info("TRANSFORMATION STAGE - Processing table '%s'...", table_name)
     file_name = f"{table_name}.parquet"
     staging_object_name = (
@@ -107,31 +108,31 @@ def transform_and_validate_table(
     return result
 
 
-def transform_routes(config):
+def transform_routes(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "routes"
     return transform_and_validate_table(config, table_name)
 
 
-def transform_trips(config):
+def transform_trips(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "trips"
     return transform_and_validate_table(config, table_name)
 
 
-def transform_stop_times(config):
+def transform_stop_times(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "stop_times"
     return transform_and_validate_table(config, table_name)
 
 
-def transform_stops(config):
+def transform_stops(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "stops"
     return transform_and_validate_table(config, table_name)
 
 
-def transform_calendar(config):
+def transform_calendar(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "calendar"
     return transform_and_validate_table(config, table_name)
 
 
-def transform_frequencies(config):
+def transform_frequencies(config: Dict[str, Any]) -> Dict[str, Any]:
     table_name = "frequencies"
     return transform_and_validate_table(config, table_name)

@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from infra.object_storage import write_generic_bytes_to_object_storage
 from quality.reporting import (
@@ -69,7 +69,7 @@ def create_data_quality_report(
     execution_id: str,
     stage_results: Dict[str, Dict[str, Any]],
     batch_ts: Optional[Any] = None,
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or datetime.now(timezone.utc).isoformat()
     report_path = _build_report_path(config, batch_ts_value, execution_id)
@@ -96,7 +96,7 @@ def create_failure_quality_report(
     failure_message: str,
     stage_results: Dict[str, Dict[str, Any]],
     batch_ts: Optional[Any] = None,
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or datetime.now(timezone.utc).isoformat()
     report_path = _build_report_path(config, batch_ts_value, execution_id)

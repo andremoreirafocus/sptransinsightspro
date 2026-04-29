@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
 import logging
-from typing import Any
+from typing import Any, Callable, Dict, Optional
 import uuid
 
 from gtfs.config.gtfs_config_schema import GeneralConfig
@@ -33,7 +33,7 @@ PIPELINE_NAME = "gtfs"
 
 
 class StageExecutionError(ValueError):
-    def __init__(self, stage: str, message: str, stage_result: dict):
+    def __init__(self, stage: str, message: str, stage_result: dict) -> None:
         super().__init__(message)
         self.stage = stage
         self.stage_result = stage_result
@@ -51,7 +51,7 @@ class RelocationDetails:
         }
 
 
-def load_pipeline_config():
+def load_pipeline_config() -> Dict[str, Any]:
     try:
         return get_config(
             PIPELINE_NAME,
@@ -66,7 +66,7 @@ def load_pipeline_config():
         raise ValueError(f"Pipeline configuration validation failed: {e}")
 
 
-def send_webhook_from_report(report: dict, pipeline_config: dict, path: str):
+def send_webhook_from_report(report: dict, pipeline_config: dict, path: str) -> None:
     summary = report.get("summary", {})
     execution_id = summary.get("execution_id")
     status = summary.get("status")
@@ -104,7 +104,7 @@ def send_webhook_from_report(report: dict, pipeline_config: dict, path: str):
         )
 
 
-def apply_relocation_result(stage_result: dict, relocation: dict):
+def apply_relocation_result(stage_result: dict, relocation: dict) -> None:
     stage_result["relocation_status"] = relocation.get("status", "FAILED")
     stage_result["relocation_details"] = {
         "moved": relocation.get("moved", []),
@@ -115,7 +115,7 @@ def apply_relocation_result(stage_result: dict, relocation: dict):
         stage_result["error_details"]["relocation_errors"] = relocation["errors"]
 
 
-def extract_load_files(run_context, stage_results):
+def extract_load_files(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     pipeline_config = load_pipeline_config()
     stage_result = {
         "status": "FAIL",
@@ -175,11 +175,11 @@ def extract_load_files(run_context, stage_results):
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("extract_load_files", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 
-def transform(run_context, stage_results):
+def transform(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     pipeline_config = load_pipeline_config()
     stage_result = {
         "status": "FAIL",
@@ -257,11 +257,11 @@ def transform(run_context, stage_results):
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("transformation", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 
-def create_trip_details(run_context, stage_results):
+def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     pipeline_config = load_pipeline_config()
     table_name = pipeline_config["general"]["tables"]["trip_details_table_name"]
     staged_result = []
@@ -380,18 +380,18 @@ def create_trip_details(run_context, stage_results):
                     "errors": [str(relocation_exception)],
                 }
         err = StageExecutionError("enrichment", str(e), stage_result)
-        handle_unexpected_error(err, run_context, stage_results)
+        handle_unexpected_error(err, run_context, stage_results, write_fn)
         raise err from e
 
 
-def build_run_context():
+def build_run_context() -> Dict[str, Any]:
     execution_id = str(uuid.uuid4())
     batch_ts = datetime.now(timezone.utc).isoformat()
     run_context = {"execution_id": execution_id, "batch_ts": batch_ts}
     return run_context
 
 
-def build_quality_report_and_send_webhook(run_context, stage_results):
+def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_results: Dict[str, Any]) -> None:
     pipeline_config = load_pipeline_config()
     try:
         report = create_data_quality_report(
@@ -406,7 +406,7 @@ def build_quality_report_and_send_webhook(run_context, stage_results):
         raise
 
 
-def handle_unexpected_error(e, run_context, stage_results: dict):
+def handle_unexpected_error(e: StageExecutionError, run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> None:
     pipeline_config = load_pipeline_config()
     stage_results[e.stage] = e.stage_result
     logger.error("%s failed: %s", e.stage, e)
@@ -417,5 +417,6 @@ def handle_unexpected_error(e, run_context, stage_results: dict):
         failure_message=str(e),
         stage_results=stage_results,
         batch_ts=run_context["batch_ts"],
+        write_fn=write_fn,
     )
     send_webhook_from_report(report, pipeline_config, "failure path")

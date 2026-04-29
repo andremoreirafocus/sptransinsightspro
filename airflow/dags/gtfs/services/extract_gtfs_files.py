@@ -1,8 +1,10 @@
-import requests
-import zipfile
 import io
 import logging
+import zipfile
 from pathlib import Path
+from typing import Any, Callable, Dict, List
+
+import requests
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -20,7 +22,7 @@ def _is_safe_zip_member(base_dir: Path, member_name: str) -> bool:
     return True
 
 
-def extract_gtfs_files(config, http_get_fn=requests.get):
+def extract_gtfs_files(config: Dict[str, Any], http_get_fn: Callable[..., Any] = requests.get) -> List[str]:
     def get_config(config):
         try:
             general = config["general"]

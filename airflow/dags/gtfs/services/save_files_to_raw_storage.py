@@ -1,17 +1,19 @@
-from infra.object_storage import write_generic_bytes_to_object_storage
 import logging
+from typing import Any, Callable, Dict, List, Optional
+
+from infra.object_storage import write_generic_bytes_to_object_storage
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
 def save_files_to_raw_storage(
-    config,
-    files_list,
-    failed=False,
-    read_file_fn=open,
-    write_fn=write_generic_bytes_to_object_storage,
-):
+    config: Dict[str, Any],
+    files_list: Optional[List[str]],
+    failed: bool = False,
+    read_file_fn: Callable[..., Any] = open,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
+) -> None:
     def get_config(config):
         try:
             general = config["general"]

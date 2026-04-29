@@ -1,5 +1,6 @@
 import io
 import logging
+from typing import Any, Callable, Dict, List, Optional
 
 from minio import Minio
 
@@ -7,12 +8,12 @@ logger = logging.getLogger(__name__)
 
 
 def _move_object_with_minio(
-    connection,
-    bucket_name,
-    source_object_name,
-    destination_object_name,
-    client_factory=Minio,
-):
+    connection: Dict[str, Any],
+    bucket_name: str,
+    source_object_name: str,
+    destination_object_name: str,
+    client_factory: Callable[..., Any] = Minio,
+) -> None:
     client = client_factory(
         connection["endpoint"],
         access_key=connection["access_key"],
@@ -36,11 +37,11 @@ def _move_object_with_minio(
 
 
 def relocate_staged_trusted_files(
-    config,
-    staged_results,
-    target,
-    move_fn=_move_object_with_minio,
-):
+    config: Dict[str, Any],
+    staged_results: Optional[List[Dict[str, Any]]],
+    target: str,
+    move_fn: Callable[..., Any] = _move_object_with_minio,
+) -> Dict[str, Any]:
     def get_config(cfg):
         try:
             storage = cfg["general"]["storage"]

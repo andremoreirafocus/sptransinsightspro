@@ -1,10 +1,12 @@
-from infra.duck_db_v3 import get_duckdb_connection
 import logging
+from typing import Any, Dict, Optional
+
+from infra.duck_db_v3 import get_duckdb_connection
 
 logger = logging.getLogger(__name__)
 
 
-def create_trip_details_table_and_fill_missing_data(config, duckdb_client=None):
+def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> Dict[str, Any]:
     def get_config(config):
         try:
             general = config["general"]

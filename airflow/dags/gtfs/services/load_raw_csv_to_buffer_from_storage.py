@@ -1,14 +1,16 @@
-from infra.object_storage import read_file_from_object_storage_to_bytesio
-
+import io
 import logging
+from typing import Any, Callable, Dict
+
+from infra.object_storage import read_file_from_object_storage_to_bytesio
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
 def load_raw_csv_to_buffer_from_storage(
-    config, file_name, read_fn=read_file_from_object_storage_to_bytesio
-):
+    config: Dict[str, Any], file_name: str, read_fn: Callable[..., Any] = read_file_from_object_storage_to_bytesio
+) -> io.BytesIO:
     """
     Load position data from source bucket and app folder.
     :param source_bucket: Source bucket name

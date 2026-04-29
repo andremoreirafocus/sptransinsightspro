@@ -1,16 +1,17 @@
 import csv
 import logging
+from typing import Any, Callable, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 DEFAULT_MIN_LINES = 2
 
 
 def validate_raw_gtfs_files(
-    config,
-    files_list,
-    min_lines=DEFAULT_MIN_LINES,
-    read_file_fn=open,
-):
+    config: Dict[str, Any],
+    files_list: Optional[List[str]],
+    min_lines: int = DEFAULT_MIN_LINES,
+    read_file_fn: Callable[..., Any] = open,
+) -> Dict[str, Any]:
     """Validate extracted GTFS text files before writing to raw storage.
 
     Rules per file:
