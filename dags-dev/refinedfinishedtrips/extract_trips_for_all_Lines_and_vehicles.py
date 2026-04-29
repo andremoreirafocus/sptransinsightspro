@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Any, Callable, Dict
 import uuid
 
 from refinedfinishedtrips.services.create_quality_report import (
@@ -25,15 +26,15 @@ logger = logging.getLogger(__name__)
 
 
 def _handle_positions_result(
-    positions_result,
-    config,
-    execution_id,
-    run_ts,
-    webhook_url,
-    create_report_fn,
-    create_failure_report_fn,
-    send_webhook_fn,
-):
+    positions_result: Dict[str, Any],
+    config: Dict[str, Any],
+    execution_id: str,
+    run_ts: datetime,
+    webhook_url: str,
+    create_report_fn: Callable[..., Any],
+    create_failure_report_fn: Callable[..., Any],
+    send_webhook_fn: Callable[..., Any],
+) -> None:
     def checks_message(status):
         return "; ".join(
             c.get("note", f"{c['check']} check {status.lower()}")
@@ -55,7 +56,7 @@ def _handle_positions_result(
         logger.info(f"Positions quality warning report sent to webhook: {webhook_url}")
 
 
-def _handle_trips_result(trips_result):
+def _handle_trips_result(trips_result: Dict[str, Any]) -> None:
     if trips_result["status"] == "WARN":
         warn_notes = "; ".join(
             c.get("note", f"{c['check']} check warn")
@@ -65,24 +66,24 @@ def _handle_trips_result(trips_result):
         logger.warning(f"Trip extraction quality WARN: {warn_notes}")
 
 
-def _handle_persistence_result(persistence_result):
+def _handle_persistence_result(persistence_result: Dict[str, Any]) -> None:
     if persistence_result["status"] == "WARN":
         logger.warning(f"Persistence quality WARN: {persistence_result.get('note', 'all trips were duplicates')}")
 
 
 def extract_trips_for_all_Lines_and_vehicles(
-    config,
-    get_recent_positions_fn=get_recent_positions,
-    save_trips_fn=save_finished_trips_to_db,
-    extract_trips_fn=get_all_finished_trips,
-    validate_positions_fn=validate_positions_quality,
-    validate_trips_fn=validate_trips_quality,
-    validate_persistence_fn=validate_persistence_quality,
-    create_report_fn=create_quality_report,
-    create_failure_report_fn=create_failure_quality_report,
-    create_final_report_fn=create_final_quality_report,
-    send_webhook_fn=send_webhook,
-):
+    config: Dict[str, Any],
+    get_recent_positions_fn: Callable[..., Any] = get_recent_positions,
+    save_trips_fn: Callable[..., Any] = save_finished_trips_to_db,
+    extract_trips_fn: Callable[..., Any] = get_all_finished_trips,
+    validate_positions_fn: Callable[..., Any] = validate_positions_quality,
+    validate_trips_fn: Callable[..., Any] = validate_trips_quality,
+    validate_persistence_fn: Callable[..., Any] = validate_persistence_quality,
+    create_report_fn: Callable[..., Any] = create_quality_report,
+    create_failure_report_fn: Callable[..., Any] = create_failure_quality_report,
+    create_final_report_fn: Callable[..., Any] = create_final_quality_report,
+    send_webhook_fn: Callable[..., Any] = send_webhook,
+) -> None:
     def get_config(config):
         return config["general"]["notifications"]["webhook_url"]
 

@@ -1,10 +1,10 @@
 import logging
+from typing import Any, Dict, List, Tuple
 
-# This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
-def extract_raw_trips_metadata(records):
+def extract_raw_trips_metadata(records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     trips_metadata = []
     if records:
         if len(records) < 2:
@@ -44,7 +44,7 @@ def extract_raw_trips_metadata(records):
     return trips_metadata
 
 
-def filter_healthy_trips(trips_metadata, positions_records):
+def filter_healthy_trips(trips_metadata: List[Dict[str, Any]], positions_records: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     MIN_TRIP_DURATION_FOR_CIRCULAR = 1200
     MIN_TRIP_DURATION_FOR_NON_CIRCULAR = 1800
     MAX_TRIP_DURATION = 10800
@@ -67,7 +67,7 @@ def filter_healthy_trips(trips_metadata, positions_records):
     return filtered_trips_metadata
 
 
-def get_trip_id(linha, sentido):
+def get_trip_id(linha: str, sentido: int) -> str:
     def sentido_convertido(sentido):
         if sentido == 1:
             return 0
@@ -80,7 +80,7 @@ def get_trip_id(linha, sentido):
     return this_trip_id
 
 
-def generate_trips_table(position_records, trips_metadata, linha_lt, veiculo_id):
+def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata: List[Dict[str, Any]], linha_lt: str, veiculo_id: int) -> List[Tuple]:
     trips = []
     for trip_metadata in trips_metadata:
         sentido = trip_metadata["sentido"]

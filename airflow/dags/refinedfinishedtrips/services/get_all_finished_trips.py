@@ -1,4 +1,7 @@
 import logging
+from typing import List, Tuple
+
+import pandas as pd
 
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
     extract_trips_per_line_per_vehicle,
@@ -7,7 +10,7 @@ from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
 logger = logging.getLogger(__name__)
 
 
-def get_all_finished_trips(df_recent_positions):
+def get_all_finished_trips(df_recent_positions: pd.DataFrame) -> List[Tuple]:
     positions_list = df_recent_positions.to_dict("records")
     num_processed = 0
     all_finished_trips = []

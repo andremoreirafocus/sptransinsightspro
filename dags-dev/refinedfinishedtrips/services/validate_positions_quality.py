@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, timezone
+from typing import Any, Callable, Dict, Optional
 from zoneinfo import ZoneInfo
 import logging
 
@@ -7,11 +8,11 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 
-def _now_utc():
+def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def check_freshness(config, df, now_fn=None):
+def check_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -57,7 +58,7 @@ def check_freshness(config, df, now_fn=None):
     }
 
 
-def check_recent_gaps(config, df, now_fn=None):
+def check_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -132,7 +133,7 @@ def check_recent_gaps(config, df, now_fn=None):
     }
 
 
-def validate_positions_quality(config, df, now_fn=None):
+def validate_positions_quality(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
     logger.info(f"Running positions quality checks on {len(df)} position records.")
     checks = [
         check_freshness(config, df, now_fn),

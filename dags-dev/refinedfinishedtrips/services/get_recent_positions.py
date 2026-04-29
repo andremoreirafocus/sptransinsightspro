@@ -1,14 +1,16 @@
-from infra.duck_db_v3 import get_duckdb_connection
 from datetime import datetime, timezone
-
+from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 import logging
 
-# This logger inherits the configuration from the root logger in main.py
+import pandas as pd
+
+from infra.duck_db_v3 import get_duckdb_connection
+
 logger = logging.getLogger(__name__)
 
 
-def get_recent_positions(config, duckdb_client=None):
+def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config):
         try:
             general = config["general"]

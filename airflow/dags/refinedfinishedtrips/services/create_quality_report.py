@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 from infra.object_storage import write_generic_bytes_to_object_storage
 from quality.reporting import (
@@ -65,7 +65,7 @@ def create_quality_report(
     execution_id: str,
     run_ts: Any,
     positions_result: Dict[str, Any],
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
         storage = config["general"]["storage"]
@@ -106,7 +106,7 @@ def create_failure_quality_report(
     failure_phase: str,
     failure_message: str,
     positions_result: Dict[str, Any],
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
         storage = config["general"]["storage"]
@@ -149,7 +149,7 @@ def create_final_quality_report(
     positions_result: Dict[str, Any],
     trips_result: Dict[str, Any],
     persistence_result: Dict[str, Any],
-    write_fn=write_generic_bytes_to_object_storage,
+    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
         storage = config["general"]["storage"]

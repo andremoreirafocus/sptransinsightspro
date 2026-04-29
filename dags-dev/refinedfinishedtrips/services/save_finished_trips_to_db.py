@@ -1,11 +1,12 @@
 import logging
+from typing import Any, Callable, Dict, List, Tuple
+
 from sqlalchemy import create_engine, text
 
-# Initialize logger
 logger = logging.getLogger(__name__)
 
 
-def save_finished_trips_to_db(config, trips_tuples, engine_factory=create_engine):
+def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], engine_factory: Callable = create_engine) -> Dict[str, Any]:
     """
     Saves finished trips to Postgres using SQLAlchemy.
     Input: trips_tuples (List of Tuples)

@@ -1,15 +1,18 @@
 import logging
+from typing import Any, Dict, List
+
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
 
-def _effective_window_minutes(df):
+def _effective_window_minutes(df: pd.DataFrame) -> float:
     max_ts = df["extracao_ts"].max()
     min_ts = df["extracao_ts"].min()
     return round((max_ts - min_ts).total_seconds() / 60, 2)
 
 
-def check_zero_trips(config, effective_window_minutes, trips_count):
+def check_zero_trips(config: Dict[str, Any], effective_window_minutes: float, trips_count: int) -> Dict[str, Any]:
     def get_config(config):
         return config["general"]["quality"]["trips_effective_window_threshold_minutes"]
 
@@ -36,7 +39,7 @@ def check_zero_trips(config, effective_window_minutes, trips_count):
     return result
 
 
-def check_low_trip_count(config, effective_window_minutes, trips_count):
+def check_low_trip_count(config: Dict[str, Any], effective_window_minutes: float, trips_count: int) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -67,7 +70,7 @@ def check_low_trip_count(config, effective_window_minutes, trips_count):
     return result
 
 
-def validate_trips_quality(config, df, trips_extracted):
+def validate_trips_quality(config: Dict[str, Any], df: pd.DataFrame, trips_extracted: List) -> Dict[str, Any]:
     trips_count = len(trips_extracted)
     effective_window = _effective_window_minutes(df)
     logger.info(
