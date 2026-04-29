@@ -92,7 +92,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     df_recent_positions = get_recent_positions_fn(config)
     logger.info(f"Validating quality of {len(df_recent_positions)} position records.")
-    positions_result = validate_positions_fn(df_recent_positions, config)
+    positions_result = validate_positions_fn(config, df_recent_positions)
     _handle_positions_result(
         positions_result,
         config,
@@ -104,7 +104,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         send_webhook_fn,
     )
     all_finished_trips = extract_trips_fn(df_recent_positions)
-    trips_result = validate_trips_fn(df_recent_positions, all_finished_trips, config)
+    trips_result = validate_trips_fn(config, df_recent_positions, all_finished_trips)
     _handle_trips_result(trips_result)
     save_result = save_trips_fn(config, all_finished_trips)
     persistence_result = validate_persistence_fn(save_result)

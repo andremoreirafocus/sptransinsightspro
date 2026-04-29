@@ -13,10 +13,17 @@ logger = logging.getLogger(__name__)
 PIPELINE_NAME = "refinedfinishedtrips"
 
 
-def _count_failed_checks(positions_result: Dict[str, Any]) -> int:
-    return sum(
-        1 for c in positions_result.get("checks", []) if c.get("status") == "FAIL"
-    )
+def _count_failed_checks(result: Dict[str, Any]) -> int:
+    return sum(1 for c in result.get("checks", []) if c.get("status") == "FAIL")
+
+
+def _derive_overall_status(*results: Dict[str, Any]) -> str:
+    statuses = [r["status"] for r in results]
+    if "FAIL" in statuses:
+        return "FAIL"
+    if "WARN" in statuses:
+        return "WARN"
+    return "PASS"
 
 
 def build_quality_report(
@@ -132,4 +139,65 @@ def create_failure_quality_report(
         write_fn=write_fn,
     )
     logger.info(f"Failure quality report saved to {report_path}.")
+    return report
+
+
+def create_final_quality_report(
+    config: Dict[str, Any],
+    execution_id: str,
+    run_ts: Any,
+    positions_result: Dict[str, Any],
+    trips_result: Dict[str, Any],
+    persistence_result: Dict[str, Any],
+    write_fn=write_generic_bytes_to_object_storage,
+) -> Dict[str, Any]:
+    def get_config(config):
+        storage = config["general"]["storage"]
+        return (
+            storage["metadata_bucket"],
+            storage["quality_report_folder"],
+            {**config["connections"]["object_storage"], "secure": False},
+        )
+
+    metadata_bucket, quality_report_folder, connection_data = get_config(config)
+    report_path = build_quality_report_path(
+        metadata_bucket=metadata_bucket,
+        quality_report_folder=quality_report_folder,
+        pipeline_name=PIPELINE_NAME,
+        batch_ts=run_ts,
+        filename_suffix=f"_{execution_id.replace('-', '')[:8]}",
+    )
+    overall_status = _derive_overall_status(positions_result, trips_result, persistence_result)
+    items_failed = sum(_count_failed_checks(r) for r in (positions_result, trips_result, persistence_result))
+    summary = build_quality_summary(
+        pipeline=PIPELINE_NAME,
+        execution_id=execution_id,
+        status=overall_status,
+        items_failed=items_failed,
+        quality_report_path=report_path,
+        positions_in_time_window_count=positions_result.get("positions_in_time_window_count"),
+        trips_extracted=trips_result.get("trips_extracted"),
+        new_trips_saved=persistence_result.get("new_rows"),
+        skipped_trips=persistence_result.get("skipped_rows"),
+    )
+    details = {
+        "execution_id": execution_id,
+        "status": overall_status,
+        "failure_phase": None,
+        "failure_message": None,
+        "phases": {
+            "positions": positions_result,
+            "trip_extraction": trips_result,
+            "persistence": persistence_result,
+        },
+        "artifacts": {"quality_report_path": report_path},
+    }
+    report = {"summary": summary, "details": details}
+    save_quality_report(
+        report=report,
+        path=report_path,
+        connection_data=connection_data,
+        write_fn=write_fn,
+    )
+    logger.info(f"Final quality report ({overall_status}) saved to {report_path}.")
     return report

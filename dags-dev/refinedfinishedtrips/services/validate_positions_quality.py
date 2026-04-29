@@ -11,7 +11,7 @@ def _now_utc():
     return datetime.now(timezone.utc)
 
 
-def check_freshness(df, config, now_fn=None):
+def check_freshness(config, df, now_fn=None):
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -57,7 +57,7 @@ def check_freshness(df, config, now_fn=None):
     }
 
 
-def check_recent_gaps(df, config, now_fn=None):
+def check_recent_gaps(config, df, now_fn=None):
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -132,11 +132,11 @@ def check_recent_gaps(df, config, now_fn=None):
     }
 
 
-def validate_positions_quality(df, config, now_fn=None):
+def validate_positions_quality(config, df, now_fn=None):
     logger.info(f"Running positions quality checks on {len(df)} position records.")
     checks = [
-        check_freshness(df, config, now_fn),
-        check_recent_gaps(df, config, now_fn),
+        check_freshness(config, df, now_fn),
+        check_recent_gaps(config, df, now_fn),
     ]
     statuses = [c["status"] for c in checks]
     if "FAIL" in statuses:

@@ -9,7 +9,7 @@ def _effective_window_minutes(df):
     return round((max_ts - min_ts).total_seconds() / 60, 2)
 
 
-def check_zero_trips(effective_window_minutes, trips_count, config):
+def check_zero_trips(config, effective_window_minutes, trips_count):
     def get_config(config):
         return config["general"]["quality"]["trips_effective_window_threshold_minutes"]
 
@@ -36,7 +36,7 @@ def check_zero_trips(effective_window_minutes, trips_count, config):
     return result
 
 
-def check_low_trip_count(effective_window_minutes, trips_count, config):
+def check_low_trip_count(config, effective_window_minutes, trips_count):
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -67,15 +67,15 @@ def check_low_trip_count(effective_window_minutes, trips_count, config):
     return result
 
 
-def validate_trips_quality(df, trips_extracted, config):
+def validate_trips_quality(config, df, trips_extracted):
     trips_count = len(trips_extracted)
     effective_window = _effective_window_minutes(df)
     logger.info(
         f"Running trip extraction quality checks: {trips_count} trips, effective window {effective_window} min."
     )
     checks = [
-        check_zero_trips(effective_window, trips_count, config),
-        check_low_trip_count(effective_window, trips_count, config),
+        check_zero_trips(config, effective_window, trips_count),
+        check_low_trip_count(config, effective_window, trips_count),
     ]
     overall = "WARN" if any(c["status"] == "WARN" for c in checks) else "PASS"
     logger.info(f"Trip extraction quality overall status: {overall}.")

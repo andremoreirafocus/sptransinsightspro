@@ -82,6 +82,7 @@ def save_finished_trips_to_db(config, trips_tuples, engine_factory=create_engine
             logger.info(
                 f"Sync complete: {new_rows} new trips added, {skipped_rows} duplicates skipped."
             )
+        return {"new_rows": new_rows, "skipped_rows": skipped_rows}
     except Exception as e:
         logger.error(f"Persistence failed: {e}")
         raise ValueError(f"Persistence failed: {e}")

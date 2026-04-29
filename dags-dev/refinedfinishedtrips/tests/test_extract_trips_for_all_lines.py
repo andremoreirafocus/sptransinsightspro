@@ -37,7 +37,7 @@ def make_config():
     }
 
 
-def positions_pass_stub(df, config):
+def positions_pass_stub(config, df):
     return {
         "status": "PASS",
         "positions_in_time_window_count": len(df),
@@ -45,7 +45,7 @@ def positions_pass_stub(df, config):
     }
 
 
-def positions_warn_stub(df, config):
+def positions_warn_stub(config, df):
     return {
         "status": "WARN",
         "positions_in_time_window_count": len(df),
@@ -59,7 +59,7 @@ def positions_warn_stub(df, config):
     }
 
 
-def positions_fail_stub(df, config):
+def positions_fail_stub(config, df):
     return {
         "status": "FAIL",
         "positions_in_time_window_count": len(df),
@@ -73,7 +73,7 @@ def positions_fail_stub(df, config):
     }
 
 
-def trips_pass_stub(df, trips, config):
+def trips_pass_stub(config, df, trips):
     return {
         "status": "PASS",
         "effective_window_minutes": 0.0,
