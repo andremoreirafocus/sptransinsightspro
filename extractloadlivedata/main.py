@@ -2,6 +2,7 @@ from src.extractloadlivedata import extractloadlivedata
 from src.config import get_config, validate_config
 from apscheduler.schedulers.blocking import BlockingScheduler
 from datetime import datetime
+from typing import Tuple, Union
 import sys
 
 import logging
@@ -22,13 +23,13 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def run_extractloadlivedata_task():
+def run_extractloadlivedata_task() -> None:
     logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Task executing...")
     extractloadlivedata()
     logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Task executed!")
 
 
-def get_scheduling_config():
+def get_scheduling_config() -> Tuple[str, Union[int, str], int, int, int]:
     config = get_config()
     interval = int(config["EXTRACTION_INTERVAL_SECONDS"])
     if interval <= 0:
@@ -58,7 +59,7 @@ def get_scheduling_config():
     return minutes_schedule, seconds_schedule, grace_time, minutes, seconds
 
 
-def main():
+def main() -> None:
     validate_config(get_config())
     minutes_schedule, seconds_schedule, grace_time, minutes, seconds = (
         get_scheduling_config()

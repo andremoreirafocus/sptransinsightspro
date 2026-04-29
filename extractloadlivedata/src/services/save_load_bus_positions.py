@@ -10,6 +10,7 @@ import json
 import os
 import glob
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from src.services.exceptions import (
     LocalIngestBufferSaveError,
     SavePositionsToRawError,
@@ -18,8 +19,12 @@ from src.services.exceptions import (
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
+ConfigDict = Dict[str, Any]
+PayloadDict = Dict[str, Any]
+StorageSaveResult = Dict[str, Any]
 
-def get_file_name_from_data(data):
+
+def get_file_name_from_data(data: PayloadDict) -> Tuple[str, str]:
     iso_timestamp_str = data.get("metadata").get("extracted_at")
 
     # Parse the timestamp
@@ -42,7 +47,9 @@ def get_file_name_from_data(data):
     return filename, partition
 
 
-def save_bus_positions_to_local_volume(config, data):
+def save_bus_positions_to_local_volume(
+    config: ConfigDict, data: PayloadDict
+) -> None:
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
         compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
@@ -67,7 +74,11 @@ def save_bus_positions_to_local_volume(config, data):
         ) from e
 
 
-def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
+def load_bus_positions_from_local_volume_file(
+    folder: str,
+    file: str,
+    open_fn: Optional[Callable[..., Any]] = None,
+) -> PayloadDict:
     try:
         file_path = f"{folder}/{file}"
         open_fn = open_fn or open
@@ -90,7 +101,12 @@ def load_bus_positions_from_local_volume_file(folder, file, open_fn=None):
     return file_content
 
 
-def remove_local_file(config, data, glob_fn=None, remove_fn=None):
+def remove_local_file(
+    config: ConfigDict,
+    data: PayloadDict,
+    glob_fn: Optional[Callable[..., Any]] = None,
+    remove_fn: Optional[Callable[..., Any]] = None,
+) -> None:
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
         return ingest_buffer_folder
@@ -122,7 +138,10 @@ def remove_local_file(config, data, glob_fn=None, remove_fn=None):
             logger.error(f"Error removing local file '{file_path}': {e}")
 
 
-def get_pending_storage_save_list(config, listdir_fn=None):
+def get_pending_storage_save_list(
+    config: ConfigDict,
+    listdir_fn: Optional[Callable[..., Any]] = None,
+) -> List[str]:
     def get_config(config):
         ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
         return ingest_buffer_folder
@@ -137,8 +156,12 @@ def get_pending_storage_save_list(config, listdir_fn=None):
 
 
 def save_bus_positions_to_storage_with_retries(
-    config, data, sleep_fn=None, save_fn=None, with_metrics=False
-):
+    config: ConfigDict,
+    data: PayloadDict,
+    sleep_fn: Optional[Callable[[int], None]] = None,
+    save_fn: Optional[Callable[[ConfigDict, PayloadDict], None]] = None,
+    with_metrics: bool = False,
+) -> Any:
     def get_config(config):
         # Usamos uma chave específica para retries de storage,
         # ou reaproveitamos a da API conforme sua preferência
@@ -184,7 +207,7 @@ def save_bus_positions_to_storage_with_retries(
             back_off *= 2
 
 
-def save_bus_positions_to_storage(config, data):
+def save_bus_positions_to_storage(config: ConfigDict, data: PayloadDict) -> None:
     def get_config(config):
         compression = config["DATA_COMPRESSION_ON_SAVE"] == "true"
         return compression
@@ -205,7 +228,7 @@ def save_bus_positions_to_storage(config, data):
     )
 
 
-def get_payload_summary(data):
+def get_payload_summary(data: PayloadDict) -> Tuple[str, int, int]:
     hour_minute = data.get("payload").get("hr").replace(":", "")
     total_qv = 0
     payload = data.get("payload")
@@ -215,7 +238,7 @@ def get_payload_summary(data):
     return hour_minute, total_qv, total_bus_lines
 
 
-def data_structure_is_valid(data):
+def data_structure_is_valid(data: Any) -> bool:
     if not isinstance(data, dict):
         logger.error("Data does not have a valid structure.")
         return False
@@ -247,7 +270,12 @@ def data_structure_is_valid(data):
     return True
 
 
-def save_data_to_raw_object_storage(config, data, compression=False, client=None):
+def save_data_to_raw_object_storage(
+    config: ConfigDict,
+    data: str,
+    compression: bool = False,
+    client: Optional[Any] = None,
+) -> None:
     def get_config(config):
         raw_bucket_name = config["SOURCE_BUCKET"]
         app_folder = config["APP_FOLDER"]

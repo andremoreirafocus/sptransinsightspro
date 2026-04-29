@@ -1,10 +1,11 @@
 from sqlalchemy import create_engine, text
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
-def save_row(connection, schema, table, row_tuple, columns, engine_factory=None):
+def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tuple, columns: List[str], engine_factory: Optional[Callable[..., Any]] = None) -> bool:
     """
     Save a single row to the database.
 
@@ -54,7 +55,7 @@ def save_row(connection, schema, table, row_tuple, columns, engine_factory=None)
         raise ValueError(f"Database error while saving row to {schema}.{table}: {e}")
 
 
-def execute_select_query(connection, query, engine_factory=None):
+def execute_select_query(connection: Dict[str, Any], query: str, engine_factory: Optional[Callable[..., Any]] = None) -> List[Dict[str, Any]]:
     """
     Execute a SELECT query and return results as a list of dictionaries.
     """
@@ -85,7 +86,7 @@ def execute_select_query(connection, query, engine_factory=None):
         raise ValueError(f"Database error while executing SELECT query: {e}")
 
 
-def execute_update_query(connection, query, params=None, engine_factory=None):
+def execute_update_query(connection: Dict[str, Any], query: str, params: Optional[Dict[str, Any]] = None, engine_factory: Optional[Callable[..., Any]] = None) -> bool:
     """
     Execute an UPDATE, DELETE, or other DML query.
     """

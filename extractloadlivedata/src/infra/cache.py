@@ -1,6 +1,7 @@
 import diskcache as dc
 import os
 import logging
+from typing import Any, Callable, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 _cache = None
 
 
-def get_cache(cache_dir, cache_factory=None):
+def get_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] = None) -> dc.Cache:
     """
     Get or initialize the diskcache instance.
 
@@ -27,7 +28,7 @@ def get_cache(cache_dir, cache_factory=None):
     return _cache
 
 
-def add_to_cache(cache_dir, key, value, cache_factory=None):
+def add_to_cache(cache_dir: str, key: str, value: Any, cache_factory: Optional[Callable[..., Any]] = None) -> None:
     """
     Add an item to the cache.
 
@@ -42,7 +43,7 @@ def add_to_cache(cache_dir, key, value, cache_factory=None):
     logger.info(f"Cache entry created with key '{key}' and value '{value}'")
 
 
-def get_from_cache(cache_dir, cache_factory=None):
+def get_from_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] = None) -> List[Any]:
     """
     Retrieve all items from the cache.
 
@@ -59,7 +60,7 @@ def get_from_cache(cache_dir, cache_factory=None):
     return items
 
 
-def get_cache_value(cache_dir, key, cache_factory=None):
+def get_cache_value(cache_dir: str, key: str, cache_factory: Optional[Callable[..., Any]] = None) -> Any:
     """
     Retrieve a specific value from the cache.
 
@@ -74,7 +75,7 @@ def get_cache_value(cache_dir, key, cache_factory=None):
     return cache.get(key)
 
 
-def remove_from_cache(cache_dir, key, cache_factory=None):
+def remove_from_cache(cache_dir: str, key: str, cache_factory: Optional[Callable[..., Any]] = None) -> None:
     """
     Remove an item from the cache.
 

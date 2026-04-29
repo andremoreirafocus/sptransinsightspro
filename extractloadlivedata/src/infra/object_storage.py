@@ -1,6 +1,7 @@
 from minio import Minio
 import io
 import logging
+from typing import Any, Dict, List, Optional, Union
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
@@ -8,7 +9,7 @@ logger = logging.getLogger(__name__)
 client_factory = Minio
 
 
-def _get_object_storage_client(connection_data, client=None):
+def _get_object_storage_client(connection_data: Dict[str, Any], client: Optional[Any] = None) -> Any:
     return client or client_factory(
         connection_data["minio_endpoint"],
         access_key=connection_data["access_key"],
@@ -18,11 +19,11 @@ def _get_object_storage_client(connection_data, client=None):
 
 
 def list_objects_in_object_storage_bucket(
-    connection_data,
-    bucket_name,
-    prefix,
-    client=None,
-):
+    connection_data: Dict[str, Any],
+    bucket_name: str,
+    prefix: str,
+    client: Optional[Any] = None,
+) -> List[str]:
     """
     Lists files in a MinIO folder (prefix).
     :param bucket_name: MinIO bucket name
@@ -41,8 +42,11 @@ def list_objects_in_object_storage_bucket(
 
 
 def read_file_from_object_storage(
-    connection_data, bucket_name, object_name, client=None
-):
+    connection_data: Dict[str, Any],
+    bucket_name: str,
+    object_name: str,
+    client: Optional[Any] = None,
+) -> Optional[str]:
     """
     Reads a file from MinIO and returns its contents as a string.
     :param connection data: MinIO connection data
@@ -63,8 +67,12 @@ def read_file_from_object_storage(
 
 
 def write_generic_bytes_to_object_storage(
-    connection_data, buffer, bucket_name, object_name, client=None
-):
+    connection_data: Dict[str, Any],
+    buffer: Union[bytes, io.BytesIO],
+    bucket_name: str,
+    object_name: str,
+    client: Optional[Any] = None,
+) -> None:
     """
     Writes a io bytes buffer (such as from Pandas) to MinIO at the specified bucket and object name.
     :param connection data: MinIO connection data

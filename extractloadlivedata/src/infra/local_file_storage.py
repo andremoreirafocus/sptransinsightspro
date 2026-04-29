@@ -1,20 +1,20 @@
 from src.infra.compression import compress_data
 import os
-
 import logging
+from typing import Any, Callable, Optional
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
 def save_data_to_json_file(
-    data,
-    downloads_folder,
-    file_name,
-    compression=False,
-    open_fn=None,
-    makedirs_fn=None,
-):
+    data: Any,
+    downloads_folder: str,
+    file_name: str,
+    compression: bool = False,
+    open_fn: Optional[Callable[..., Any]] = None,
+    makedirs_fn: Optional[Callable[..., Any]] = None,
+) -> bool:
     open_fn = open_fn or open
     makedirs_fn = makedirs_fn or os.makedirs
     try:

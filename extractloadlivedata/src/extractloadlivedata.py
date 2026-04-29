@@ -25,7 +25,7 @@ from src.services.exceptions import (
     SavePositionsToRawError,
 )
 from dataclasses import dataclass
-from typing import Callable, Optional, Tuple, Any
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from uuid import uuid4
 import json
 
@@ -38,20 +38,24 @@ import logging
 logger = logging.getLogger(__name__)
 SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX = "[SEVERE] non recoverable "
 
+ConfigDict = Dict[str, Any]
+PayloadDict = Dict[str, Any]
+AlertSender = Callable[[str, Dict[str, Any]], None]
+
 
 @dataclass(frozen=True)
 class Services:
-    extract_buses_positions_with_retries: Callable[[dict], Any]
-    get_buses_positions_with_metadata: Callable[[Any], Tuple[Any, Any]]
-    save_bus_positions_to_local_volume: Callable[[dict, Any], None]
-    save_bus_positions_to_storage_with_retries: Callable[[dict, Any], bool]
-    load_bus_positions_from_local_volume_file: Callable[[str, str], Any]
-    remove_local_file: Callable[[dict, Any], None]
-    get_pending_storage_save_list: Callable[[dict], list]
-    create_pending_invokation: Callable[[dict, str], None]
-    trigger_pending_airflow_dag_invokations: Callable[[dict], None]
-    create_pending_processing_request: Callable[[dict, str], None]
-    trigger_pending_processing_requests: Callable[[dict], None]
+    extract_buses_positions_with_retries: Callable[..., Any]
+    get_buses_positions_with_metadata: Callable[[PayloadDict], Tuple[PayloadDict, str]]
+    save_bus_positions_to_local_volume: Callable[[ConfigDict, PayloadDict], None]
+    save_bus_positions_to_storage_with_retries: Callable[..., Any]
+    load_bus_positions_from_local_volume_file: Callable[[str, str], PayloadDict]
+    remove_local_file: Callable[[ConfigDict, PayloadDict], None]
+    get_pending_storage_save_list: Callable[[ConfigDict], List[str]]
+    create_pending_invokation: Callable[[ConfigDict, str], None]
+    trigger_pending_airflow_dag_invokations: Callable[..., Any]
+    create_pending_processing_request: Callable[[ConfigDict, str], None]
+    trigger_pending_processing_requests: Callable[..., Any]
 
 
 def _build_services() -> Services:
@@ -70,7 +74,7 @@ def _build_services() -> Services:
     )
 
 
-def _get_config_values(config: dict) -> Tuple[str, str]:
+def _get_config_values(config: ConfigDict) -> Tuple[str, str]:
     ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
     notification_engine = config.get("NOTIFICATION_ENGINE")
     if notification_engine is None:
@@ -82,9 +86,9 @@ def _get_config_values(config: dict) -> Tuple[str, str]:
 
 
 def extractloadlivedata(
-    config: Optional[dict] = None,
+    config: Optional[ConfigDict] = None,
     services: Optional[Services] = None,
-    send_alert_fn: Callable[[str, dict], None] = send_alert,
+    send_alert_fn: AlertSender = send_alert,
 ) -> None:
     services = services or _build_services()
     config = config or get_config()

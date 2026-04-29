@@ -2,16 +2,23 @@ import requests
 import time
 from datetime import datetime
 import logging
+from typing import Any, Callable, Dict, Optional, Tuple
 from src.services.exceptions import PositionsDownloadError
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 DEFAULT_API_TIMEOUT_SECONDS = 10
+ConfigDict = Dict[str, Any]
+PayloadDict = Dict[str, Any]
+DownloadResult = Dict[str, Any]
 
 
 def extract_buses_positions_with_retries(
-    config, session=None, sleep_fn=None, with_metrics=False
-):
+    config: ConfigDict,
+    session: Optional[Any] = None,
+    sleep_fn: Optional[Callable[[int], None]] = None,
+    with_metrics: bool = False,
+) -> Any:
     def get_config(config):
         token = config["TOKEN"]
         api_base_url = config["API_BASE_URL"]
@@ -58,7 +65,9 @@ def extract_buses_positions_with_retries(
         back_off *= 2
 
 
-def get_buses_positions_with_metadata(buses_positions_payload):
+def get_buses_positions_with_metadata(
+    buses_positions_payload: PayloadDict,
+) -> Tuple[PayloadDict, str]:
     reference_time, total_vehicles = get_buses_positions_summary(
         buses_positions_payload
     )
@@ -76,7 +85,9 @@ def get_buses_positions_with_metadata(buses_positions_payload):
     return buses_positions, reference_time
 
 
-def extract_buses_positions(base_url, token, session=None):
+def extract_buses_positions(
+    base_url: str, token: str, session: Optional[Any] = None
+) -> Optional[PayloadDict]:
     session = session or requests.Session()
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
     try:
@@ -109,7 +120,7 @@ def extract_buses_positions(base_url, token, session=None):
         return None
 
 
-def buses_positions_response_is_valid(buses_positions):
+def buses_positions_response_is_valid(buses_positions: Any) -> bool:
     """
     Validate the structure of the incoming buses_positions.
     :param buses_positions: The buses_positions to validate
@@ -127,7 +138,7 @@ def buses_positions_response_is_valid(buses_positions):
     return True
 
 
-def get_buses_positions_summary(buses_positions):
+def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
     if not isinstance(buses_positions, dict):
         logger.error(f"Incorrect data type: {type(buses_positions)}")
         return "NaN", "NaN"

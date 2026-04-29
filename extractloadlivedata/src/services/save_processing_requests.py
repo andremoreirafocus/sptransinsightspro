@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.infra.sql_db_v2 import save_row
 from src.infra.cache import (
@@ -14,8 +15,17 @@ from src.services.exceptions import IngestNotificationError
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
+ConfigDict = Dict[str, Any]
+DbConnection = Dict[str, Any]
+PendingProcessingMetrics = Dict[str, int]
+PendingProcessingResult = Dict[str, Any]
 
-def create_pending_processing_request(config, pending_marker, cache_factory=None):
+
+def create_pending_processing_request(
+    config: ConfigDict,
+    pending_marker: str,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> None:
     """Add a pending processing request to the cache."""
 
     def get_config(config):
@@ -29,7 +39,10 @@ def create_pending_processing_request(config, pending_marker, cache_factory=None
     add_to_cache(cache_dir, marker_name, pending_marker, cache_factory=cache_factory)
 
 
-def get_pending_processing_requests(config, cache_factory=None):
+def get_pending_processing_requests(
+    config: ConfigDict,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> List[Any]:
     """Retrieve all pending processing requests from the cache."""
 
     def get_config(config):
@@ -40,7 +53,11 @@ def get_pending_processing_requests(config, cache_factory=None):
     return get_from_cache(cache_dir, cache_factory=cache_factory)
 
 
-def remove_pending_processing_request(config, marker_name, cache_factory=None):
+def remove_pending_processing_request(
+    config: ConfigDict,
+    marker_name: str,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> None:
     """Remove a pending processing request from the cache."""
 
     def get_config(config):
@@ -51,7 +68,7 @@ def remove_pending_processing_request(config, marker_name, cache_factory=None):
     remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
 
 
-def get_utc_logical_date_from_file(pending_marker):
+def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
     """Extract logical date from filename and convert to UTC timezone-aware datetime."""
     try:
         logger.info(f"Extracting logical date from: {pending_marker}")
@@ -85,8 +102,11 @@ def get_utc_logical_date_from_file(pending_marker):
 
 
 def save_processing_request(
-    config, pending_marker, save_row_fn=None, engine_factory=None
-):
+    config: ConfigDict,
+    pending_marker: str,
+    save_row_fn: Optional[Callable[..., bool]] = None,
+    engine_factory: Optional[Callable[..., Any]] = None,
+) -> bool:
     """
     Save a processing request to the database.
 
@@ -98,7 +118,7 @@ def save_processing_request(
         bool: True if save was successful, False otherwise
     """
 
-    def get_config(config):
+    def get_config(config: ConfigDict) -> Tuple[DbConnection, str, str]:
         if "RAW_EVENTS_TABLE_NAME" not in config:
             logger.error("RAW_EVENTS_TABLE_NAME configuration is missing.")
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
@@ -171,13 +191,16 @@ def save_processing_request(
 
 
 def trigger_pending_processing_requests(
-    config, cache_factory=None, save_fn=None, with_metrics=False
-):
+    config: ConfigDict,
+    cache_factory: Optional[Callable[..., Any]] = None,
+    save_fn: Optional[Callable[..., bool]] = None,
+    with_metrics: bool = False,
+) -> Optional[PendingProcessingResult]:
     """
     Process all pending processing requests and save them to the database.
     Only remove from cache if the database save was successful.
     """
-    def get_config(config):
+    def get_config(config: ConfigDict) -> str:
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 

@@ -2,6 +2,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import logging
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
 from src.services.exceptions import IngestNotificationError
@@ -9,8 +10,17 @@ from src.services.exceptions import IngestNotificationError
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
+ConfigDict = Dict[str, Any]
+AuthTuple = Tuple[str, str]
+PendingInvocationMetrics = Dict[str, int]
+PendingInvocationResult = Dict[str, Any]
 
-def create_pending_invokation(config, filename, cache_factory=None):
+
+def create_pending_invokation(
+    config: ConfigDict,
+    filename: str,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> None:
     """Add a pending invocation to the cache."""
 
     def get_config(config):
@@ -28,7 +38,11 @@ def create_pending_invokation(config, filename, cache_factory=None):
     )
 
 
-def remove_pending_invokation(config, marker_name, cache_factory=None):
+def remove_pending_invokation(
+    config: ConfigDict,
+    marker_name: str,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> None:
     """Remove a pending invocation from the cache."""
 
     def get_config(config):
@@ -40,7 +54,10 @@ def remove_pending_invokation(config, marker_name, cache_factory=None):
     remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
 
 
-def get_pending_invokations(config, cache_factory=None):
+def get_pending_invokations(
+    config: ConfigDict,
+    cache_factory: Optional[Callable[..., Any]] = None,
+) -> List[Any]:
     """Retrieve all pending invocations from the cache."""
 
     def get_config(config):
@@ -55,8 +72,11 @@ def get_pending_invokations(config, cache_factory=None):
 
 
 def trigger_pending_airflow_dag_invokations(
-    config, post_fn=None, cache_factory=None, with_metrics=False
-):
+    config: ConfigDict,
+    post_fn: Optional[Callable[..., Any]] = None,
+    cache_factory: Optional[Callable[..., Any]] = None,
+    with_metrics: bool = False,
+) -> Optional[PendingInvocationResult]:
     """Trigger all pending invocations and remove them if successful."""
     pending_markers = get_pending_invokations(config, cache_factory=cache_factory)
     success_count = 0
@@ -90,7 +110,7 @@ def trigger_pending_airflow_dag_invokations(
         }
 
 
-def get_utc_logical_date_from_file(pending_marker):
+def get_utc_logical_date_from_file(pending_marker: str) -> str:
     current_timezone_name = datetime.now(ZoneInfo("localtime")).tzname()
     logger.info(f"Current timezone: {current_timezone_name}")
     logger.info(f"pending_marker : {pending_marker}")
@@ -107,12 +127,16 @@ def get_utc_logical_date_from_file(pending_marker):
     return logical_date
 
 
-def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
+def trigger_airflow_dag_run(
+    config: ConfigDict,
+    pending_marker: str,
+    post_fn: Optional[Callable[..., Any]] = None,
+) -> bool:
     """
     Sends the POST request to Airflow API using logical_date.
     """
 
-    def get_config(config):
+    def get_config(config: ConfigDict) -> Tuple[str, AuthTuple]:
         user = config["AIRFLOW_USER"]
         password = config["AIRFLOW_PASSWORD"]
         airflow_webserver = config["AIRFLOW_WEBSERVER"]
@@ -170,7 +194,7 @@ def trigger_airflow_dag_run(config, pending_marker, post_fn=None):
         ) from e
 
 
-def main():
+def main() -> None:
 
     logical_date = get_utc_logical_date_from_file(
         "posicoes_onibus-202602241926.json.zst"

@@ -1,4 +1,5 @@
 import os
+from typing import Dict
 
 from dotenv import load_dotenv
 
@@ -41,12 +42,12 @@ _ENGINE_REQUIRED_KEYS = {
 }
 
 
-def get_config():
+def get_config() -> Dict[str, str]:
     load_dotenv(override=False)
     return os.environ
 
 
-def validate_config(config: dict) -> None:
+def validate_config(config: Dict[str, str]) -> None:
     missing = [k for k in _COMMON_REQUIRED_KEYS if not config.get(k)]
     if missing:
         raise ValueError(f"Missing required config keys: {missing}")
