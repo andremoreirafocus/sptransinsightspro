@@ -36,17 +36,30 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
     logger.info(f"Using staging table: {staging_table} for batch operations.")
     try:
         with engine.begin() as conn:
+            max_result = conn.execute(text(f"SELECT MAX(trip_end_time) FROM {table_name}"))
+            latest_trip_end_time = max_result.fetchone()[0]
+
+        if latest_trip_end_time is not None:
+            new_trips_tuples = [t for t in trips_tuples if t[3] > latest_trip_end_time]
+            logger.info(
+                f"Filtered {len(trips_tuples) - len(new_trips_tuples)} already-persisted trips. "
+                f"{len(new_trips_tuples)} new trips to save."
+            )
+        else:
+            new_trips_tuples = trips_tuples
+
+        with engine.begin() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
             conn.execute(
                 text(f"""
-                CREATE UNLOGGED TABLE {staging_table} 
+                CREATE UNLOGGED TABLE {staging_table}
                 AS SELECT * FROM {table_name} WITH NO DATA;
             """)
             )
-            if trips_tuples:
+            if new_trips_tuples:
                 insert_stmt = text(f"""
                     INSERT INTO {staging_table} (
-                        trip_id, vehicle_id, trip_start_time, trip_end_time, 
+                        trip_id, vehicle_id, trip_start_time, trip_end_time,
                         duration, is_circular, average_speed
                     ) VALUES (:t_id, :v_id, :t_start, :t_end, :dur, :circ, :spd)
                 """)
@@ -60,7 +73,7 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
                         "circ": t[5],
                         "spd": t[6],
                     }
-                    for t in trips_tuples
+                    for t in new_trips_tuples
                 ]
                 conn.execute(insert_stmt, params)
         with engine.begin() as conn:

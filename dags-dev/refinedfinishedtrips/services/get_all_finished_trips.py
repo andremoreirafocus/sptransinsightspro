@@ -1,5 +1,5 @@
 import logging
-from typing import List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import pandas as pd
 
@@ -10,9 +10,14 @@ from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
 logger = logging.getLogger(__name__)
 
 
-def get_all_finished_trips(df_recent_positions: pd.DataFrame) -> List[Tuple]:
+def get_all_finished_trips(config: Dict[str, Any], df_recent_positions: pd.DataFrame) -> List[Tuple]:
+    def get_config(config):
+        return config["general"]["trip_detection"]["stop_proximity_threshold_meters"]
+
+    stop_proximity_threshold_meters = get_config(config)
     positions_list = df_recent_positions.to_dict("records")
     num_processed = 0
+    total_sentido_mismatches = 0
     all_finished_trips = []
     current_vehicle = None
     start_idx = 0
@@ -24,11 +29,12 @@ def get_all_finished_trips(df_recent_positions: pd.DataFrame) -> List[Tuple]:
         vehicle_changed = current_vehicle is not None and current_vehicle != vehicle_key
         if vehicle_changed:
             prev_linha_lt, prev_veiculo_id = current_vehicle
-            finished_trips = extract_trips_per_line_per_vehicle(
-                positions_list, start_idx, i - 1, prev_linha_lt, prev_veiculo_id
+            finished_trips, mismatches = extract_trips_per_line_per_vehicle(
+                positions_list, start_idx, i - 1, prev_linha_lt, prev_veiculo_id, stop_proximity_threshold_meters
             )
             if finished_trips:
                 all_finished_trips.extend(finished_trips)
+            total_sentido_mismatches += mismatches
             num_processed += 1
             if num_processed % 500 == 0:
                 logger.info(
@@ -37,12 +43,14 @@ def get_all_finished_trips(df_recent_positions: pd.DataFrame) -> List[Tuple]:
             start_idx = i
         current_vehicle = vehicle_key
         if is_last:
-            finished_trips = extract_trips_per_line_per_vehicle(
-                positions_list, start_idx, i, linha_lt, veiculo_id
+            finished_trips, mismatches = extract_trips_per_line_per_vehicle(
+                positions_list, start_idx, i, linha_lt, veiculo_id, stop_proximity_threshold_meters
             )
             if finished_trips:
                 all_finished_trips.extend(finished_trips)
+            total_sentido_mismatches += mismatches
             num_processed += 1
+    total_trips = len(all_finished_trips)
     logger.info(f"Progress: {num_processed} vehicle/line combinations processed.")
-    logger.info(f"Total finished trips: {len(all_finished_trips)}")
+    logger.info(f"Total finished trips: {total_trips}, sentido mismatches: {total_sentido_mismatches}/{total_trips}")
     return all_finished_trips

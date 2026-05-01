@@ -19,6 +19,7 @@ def make_config():
                 "trips_effective_window_threshold_minutes": 60,
                 "trips_min_trips_threshold": 5,
             },
+            "trip_detection": {"stop_proximity_threshold_meters": 100},
         },
         "connections": {
             "database": {
@@ -216,7 +217,7 @@ def test_positions_warn_calls_create_report_and_early_webhook():
         create_final_report_fn=noop_create_final_report,
         send_webhook_fn=lambda summary, url: webhooks.append(summary),
         save_trips_fn=noop_save_trips,
-        extract_trips_fn=lambda df: [],
+        extract_trips_fn=lambda config, df: [],
     )
 
     assert len(reports) == 1
@@ -238,7 +239,7 @@ def test_positions_warn_pipeline_continues_and_save_called():
         create_final_report_fn=noop_create_final_report,
         send_webhook_fn=noop_send_webhook,
         save_trips_fn=save,
-        extract_trips_fn=lambda df: [],
+        extract_trips_fn=lambda config, df: [],
     )
 
     assert len(save.calls) == 1
@@ -272,7 +273,7 @@ def test_all_phases_pass_final_webhook_sent_once():
         create_final_report_fn=noop_create_final_report,
         send_webhook_fn=lambda summary, url: webhooks.append(summary),
         save_trips_fn=noop_save_trips,
-        extract_trips_fn=lambda df: [],
+        extract_trips_fn=lambda config, df: [],
     )
 
     assert len(webhooks) == 1
@@ -307,7 +308,7 @@ def test_all_phases_pass_final_report_status_pass():
         create_final_report_fn=capturing_final_report,
         send_webhook_fn=noop_send_webhook,
         save_trips_fn=noop_save_trips,
-        extract_trips_fn=lambda df: [],
+        extract_trips_fn=lambda config, df: [],
     )
 
     assert len(final_reports) == 1
@@ -348,6 +349,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
         make_config(),
         get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
+        extract_trips_fn=lambda config, df: [],
         validate_positions_fn=positions_pass_stub,
         validate_persistence_fn=persistence_pass_stub,
         create_final_report_fn=noop_create_final_report,
@@ -383,6 +385,7 @@ def test_two_vehicles_save_called_once_with_combined_result():
         make_config(),
         get_recent_positions_fn=lambda c: df,
         save_trips_fn=save,
+        extract_trips_fn=lambda config, df: [],
         validate_positions_fn=positions_pass_stub,
         validate_persistence_fn=persistence_pass_stub,
         create_final_report_fn=noop_create_final_report,

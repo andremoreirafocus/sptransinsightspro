@@ -24,6 +24,9 @@
     },
     "notifications": {
       "webhook_url": "disabled"
+    },
+    "trip_detection": {
+      "stop_proximity_threshold_meters": 100
     }
   }
 }

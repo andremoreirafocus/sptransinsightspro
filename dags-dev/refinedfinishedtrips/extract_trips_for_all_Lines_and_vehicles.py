@@ -104,7 +104,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         create_failure_report_fn,
         send_webhook_fn,
     )
-    all_finished_trips = extract_trips_fn(df_recent_positions)
+    all_finished_trips = extract_trips_fn(config, df_recent_positions)
     trips_result = validate_trips_fn(config, df_recent_positions, all_finished_trips)
     _handle_trips_result(trips_result)
     save_result = save_trips_fn(config, all_finished_trips)
