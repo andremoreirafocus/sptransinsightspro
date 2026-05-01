@@ -92,13 +92,17 @@ def _emit_trip(
     is_circular: bool,
 ) -> bool:
     last_record_sentido = position_records[trip_end_record_index]["linha_sentido"]
+    trip_start_time = position_records[trip_start_record_index]["veiculo_ts"]
+    trip_end_time = position_records[trip_end_record_index]["veiculo_ts"]
     mismatch = derived_sentido != last_record_sentido
     if mismatch:
         logger.warning(
             f"Sentido mismatch for vehicle {position_records[0]['veiculo_id']} "
             f"on line {position_records[0]['linha_lt']}: "
             f"derived={derived_sentido}, linha_sentido={last_record_sentido}"
-            f" (circular={is_circular})"
+            f" (circular={is_circular}, "
+            f"start_idx={trip_start_record_index}, end_idx={trip_end_record_index}, "
+            f"trip_start_time={trip_start_time}, trip_end_time={trip_end_time})"
         )
     trips_metadata.append(
         {
