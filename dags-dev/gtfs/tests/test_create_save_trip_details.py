@@ -1,5 +1,4 @@
 import duckdb
-import duckdb
 import pytest
 from fakes.fake_duckdb_connection import FakeDuckDBConnection
 from gtfs.services.create_save_trip_details import (
