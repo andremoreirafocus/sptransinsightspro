@@ -11,6 +11,9 @@ from refinedfinishedtrips.services.extract_trips_from_positions import (
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
     extract_trips_per_line_per_vehicle,
 )
+from refinedfinishedtrips.services.sanitize_position_records import (
+    sanitize_position_records,
+)
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
 THRESHOLD = 100
@@ -24,6 +27,8 @@ def _pos(
     offset_seconds: int = 0,
     linha_sentido: int = 1,
     is_circular: bool = False,
+    veiculo_lat: float = -23.5,
+    veiculo_long: float = -46.6,
 ):
     return {
         "distance_to_first_stop": distance_to_first_stop,
@@ -33,7 +38,25 @@ def _pos(
         "veiculo_id": VEICULO_ID,
         "veiculo_ts": BASE_TS + timedelta(seconds=offset_seconds),
         "is_circular": is_circular,
+        "veiculo_lat": veiculo_lat,
+        "veiculo_long": veiculo_long,
     }
+
+
+def _geo_pos(
+    veiculo_lat: float,
+    veiculo_long: float,
+    offset_seconds: int,
+    linha_sentido: int = 1,
+):
+    return _pos(
+        1000,
+        1000,
+        offset_seconds=offset_seconds,
+        linha_sentido=linha_sentido,
+        veiculo_lat=veiculo_lat,
+        veiculo_long=veiculo_long,
+    )
 
 
 # --- get_trip_id ---
@@ -165,11 +188,37 @@ def test_extract_raw_trips_metadata_divergent_linha_sentido_logs_warning(caplog)
         _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed
         _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # arrived — last record sentido=2, derived=1
     ]
+    with caplog.at_level(logging.DEBUG):
+        result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 1
+    assert result[0]["sentido_mismatch"] is True
+
+
+def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn(caplog):
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # boundary at departure
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # in motion
+        _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # boundary at arrival
+    ]
     with caplog.at_level(logging.WARNING):
         result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido"] == 1
-    assert any("mismatch" in record.message.lower() for record in caplog.records)
+    assert result[0]["sentido_mismatch"] is False
+
+
+def test_extract_raw_trips_metadata_ambiguous_in_trip_sentido_does_not_warn(caplog):
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),
+        _pos(800, 1500, offset_seconds=120, linha_sentido=2),
+        _pos(2000, 60, offset_seconds=180, linha_sentido=1),
+    ]
+    with caplog.at_level(logging.WARNING):
+        result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido_mismatch"] is False
 
 
 # --- generate_trips_table ---
@@ -224,24 +273,27 @@ def test_generate_trips_table_average_speed_always_zero():
 
 
 def test_extract_trips_per_vehicle_empty_positions_returns_empty():
-    trips, mismatches = extract_trips_per_line_per_vehicle([], 0, 0, LINHA_LT, VEICULO_ID, THRESHOLD)
+    trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle([], 0, 0, LINHA_LT, VEICULO_ID, THRESHOLD)
     assert trips == []
     assert mismatches == 0
+    assert dropped_points == 0
 
 
 def test_extract_trips_per_vehicle_invalid_indices_returns_empty():
     position_records = [_pos(50, 3000)]
-    trips, mismatches = extract_trips_per_line_per_vehicle(position_records, 5, 2, LINHA_LT, VEICULO_ID, THRESHOLD)
+    trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(position_records, 5, 2, LINHA_LT, VEICULO_ID, THRESHOLD)
     assert trips == []
     assert mismatches == 0
+    assert dropped_points == 0
 
 
 def test_extract_trips_per_vehicle_no_departure_event_returns_empty():
     # Bus mid-route the entire window — no complete trip
     position_records = [_pos(800, 1500, offset_seconds=i * 60) for i in range(5)]
-    trips, mismatches = extract_trips_per_line_per_vehicle(position_records, 0, 4, LINHA_LT, VEICULO_ID, THRESHOLD)
+    trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(position_records, 0, 4, LINHA_LT, VEICULO_ID, THRESHOLD)
     assert trips == []
     assert mismatches == 0
+    assert dropped_points == 0
 
 
 def test_extract_trips_per_vehicle_one_complete_trip_detected():
@@ -250,9 +302,71 @@ def test_extract_trips_per_vehicle_one_complete_trip_detected():
         _pos(500, 2000, offset_seconds=60, linha_sentido=1),
         _pos(2000, 60, offset_seconds=120, linha_sentido=1),
     ]
-    trips, mismatches = extract_trips_per_line_per_vehicle(
+    trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(
         position_records, 0, 2, LINHA_LT, VEICULO_ID, THRESHOLD
     )
     assert len(trips) == 1
     assert trips[0][0] == "1234-10-0"
     assert mismatches == 0
+    assert dropped_points == 0
+
+
+def test_sanitize_position_records_drops_single_spatial_discontinuity():
+    position_records = [
+        _geo_pos(-23.460811, -46.687363, 0),
+        _geo_pos(-23.526252, -46.667517, 60),
+        _geo_pos(-23.460857, -46.687422, 120),
+    ]
+
+    cleaned_records, sanitization = sanitize_position_records(position_records)
+
+    assert len(cleaned_records) == 2
+    assert cleaned_records[0]["veiculo_ts"] == BASE_TS
+    assert cleaned_records[1]["veiculo_ts"] == BASE_TS + timedelta(seconds=120)
+    assert sanitization["dropped_points_count"] == 1
+
+
+def test_sanitize_position_records_keeps_normal_sequence_unchanged():
+    position_records = [
+        _geo_pos(-23.460811, -46.687363, 0),
+        _geo_pos(-23.461000, -46.688000, 120),
+        _geo_pos(-23.461500, -46.689000, 240),
+    ]
+
+    cleaned_records, sanitization = sanitize_position_records(position_records)
+
+    assert cleaned_records == position_records
+    assert sanitization["dropped_points_count"] == 0
+
+
+def test_sanitize_position_records_does_not_drop_two_consecutive_bad_points():
+    position_records = [
+        _geo_pos(-23.460811, -46.687363, 0),
+        _geo_pos(-23.526252, -46.667517, 60),
+        _geo_pos(-23.526241, -46.667897, 120),
+        _geo_pos(-23.460857, -46.687422, 180),
+    ]
+
+    cleaned_records, sanitization = sanitize_position_records(position_records)
+
+    assert cleaned_records == position_records
+    assert sanitization["dropped_points_count"] == 0
+
+
+def test_extract_trips_per_vehicle_logs_when_sanitization_drops_point(caplog):
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1, veiculo_lat=-23.460811, veiculo_long=-46.687363),
+        _pos(3000, 50, offset_seconds=60, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
+        _pos(500, 2000, offset_seconds=120, linha_sentido=1, veiculo_lat=-23.461000, veiculo_long=-46.688000),
+        _pos(1200, 1000, offset_seconds=180, linha_sentido=1, veiculo_lat=-23.480000, veiculo_long=-46.690000),
+        _pos(2000, 60, offset_seconds=240, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
+    ]
+
+    with caplog.at_level(logging.DEBUG):
+        trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(
+            position_records, 0, len(position_records) - 1, LINHA_LT, VEICULO_ID, THRESHOLD
+        )
+
+    assert len(trips) == 1
+    assert mismatches == 0
+    assert dropped_points == 1

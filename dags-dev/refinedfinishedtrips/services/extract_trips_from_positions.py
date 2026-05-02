@@ -1,4 +1,5 @@
 import logging
+from collections import Counter
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -56,6 +57,7 @@ def extract_raw_trips_metadata(
                         current_index,
                         derived_sentido,
                         is_circular,
+                        stop_proximity_threshold_meters,
                     )
                     state = _SEEKING_DEPARTURE
                     trip_start_record_index = None
@@ -74,6 +76,7 @@ def extract_raw_trips_metadata(
                         current_index,
                         derived_sentido,
                         is_circular,
+                        stop_proximity_threshold_meters,
                     )
                     state = _SEEKING_DEPARTURE
                     trip_start_record_index = None
@@ -90,19 +93,24 @@ def _emit_trip(
     trip_end_record_index: int,
     derived_sentido: int,
     is_circular: bool,
+    stop_proximity_threshold_meters: int,
 ) -> bool:
-    last_record_sentido = position_records[trip_end_record_index]["linha_sentido"]
+    representative_sentido = _get_representative_in_trip_sentido(
+        position_records,
+        trip_start_record_index,
+        trip_end_record_index,
+        stop_proximity_threshold_meters,
+    )
     trip_start_time = position_records[trip_start_record_index]["veiculo_ts"]
     trip_end_time = position_records[trip_end_record_index]["veiculo_ts"]
-    mismatch = derived_sentido != last_record_sentido
+    mismatch = (
+        representative_sentido is not None and derived_sentido != representative_sentido
+    )
     if mismatch:
-        logger.warning(
+        logger.debug(
             f"Sentido mismatch for vehicle {position_records[0]['veiculo_id']} "
             f"on line {position_records[0]['linha_lt']}: "
-            f"derived={derived_sentido}, linha_sentido={last_record_sentido}"
-            f" (circular={is_circular}, "
-            f"start_idx={trip_start_record_index}, end_idx={trip_end_record_index}, "
-            f"trip_start_time={trip_start_time}, trip_end_time={trip_end_time})"
+            f"trip_start_time={trip_start_time}, trip_end_time={trip_end_time}"
         )
     trips_metadata.append(
         {
@@ -113,6 +121,35 @@ def _emit_trip(
         }
     )
     return mismatch
+
+
+def _get_representative_in_trip_sentido(
+    position_records: List[Dict[str, Any]],
+    trip_start_record_index: int,
+    trip_end_record_index: int,
+    stop_proximity_threshold_meters: int,
+) -> Optional[int]:
+    in_trip_sentidos = []
+    for position_record in position_records[
+        trip_start_record_index : trip_end_record_index + 1
+    ]:
+        at_first_stop = (
+            position_record["distance_to_first_stop"] < stop_proximity_threshold_meters
+        )
+        at_last_stop = (
+            position_record["distance_to_last_stop"] < stop_proximity_threshold_meters
+        )
+        if at_first_stop or at_last_stop:
+            continue
+        in_trip_sentidos.append(position_record["linha_sentido"])
+
+    if not in_trip_sentidos:
+        return None
+
+    counts = Counter(in_trip_sentidos).most_common()
+    if len(counts) != 1:
+        return None
+    return int(counts[0][0])
 
 
 def get_trip_id(linha: str, sentido: int) -> str:
