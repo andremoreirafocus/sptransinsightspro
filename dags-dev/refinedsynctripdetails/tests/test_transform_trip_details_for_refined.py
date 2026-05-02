@@ -35,7 +35,7 @@ def test_non_circular_trip_details_remain_unchanged():
     assert transformed_row["first_stop_name"] == "Terminal A"
     assert transformed_row["last_stop_id"] == 2
     assert transformed_row["last_stop_name"] == "Terminal B"
-    assert transformed_row["is_circular"] == False
+    assert not transformed_row["is_circular"]
 
 
 def test_circular_direction_0_replaces_last_stop_with_intermediate_placeholder():

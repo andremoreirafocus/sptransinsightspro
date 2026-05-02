@@ -6,7 +6,21 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 
 ## O que este subprojeto faz
 - Lê da camada trusted a tabela de detalhes de viagem gerada a partir da extração de dados do GFTS da SPTRANS.
-- Replica este conteúdo para uma tabela de detalhes de viagens na camada refined para servir à camada de visualização.
+- Aplica uma transformação leve para a camada refined antes da persistência, preservando a tabela trusted como fonte canônica de referência.
+- Salva este resultado em uma tabela de detalhes de viagens na camada refined para servir à camada de visualização.
+
+### Tratamento de linhas circulares na camada refined
+Para linhas circulares, a camada refined não replica cegamente os extremos da tabela trusted.
+
+Como a visualização consome metadados de origem e destino por direção operacional, o pipeline ajusta os registros circulares:
+- em viagens `-0`, preserva os campos de `first_stop_*`
+- em viagens `-1`, preserva os campos de `last_stop_*`
+- no extremo oposto, substitui o nome por `Parada intermediaria`
+- no extremo oposto, define `id`, `lat` e `lon` como nulos
+
+Assim:
+- a camada trusted continua com metadados canônicos para processamento
+- a camada refined passa a expor metadados mais aderentes à semântica esperada pelo dashboard
 
 
 ## Pré-requisitos
