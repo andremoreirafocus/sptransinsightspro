@@ -1,7 +1,4 @@
-import logging
 from datetime import datetime, timedelta, timezone
-
-import pytest
 
 from refinedfinishedtrips.services.extract_trips_from_positions import (
     extract_raw_trips_metadata,
@@ -170,55 +167,168 @@ def test_extract_raw_trips_metadata_dwell_time_excluded_from_trip_start():
     assert result[0]["start_position_index"] == 2
 
 
-def test_extract_raw_trips_metadata_circular_route_does_not_close_immediately():
-    # First record is within threshold of both stops — must not immediately close a trip
+def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
+    # Circular routes may use the same anchor for start and end; after real departure,
+    # returning to the anchor closes the trip.
     position_records = [
-        _pos(50, 50, offset_seconds=0, is_circular=True, linha_sentido=1),    # at both stops simultaneously
-        _pos(500, 2000, offset_seconds=60, is_circular=True, linha_sentido=1),  # departed
-        _pos(2000, 60, offset_seconds=120, is_circular=True, linha_sentido=1),  # arrived
+        _pos(50, 50, offset_seconds=0, is_circular=True, linha_sentido=1),
+        _pos(500, 2000, offset_seconds=60, is_circular=True, linha_sentido=1),
+        _pos(2000, 60, offset_seconds=120, is_circular=True, linha_sentido=1),
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
-    # No trip should be emitted because at_first_stop and at_last_stop were both True on first record
-    assert result == []
+    assert len(result) == 1
+    assert result[0]["start_position_index"] == 0
+    assert result[0]["end_position_index"] == 2
+    assert result[0]["sentido"] == 1
 
 
-def test_extract_raw_trips_metadata_divergent_linha_sentido_logs_warning(caplog):
+def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_mismatch():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # at first stop, wrong sentido
         _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed
         _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # arrived — last record sentido=2, derived=1
     ]
-    with caplog.at_level(logging.DEBUG):
-        result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido"] == 1
     assert result[0]["sentido_mismatch"] is True
 
 
-def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn(caplog):
+def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # boundary at departure
         _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # in motion
         _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # boundary at arrival
     ]
-    with caplog.at_level(logging.WARNING):
-        result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido"] == 1
     assert result[0]["sentido_mismatch"] is False
 
 
-def test_extract_raw_trips_metadata_ambiguous_in_trip_sentido_does_not_warn(caplog):
+def test_extract_raw_trips_metadata_ambiguous_in_trip_sentido_does_not_warn():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=1),
         _pos(500, 2000, offset_seconds=60, linha_sentido=1),
         _pos(800, 1500, offset_seconds=120, linha_sentido=2),
         _pos(2000, 60, offset_seconds=180, linha_sentido=1),
     ]
-    with caplog.at_level(logging.WARNING):
-        result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido_mismatch"] is False
+
+
+def test_extract_raw_trips_metadata_circular_syncs_only_after_first_anchor_occurrence():
+    position_records = [
+        _pos(600, 700, offset_seconds=0, is_circular=True, linha_sentido=1),
+        _pos(700, 800, offset_seconds=60, is_circular=True, linha_sentido=1),
+        _pos(50, 400, offset_seconds=120, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(60, 420, offset_seconds=180, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(500, 1200, offset_seconds=240, is_circular=True, linha_sentido=1, veiculo_lat=-23.5050, veiculo_long=-46.6050),
+        _pos(700, 800, offset_seconds=300, is_circular=True, linha_sentido=1, veiculo_lat=-23.5100, veiculo_long=-46.6100),
+        _pos(60, 430, offset_seconds=360, is_circular=True, linha_sentido=2, veiculo_lat=-23.5001, veiculo_long=-46.6001),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert len(result) == 1
+    assert result[0]["start_position_index"] == 3
+    assert result[0]["end_position_index"] == 5
+    assert result[0]["sentido"] == 1
+
+
+def test_extract_raw_trips_metadata_circular_removes_waiting_time_from_trip_start():
+    position_records = [
+        _pos(50, 400, offset_seconds=0, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(60, 420, offset_seconds=60, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(55, 410, offset_seconds=120, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(500, 1200, offset_seconds=180, is_circular=True, linha_sentido=1, veiculo_lat=-23.5050, veiculo_long=-46.6050),
+        _pos(900, 900, offset_seconds=240, is_circular=True, linha_sentido=1, veiculo_lat=-23.5100, veiculo_long=-46.6100),
+        _pos(60, 430, offset_seconds=300, is_circular=True, linha_sentido=2, veiculo_lat=-23.5001, veiculo_long=-46.6001),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert len(result) == 1
+    assert result[0]["start_position_index"] == 2
+    assert result[0]["end_position_index"] == 4
+
+
+def test_extract_raw_trips_metadata_circular_direction_change_after_movement_creates_trip():
+    position_records = [
+        _pos(50, 400, offset_seconds=0, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(500, 1200, offset_seconds=60, is_circular=True, linha_sentido=1, veiculo_lat=-23.5050, veiculo_long=-46.6050),
+        _pos(800, 1000, offset_seconds=120, is_circular=True, linha_sentido=1, veiculo_lat=-23.5100, veiculo_long=-46.6100),
+        _pos(70, 450, offset_seconds=180, is_circular=True, linha_sentido=2, veiculo_lat=-23.5001, veiculo_long=-46.6001),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert len(result) == 1
+    assert result[0]["start_position_index"] == 0
+    assert result[0]["end_position_index"] == 2
+    assert result[0]["sentido"] == 1
+
+
+def test_extract_raw_trips_metadata_circular_movement_inside_anchor_does_not_create_false_trip():
+    position_records = [
+        _pos(5, 5, offset_seconds=0, is_circular=True, linha_sentido=2, veiculo_lat=-23.469887, veiculo_long=-46.721775),
+        _pos(5, 5, offset_seconds=120, is_circular=True, linha_sentido=2, veiculo_lat=-23.469887, veiculo_long=-46.721775),
+        _pos(64, 64, offset_seconds=240, is_circular=True, linha_sentido=2, veiculo_lat=-23.470407, veiculo_long=-46.721549),
+        _pos(24, 24, offset_seconds=360, is_circular=True, linha_sentido=1, veiculo_lat=-23.469688, veiculo_long=-46.721875),
+        _pos(231, 231, offset_seconds=480, is_circular=True, linha_sentido=1, veiculo_lat=-23.471774, veiculo_long=-46.720854),
+        _pos(900, 900, offset_seconds=600, is_circular=True, linha_sentido=1, veiculo_lat=-23.477580, veiculo_long=-46.719051),
+        _pos(1411, 1411, offset_seconds=720, is_circular=True, linha_sentido=1, veiculo_lat=-23.482070, veiculo_long=-46.717945),
+        _pos(1610, 1610, offset_seconds=840, is_circular=True, linha_sentido=1, veiculo_lat=-23.484344, veiculo_long=-46.722791),
+        _pos(1895, 1895, offset_seconds=960, is_circular=True, linha_sentido=2, veiculo_lat=-23.486371, veiculo_long=-46.726582),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert len(result) == 1
+    assert result[0]["start_position_index"] == 3
+    assert result[0]["end_position_index"] == 7
+    assert result[0]["sentido"] == 1
+
+
+def test_extract_raw_trips_metadata_circular_terminal_return_closes_trip_after_off_terminal_sentido_change():
+    position_records = [
+        _pos(5, 5, offset_seconds=0, is_circular=True, linha_sentido=2, veiculo_lat=-23.469887, veiculo_long=-46.721775),
+        _pos(5, 5, offset_seconds=120, is_circular=True, linha_sentido=2, veiculo_lat=-23.469887, veiculo_long=-46.721775),
+        _pos(24, 24, offset_seconds=240, is_circular=True, linha_sentido=1, veiculo_lat=-23.469688, veiculo_long=-46.721875),
+        _pos(231, 231, offset_seconds=360, is_circular=True, linha_sentido=1, veiculo_lat=-23.471774, veiculo_long=-46.720854),
+        _pos(900, 900, offset_seconds=480, is_circular=True, linha_sentido=1, veiculo_lat=-23.477580, veiculo_long=-46.719051),
+        _pos(1411, 1411, offset_seconds=600, is_circular=True, linha_sentido=1, veiculo_lat=-23.482070, veiculo_long=-46.717945),
+        _pos(1610, 1610, offset_seconds=720, is_circular=True, linha_sentido=1, veiculo_lat=-23.484344, veiculo_long=-46.722791),
+        _pos(1895, 1895, offset_seconds=840, is_circular=True, linha_sentido=2, veiculo_lat=-23.486371, veiculo_long=-46.726582),
+        _pos(1661, 1661, offset_seconds=960, is_circular=True, linha_sentido=2, veiculo_lat=-23.484783, veiculo_long=-46.723133),
+        _pos(1406, 1406, offset_seconds=1080, is_circular=True, linha_sentido=2, veiculo_lat=-23.482116, veiculo_long=-46.718284),
+        _pos(529, 529, offset_seconds=1200, is_circular=True, linha_sentido=2, veiculo_lat=-23.474263, veiculo_long=-46.719772),
+        _pos(5, 5, offset_seconds=1320, is_circular=True, linha_sentido=2, veiculo_lat=-23.469887, veiculo_long=-46.721775),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert len(result) == 2
+    assert result[0]["start_position_index"] == 2
+    assert result[0]["end_position_index"] == 6
+    assert result[0]["sentido"] == 1
+    assert result[1]["start_position_index"] == 7
+    assert result[1]["end_position_index"] == 11
+    assert result[1]["sentido"] == 2
+
+
+def test_extract_raw_trips_metadata_circular_noisy_direction_flip_without_movement_does_not_create_trip():
+    position_records = [
+        _pos(50, 400, offset_seconds=0, is_circular=True, linha_sentido=1, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(55, 410, offset_seconds=60, is_circular=True, linha_sentido=2, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(60, 420, offset_seconds=120, is_circular=True, linha_sentido=2, veiculo_lat=-23.5000, veiculo_long=-46.6000),
+        _pos(500, 1200, offset_seconds=180, is_circular=True, linha_sentido=2, veiculo_lat=-23.5050, veiculo_long=-46.6050),
+    ]
+
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+
+    assert result == []
 
 
 # --- generate_trips_table ---
@@ -353,7 +463,7 @@ def test_sanitize_position_records_does_not_drop_two_consecutive_bad_points():
     assert sanitization["dropped_points_count"] == 0
 
 
-def test_extract_trips_per_vehicle_logs_when_sanitization_drops_point(caplog):
+def test_extract_trips_per_vehicle_returns_drop_count_when_sanitization_drops_point():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=1, veiculo_lat=-23.460811, veiculo_long=-46.687363),
         _pos(3000, 50, offset_seconds=60, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
@@ -362,10 +472,9 @@ def test_extract_trips_per_vehicle_logs_when_sanitization_drops_point(caplog):
         _pos(2000, 60, offset_seconds=240, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
     ]
 
-    with caplog.at_level(logging.DEBUG):
-        trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(
-            position_records, 0, len(position_records) - 1, LINHA_LT, VEICULO_ID, THRESHOLD
-        )
+    trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(
+        position_records, 0, len(position_records) - 1, LINHA_LT, VEICULO_ID, THRESHOLD
+    )
 
     assert len(trips) == 1
     assert mismatches == 0

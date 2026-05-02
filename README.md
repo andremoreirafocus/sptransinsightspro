@@ -29,6 +29,9 @@ Detalhes sobre as DAGS:
         ![Para mais informações:](./dags-dev/transformlivedata/README.md)
     - DAG orchestratetransform: processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.  ![Para mais informações:](./dags-dev/orchestratetransform/README.md)
     - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada enriquecidos da camada trusted, incluindo checagem de qualidade com as seguintes etapas:
+        - Extração de viagens baseada principalmente em geolocalização 
+        - Sanitização de amostras anômalas de posição
+        - Maior precisão de `trip_start_time`, `trip_end_time` e `duration`
         - Verificação de qualidade das posições (freshness e gaps de extração); falha interrompe o pipeline com relatório e notificação imediata
         - Verificação de qualidade da extração de viagens (zero trips e low trip count) baseada na janela efetiva de extração
         - Verificação de duplicatas na persistência

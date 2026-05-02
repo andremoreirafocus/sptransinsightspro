@@ -1,5 +1,6 @@
 import logging
 from collections import Counter
+from math import atan2, cos, radians, sin, sqrt
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
@@ -8,9 +9,44 @@ _SEEKING_DEPARTURE = "SEEKING_DEPARTURE"
 _IN_TRIP = "IN_TRIP"
 _DIRECTION_FIRST_TO_LAST = "first_to_last"
 _DIRECTION_LAST_TO_FIRST = "last_to_first"
+_CIRCULAR_SEEKING_START = "SEEKING_START"
+_CIRCULAR_SEEKING_TERMINAL_EXIT = "SEEKING_TERMINAL_EXIT"
+_CIRCULAR_IN_TRIP = "IN_TRIP"
+_MIN_MOVEMENT_DISTANCE_METERS = 30.0
 
 
 def extract_raw_trips_metadata(
+    position_records: List[Dict[str, Any]],
+    stop_proximity_threshold_meters: int,
+) -> List[Dict[str, Any]]:
+    if not position_records:
+        return []
+    if position_records[0]["is_circular"]:
+        trips_metadata = extract_circular_trips_metadata(
+            position_records, stop_proximity_threshold_meters
+        )
+        if trips_metadata:
+            logger.debug(
+                "Using circular trip extraction for line %s vehicle %s; detected %s trip(s)",
+                position_records[0]["linha_lt"],
+                position_records[0]["veiculo_id"],
+                len(trips_metadata),
+            )
+        return trips_metadata
+    trips_metadata = extract_non_circular_trips_metadata(
+        position_records, stop_proximity_threshold_meters
+    )
+    if trips_metadata:
+        logger.debug(
+            "Using non-circular trip extraction for line %s vehicle %s; detected %s trip(s)",
+            position_records[0]["linha_lt"],
+            position_records[0]["veiculo_id"],
+            len(trips_metadata),
+        )
+    return trips_metadata
+
+
+def extract_non_circular_trips_metadata(
     position_records: List[Dict[str, Any]],
     stop_proximity_threshold_meters: int,
 ) -> List[Dict[str, Any]]:
@@ -86,6 +122,117 @@ def extract_raw_trips_metadata(
     return trips_metadata
 
 
+def extract_circular_trips_metadata(
+    position_records: List[Dict[str, Any]],
+    stop_proximity_threshold_meters: int,
+) -> List[Dict[str, Any]]:
+    trips_metadata = []
+    if len(position_records) < 2:
+        return trips_metadata
+
+    state = _CIRCULAR_SEEKING_START
+    trip_start_record_index: Optional[int] = None
+    active_sentido: Optional[int] = None
+    synchronized = False
+
+    for current_index, position_record in enumerate(position_records):
+        at_anchor_stop = _is_at_anchor_stop(
+            position_record, stop_proximity_threshold_meters
+        )
+        current_sentido = int(position_record["linha_sentido"])
+
+        if not synchronized:
+            if not at_anchor_stop:
+                continue
+            synchronized = True
+
+        if state == _CIRCULAR_SEEKING_START:
+            if current_index > 0:
+                previous_record = position_records[current_index - 1]
+                previous_sentido = int(previous_record["linha_sentido"])
+                previous_at_anchor_stop = _is_at_anchor_stop(
+                    previous_record, stop_proximity_threshold_meters
+                )
+                if current_sentido != previous_sentido:
+                    trip_start_record_index = current_index
+                    active_sentido = current_sentido
+                    if at_anchor_stop:
+                        state = _CIRCULAR_SEEKING_TERMINAL_EXIT
+                    else:
+                        state = _CIRCULAR_IN_TRIP
+                    continue
+                if (
+                    previous_at_anchor_stop
+                    and not at_anchor_stop
+                    and previous_sentido == current_sentido
+                    and _has_meaningful_movement(previous_record, position_record)
+                ):
+                    trip_start_record_index = current_index - 1
+                    active_sentido = current_sentido
+                    state = _CIRCULAR_IN_TRIP
+                    continue
+            if at_anchor_stop:
+                trip_start_record_index = current_index
+                active_sentido = current_sentido
+                state = _CIRCULAR_SEEKING_TERMINAL_EXIT
+                continue
+
+        if state == _CIRCULAR_SEEKING_TERMINAL_EXIT:
+            if trip_start_record_index is None or active_sentido is None:
+                state = _CIRCULAR_SEEKING_START
+                continue
+            if at_anchor_stop:
+                if current_sentido != active_sentido:
+                    trip_start_record_index = current_index
+                    active_sentido = current_sentido
+                else:
+                    trip_start_record_index = current_index
+                continue
+            if current_sentido == active_sentido:
+                state = _CIRCULAR_IN_TRIP
+                continue
+            trip_start_record_index = current_index
+            active_sentido = current_sentido
+            state = _CIRCULAR_IN_TRIP
+            continue
+
+        if state == _CIRCULAR_IN_TRIP and active_sentido is not None:
+            if current_sentido != active_sentido and trip_start_record_index is not None:
+                trip_end_record_index = current_index - 1
+                if trip_end_record_index >= trip_start_record_index:
+                    _emit_trip(
+                        trips_metadata,
+                        position_records,
+                        trip_start_record_index,
+                        trip_end_record_index,
+                        active_sentido,
+                        True,
+                        stop_proximity_threshold_meters,
+                    )
+                trip_start_record_index = current_index
+                active_sentido = current_sentido
+                if at_anchor_stop:
+                    state = _CIRCULAR_SEEKING_TERMINAL_EXIT
+                else:
+                    state = _CIRCULAR_IN_TRIP
+                continue
+            if at_anchor_stop and trip_start_record_index is not None:
+                _emit_trip(
+                    trips_metadata,
+                    position_records,
+                    trip_start_record_index,
+                    current_index,
+                    active_sentido,
+                    True,
+                    stop_proximity_threshold_meters,
+                )
+                trip_start_record_index = current_index
+                active_sentido = current_sentido
+                state = _CIRCULAR_SEEKING_TERMINAL_EXIT
+
+    return trips_metadata
+
+
 def _emit_trip(
     trips_metadata: List[Dict[str, Any]],
     position_records: List[Dict[str, Any]],
@@ -121,6 +268,40 @@ def _emit_trip(
         }
     )
     return mismatch
+
+
+def _is_at_anchor_stop(
+    position_record: Dict[str, Any], stop_proximity_threshold_meters: int
+) -> bool:
+    return (
+        position_record["distance_to_first_stop"] < stop_proximity_threshold_meters
+        or position_record["distance_to_last_stop"] < stop_proximity_threshold_meters
+    )
+
+
+def _has_meaningful_movement(
+    current_record: Dict[str, Any], next_record: Dict[str, Any]
+) -> bool:
+    distance_meters = _calculate_distance_meters(
+        float(current_record["veiculo_lat"]),
+        float(current_record["veiculo_long"]),
+        float(next_record["veiculo_lat"]),
+        float(next_record["veiculo_long"]),
+    )
+    return distance_meters > _MIN_MOVEMENT_DISTANCE_METERS
+
+
+def _calculate_distance_meters(
+    lat1: float, lon1: float, lat2: float, lon2: float
+) -> float:
+    earth_radius_meters = 6371000
+    phi1 = radians(lat1)
+    phi2 = radians(lat2)
+    delta_phi = radians(lat2 - lat1)
+    delta_lambda = radians(lon2 - lon1)
+    a = sin(delta_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(delta_lambda / 2) ** 2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return earth_radius_meters * c
 
 
 def _get_representative_in_trip_sentido(

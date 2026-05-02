@@ -21,6 +21,103 @@ Para cada linha e veículo:
   - **duplicatas**: aviso se todas as viagens da execução já estavam presentes no banco de dados (duplicatas)
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata e notifica via webhook com o status consolidado das três fases (posições, extração de viagens e persistência)
 
+## Algoritmo de extração de viagens
+O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
+- `trip_start_time`
+- `trip_end_time`
+- `duration`
+
+Esses campos são especialmente sensíveis a ruídos comuns do dado de posição em produção, como:
+- ônibus parado em terminal antes de iniciar a viagem
+- mudança de `linha_sentido` em momentos de borda operacional
+- amostras espaciais isoladas incompatíveis com a trajetória real
+- janelas de processamento que começam ou terminam no meio de um ciclo operacional
+
+Por isso, a extração não se apoia apenas em `linha_sentido`. A lógica usa principalmente geolocalização para identificar início e fim de viagem e usa `linha_sentido` apenas como sinal complementar quando necessário, especialmente em linhas circulares.
+
+### 1. Sanitização espacial das posições
+Antes de extrair viagens, o pipeline sanitiza a sequência de posições de cada combinação linha/veículo.
+
+Essa sanitização remove amostras isoladas espacialmente inválidas, caracterizadas por:
+- um ponto intermediário incompatível com o ponto anterior
+- incompatível também com o ponto seguinte
+- enquanto a ligação direta entre anterior e seguinte permanece plausível
+
+Na prática, isso elimina "teletransportes" pontuais do ônibus sem descartar sequências inteiras de dados.
+Esse passo é importante porque um único ponto espacial inválido pode:
+- antecipar artificialmente um início de viagem
+- encerrar uma viagem no ponto errado
+- inflar ou reduzir incorretamente a duração observada
+
+Com isso, a extração final fica mais estável e mais aderente ao deslocamento real do veículo.
+
+### 2. Linhas não circulares
+Para linhas não circulares, o algoritmo usa proximidade geográfica aos terminais de referência:
+- `first_stop`
+- `last_stop`
+
+Uma viagem é formada quando:
+- o veículo é observado próximo de um terminal
+- depois se afasta desse terminal
+- e posteriormente chega ao terminal oposto
+
+O início da viagem é registrado como a última posição ainda próxima do terminal de partida antes do movimento real.
+O fim da viagem é registrado quando o veículo entra na zona de proximidade do terminal de chegada.
+
+Assim, a detecção depende da trajetória espacial observada, e não apenas de `linha_sentido`.
+Essa estratégia é necessária porque:
+- o ônibus pode permanecer parado no terminal por vários ciclos de coleta antes de partir
+- o `linha_sentido` pode mudar em momentos de borda antes ou depois do deslocamento efetivo
+
+Ao usar a fronteira espacial observada, o algoritmo melhora diretamente:
+- a precisão do início da viagem
+- a precisão do fim da viagem
+- a qualidade da duração calculada
+
+### 3. Linhas circulares
+Para linhas circulares, o algoritmo usa uma composição de dois sinais de fronteira:
+- proximidade ao terminal/âncora
+- mudança de `linha_sentido`
+
+Após a primeira sincronização do veículo com a região do terminal, o algoritmo passa a detectar viagens considerando que:
+- uma viagem pode começar por saída do terminal
+- uma viagem também pode começar por mudança de `linha_sentido`
+- uma viagem pode terminar por retorno ao terminal
+- uma viagem também pode terminar por mudança de `linha_sentido`
+
+Isso evita perda de viagens quando a janela de análise começa no meio de um ciclo ou quando a mudança de sentido ocorre fora da área do terminal.
+Esse comportamento é importante porque, em linhas circulares:
+- a janela de processamento pode não capturar a saída do terminal
+- uma viagem pode precisar ser encerrada por retorno ao terminal
+- outra pode precisar ser segmentada por mudança operacional de `linha_sentido`
+
+Sem essa composição de sinais, viagens circulares tenderiam a ficar subdetectadas ou com limites temporais imprecisos.
+
+### 4. Remoção de tempo parado em terminal
+Períodos em que o ônibus permanece parado aguardando início de operação não devem inflar a duração da viagem.
+
+Por isso, o algoritmo:
+- remove o dwell no terminal do início da viagem
+- usa como início efetivo a última posição no terminal imediatamente anterior à saída real
+
+Essa remoção é aplicada apenas em contexto de terminal, não durante o percurso em rota.
+Isso é necessário para que a duração represente o tempo de operação da viagem, e não o tempo de espera do veículo estacionado antes da partida.
+
+### 5. Validação de sentido
+O campo `linha_sentido` não é usado como única base para descobrir viagens.
+
+Ele é usado como sinal complementar:
+- principalmente para segmentação de linhas circulares
+- e para validação de consistência da viagem detectada
+
+Na validação, o algoritmo desconsidera amostras de borda próximas ao terminal, pois nessas regiões o `linha_sentido` pode mudar antes ou depois do deslocamento real devido à granularidade temporal da coleta.
+
+Em conjunto, essas decisões tornam a tabela de viagens finalizadas mais confiável para:
+- análise de eficiência operacional
+- comparação de duração entre viagens
+- avaliação de ciclo e regularidade
+- consumo analítico na camada de visualização
+
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
 - Disponibilidade do bucket da camada metadata no serviço de object storage para armazenamento dos relatórios de qualidade
