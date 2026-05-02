@@ -4,6 +4,9 @@ from refinedsynctripdetails.services.load_trip_details_from_storage_to_dataframe
 from refinedsynctripdetails.services.save_trip_details_from_dataframe_to_refined import (
     save_trip_details_from_dataframe_to_refined,
 )
+from refinedsynctripdetails.services.transform_trip_details_for_refined import (
+    transform_trip_details_for_refined,
+)
 from pipeline_configurator.config import get_config
 from refinedsynctripdetails.config.refinedsynctripdetails_config_schema import (
     GeneralConfig,
@@ -47,6 +50,7 @@ def _load_pipeline_config():
 def refined_sync_trip_details(config):
 
     df_trip_details = load_trip_details_from_storage_to_dataframe(config)
+    df_trip_details = transform_trip_details_for_refined(df_trip_details)
     save_trip_details_from_dataframe_to_refined(config, df_trip_details)
 
 
