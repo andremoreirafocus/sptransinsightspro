@@ -41,11 +41,19 @@ def extract_trips_per_line_per_vehicle(
         if not raw_trips_metadata:
             logger.debug(f"No trips for line {linha_lt} vehicle {veiculo_id}")
             return [], 0, sanitization["dropped_points_count"]
-        sentido_mismatches = sum(1 for m in raw_trips_metadata if m.get("sentido_mismatch", False))
+        source_sentido_discrepancies = sum(
+            1
+            for trip_metadata in raw_trips_metadata
+            if trip_metadata.get("source_sentido_discrepancy", False)
+        )
         finished_trips = generate_trips_table(
             position_records, raw_trips_metadata, linha_lt, veiculo_id
         )
-        return finished_trips, sentido_mismatches, sanitization["dropped_points_count"]
+        return (
+            finished_trips,
+            source_sentido_discrepancies,
+            sanitization["dropped_points_count"],
+        )
     except Exception as e:
         logger.error(f"Error processing {linha_lt}/{veiculo_id}: {e}")
         raise TypeError(f"Error processing {linha_lt}/{veiculo_id}:")

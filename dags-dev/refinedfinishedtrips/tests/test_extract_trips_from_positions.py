@@ -182,7 +182,7 @@ def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
     assert result[0]["sentido"] == 1
 
 
-def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_mismatch():
+def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_source_sentido_discrepancy():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # at first stop, wrong sentido
         _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed
@@ -191,7 +191,7 @@ def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_mismatch():
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido"] == 1
-    assert result[0]["sentido_mismatch"] is True
+    assert result[0]["source_sentido_discrepancy"] is True
 
 
 def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn():
@@ -203,7 +203,7 @@ def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn():
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["sentido"] == 1
-    assert result[0]["sentido_mismatch"] is False
+    assert result[0]["source_sentido_discrepancy"] is False
 
 
 def test_extract_raw_trips_metadata_ambiguous_in_trip_sentido_does_not_warn():
@@ -215,7 +215,7 @@ def test_extract_raw_trips_metadata_ambiguous_in_trip_sentido_does_not_warn():
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
-    assert result[0]["sentido_mismatch"] is False
+    assert result[0]["source_sentido_discrepancy"] is False
 
 
 def test_extract_raw_trips_metadata_circular_syncs_only_after_first_anchor_occurrence():

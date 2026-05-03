@@ -1,0 +1,81 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "refinedfinishedtrips",
+    "execution_id": "5d0bb310-d65d-4ba1-be34-88cf87d8207b",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "items_failed": 0,
+    "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=05/day=03/hour=14/quality-report-refinedfinishedtrips_1417_5d0bb310.json",
+    "generated_at_utc": "2026-05-03T14:17:36.974905+00:00",
+    "positions_in_time_window_count": 175124,
+    "trips_extracted": 1711,
+    "source_sentido_discrepancies": 16,
+    "sanitization_dropped_points": 326,
+    "vehicle_line_groups_processed": 5358,
+    "new_trips_saved": 98,
+    "skipped_trips": 1613
+  },
+  "details": {
+    "execution_id": "5d0bb310-d65d-4ba1-be34-88cf87d8207b",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "phases": {
+      "positions": {
+        "status": "PASS",
+        "positions_in_time_window_count": 175124,
+        "checks": [
+          {
+            "check": "freshness",
+            "status": "PASS",
+            "observed_lag_minutes": 1.56,
+            "warn_threshold_minutes": 10,
+            "fail_threshold_minutes": 30
+          },
+          {
+            "check": "recent_gaps",
+            "status": "PASS",
+            "max_gap_minutes": 2.0,
+            "distinct_extracao_ts_in_window": 30,
+            "warn_threshold_minutes": 5,
+            "fail_threshold_minutes": 15,
+            "recent_window_minutes": 60
+          }
+        ]
+      },
+      "trip_extraction": {
+        "status": "PASS",
+        "effective_window_minutes": 66.0,
+        "trips_extracted": 1711,
+        "source_sentido_discrepancies": 16,
+        "sanitization_dropped_points": 326,
+        "input_position_records": 175124,
+        "vehicle_line_groups_processed": 5358,
+        "checks": [
+          {
+            "check": "zero_trips",
+            "status": "PASS",
+            "effective_window_minutes": 66.0,
+            "window_threshold_minutes": 60
+          },
+          {
+            "check": "low_trip_count",
+            "status": "PASS",
+            "trips_extracted": 1711,
+            "min_trips_threshold": 5
+          }
+        ]
+      },
+      "persistence": {
+        "status": "PASS",
+        "new_rows": 98,
+        "skipped_rows": 1613
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=05/day=03/hour=14/quality-report-refinedfinishedtrips_1417_5d0bb310.json"
+    }
+  }
+}

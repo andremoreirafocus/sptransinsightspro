@@ -156,6 +156,22 @@ def test_validate_trips_quality_returns_effective_window_and_trip_count():
     assert result["trips_extracted"] == 10
 
 
+def test_validate_trips_quality_includes_extraction_metrics_when_provided():
+    df = make_df(window_minutes=180)
+    trips = [f"trip_{i}" for i in range(10)]
+    extraction_metrics = {
+        "total_source_sentido_discrepancies": 13,
+        "total_input_position_sanitization_drops": 879,
+        "total_input_position_records": 525603,
+        "vehicle_line_groups_processed": 8577,
+    }
+    result = validate_trips_quality(make_config(), df, trips, extraction_metrics)
+    assert result["source_sentido_discrepancies"] == 13
+    assert result["sanitization_dropped_points"] == 879
+    assert result["input_position_records"] == 525603
+    assert result["vehicle_line_groups_processed"] == 8577
+
+
 def test_validate_trips_quality_result_contains_two_checks():
     df = make_df(window_minutes=180)
     result = validate_trips_quality(make_config(), df, [])

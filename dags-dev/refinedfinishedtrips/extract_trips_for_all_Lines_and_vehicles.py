@@ -25,12 +25,65 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _parse_trip_extraction_output(trip_extraction_output: Any) -> tuple[Any, Dict[str, Any]]:
+    if (
+        isinstance(trip_extraction_output, tuple)
+        and len(trip_extraction_output) == 2
+        and isinstance(trip_extraction_output[1], dict)
+    ):
+        return trip_extraction_output
+    return trip_extraction_output, {}
+
+
+def _send_webhook_from_report(
+    report: Dict[str, Any],
+    config: Dict[str, Any],
+    send_webhook_fn: Callable[..., Any],
+    path: str,
+) -> None:
+    def get_config(config):
+        return config.get("general", {}).get("notifications", {}).get("webhook_url")
+
+    summary = report.get("summary", {})
+    execution_id = summary.get("execution_id")
+    status = summary.get("status")
+    failure_phase = summary.get("failure_phase")
+    webhook_url = get_config(config)
+    normalized_webhook_url = str(webhook_url or "").strip()
+    if normalized_webhook_url.lower() in {"", "disabled", "none", "null"}:
+        logger.info(
+            "Webhook notification disabled (%s): execution_id=%s status=%s failure_phase=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+        )
+        return
+    try:
+        send_webhook_fn(summary, normalized_webhook_url)
+        logger.info(
+            "Webhook notification sent (%s): execution_id=%s status=%s failure_phase=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+        )
+    except Exception as exc:
+        logger.error(
+            "Webhook notification failed (%s): execution_id=%s status=%s failure_phase=%s error=%s",
+            path,
+            execution_id,
+            status,
+            failure_phase,
+            exc,
+        )
+
+
 def _handle_positions_result(
     positions_result: Dict[str, Any],
     config: Dict[str, Any],
     execution_id: str,
     run_ts: datetime,
-    webhook_url: str,
     create_report_fn: Callable[..., Any],
     create_failure_report_fn: Callable[..., Any],
     send_webhook_fn: Callable[..., Any],
@@ -45,15 +98,23 @@ def _handle_positions_result(
         failure_message = checks_message("FAIL")
         logger.error(f"Positions quality FAIL: {failure_message}")
         report = create_failure_report_fn(
-            config, execution_id, run_ts, "positions", failure_message, positions_result
+            config,
+            execution_id,
+            run_ts,
+            "positions",
+            failure_message,
+            positions_result,
         )
-        send_webhook_fn(report["summary"], webhook_url)
+        _send_webhook_from_report(
+            report, config, send_webhook_fn, "positions fail"
+        )
         raise ValueError(f"Positions quality check FAILED: {failure_message}")
     if positions_result["status"] == "WARN":
         logger.warning(f"Positions quality WARN: {checks_message('WARN')}")
         report = create_report_fn(config, execution_id, run_ts, positions_result)
-        send_webhook_fn(report["summary"], webhook_url)
-        logger.info(f"Positions quality warning report sent to webhook: {webhook_url}")
+        _send_webhook_from_report(
+            report, config, send_webhook_fn, "positions warn"
+        )
 
 
 def _handle_trips_result(trips_result: Dict[str, Any]) -> None:
@@ -84,12 +145,12 @@ def extract_trips_for_all_Lines_and_vehicles(
     create_final_report_fn: Callable[..., Any] = create_final_quality_report,
     send_webhook_fn: Callable[..., Any] = send_webhook,
 ) -> None:
-    def get_config(config):
-        return config["general"]["notifications"]["webhook_url"]
-
-    webhook_url = get_config(config)
     execution_id = str(uuid.uuid4())
     run_ts = datetime.now(timezone.utc)
+    positions_result = None
+    trips_result = None
+    persistence_result = None
+    extraction_metrics = {}
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     df_recent_positions = get_recent_positions_fn(config)
     logger.info(f"Validating quality of {len(df_recent_positions)} position records.")
@@ -99,19 +160,60 @@ def extract_trips_for_all_Lines_and_vehicles(
         config,
         execution_id,
         run_ts,
-        webhook_url,
         create_report_fn,
         create_failure_report_fn,
         send_webhook_fn,
     )
-    all_finished_trips = extract_trips_fn(config, df_recent_positions)
-    trips_result = validate_trips_fn(config, df_recent_positions, all_finished_trips)
-    _handle_trips_result(trips_result)
-    save_result = save_trips_fn(config, all_finished_trips)
-    persistence_result = validate_persistence_fn(save_result)
-    _handle_persistence_result(persistence_result)
+    try:
+        trip_extraction_output = extract_trips_fn(config, df_recent_positions)
+        all_finished_trips, extraction_metrics = _parse_trip_extraction_output(
+            trip_extraction_output
+        )
+        trips_result = validate_trips_fn(
+            config, df_recent_positions, all_finished_trips, extraction_metrics
+        )
+        _handle_trips_result(trips_result)
+    except Exception as exc:
+        failure_message = str(exc)
+        logger.error(f"Trip extraction failed: {failure_message}")
+        report = create_failure_report_fn(
+            config,
+            execution_id,
+            run_ts,
+            "trip_extraction",
+            failure_message,
+            positions_result,
+            trips_result=trips_result,
+        )
+        _send_webhook_from_report(
+            report, config, send_webhook_fn, "trip extraction fail"
+        )
+        raise
+    try:
+        save_result = save_trips_fn(config, all_finished_trips)
+        persistence_result = validate_persistence_fn(save_result)
+        _handle_persistence_result(persistence_result)
+    except Exception as exc:
+        failure_message = str(exc)
+        logger.error(f"Persistence failed: {failure_message}")
+        report = create_failure_report_fn(
+            config,
+            execution_id,
+            run_ts,
+            "persistence",
+            failure_message,
+            positions_result,
+            trips_result=trips_result,
+            persistence_result=persistence_result,
+        )
+        _send_webhook_from_report(
+            report, config, send_webhook_fn, "persistence fail"
+        )
+        raise
     report = create_final_report_fn(
         config, execution_id, run_ts, positions_result, trips_result, persistence_result
     )
-    send_webhook_fn(report["summary"], webhook_url)
+    _send_webhook_from_report(
+        report, config, send_webhook_fn, "final report"
+    )
     logger.info(f"Pipeline run complete. execution_id={execution_id}, status={report['summary']['status']}")
