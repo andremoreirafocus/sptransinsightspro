@@ -18,8 +18,9 @@ Para cada linha e veículo:
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
 - em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
-- verifica a qualidade da persistência, executando uma verificação:
-  - **duplicatas**: aviso se todas as viagens da execução já estavam presentes no banco de dados (duplicatas)
+- verifica o resultado da persistência, registrando quantas viagens:
+  - foram efetivamente inseridas nesta execução
+  - já haviam sido salvas anteriormente
 - em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata e notifica via webhook com o status consolidado das três fases (posições, extração de viagens e persistência)
 

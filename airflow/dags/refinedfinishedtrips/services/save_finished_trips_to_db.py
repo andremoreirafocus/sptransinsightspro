@@ -90,13 +90,16 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
                 DO NOTHING;
             """)
             execution_result = conn.execute(upsert_query)
-            new_rows = execution_result.rowcount
-            skipped_rows = len(trips_tuples) - new_rows
+            added_rows = execution_result.rowcount
+            previously_saved_rows = len(trips_tuples) - added_rows
             conn.execute(text(f"ANALYZE {table_name};"))
             logger.info(
-                f"Sync complete: {new_rows} new trips added, {skipped_rows} duplicates skipped."
+                f"Sync complete: {added_rows} trips added, {previously_saved_rows} had been previously saved."
             )
-        return {"new_rows": new_rows, "skipped_rows": skipped_rows}
+        return {
+            "added_rows": added_rows,
+            "previously_saved_rows": previously_saved_rows,
+        }
     except Exception as e:
         logger.error(f"Persistence failed: {e}")
         raise ValueError(f"Persistence failed: {e}")

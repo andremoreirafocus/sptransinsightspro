@@ -1,0 +1,154 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "refinedfinishedtrips",
+    "execution_id": "886b77f7-3b7d-4519-808b-bf9d2d71c3ba",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "items_failed": 0,
+    "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=05/day=03/hour=21/quality-report-refinedfinishedtrips_2110_886b77f7.json",
+    "generated_at_utc": "2026-05-03T21:10:35.963353+00:00",
+    "positions_in_time_window_count": 50465,
+    "trips_extracted": 30,
+    "source_sentido_discrepancies": 3,
+    "sanitization_dropped_points": 74,
+    "vehicle_line_groups_processed": 5133,
+    "added_rows": 5,
+    "previously_saved_rows": 25
+  },
+  "details": {
+    "execution_id": "886b77f7-3b7d-4519-808b-bf9d2d71c3ba",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "phases": {
+      "positions": {
+        "status": "PASS",
+        "positions_in_time_window_count": 50465,
+        "checks": [
+          {
+            "check": "freshness",
+            "status": "PASS",
+            "observed_lag_minutes": 0.6,
+            "warn_threshold_minutes": 10,
+            "fail_threshold_minutes": 30
+          },
+          {
+            "check": "recent_gaps",
+            "status": "PASS",
+            "max_gap_minutes": 2.0,
+            "distinct_extracao_ts_in_window": 10,
+            "warn_threshold_minutes": 5,
+            "fail_threshold_minutes": 15,
+            "recent_window_minutes": 60
+          }
+        ]
+      },
+      "trip_extraction": {
+        "status": "PASS",
+        "effective_window_minutes": 18.0,
+        "trips_extracted": 30,
+        "source_sentido_discrepancies": 3,
+        "sanitization_dropped_points": 74,
+        "input_position_records": 50465,
+        "vehicle_line_groups_processed": 5133,
+        "checks": [
+          {
+            "check": "zero_trips",
+            "status": "PASS",
+            "effective_window_minutes": 18.0,
+            "window_threshold_minutes": 60
+          },
+          {
+            "check": "low_trip_count",
+            "status": "PASS",
+            "trips_extracted": 30,
+            "min_trips_threshold": 5
+          }
+        ]
+      },
+      "persistence": {
+        "status": "PASS",
+        "added_rows": 5,
+        "previously_saved_rows": 25
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/refinedfinishedtrips/year=2026/month=05/day=03/hour=21/quality-report-refinedfinishedtrips_2110_886b77f7.json",
+      "column_lineage": {
+        "table_name": "finished_trips",
+        "columns": {
+          "trip_id": {
+            "sources": [
+              "linha_lt",
+              "sentido"
+            ],
+            "derivation": "built by get_trip_id(linha_lt, sentido)"
+          },
+          "vehicle_id": {
+            "sources": [
+              "veiculo_id"
+            ],
+            "derivation": "copied from grouped vehicle key and cast to int"
+          },
+          "trip_start_time": {
+            "sources": [
+              "veiculo_ts",
+              "start_position_index"
+            ],
+            "derivation": "position_records[start_position_index][\"veiculo_ts\"]"
+          },
+          "trip_end_time": {
+            "sources": [
+              "veiculo_ts",
+              "end_position_index"
+            ],
+            "derivation": "position_records[end_position_index][\"veiculo_ts\"]"
+          },
+          "duration": {
+            "sources": [
+              "trip_start_time",
+              "trip_end_time"
+            ],
+            "derivation": "trip_end_time - trip_start_time"
+          },
+          "is_circular": {
+            "sources": [
+              "is_circular"
+            ],
+            "derivation": "copied from position_records[0][\"is_circular\"]"
+          },
+          "average_speed": {
+            "sources": [],
+            "derivation": "constant 0.0 placeholder in current implementation"
+          }
+        },
+        "drift_detected": false,
+        "warning": null,
+        "validation": {
+          "expected_columns": [
+            "average_speed",
+            "duration",
+            "is_circular",
+            "trip_end_time",
+            "trip_id",
+            "trip_start_time",
+            "vehicle_id"
+          ],
+          "actual_columns": [
+            "average_speed",
+            "duration",
+            "is_circular",
+            "trip_end_time",
+            "trip_id",
+            "trip_start_time",
+            "vehicle_id"
+          ],
+          "missing_in_lineage": [],
+          "missing_in_dataframe": []
+        }
+      }
+    }
+  }
+}

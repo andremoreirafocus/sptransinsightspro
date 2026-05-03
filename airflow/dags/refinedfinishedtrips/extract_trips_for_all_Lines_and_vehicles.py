@@ -2,6 +2,11 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict
 import uuid
 
+from refinedfinishedtrips.lineage import (
+    get_finished_trips_lineage,
+    get_finished_trips_output_columns,
+    validate_finished_trips_lineage,
+)
 from refinedfinishedtrips.services.create_quality_report import (
     create_failure_quality_report,
     create_final_quality_report,
@@ -79,6 +84,12 @@ def _send_webhook_from_report(
         )
 
 
+def _build_column_lineage() -> Dict[str, Any]:
+    column_lineage = get_finished_trips_lineage()
+    actual_output_columns = get_finished_trips_output_columns()
+    return validate_finished_trips_lineage(column_lineage, actual_output_columns)
+
+
 def _handle_positions_result(
     positions_result: Dict[str, Any],
     config: Dict[str, Any],
@@ -151,6 +162,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     trips_result = None
     persistence_result = None
     extraction_metrics = {}
+    column_lineage = None
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     df_recent_positions = get_recent_positions_fn(config)
     logger.info(f"Validating quality of {len(df_recent_positions)} position records.")
@@ -169,6 +181,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         all_finished_trips, extraction_metrics = _parse_trip_extraction_output(
             trip_extraction_output
         )
+        column_lineage = _build_column_lineage()
         trips_result = validate_trips_fn(
             config, df_recent_positions, all_finished_trips, extraction_metrics
         )
@@ -184,6 +197,7 @@ def extract_trips_for_all_Lines_and_vehicles(
             failure_message,
             positions_result,
             trips_result=trips_result,
+            column_lineage=column_lineage,
         )
         _send_webhook_from_report(
             report, config, send_webhook_fn, "trip extraction fail"
@@ -205,13 +219,20 @@ def extract_trips_for_all_Lines_and_vehicles(
             positions_result,
             trips_result=trips_result,
             persistence_result=persistence_result,
+            column_lineage=column_lineage,
         )
         _send_webhook_from_report(
             report, config, send_webhook_fn, "persistence fail"
         )
         raise
     report = create_final_report_fn(
-        config, execution_id, run_ts, positions_result, trips_result, persistence_result
+        config,
+        execution_id,
+        run_ts,
+        positions_result,
+        trips_result,
+        persistence_result,
+        column_lineage=column_lineage,
     )
     _send_webhook_from_report(
         report, config, send_webhook_fn, "final report"
