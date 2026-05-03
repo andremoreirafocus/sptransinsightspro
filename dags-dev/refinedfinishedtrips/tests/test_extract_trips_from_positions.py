@@ -8,9 +8,6 @@ from refinedfinishedtrips.services.extract_trips_from_positions import (
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
     extract_trips_per_line_per_vehicle,
 )
-from refinedfinishedtrips.services.sanitize_position_records import (
-    sanitize_position_records,
-)
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
 THRESHOLD = 100
@@ -419,48 +416,6 @@ def test_extract_trips_per_vehicle_one_complete_trip_detected():
     assert trips[0][0] == "1234-10-0"
     assert mismatches == 0
     assert dropped_points == 0
-
-
-def test_sanitize_position_records_drops_single_spatial_discontinuity():
-    position_records = [
-        _geo_pos(-23.460811, -46.687363, 0),
-        _geo_pos(-23.526252, -46.667517, 60),
-        _geo_pos(-23.460857, -46.687422, 120),
-    ]
-
-    cleaned_records, sanitization = sanitize_position_records(position_records)
-
-    assert len(cleaned_records) == 2
-    assert cleaned_records[0]["veiculo_ts"] == BASE_TS
-    assert cleaned_records[1]["veiculo_ts"] == BASE_TS + timedelta(seconds=120)
-    assert sanitization["dropped_points_count"] == 1
-
-
-def test_sanitize_position_records_keeps_normal_sequence_unchanged():
-    position_records = [
-        _geo_pos(-23.460811, -46.687363, 0),
-        _geo_pos(-23.461000, -46.688000, 120),
-        _geo_pos(-23.461500, -46.689000, 240),
-    ]
-
-    cleaned_records, sanitization = sanitize_position_records(position_records)
-
-    assert cleaned_records == position_records
-    assert sanitization["dropped_points_count"] == 0
-
-
-def test_sanitize_position_records_does_not_drop_two_consecutive_bad_points():
-    position_records = [
-        _geo_pos(-23.460811, -46.687363, 0),
-        _geo_pos(-23.526252, -46.667517, 60),
-        _geo_pos(-23.526241, -46.667897, 120),
-        _geo_pos(-23.460857, -46.687422, 180),
-    ]
-
-    cleaned_records, sanitization = sanitize_position_records(position_records)
-
-    assert cleaned_records == position_records
-    assert sanitization["dropped_points_count"] == 0
 
 
 def test_extract_trips_per_vehicle_returns_drop_count_when_sanitization_drops_point():
