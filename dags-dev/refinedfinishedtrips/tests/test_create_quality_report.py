@@ -428,6 +428,25 @@ def test_create_final_quality_report_details_contains_all_phases():
     assert "persistence" in phases
 
 
+def test_create_final_quality_report_details_contains_execution_efficiency():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(new_rows=0, skipped_rows=10),
+        write_fn=write,
+    )
+    execution_efficiency = report["details"]["execution_efficiency"]
+    idempotency = execution_efficiency["idempotency"]
+    assert idempotency["new_rows"] == 0
+    assert idempotency["skipped_rows"] == 10
+    assert idempotency["all_rows_were_duplicates"] is True
+    assert idempotency["duplicate_ratio"] == 1.0
+
+
 def test_create_final_quality_report_path_contains_execution_id_prefix():
     write = WriteCapture()
     create_final_quality_report(

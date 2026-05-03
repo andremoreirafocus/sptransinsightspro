@@ -16,9 +16,12 @@ Para cada linha e veículo:
 - verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
+- em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
-- verifica a qualidade da persistência, executando uma verificação:
-  - **duplicatas**: aviso se todas as viagens da execução já estavam presentes no banco de dados (duplicatas)
+- verifica o resultado da persistência, registrando quantas viagens:
+  - foram efetivamente inseridas nesta execução
+  - já haviam sido salvas anteriormente
+- em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata e notifica via webhook com o status consolidado das três fases (posições, extração de viagens e persistência)
 
 ## Algoritmo de extração de viagens
@@ -118,6 +121,41 @@ Em conjunto, essas decisões tornam a tabela de viagens finalizadas mais confiá
 - avaliação de ciclo e regularidade
 - consumo analítico na camada de visualização
 
+## Relato de qualidade e notificação
+O pipeline produz relatórios estruturados para três fases:
+- `positions`
+- `trip_extraction`
+- `persistence`
+
+Os relatórios de falha preservam os resultados parciais disponíveis até o ponto da interrupção.
+Assim, uma falha em `trip_extraction` ou `persistence` não perde o contexto já calculado nas fases anteriores.
+
+No relatório final, a fase `trip_extraction` também expõe métricas operacionais agregadas da execução, incluindo:
+- `trips_extracted`
+- `source_sentido_discrepancies`
+- `sanitization_dropped_points`
+- `vehicle_line_groups_processed`
+- `input_position_records`
+
+Além disso, o relatório final expõe um bloco específico de eficiência de execução / idempotência, baseado no resultado da persistência, incluindo:
+- `new_rows`
+- `skipped_rows`
+- `all_rows_were_duplicates`
+- `duplicate_ratio`
+
+O resumo (`summary`) segue o contrato comum consumido pelo `alertservice`.
+O pipeline envia webhook para:
+- falhas em `positions`
+- avisos em `positions`
+- falhas em `trip_extraction`
+- falhas em `persistence`
+- relatório final consolidado
+
+O envio do webhook é explicitamente registrado em log, indicando se:
+- a notificação foi enviada
+- a notificação estava desabilitada
+- a tentativa falhou
+
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
 - Disponibilidade do bucket da camada metadata no serviço de object storage para armazenamento dos relatórios de qualidade
@@ -174,7 +212,7 @@ Chaves esperadas em `general`
     "trips_min_trips_threshold": 5
   },
   "notifications": {
-    "webhook_url": "disabled"
+    "webhook_url": "http://localhost:8000/notify"
   }
 }
 ```
@@ -183,6 +221,9 @@ Chaves esperadas em `general`
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `refinedfinishedtrips_general` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
+
+Para desativar notificações do `alertservice`, configure:
+- `notifications.webhook_url = "disabled"`
 
 ## Instruções para instalação
 Para instalar os requisitos:

@@ -250,12 +250,12 @@ def _emit_trip(
     )
     trip_start_time = position_records[trip_start_record_index]["veiculo_ts"]
     trip_end_time = position_records[trip_end_record_index]["veiculo_ts"]
-    mismatch = (
+    source_sentido_discrepancy = (
         representative_sentido is not None and derived_sentido != representative_sentido
     )
-    if mismatch:
+    if source_sentido_discrepancy:
         logger.debug(
-            f"Sentido mismatch for vehicle {position_records[0]['veiculo_id']} "
+            f"Source sentido discrepancy for vehicle {position_records[0]['veiculo_id']} "
             f"on line {position_records[0]['linha_lt']}: "
             f"trip_start_time={trip_start_time}, trip_end_time={trip_end_time}"
         )
@@ -264,10 +264,10 @@ def _emit_trip(
             "start_position_index": trip_start_record_index,
             "end_position_index": trip_end_record_index,
             "sentido": derived_sentido,
-            "sentido_mismatch": mismatch,
+            "source_sentido_discrepancy": source_sentido_discrepancy,
         }
     )
-    return mismatch
+    return source_sentido_discrepancy
 
 
 def _is_at_anchor_stop(

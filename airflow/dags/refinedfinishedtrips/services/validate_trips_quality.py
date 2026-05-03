@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
@@ -70,9 +70,15 @@ def check_low_trip_count(config: Dict[str, Any], effective_window_minutes: float
     return result
 
 
-def validate_trips_quality(config: Dict[str, Any], df: pd.DataFrame, trips_extracted: List) -> Dict[str, Any]:
+def validate_trips_quality(
+    config: Dict[str, Any],
+    df: pd.DataFrame,
+    trips_extracted: List,
+    extraction_metrics: Optional[Dict[str, int]] = None,
+) -> Dict[str, Any]:
     trips_count = len(trips_extracted)
     effective_window = _effective_window_minutes(df)
+    extraction_metrics = extraction_metrics or {}
     logger.info(
         f"Running trip extraction quality checks: {trips_count} trips, effective window {effective_window} min."
     )
@@ -86,5 +92,13 @@ def validate_trips_quality(config: Dict[str, Any], df: pd.DataFrame, trips_extra
         "status": overall,
         "effective_window_minutes": effective_window,
         "trips_extracted": trips_count,
+        "source_sentido_discrepancies": extraction_metrics.get(
+            "total_source_sentido_discrepancies", 0
+        ),
+        "sanitization_dropped_points": extraction_metrics.get(
+            "total_input_position_sanitization_drops", 0
+        ),
+        "input_position_records": extraction_metrics.get("total_input_position_records", len(df)),
+        "vehicle_line_groups_processed": extraction_metrics.get("vehicle_line_groups_processed", 0),
         "checks": checks,
     }

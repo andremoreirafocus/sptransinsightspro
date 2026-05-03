@@ -94,7 +94,7 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             skipped_rows = len(trips_tuples) - new_rows
             conn.execute(text(f"ANALYZE {table_name};"))
             logger.info(
-                f"Sync complete: {new_rows} new trips added, {skipped_rows} duplicates skipped."
+                f"Sync complete: {new_rows} new trips added, {skipped_rows} had been previously saved."
             )
         return {"new_rows": new_rows, "skipped_rows": skipped_rows}
     except Exception as e:

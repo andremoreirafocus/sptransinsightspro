@@ -39,6 +39,23 @@ def _build_phase_details(
     return phase_details
 
 
+def _build_execution_efficiency_details(
+    persistence_result: Dict[str, Any],
+) -> Dict[str, Any]:
+    new_rows = persistence_result.get("new_rows", 0)
+    skipped_rows = persistence_result.get("skipped_rows", 0)
+    total_rows = new_rows + skipped_rows
+    duplicate_ratio = (skipped_rows / total_rows) if total_rows > 0 else 0.0
+    return {
+        "idempotency": {
+            "new_rows": new_rows,
+            "skipped_rows": skipped_rows,
+            "all_rows_were_duplicates": new_rows == 0 and skipped_rows > 0,
+            "duplicate_ratio": duplicate_ratio,
+        }
+    }
+
+
 def build_quality_report(
     execution_id: str,
     positions_result: Dict[str, Any],
@@ -212,6 +229,9 @@ def create_final_quality_report(
             "trip_extraction": trips_result,
             "persistence": persistence_result,
         },
+        "execution_efficiency": _build_execution_efficiency_details(
+            persistence_result
+        ),
         "artifacts": {"quality_report_path": report_path},
     }
     report = {"summary": summary, "details": details}
