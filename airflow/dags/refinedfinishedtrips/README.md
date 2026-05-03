@@ -136,6 +136,26 @@ No relatório final, a fase `trip_extraction` também expõe métricas operacion
 - `vehicle_line_groups_processed`
 - `input_position_records`
 
+O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.finished_trips`:
+- `trip_id`
+- `vehicle_id`
+- `trip_start_time`
+- `trip_end_time`
+- `duration`
+- `is_circular`
+- `average_speed`
+
+Essa linhagem é validada contra o contrato real de saída da pipeline.
+Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
+- `drift_detected: true`
+- `warning: "lineage drift detected"`
+
+Esse drift de lineage é reportado como artefato de governança no relatório de qualidade, sem por si só interromper a execução.
+
+A fase `persistence` do relatório final já expõe diretamente o resultado da persistência, incluindo:
+- `added_rows`
+- `previously_saved_rows`
+
 O resumo (`summary`) segue o contrato comum consumido pelo `alertservice`.
 O pipeline envia webhook para:
 - falhas em `positions`

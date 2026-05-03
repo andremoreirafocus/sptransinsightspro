@@ -94,8 +94,8 @@ def trips_pass_stub(config, df, trips, extraction_metrics=None):
 def persistence_pass_stub(save_result):
     return {
         "status": "PASS",
-        "new_rows": save_result.get("new_rows", 0),
-        "skipped_rows": save_result.get("skipped_rows", 0),
+        "added_rows": save_result.get("added_rows", 0),
+        "previously_saved_rows": save_result.get("previously_saved_rows", 0),
     }
 
 
@@ -108,12 +108,22 @@ def noop_create_failure_report(
     positions_result,
     trips_result=None,
     persistence_result=None,
+    column_lineage=None,
     write_fn=None,
 ):
     return {"summary": {"status": "FAIL"}, "details": {}}
 
 
-def noop_create_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
+def noop_create_final_report(
+    config,
+    execution_id,
+    run_ts,
+    positions_result,
+    trips_result,
+    persistence_result,
+    column_lineage=None,
+    write_fn=None,
+):
     statuses = [r["status"] for r in (positions_result, trips_result, persistence_result)]
     status = "WARN" if "WARN" in statuses else "PASS"
     return {"summary": {"status": status, "execution_id": execution_id}, "details": {}}
@@ -124,7 +134,7 @@ def noop_send_webhook(summary, webhook_url):
 
 
 def noop_save_trips(config, trips):
-    return {"new_rows": len(trips), "skipped_rows": 0}
+    return {"added_rows": len(trips), "previously_saved_rows": 0}
 
 
 class SaveCapture:
@@ -133,7 +143,7 @@ class SaveCapture:
 
     def __call__(self, config, trips):
         self.calls.append(trips)
-        return {"new_rows": len(trips), "skipped_rows": 0}
+        return {"added_rows": len(trips), "previously_saved_rows": 0}
 
 
 def make_positions_df(rows):
@@ -171,6 +181,7 @@ def test_positions_fail_calls_create_failure_report():
         positions_result,
         trips_result=None,
         persistence_result=None,
+        column_lineage=None,
         write_fn=None,
     ):
         captured.append({"failure_phase": failure_phase, "failure_message": failure_message})
@@ -207,7 +218,16 @@ def test_positions_fail_calls_send_webhook():
 def test_positions_fail_final_report_not_called():
     final_report_calls = []
 
-    def capturing_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
+    def capturing_final_report(
+        config,
+        execution_id,
+        run_ts,
+        positions_result,
+        trips_result,
+        persistence_result,
+        column_lineage=None,
+        write_fn=None,
+    ):
         final_report_calls.append(True)
         return {"summary": {"status": "PASS"}, "details": {}}
 
@@ -251,6 +271,7 @@ def test_trip_extraction_failure_calls_create_failure_report_with_positions_resu
         positions_result,
         trips_result=None,
         persistence_result=None,
+        column_lineage=None,
         write_fn=None,
     ):
         captured.append(
@@ -310,6 +331,7 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
         positions_result,
         trips_result=None,
         persistence_result=None,
+        column_lineage=None,
         write_fn=None,
     ):
         captured.append(
@@ -319,6 +341,7 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
                 "positions_result": positions_result,
                 "trips_result": trips_result,
                 "persistence_result": persistence_result,
+                "column_lineage": column_lineage,
             }
         )
         return {"summary": {"status": "FAIL"}, "details": {}}
@@ -341,6 +364,7 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
     assert captured[0]["positions_result"]["status"] == "PASS"
     assert captured[0]["trips_result"]["status"] == "PASS"
     assert captured[0]["persistence_result"] is None
+    assert captured[0]["column_lineage"]["table_name"] == "finished_trips"
 
 
 # ---------------------------------------------------------------------------
@@ -442,8 +466,19 @@ def test_all_phases_pass_final_report_status_pass():
         ]
     )
 
-    def capturing_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
-        final_reports.append((positions_result, trips_result, persistence_result))
+    def capturing_final_report(
+        config,
+        execution_id,
+        run_ts,
+        positions_result,
+        trips_result,
+        persistence_result,
+        column_lineage=None,
+        write_fn=None,
+    ):
+        final_reports.append(
+            (positions_result, trips_result, persistence_result, column_lineage)
+        )
         return {"summary": {"status": "PASS"}, "details": {}}
 
     extract_trips_for_all_Lines_and_vehicles(
@@ -459,10 +494,11 @@ def test_all_phases_pass_final_report_status_pass():
     )
 
     assert len(final_reports) == 1
-    positions_result, trips_result, persistence_result = final_reports[0]
+    positions_result, trips_result, persistence_result, column_lineage = final_reports[0]
     assert positions_result["status"] == "PASS"
     assert trips_result["status"] == "PASS"
     assert persistence_result["status"] == "PASS"
+    assert column_lineage["table_name"] == "finished_trips"
 
 
 def test_trip_extraction_metrics_reach_final_report():
@@ -487,8 +523,17 @@ def test_trip_extraction_metrics_reach_final_report():
         "vehicle_line_groups_processed": 1,
     }
 
-    def capturing_final_report(config, execution_id, run_ts, positions_result, trips_result, persistence_result, write_fn=None):
-        final_reports.append(trips_result)
+    def capturing_final_report(
+        config,
+        execution_id,
+        run_ts,
+        positions_result,
+        trips_result,
+        persistence_result,
+        column_lineage=None,
+        write_fn=None,
+    ):
+        final_reports.append((trips_result, column_lineage))
         return {"summary": {"status": "PASS"}, "details": {}}
 
     extract_trips_for_all_Lines_and_vehicles(
@@ -504,10 +549,12 @@ def test_trip_extraction_metrics_reach_final_report():
     )
 
     assert len(final_reports) == 1
-    assert final_reports[0]["source_sentido_discrepancies"] == 3
-    assert final_reports[0]["sanitization_dropped_points"] == 7
-    assert final_reports[0]["input_position_records"] == 42
-    assert final_reports[0]["vehicle_line_groups_processed"] == 1
+    trips_result, column_lineage = final_reports[0]
+    assert trips_result["source_sentido_discrepancies"] == 3
+    assert trips_result["sanitization_dropped_points"] == 7
+    assert trips_result["input_position_records"] == 42
+    assert trips_result["vehicle_line_groups_processed"] == 1
+    assert column_lineage["table_name"] == "finished_trips"
 
 
 # ---------------------------------------------------------------------------

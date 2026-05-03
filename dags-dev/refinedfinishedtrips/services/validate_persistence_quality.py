@@ -5,15 +5,15 @@ logger = logging.getLogger(__name__)
 
 
 def validate_persistence_quality(save_result: Dict[str, Any]) -> Dict[str, Any]:
-    new_rows = save_result["new_rows"]
-    skipped_rows = save_result["skipped_rows"]
+    added_rows = save_result["added_rows"]
+    previously_saved_rows = save_result["previously_saved_rows"]
     status = "PASS"
 
     logger.info(
-        f"Persistence quality check: new_rows={new_rows}, skipped_rows={skipped_rows} → {status}."
+        f"Persistence quality check: added_rows={added_rows}, previously_saved_rows={previously_saved_rows} → {status}."
     )
     return {
         "status": status,
-        "new_rows": new_rows,
-        "skipped_rows": skipped_rows,
+        "added_rows": added_rows,
+        "previously_saved_rows": previously_saved_rows,
     }

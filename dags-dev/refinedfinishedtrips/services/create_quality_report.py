@@ -39,23 +39,6 @@ def _build_phase_details(
     return phase_details
 
 
-def _build_execution_efficiency_details(
-    persistence_result: Dict[str, Any],
-) -> Dict[str, Any]:
-    new_rows = persistence_result.get("new_rows", 0)
-    skipped_rows = persistence_result.get("skipped_rows", 0)
-    total_rows = new_rows + skipped_rows
-    duplicate_ratio = (skipped_rows / total_rows) if total_rows > 0 else 0.0
-    return {
-        "idempotency": {
-            "new_rows": new_rows,
-            "skipped_rows": skipped_rows,
-            "all_rows_were_duplicates": new_rows == 0 and skipped_rows > 0,
-            "duplicate_ratio": duplicate_ratio,
-        }
-    }
-
-
 def build_quality_report(
     execution_id: str,
     positions_result: Dict[str, Any],
@@ -65,6 +48,7 @@ def build_quality_report(
     failure_message: Optional[str] = None,
     trips_result: Optional[Dict[str, Any]] = None,
     persistence_result: Optional[Dict[str, Any]] = None,
+    column_lineage: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     items_failed = _count_failed_checks(positions_result)
     summary = build_quality_summary(
@@ -85,7 +69,10 @@ def build_quality_report(
         "failure_phase": failure_phase,
         "failure_message": failure_message,
         "phases": _build_phase_details(positions_result, trips_result, persistence_result),
-        "artifacts": {"quality_report_path": quality_report_path},
+        "artifacts": {
+            "quality_report_path": quality_report_path,
+            "column_lineage": column_lineage or {},
+        },
     }
     return {"summary": summary, "details": details}
 
@@ -138,6 +125,7 @@ def create_failure_quality_report(
     positions_result: Dict[str, Any],
     trips_result: Optional[Dict[str, Any]] = None,
     persistence_result: Optional[Dict[str, Any]] = None,
+    column_lineage: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
@@ -165,6 +153,7 @@ def create_failure_quality_report(
         failure_message=failure_message,
         trips_result=trips_result,
         persistence_result=persistence_result,
+        column_lineage=column_lineage,
     )
     save_quality_report(
         report=report,
@@ -183,6 +172,7 @@ def create_final_quality_report(
     positions_result: Dict[str, Any],
     trips_result: Dict[str, Any],
     persistence_result: Dict[str, Any],
+    column_lineage: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
@@ -216,8 +206,8 @@ def create_final_quality_report(
         ),
         sanitization_dropped_points=trips_result.get("sanitization_dropped_points"),
         vehicle_line_groups_processed=trips_result.get("vehicle_line_groups_processed"),
-        new_trips_saved=persistence_result.get("new_rows"),
-        skipped_trips=persistence_result.get("skipped_rows"),
+        added_rows=persistence_result.get("added_rows"),
+        previously_saved_rows=persistence_result.get("previously_saved_rows"),
     )
     details = {
         "execution_id": execution_id,
@@ -229,10 +219,10 @@ def create_final_quality_report(
             "trip_extraction": trips_result,
             "persistence": persistence_result,
         },
-        "execution_efficiency": _build_execution_efficiency_details(
-            persistence_result
-        ),
-        "artifacts": {"quality_report_path": report_path},
+        "artifacts": {
+            "quality_report_path": report_path,
+            "column_lineage": column_lineage or {},
+        },
     }
     report = {"summary": summary, "details": details}
     save_quality_report(

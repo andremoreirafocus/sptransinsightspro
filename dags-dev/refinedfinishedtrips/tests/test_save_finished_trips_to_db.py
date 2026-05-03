@@ -57,30 +57,30 @@ def test_engine_error_raises_value_error():
         save_finished_trips_to_db(make_config(), [make_trip_tuple()], engine_factory=factory)
 
 
-def test_returns_new_and_skipped_row_counts():
+def test_returns_added_and_previously_saved_row_counts():
     factory = make_fake_engine_factory(rowcount=1)
     result = save_finished_trips_to_db(make_config(), [make_trip_tuple()], engine_factory=factory)
-    assert result == {"new_rows": 1, "skipped_rows": 0}
+    assert result == {"added_rows": 1, "previously_saved_rows": 0}
 
 
 def test_returns_zero_counts_for_empty_trips():
     factory = make_fake_engine_factory(rowcount=0)
     result = save_finished_trips_to_db(make_config(), [], engine_factory=factory)
-    assert result == {"new_rows": 0, "skipped_rows": 0}
+    assert result == {"added_rows": 0, "previously_saved_rows": 0}
 
 
-def test_skipped_rows_computed_from_rowcount():
+def test_previously_saved_rows_computed_from_rowcount():
     factory = make_fake_engine_factory(rowcount=2)
     trips = [make_trip_tuple(), make_trip_tuple(), make_trip_tuple()]
     result = save_finished_trips_to_db(make_config(), trips, engine_factory=factory)
-    assert result == {"new_rows": 2, "skipped_rows": 1}
+    assert result == {"added_rows": 2, "previously_saved_rows": 1}
 
 
 def test_db_empty_max_returns_none_all_trips_saved():
     trip = make_trip_tuple(trip_end_offset_seconds=3600)
     factory = make_fake_engine_factory(rowcount=1, max_trip_end_time=None)
     result = save_finished_trips_to_db(make_config(), [trip], engine_factory=factory)
-    assert result["new_rows"] == 1
+    assert result["added_rows"] == 1
 
 
 def test_trips_older_than_latest_saved_are_filtered_out():
@@ -95,7 +95,7 @@ def test_trips_older_than_latest_saved_are_filtered_out():
     inserted_end_times = [row["t_end"] for batch in parameterized_calls for row in batch]
     assert BASE_TS + timedelta(seconds=7200) in inserted_end_times
     assert BASE_TS + timedelta(seconds=3600) not in inserted_end_times
-    assert result["skipped_rows"] == 1
+    assert result["previously_saved_rows"] == 1
 
 
 def test_all_trips_older_than_latest_saved_results_in_no_insert():
@@ -107,4 +107,4 @@ def test_all_trips_older_than_latest_saved_results_in_no_insert():
 
     parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
     assert parameterized_calls == []
-    assert result == {"new_rows": 0, "skipped_rows": 1}
+    assert result == {"added_rows": 0, "previously_saved_rows": 1}
