@@ -139,6 +139,41 @@ def test_build_quality_report_failure_fields_propagated():
     assert result["details"]["failure_phase"] == "positions"
 
 
+def test_build_quality_report_includes_partial_phase_results_when_provided():
+    result = build_quality_report(
+        execution_id=EXEC_ID,
+        positions_result=make_positions_result(status="PASS"),
+        quality_report_path="metadata/p.json",
+        status="FAIL",
+        failure_phase="persistence",
+        failure_message="save failed",
+        trips_result={"status": "PASS", "checks": []},
+        persistence_result={
+            "status": "FAIL",
+            "added_rows": 0,
+            "previously_saved_rows": 0,
+        },
+    )
+    phases = result["details"]["phases"]
+    assert phases["positions"]["status"] == "PASS"
+    assert phases["trip_extraction"]["status"] == "PASS"
+    assert phases["persistence"]["status"] == "FAIL"
+
+
+def test_build_quality_report_includes_column_lineage_when_provided():
+    result = build_quality_report(
+        execution_id=EXEC_ID,
+        positions_result=make_positions_result(status="PASS"),
+        quality_report_path="metadata/p.json",
+        status="FAIL",
+        failure_phase="persistence",
+        failure_message="save failed",
+        column_lineage={"table_name": "finished_trips", "columns": {"trip_id": {}}},
+    )
+    artifacts = result["details"]["artifacts"]
+    assert artifacts["column_lineage"]["table_name"] == "finished_trips"
+
+
 # ---------------------------------------------------------------------------
 # create_failure_quality_report
 # ---------------------------------------------------------------------------
@@ -213,6 +248,61 @@ def test_create_failure_quality_report_saved_json_matches_returned_report():
     assert saved["summary"]["status"] == "FAIL"
 
 
+def test_create_failure_quality_report_preserves_partial_phase_results():
+    write = WriteCapture()
+    report = create_failure_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        failure_phase="persistence",
+        failure_message="save failed",
+        positions_result=make_positions_result(status="PASS"),
+        trips_result={
+            "status": "PASS",
+            "effective_window_minutes": 180.0,
+            "trips_extracted": 12,
+            "checks": [],
+        },
+        persistence_result={
+            "status": "FAIL",
+            "added_rows": 0,
+            "previously_saved_rows": 0,
+        },
+        write_fn=write,
+    )
+    phases = report["details"]["phases"]
+    assert phases["positions"]["status"] == "PASS"
+    assert phases["trip_extraction"]["trips_extracted"] == 12
+    assert phases["persistence"]["status"] == "FAIL"
+
+
+def test_create_failure_quality_report_includes_column_lineage_when_provided():
+    write = WriteCapture()
+    report = create_failure_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        failure_phase="persistence",
+        failure_message="save failed",
+        positions_result=make_positions_result(status="PASS"),
+        trips_result={
+            "status": "PASS",
+            "effective_window_minutes": 180.0,
+            "trips_extracted": 12,
+            "checks": [],
+        },
+        persistence_result={
+            "status": "FAIL",
+            "added_rows": 0,
+            "previously_saved_rows": 0,
+        },
+        column_lineage={"table_name": "finished_trips", "columns": {"trip_id": {}}},
+        write_fn=write,
+    )
+    artifacts = report["details"]["artifacts"]
+    assert artifacts["column_lineage"]["table_name"] == "finished_trips"
+
+
 # ---------------------------------------------------------------------------
 # create_quality_report (WARN / PASS path)
 # ---------------------------------------------------------------------------
@@ -275,20 +365,31 @@ def test_create_quality_report_path_contains_execution_id_prefix():
 # ---------------------------------------------------------------------------
 
 
-def make_trips_result(status="PASS", trips_extracted=10):
+def make_trips_result(
+    status="PASS",
+    trips_extracted=10,
+    source_sentido_discrepancies=0,
+    sanitization_dropped_points=0,
+    vehicle_line_groups_processed=0,
+):
     return {
         "status": status,
         "effective_window_minutes": 180.0,
         "trips_extracted": trips_extracted,
+        "source_sentido_discrepancies": source_sentido_discrepancies,
+        "sanitization_dropped_points": sanitization_dropped_points,
+        "vehicle_line_groups_processed": vehicle_line_groups_processed,
         "checks": [],
     }
 
 
-def make_persistence_result(status="PASS", new_rows=10, skipped_rows=0):
+def make_persistence_result(
+    status="PASS", added_rows=10, previously_saved_rows=0
+):
     return {
         "status": status,
-        "new_rows": new_rows,
-        "skipped_rows": skipped_rows,
+        "added_rows": added_rows,
+        "previously_saved_rows": previously_saved_rows,
     }
 
 
@@ -342,15 +443,25 @@ def test_create_final_quality_report_summary_contains_all_metrics():
         execution_id=EXEC_ID,
         run_ts=RUN_TS,
         positions_result=make_positions_result(count=150000),
-        trips_result=make_trips_result(trips_extracted=1247),
-        persistence_result=make_persistence_result(new_rows=245, skipped_rows=1002),
+        trips_result=make_trips_result(
+            trips_extracted=1247,
+            source_sentido_discrepancies=13,
+            sanitization_dropped_points=879,
+            vehicle_line_groups_processed=8577,
+        ),
+        persistence_result=make_persistence_result(
+            added_rows=245, previously_saved_rows=1002
+        ),
         write_fn=write,
     )
     summary = report["summary"]
     assert summary["positions_in_time_window_count"] == 150000
     assert summary["trips_extracted"] == 1247
-    assert summary["new_trips_saved"] == 245
-    assert summary["skipped_trips"] == 1002
+    assert summary["source_sentido_discrepancies"] == 13
+    assert summary["sanitization_dropped_points"] == 879
+    assert summary["vehicle_line_groups_processed"] == 8577
+    assert summary["added_rows"] == 245
+    assert summary["previously_saved_rows"] == 1002
 
 
 def test_create_final_quality_report_details_contains_all_phases():
@@ -368,6 +479,22 @@ def test_create_final_quality_report_details_contains_all_phases():
     assert "positions" in phases
     assert "trip_extraction" in phases
     assert "persistence" in phases
+
+
+def test_create_final_quality_report_details_do_not_include_execution_efficiency():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(
+            added_rows=0, previously_saved_rows=10
+        ),
+        write_fn=write,
+    )
+    assert "execution_efficiency" not in report["details"]
 
 
 def test_create_final_quality_report_path_contains_execution_id_prefix():
@@ -398,3 +525,25 @@ def test_create_final_quality_report_saved_json_matches_returned_report():
     saved = write.calls[0]["data"]
     assert saved["summary"]["execution_id"] == report["summary"]["execution_id"]
     assert saved["summary"]["status"] == report["summary"]["status"]
+
+
+def test_create_final_quality_report_includes_column_lineage():
+    write = WriteCapture()
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=make_trips_result(),
+        persistence_result=make_persistence_result(),
+        column_lineage={
+            "table_name": "finished_trips",
+            "columns": {"trip_id": {}, "vehicle_id": {}},
+            "drift_detected": False,
+            "warning": None,
+        },
+        write_fn=write,
+    )
+    artifacts = report["details"]["artifacts"]
+    assert artifacts["column_lineage"]["table_name"] == "finished_trips"
+    assert artifacts["column_lineage"]["drift_detected"] is False

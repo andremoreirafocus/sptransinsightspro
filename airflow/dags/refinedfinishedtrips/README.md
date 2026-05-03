@@ -16,10 +16,158 @@ Para cada linha e veículo:
 - verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
+- em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 - verifica a qualidade da persistência, executando uma verificação:
   - **duplicatas**: aviso se todas as viagens da execução já estavam presentes no banco de dados (duplicatas)
+- em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata e notifica via webhook com o status consolidado das três fases (posições, extração de viagens e persistência)
+
+## Algoritmo de extração de viagens
+O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
+- `trip_start_time`
+- `trip_end_time`
+- `duration`
+
+Esses campos são especialmente sensíveis a ruídos comuns do dado de posição em produção, como:
+- ônibus parado em terminal antes de iniciar a viagem
+- mudança de `linha_sentido` em momentos de borda operacional
+- amostras espaciais isoladas incompatíveis com a trajetória real
+- janelas de processamento que começam ou terminam no meio de um ciclo operacional
+
+Por isso, a extração não se apoia apenas em `linha_sentido`. A lógica usa principalmente geolocalização para identificar início e fim de viagem e usa `linha_sentido` apenas como sinal complementar quando necessário, especialmente em linhas circulares.
+
+### 1. Sanitização espacial das posições
+Antes de extrair viagens, o pipeline sanitiza a sequência de posições de cada combinação linha/veículo.
+
+Essa sanitização remove amostras isoladas espacialmente inválidas, caracterizadas por:
+- um ponto intermediário incompatível com o ponto anterior
+- incompatível também com o ponto seguinte
+- enquanto a ligação direta entre anterior e seguinte permanece plausível
+
+Na prática, isso elimina "teletransportes" pontuais do ônibus sem descartar sequências inteiras de dados.
+Esse passo é importante porque um único ponto espacial inválido pode:
+- antecipar artificialmente um início de viagem
+- encerrar uma viagem no ponto errado
+- inflar ou reduzir incorretamente a duração observada
+
+Com isso, a extração final fica mais estável e mais aderente ao deslocamento real do veículo.
+
+### 2. Linhas não circulares
+Para linhas não circulares, o algoritmo usa proximidade geográfica aos terminais de referência:
+- `first_stop`
+- `last_stop`
+
+Uma viagem é formada quando:
+- o veículo é observado próximo de um terminal
+- depois se afasta desse terminal
+- e posteriormente chega ao terminal oposto
+
+O início da viagem é registrado como a última posição ainda próxima do terminal de partida antes do movimento real.
+O fim da viagem é registrado quando o veículo entra na zona de proximidade do terminal de chegada.
+
+Assim, a detecção depende da trajetória espacial observada, e não apenas de `linha_sentido`.
+Essa estratégia é necessária porque:
+- o ônibus pode permanecer parado no terminal por vários ciclos de coleta antes de partir
+- o `linha_sentido` pode mudar em momentos de borda antes ou depois do deslocamento efetivo
+
+Ao usar a fronteira espacial observada, o algoritmo melhora diretamente:
+- a precisão do início da viagem
+- a precisão do fim da viagem
+- a qualidade da duração calculada
+
+### 3. Linhas circulares
+Para linhas circulares, o algoritmo usa uma composição de dois sinais de fronteira:
+- proximidade ao terminal/âncora
+- mudança de `linha_sentido`
+
+Após a primeira sincronização do veículo com a região do terminal, o algoritmo passa a detectar viagens considerando que:
+- uma viagem pode começar por saída do terminal
+- uma viagem também pode começar por mudança de `linha_sentido`
+- uma viagem pode terminar por retorno ao terminal
+- uma viagem também pode terminar por mudança de `linha_sentido`
+
+Isso evita perda de viagens quando a janela de análise começa no meio de um ciclo ou quando a mudança de sentido ocorre fora da área do terminal.
+Esse comportamento é importante porque, em linhas circulares:
+- a janela de processamento pode não capturar a saída do terminal
+- uma viagem pode precisar ser encerrada por retorno ao terminal
+- outra pode precisar ser segmentada por mudança operacional de `linha_sentido`
+
+Sem essa composição de sinais, viagens circulares tenderiam a ficar subdetectadas ou com limites temporais imprecisos.
+
+### 4. Remoção de tempo parado em terminal
+Períodos em que o ônibus permanece parado aguardando início de operação não devem inflar a duração da viagem.
+
+Por isso, o algoritmo:
+- remove o dwell no terminal do início da viagem
+- usa como início efetivo a última posição no terminal imediatamente anterior à saída real
+
+Essa remoção é aplicada apenas em contexto de terminal, não durante o percurso em rota.
+Isso é necessário para que a duração represente o tempo de operação da viagem, e não o tempo de espera do veículo estacionado antes da partida.
+
+### 5. Validação de sentido
+O campo `linha_sentido` não é usado como única base para descobrir viagens.
+
+Ele é usado como sinal complementar:
+- principalmente para segmentação de linhas circulares
+- e para validação de consistência da viagem detectada
+
+Na validação, o algoritmo desconsidera amostras de borda próximas ao terminal, pois nessas regiões o `linha_sentido` pode mudar antes ou depois do deslocamento real devido à granularidade temporal da coleta.
+
+Em conjunto, essas decisões tornam a tabela de viagens finalizadas mais confiável para:
+- análise de eficiência operacional
+- comparação de duração entre viagens
+- avaliação de ciclo e regularidade
+- consumo analítico na camada de visualização
+
+## Relato de qualidade e notificação
+O pipeline produz relatórios estruturados para três fases:
+- `positions`
+- `trip_extraction`
+- `persistence`
+
+Os relatórios de falha preservam os resultados parciais disponíveis até o ponto da interrupção.
+Assim, uma falha em `trip_extraction` ou `persistence` não perde o contexto já calculado nas fases anteriores.
+
+No relatório final, a fase `trip_extraction` também expõe métricas operacionais agregadas da execução, incluindo:
+- `trips_extracted`
+- `source_sentido_discrepancies`
+- `sanitization_dropped_points`
+- `vehicle_line_groups_processed`
+- `input_position_records`
+
+O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.finished_trips`:
+- `trip_id`
+- `vehicle_id`
+- `trip_start_time`
+- `trip_end_time`
+- `duration`
+- `is_circular`
+- `average_speed`
+
+Essa linhagem é validada contra o contrato real de saída da pipeline.
+Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
+- `drift_detected: true`
+- `warning: "lineage drift detected"`
+
+Esse drift de lineage é reportado como artefato de governança no relatório de qualidade, sem por si só interromper a execução.
+
+A fase `persistence` do relatório final já expõe diretamente o resultado da persistência, incluindo:
+- `added_rows`
+- `previously_saved_rows`
+
+O resumo (`summary`) segue o contrato comum consumido pelo `alertservice`.
+O pipeline envia webhook para:
+- falhas em `positions`
+- avisos em `positions`
+- falhas em `trip_extraction`
+- falhas em `persistence`
+- relatório final consolidado
+
+O envio do webhook é explicitamente registrado em log, indicando se:
+- a notificação foi enviada
+- a notificação estava desabilitada
+- a tentativa falhou
 
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
@@ -77,7 +225,7 @@ Chaves esperadas em `general`
     "trips_min_trips_threshold": 5
   },
   "notifications": {
-    "webhook_url": "disabled"
+    "webhook_url": "http://localhost:8000/notify"
   }
 }
 ```
@@ -86,6 +234,9 @@ Chaves esperadas em `general`
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
 - Variable `refinedfinishedtrips_general` (JSON)
 - Credenciais via Connections (MinIO e Postgres)
+
+Para desativar notificações do `alertservice`, configure:
+- `notifications.webhook_url = "disabled"`
 
 ## Instruções para instalação
 Para instalar os requisitos:

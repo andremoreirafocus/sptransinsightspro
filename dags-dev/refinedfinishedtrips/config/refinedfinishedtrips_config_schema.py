@@ -33,6 +33,11 @@ class QualityConfig(BaseModel):
     trips_min_trips_threshold: int
 
 
+class TripDetectionConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    stop_proximity_threshold_meters: int
+
+
 class NotificationsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     webhook_url: str
@@ -45,6 +50,7 @@ class GeneralConfig(BaseModel):
     tables: TablesConfig
     quality: QualityConfig
     notifications: NotificationsConfig
+    trip_detection: TripDetectionConfig
 
 
 def validate_general_input(

@@ -31,6 +31,28 @@ def test_returns_dataframe_from_duckdb_client():
     assert result.equals(expected_df)
 
 
+def test_sql_query_includes_distance_and_position_columns():
+    expected_df = pd.DataFrame(
+        [
+            {
+                "veiculo_ts": "2026-04-14",
+                "linha_lt": "1234-10",
+                "veiculo_id": 100,
+                "veiculo_lat": -23.5,
+                "veiculo_long": -46.6,
+                "distance_to_first_stop": 50.0,
+                "distance_to_last_stop": 3200.0,
+            }
+        ]
+    )
+    fake = FakeDuckDBConnection(df=expected_df)
+    result = get_recent_positions(make_config(), duckdb_client=fake)
+    assert "veiculo_lat" in result.columns
+    assert "veiculo_long" in result.columns
+    assert "distance_to_first_stop" in result.columns
+    assert "distance_to_last_stop" in result.columns
+
+
 def test_missing_config_key_raises_value_error():
     config = make_config()
     del config["general"]

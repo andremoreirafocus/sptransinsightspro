@@ -62,33 +62,50 @@ def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duck
             GROUP BY trip_id
         ),
         calculated_base AS (
-            SELECT 
+            SELECT
                 *,
                 ROUND(SQRT(POW( last_stop_lat -  first_stop_lat, 2) + POW( last_stop_lon -  first_stop_lon, 2)) * 106428) AS trip_linear_distance,
                 (first_stop_id = last_stop_id) AS is_circular
             FROM base_metrics
         ),
-        missing_patches AS (
-            SELECT 
+        normalized_base AS (
+            SELECT
+                base.trip_id,
+                COALESCE(ref.first_stop_id, base.first_stop_id) AS first_stop_id,
+                COALESCE(ref.first_stop_name, base.first_stop_name) AS first_stop_name,
+                COALESCE(ref.first_stop_lat, base.first_stop_lat) AS first_stop_lat,
+                COALESCE(ref.first_stop_lon, base.first_stop_lon) AS first_stop_lon,
+                COALESCE(ref.last_stop_id, base.last_stop_id) AS last_stop_id,
+                COALESCE(ref.last_stop_name, base.last_stop_name) AS last_stop_name,
+                COALESCE(ref.last_stop_lat, base.last_stop_lat) AS last_stop_lat,
+                COALESCE(ref.last_stop_lon, base.last_stop_lon) AS last_stop_lon,
+                COALESCE(ref.trip_linear_distance, base.trip_linear_distance) AS trip_linear_distance,
+                COALESCE(ref.is_circular, base.is_circular) AS is_circular
+            FROM calculated_base base
+            LEFT JOIN calculated_base ref
+                ON base.trip_id LIKE '%-1'
+                AND ref.trip_id = REGEXP_REPLACE(base.trip_id, '-1$', '-0')
+        ),
+        inferred_sentido_2_trips AS (
+            SELECT
                 REPLACE(t0.trip_id, '-0', '-1') AS trip_id,
-                -- Logic: If circular, keep same. If not circular, swap.
-                CASE WHEN t0.is_circular THEN t0.first_stop_id ELSE t0.last_stop_id END AS first_stop_id,
-                CASE WHEN t0.is_circular THEN t0.first_stop_name ELSE t0.last_stop_name END AS first_stop_name,
-                CASE WHEN t0.is_circular THEN t0. first_stop_lat ELSE t0. last_stop_lat END AS  first_stop_lat,
-                CASE WHEN t0.is_circular THEN t0. first_stop_lon ELSE t0. last_stop_lon END AS  first_stop_lon,
-                CASE WHEN t0.is_circular THEN t0.last_stop_id ELSE t0.first_stop_id END AS last_stop_id,
-                CASE WHEN t0.is_circular THEN t0.last_stop_name ELSE t0.first_stop_name END AS last_stop_name,
-                CASE WHEN t0.is_circular THEN t0. last_stop_lat ELSE t0. first_stop_lat END AS  last_stop_lat,
-                CASE WHEN t0.is_circular THEN t0. last_stop_lon ELSE t0. first_stop_lon END AS  last_stop_lon,
+                t0.first_stop_id,
+                t0.first_stop_name,
+                t0.first_stop_lat,
+                t0.first_stop_lon,
+                t0.last_stop_id,
+                t0.last_stop_name,
+                t0.last_stop_lat,
+                t0.last_stop_lon,
                 t0.trip_linear_distance,
                 t0.is_circular
-            FROM calculated_base t0
-            LEFT JOIN calculated_base t1 ON t1.trip_id = REPLACE(t0.trip_id, '-0', '-1')
+            FROM normalized_base t0
+            LEFT JOIN normalized_base t1 ON t1.trip_id = REPLACE(t0.trip_id, '-0', '-1')
             WHERE t0.trip_id LIKE '%-0' AND t1.trip_id IS NULL
         )
-        SELECT * FROM calculated_base
+        SELECT * FROM normalized_base
         UNION ALL
-        SELECT * FROM missing_patches;
+        SELECT * FROM inferred_sentido_2_trips;
         """
         logger.info("Generating trip_details...")
         con.execute(sql_command)

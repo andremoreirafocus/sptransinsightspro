@@ -26,6 +26,19 @@ def _derive_overall_status(*results: Dict[str, Any]) -> str:
     return "PASS"
 
 
+def _build_phase_details(
+    positions_result: Dict[str, Any],
+    trips_result: Optional[Dict[str, Any]] = None,
+    persistence_result: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    phase_details = {"positions": positions_result}
+    if trips_result is not None:
+        phase_details["trip_extraction"] = trips_result
+    if persistence_result is not None:
+        phase_details["persistence"] = persistence_result
+    return phase_details
+
+
 def build_quality_report(
     execution_id: str,
     positions_result: Dict[str, Any],
@@ -33,6 +46,9 @@ def build_quality_report(
     status: str,
     failure_phase: Optional[str] = None,
     failure_message: Optional[str] = None,
+    trips_result: Optional[Dict[str, Any]] = None,
+    persistence_result: Optional[Dict[str, Any]] = None,
+    column_lineage: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     items_failed = _count_failed_checks(positions_result)
     summary = build_quality_summary(
@@ -52,10 +68,11 @@ def build_quality_report(
         "status": status,
         "failure_phase": failure_phase,
         "failure_message": failure_message,
-        "phases": {
-            "positions": positions_result,
+        "phases": _build_phase_details(positions_result, trips_result, persistence_result),
+        "artifacts": {
+            "quality_report_path": quality_report_path,
+            "column_lineage": column_lineage or {},
         },
-        "artifacts": {"quality_report_path": quality_report_path},
     }
     return {"summary": summary, "details": details}
 
@@ -106,6 +123,9 @@ def create_failure_quality_report(
     failure_phase: str,
     failure_message: str,
     positions_result: Dict[str, Any],
+    trips_result: Optional[Dict[str, Any]] = None,
+    persistence_result: Optional[Dict[str, Any]] = None,
+    column_lineage: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
@@ -131,6 +151,9 @@ def create_failure_quality_report(
         status="FAIL",
         failure_phase=failure_phase,
         failure_message=failure_message,
+        trips_result=trips_result,
+        persistence_result=persistence_result,
+        column_lineage=column_lineage,
     )
     save_quality_report(
         report=report,
@@ -149,6 +172,7 @@ def create_final_quality_report(
     positions_result: Dict[str, Any],
     trips_result: Dict[str, Any],
     persistence_result: Dict[str, Any],
+    column_lineage: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     def get_config(config):
@@ -177,8 +201,13 @@ def create_final_quality_report(
         quality_report_path=report_path,
         positions_in_time_window_count=positions_result.get("positions_in_time_window_count"),
         trips_extracted=trips_result.get("trips_extracted"),
-        new_trips_saved=persistence_result.get("new_rows"),
-        skipped_trips=persistence_result.get("skipped_rows"),
+        source_sentido_discrepancies=trips_result.get(
+            "source_sentido_discrepancies"
+        ),
+        sanitization_dropped_points=trips_result.get("sanitization_dropped_points"),
+        vehicle_line_groups_processed=trips_result.get("vehicle_line_groups_processed"),
+        added_rows=persistence_result.get("added_rows"),
+        previously_saved_rows=persistence_result.get("previously_saved_rows"),
     )
     details = {
         "execution_id": execution_id,
@@ -190,7 +219,10 @@ def create_final_quality_report(
             "trip_extraction": trips_result,
             "persistence": persistence_result,
         },
-        "artifacts": {"quality_report_path": report_path},
+        "artifacts": {
+            "quality_report_path": report_path,
+            "column_lineage": column_lineage or {},
+        },
     }
     report = {"summary": summary, "details": details}
     save_quality_report(
