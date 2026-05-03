@@ -602,7 +602,7 @@ def _make_full_report(status="PASS"):
             "artifacts": {
                 "quality_report_path": "bucket/path.json",
                 "quarantine_path": "bucket/q/",
-                "colum lineage": {},
+                "column_lineage": {},
             },
         },
     }

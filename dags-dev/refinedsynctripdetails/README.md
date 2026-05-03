@@ -82,7 +82,7 @@ Crie `dags-dev/refinedsynctripdetails/.env` com base em `.env.example` preenchen
 Criar tabelas conforme instruções abaixo:
 
 ```shell
-python ./refinedsynctripdetails-v1.py
+python ./refinedsynctripdetails-v<version number>.py
 ```
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:

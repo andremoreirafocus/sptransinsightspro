@@ -85,7 +85,7 @@
     "artifacts": {
       "quality_report_path": "metadata/quality-reports/transformlivedata/year=2026/month=02/day=26/hour=20/quality-report-positions_2036.json",
       "quarantine_path": "quarantined/sptrans/positions/year=2026/month=02/day=26/hour=20/positions_2036_*.parquet",
-      "colum lineage": {
+      "column_lineage": {
         "linha_lt": {
           "inputs": [
             "payload.l[i].c"

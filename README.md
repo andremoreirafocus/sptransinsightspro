@@ -34,11 +34,11 @@ Detalhes sobre as DAGS:
         - Maior precisão de `trip_start_time`, `trip_end_time` e `duration`
         - Verificação de qualidade das posições (freshness e gaps de extração); falha interrompe o pipeline com relatório e notificação imediata
         - Verificação de qualidade da extração de viagens (zero trips e low trip count) baseada na janela efetiva de extração
-        - Verificação de duplicatas na persistência
+        - Resultado da persistência com contagem de viagens adicionadas e de viagens que já haviam sido salvas anteriormente
         - Relatório de qualidade consolidado com status das três fases ao final de cada execução, persistido no bucket de metadata e enviado ao `alertservice` via webhook
         ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
     - DAG refinedsynctripdetails: processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
-    - DAG updatelatestposition: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
+    - DAG updatelatestpositions: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
 - extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
 - alertservice: microserviço que recebe resumos de qualidade via webhook de `transformlivedata`, `gtfs` e `extractloadlivedata`, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline. ![Para mais informações:](./alertservice/README.md)
