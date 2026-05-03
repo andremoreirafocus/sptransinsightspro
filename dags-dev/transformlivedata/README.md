@@ -52,6 +52,8 @@ O bloco `summary` traz um diagnóstico rápido para monitoramento:
 Em caso de falha que interrompa o pipeline, o relatório ainda é gerado com informações parciais das etapas concluídas até o ponto de erro.  
 Isso permite identificar exatamente em qual fase o processamento parou e quais métricas já haviam sido calculadas, mesmo quando o pipeline não completa o fluxo inteiro.
 
+- Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-positions_HHMM_uuid.json](./samples/quality-report-positions_HHMM_uuid.json).
+
 ### Estrutura simplificada (exemplo)
 ```json
 {
@@ -178,6 +180,8 @@ python transformlivedata-v2.py
 ```
 
 ## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
+
+Na pasta [samples](./samples) há um exemplo curado manualmente do artefato de saída `positions`: [positions_HHMM_0.parquet](./samples/positions_HHMM_0.parquet), apenas para referência documental.
 
 ```sql
 CREATE TABLE trusted.positions (

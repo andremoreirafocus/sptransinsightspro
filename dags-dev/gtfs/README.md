@@ -100,6 +100,7 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
 - Caminho final: `trusted/<gtfs_folder>/trip_details/trip_details.parquet`
 - A validação GX de `trip_details` usa a suite `data_expectations_trip_details` quando configurada.
 - Em falhas após escrita em staging, a pipeline tenta quarentenar o artefato staged para evitar resíduos órfãos.
+- Na pasta [samples](./samples) há um exemplo curado manualmente do artefato `trip_details`: [trip_details.parquet](./samples/trip_details.parquet), apenas para referência documental.
 
 ### Relatório consolidado de qualidade
 - Há exatamente um relatório por execução de `gtfs-v3.py`, com `summary` + `details`.
@@ -112,6 +113,7 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
 - A construção e persistência do relatório delegam para `quality.reporting` (`build_quality_report_path`, `build_quality_summary`, `save_quality_report`).
 - A seção `summary` segue o contrato padrão definido em `quality.reporting`, com os campos adicionais específicos da pipeline GTFS: `stage`, `validated_items_count`, `relocation_status`, `relocation_error`.
 - `acceptance_rate` é um valor contínuo entre 0.0 e 1.0, calculado como `(validated_items_count - rows_failed) / validated_items_count` sobre o total de itens processados em todas as fases. Antes era binário (0.0 ou 1.0).
+- Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-gtfs_HHMM_uuid.json](./samples/quality-report-gtfs_HHMM_uuid.json).
 
 ### Relato de qualidade e notificação (alertservice)
 - Em falhas de qualquer fase, a pipeline gera e persiste um relatório consolidado com:

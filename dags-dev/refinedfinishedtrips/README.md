@@ -169,6 +169,7 @@ O envio do webhook é explicitamente registrado em log, indicando se:
 - a notificação foi enviada
 - a notificação estava desabilitada
 - a tentativa falhou
+- Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
 
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
