@@ -231,12 +231,6 @@ Chaves esperadas em `general`
   }
 }
 ```
-
-### Airflow (produção)
-No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
-- Variable `refinedfinishedtrips_general` (JSON)
-- Credenciais via Connections (MinIO e Postgres)
-
 Para desativar notificações do `alertservice`, configure:
 - `notifications.webhook_url = "disabled"`
 
@@ -246,14 +240,6 @@ Para instalar os requisitos:
 - python3 -m venv .env
 - source .venv/bin/activate
 - pip install -r requirements.txt
-
-## Instruções para execução em modo local
-Crie `dags-dev/refinedfinishedtrips/.env` com base em `.env.example` preenchendo todos os campos.
-Criar tabelas conforme instruções abaixo:
-
-```shell
-python ./refinedfinishedtrips-v4.py
-```
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
 ## Para criar as tabelas e índices necessários ao subprojeto:
@@ -278,8 +264,6 @@ CREATE SCHEMA partman;
 CREATE EXTENSION pg_partman SCHEMA partman;
 
 CREATE SCHEMA refined;
-
-
 
 CREATE TABLE refined.finished_trips (
     trip_id TEXT,
@@ -345,30 +329,22 @@ WHERE parent.relname = 'finished_trips'
 ORDER BY child.relname DESC;
 ```
 
-Deprecated
-CREATE TABLE refined.finished_trips (
-    trip_id TEXT,             -- e.g., '101A_0'
-    vehicle_id INTEGER,       -- e.g., 505
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
-    -- This combination is guaranteed unique by your bus logic
-    PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
-);
+### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
+- Variable `refinedfinishedtrips_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
 
+Antes da execução da DAG no Airflow, as tabelas necessárias já devem estar criadas conforme instruções acima.
 
+## Instruções para execução em modo local
+Crie `dags-dev/refinedfinishedtrips/.env` com base em `.env.example` preenchendo todos os campos.
+Com as tabelas já criadas conforme instruções acima, execute:
 
-#Tabela usada apenas em testes de algoritmo experimental
-```sql
-CREATE TABLE trusted.ongoing_trips (
-    id BIGSERIAL PRIMARY KEY,
-    trip_id TEXT,
-    vehicle_id INTEGER,
-    trip_start_time TIMESTAMPTZ,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
-    is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION
-);
+```shell
+python ./refinedfinishedtrips-v<version number>.py
+```
+
+Exemplo: 
+```shell
+python ./refinedfinishedtrips-v4.py
+```

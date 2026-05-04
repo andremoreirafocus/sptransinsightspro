@@ -149,5 +149,12 @@ Para instalar os requisitos:
 Crie `dags-dev/gtfs/.env` com base em `.env.example` preenchendo todos os campos:
 
 ```shell
-python gtfs-v3.py
+Execute:
+```shell
+python ./gtfs-v<version number>.py
+```
+
+Exemplo: 
+```shell
+python ./gtfs-v3.py
 ```

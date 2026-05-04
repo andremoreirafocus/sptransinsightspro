@@ -37,7 +37,7 @@ Detalhes sobre as DAGS:
         - Resultado da persistência com contagem de viagens adicionadas e de viagens que já haviam sido salvas anteriormente
         - Relatório de qualidade consolidado com status das três fases ao final de cada execução, persistido no bucket de metadata e enviado ao `alertservice` via webhook
         ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
-    - DAG refinedsynctripdetails: processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
+    - DAG refinedsynctripdetails: processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
     - DAG updatelatestpositions: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
 - extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
@@ -133,7 +133,7 @@ Este script realiza os seguintes passos:
 
 O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
-Para a pipeline `gtfs`, a suíte de testes segue padrão de injeção de dependências com fakes reutilizáveis em `dags-dev/gtfs/tests/fakes/` (sem `monkeypatch`) e atualmente cobre os serviços centrais de transformação, relocação, schema e webhook.
+As suítes de testes do projeto priorizam injeção explícita de dependências, uso de fakes reutilizáveis e cobertura de serviços e fluxos de orquestração, evitando `monkeypatch` como estratégia padrão.
 
 ### Deployment de Microserviços
 Para atualizar e reiniciar um microserviço (ex: `extractloadlivedata`), utilize o script de deployment:
