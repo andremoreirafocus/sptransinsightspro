@@ -271,7 +271,7 @@ CREATE DATABASE sptrans_insights;
 
 \c sptrans_insights
 
-Com particonamemto:
+Com particionamemto:
 
 ```sql
 CREATE SCHEMA partman;

@@ -66,11 +66,19 @@ Para instalar os requisitos:
 Crie `dags-dev/updatelatestpositions/.env` com base em `.env.example` preenchendo todos os campos:
 
 ```shell
-python ./updatelatestpositions-v2.py
+python ./updatelatestpositions-v3.py
 ```
 
+## Configurações de Banco de dados que devem ser feitas antes da execução:
+## Para criar as tabelas e índices necessários ao subprojeto:
+Database commands:
+```
+docker exec -it postgres bash
+psql -U postgres -W
 # A tabela abaixo precisa ser criada, pois é criada via CTAS
+
 ```sql
+\c sptrans_insights
 CREATE TABLE refined.latest_positions (
     id BIGSERIAL PRIMARY KEY,
     veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
