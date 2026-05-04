@@ -1,9 +1,5 @@
-from refinedfinishedtrips.extract_trips_for_all_Lines_and_vehicles import (
+from refinedfinishedtrips.extract_trips import (
     extract_trips_for_all_Lines_and_vehicles,
-)
-from pipeline_configurator.config import get_config
-from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
-    GeneralConfig,
 )
 import os
 import logging
@@ -12,10 +8,11 @@ PIPELINE_NAME = "refinedfinishedtrips"
 _IN_AIRFLOW = bool(os.getenv("AIRFLOW_HOME"))
 
 if _IN_AIRFLOW:
-    VERSION = 4
+    VERSION = 5
     DAG_NAME = f"{PIPELINE_NAME}-v{VERSION}"
 else:
     from logging.handlers import RotatingFileHandler
+
     LOG_FILENAME = f"{PIPELINE_NAME}.log"
     logging.basicConfig(
         level=logging.INFO,
@@ -25,34 +22,19 @@ else:
             logging.StreamHandler(),
         ],
     )
+
 logger = logging.getLogger(__name__)
 
 
-def _load_pipeline_config():
-    try:
-        pipeline_config = get_config(
-            PIPELINE_NAME,
-            None,
-            GeneralConfig,
-            None,
-            "minio_conn",
-            "postgres_conn",
-        )
-    except Exception as e:
-        logger.error(f"Pipeline configuration validation failed: {e}")
-        raise ValueError(f"Pipeline configuration validation failed: {e}")
-    return pipeline_config
-
-
 def extract_trips():
-    pipeline_config = _load_pipeline_config()
-    extract_trips_for_all_Lines_and_vehicles(pipeline_config)
+    extract_trips_for_all_Lines_and_vehicles(PIPELINE_NAME)
 
 
 if _IN_AIRFLOW:
     from airflow import DAG
     from airflow.operators.python import PythonOperator
     from airflow.utils.dates import days_ago
+
     default_args = {
         "owner": "airflow",
         "depends_on_past": False,
@@ -61,7 +43,8 @@ if _IN_AIRFLOW:
         "email_on_failure": False,
         "email_on_retry": False,
         "retries": 3,
-    }               
+    }
+
     with DAG(
         DAG_NAME,
         default_args=default_args,

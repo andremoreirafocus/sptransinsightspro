@@ -2,6 +2,10 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict
 import uuid
 
+from pipeline_configurator.config import get_config
+from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
+    GeneralConfig,
+)
 from refinedfinishedtrips.lineage import (
     get_finished_trips_lineage,
     get_finished_trips_output_columns,
@@ -28,6 +32,22 @@ from infra.notifications import send_webhook
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _load_pipeline_config(pipeline_name: str) -> Dict[str, Any]:
+    try:
+        pipeline_config = get_config(
+            pipeline_name,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+        )
+    except Exception as e:
+        logger.error(f"Pipeline configuration validation failed: {e}")
+        raise ValueError(f"Pipeline configuration validation failed: {e}")
+    return pipeline_config
 
 
 def _parse_trip_extraction_output(trip_extraction_output: Any) -> tuple[Any, Dict[str, Any]]:
@@ -144,7 +164,7 @@ def _handle_persistence_result(persistence_result: Dict[str, Any]) -> None:
 
 
 def extract_trips_for_all_Lines_and_vehicles(
-    config: Dict[str, Any],
+    pipeline_name_or_config: str | Dict[str, Any],
     get_recent_positions_fn: Callable[..., Any] = get_recent_positions,
     save_trips_fn: Callable[..., Any] = save_finished_trips_to_db,
     extract_trips_fn: Callable[..., Any] = get_all_finished_trips,
@@ -156,6 +176,10 @@ def extract_trips_for_all_Lines_and_vehicles(
     create_final_report_fn: Callable[..., Any] = create_final_quality_report,
     send_webhook_fn: Callable[..., Any] = send_webhook,
 ) -> None:
+    if isinstance(pipeline_name_or_config, dict):
+        config = pipeline_name_or_config
+    else:
+        config = _load_pipeline_config(pipeline_name_or_config)
     execution_id = str(uuid.uuid4())
     run_ts = datetime.now(timezone.utc)
     positions_result = None
