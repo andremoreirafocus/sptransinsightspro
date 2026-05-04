@@ -179,6 +179,9 @@ Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo to
 python transformlivedata-v2.py
 ```
 
+Para reprocessamento pontual do pipeline, utilize o script [transformlivedata-backfill-v9.py](../transformlivedata-backfill-v9.py). 
+Em modo local, o script percorre toda a janela entre `BACKFILL_START` e `BACKFILL_END` em passos de `BACKFILL_STEP_MINUTES` definidos no próprio script.
+
 ## Estrutura da tabela de posições instantâneas enriquecidas criadas neste subprojeto usando comando equivalente SQL:
 
 Na pasta [samples](./samples) há um exemplo curado manualmente do artefato de saída `positions`: [positions_HHMM_0.parquet](./samples/positions_HHMM_0.parquet), apenas para referência documental.
