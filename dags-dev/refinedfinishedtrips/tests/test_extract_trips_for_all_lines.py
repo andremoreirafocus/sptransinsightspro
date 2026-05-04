@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 import pandas as pd
 import pytest
 
-from refinedfinishedtrips.extract_trips_for_all_Lines_and_vehicles import (
+from refinedfinishedtrips.extract_trips import (
     extract_trips_for_all_Lines_and_vehicles,
 )
 
