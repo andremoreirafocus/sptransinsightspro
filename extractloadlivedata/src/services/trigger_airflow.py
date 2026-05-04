@@ -193,14 +193,3 @@ def trigger_airflow_dag_run(
             f"airflow dag trigger failed for marker '{pending_marker}'"
         ) from e
 
-
-def main() -> None:
-
-    logical_date = get_utc_logical_date_from_file(
-        "posicoes_onibus-202602241926.json.zst"
-    )
-    logger.info(f"Logical_date: {logical_date}")
-
-
-if __name__ == "__main__":
-    main()
