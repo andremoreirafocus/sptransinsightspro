@@ -11,12 +11,20 @@ A solução adota o conceito de monorepo e é composta por alguns subprojetos. C
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
+- Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata e alertservice, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
+- extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
+- alertservice: microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline. ![Para mais informações:](./alertservice/README.md)
+- Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada
+- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
+- Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
+- PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
+- PowerBI: utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL. ![Para mais informações:](./powerbi/README.md)
 - Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. ![Para mais informações:](./airflow/README.md). 
 O ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informações:](./dags-dev/README.md)
 Detalhes sobre as DAGS:
     - DAG gtfs: processo composto de 3 etapas principais.   
         - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS, valida os arquivos e salva na camada raw (ou quarentena em caso de falha).
-        - transformação: executa a **TRANSFORMATION STAGE** com validação de qualidade (Great Expectations quando aplicável), staging de artefatos (tabelas) em formato Parquet, quarentena em caso de falha e promoção para caminho final em caso de sucesso.
+        - transformação: executa a transformação das posições com validação de qualidade (Great Expectations quando aplicável), staging de artefatos (tabelas) em formato Parquet, quarentena em caso de falha e promoção para caminho final em caso de sucesso.
         - enrichment: cria a tabela `trip_details` em staging, valida com Great Expectations e só então promove para caminho final (ou quarentena em caso de falha).
         - qualidade: gera um relatório consolidado único por execução, persistido em bucket de metadados, incluindo diagnósticos por fase e linhagem de colunas de `trip_details` com detecção de drift.
         - Esta DAG emite um sinal (dataset do Airflow) ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens para a camada refined seja iniciada automaticamente.
@@ -42,13 +50,16 @@ Detalhes sobre as DAGS:
     - DAG refinedsynctripdetails: processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
     - DAG updatelatestpositions: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
 
-- extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
-- alertservice: microserviço que recebe resumos de qualidade via webhook de `transformlivedata`, `gtfs` e `extractloadlivedata`, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline. ![Para mais informações:](./alertservice/README.md)
-- Minio: utilizado para implementar as camadas raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para os dados da camada trusted
-- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
-- Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
-- PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
-- PowerBI: utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL. ![Para mais informações:](./powerbi/README.md)
+### Orquestração por eventos no Airflow
+O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração orientada a eventos atualmente implementada no Airflow por meio de Datasets.
+
+![Diagrama de eventos do Airflow](./diagrama_eventos_airflow.png)
+
+- `gtfs` publica o Dataset `gtfs://trip_details_ready`
+- `refinedsynctripdetails` é disparada por esse Dataset, ou seja, é executado automaticamente após a conclusão com sucesso do pipeline gtfs
+- `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
+- `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+
 
 ## Configuração
 Um template de configuração está disponível em `.env.example` na raiz do projeto. Este arquivo contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata).
