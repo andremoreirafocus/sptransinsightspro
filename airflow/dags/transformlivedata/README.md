@@ -150,13 +150,6 @@ Chaves esperadas em `general`
 Observação: `webhook_url` é a URL do microserviço `alertservice` e é obrigatório.  
 Para desativar notificações para o alertservice, use o valor `"disabled"`.
 
-### Airflow (produção)
-No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
-- Variable `transformlivedata_general` (JSON, inclui a seção `data_validations`)
-- Variable `transformlivedata_raw_data_json_schema` (JSON)
-- Variable `transformlivedata_data_expectations` (JSON)
-- Credenciais via Connections (MinIO e Postgres)
-
 ## Testes unitários
 Os testes unitários deste subprojeto estão restritos ao módulo `transform_positions.py` e cobrem o núcleo da lógica de transformação, incluindo:
 - validação de payloads e estrutura mínima dos dados
@@ -172,11 +165,31 @@ Para instalar os requisitos:
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
+## Configurações de Banco de dados que devem ser feitas antes da execução:
+A tabela `to_be_processed.raw` cjá deve ter sido criada conforme instruções em [extractloadlivedata/README.md](../../extractloadlivedata/README.md).
+
+### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
+- Variable `transformlivedata_general` (JSON, inclui a seção `data_validations`)
+- Variable `transformlivedata_raw_data_json_schema` (JSON)
+- Variable `transformlivedata_data_expectations` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
+
+Antes da execução da DAG no Airflow, a tabela `to_be_processed.raw` já deve estar criada conforme instruções acima.
+A partir da versão `transformlivedata-v10.py`, a task de transformação publica o Airflow Dataset `sptrans://trusted/transformed_positions_ready` após conclusão bem sucedida.
+Isso explicita a dependência de orquestração para pipelines downstream e melhora o freshness dos dados consumidos, além de reduzir a necessidade de manutenção de agendamentos acoplados por cron.
+
 ## Instruções para execução em modo local
 Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo todos os campos:
+Com a tabela já criada conforme instruções acima, execute:
 
 ```shell
-python transformlivedata-v2.py
+python ./transformlivedata-v<version number>.py
+```
+
+Exemplo: 
+```shell
+python ./transformlivedata-v2.py
 ```
 
 Para reprocessamento pontual do pipeline, utilize o script [transformlivedata-backfill-v9.py](../transformlivedata-backfill-v9.py). 

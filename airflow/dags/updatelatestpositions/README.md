@@ -50,11 +50,6 @@ Chaves esperadas em `general`
 }
 ```
 
-### Airflow (produção)
-No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
-- Variable `updatelatestpositions_general` (JSON)
-- Credenciais via Connections (MinIO e Postgres)
-
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
@@ -62,23 +57,10 @@ Para instalar os requisitos:
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-## Instruções para execução em modo local
-Crie `dags-dev/updatelatestpositions/.env` com base em `.env.example` preenchendo todos os campos:
-
-```shell
-python ./updatelatestpositions-v3.py
-```
-
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-## Para criar as tabelas e índices necessários ao subprojeto:
-Database commands:
-```
-docker exec -it postgres bash
-psql -U postgres -W
-# A tabela abaixo precisa ser criada, pois é criada via CTAS
+A tabela abaixo precisa ser criada antes da execução local:
 
 ```sql
-\c sptrans_insights
 CREATE TABLE refined.latest_positions (
     id BIGSERIAL PRIMARY KEY,
     veiculo_ts TIMESTAMPTZ,        -- ta: Timestamp UTC
@@ -89,4 +71,24 @@ CREATE TABLE refined.latest_positions (
     linha_sentido INTEGER,         -- sl: Sentido
     trip_id TEXT
 );
+```
+
+### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
+- Variable `updatelatestpositions_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
+
+Antes da execução da DAG no Airflow, a tabela `refined.latest_positions` já deve estar criada conforme instruções acima.
+
+## Instruções para execução em modo local
+Crie `dags-dev/updatelatestpositions/.env` com base em `.env.example` preenchendo todos os campos:
+Com a tabela já criada conforme instruções acima, execute:
+
+```shell
+python ./updatelatestpositions-v<version number>.py
+```
+
+Exemplo: 
+```shell
+python ./updatelatestpositions-v2.py
 ```

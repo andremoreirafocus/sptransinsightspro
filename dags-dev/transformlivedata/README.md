@@ -176,6 +176,8 @@ No Airflow, as configurações e credenciais são gerenciadas utilzando-se os re
 - Credenciais via Connections (MinIO e Postgres)
 
 Antes da execução da DAG no Airflow, a tabela `to_be_processed.raw` já deve estar criada conforme instruções acima.
+A partir da versão `transformlivedata-v10.py`, a task de transformação publica o Airflow Dataset `sptrans://trusted/transformed_positions_ready` após conclusão bem sucedida.
+Isso explicita a dependência de orquestração para pipelines downstream e melhora o freshness dos dados consumidos, além de reduzir a necessidade de manutenção de agendamentos acoplados por cron.
 
 ## Instruções para execução em modo local
 Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo todos os campos:

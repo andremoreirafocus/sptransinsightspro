@@ -1,7 +1,7 @@
 {
     "orchestratetransform_general": {
         "orchestration": {
-            "target_dag": "transformlivedata-v9",
+            "target_dag": "transformlivedata-v10",
             "wait_time_seconds": 15
         },
         "tables": {

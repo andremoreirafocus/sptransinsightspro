@@ -65,11 +65,6 @@ Chaves esperadas em `general`
 }
 ```
 
-### Airflow (produção)
-No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
-- Variable `refinedsynctripdetails_general` (JSON)
-- Credenciais via Connections (MinIO e Postgres)
-
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
@@ -77,13 +72,6 @@ Para instalar os requisitos:
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
-## Instruções para execução em modo local
-Crie `dags-dev/refinedsynctripdetails/.env` com base em `.env.example` preenchendo todos os campos.
-Criar tabelas conforme instruções abaixo:
-
-```shell
-python ./refinedsynctripdetails-v<version number>.py
-```
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
 ## Para criar as tabelas e índices necessários ao subprojeto:
@@ -121,4 +109,25 @@ CREATE TABLE refined.trip_details (
 CREATE INDEX idx_trip_lookup 
 ON refined.trip_details (trip_id);
 
+```
+
+### Airflow (produção)
+No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.
+- Variable `refinedsynctripdetails_general` (JSON)
+- Credenciais via Connections (MinIO e Postgres)
+
+Antes da execução da DAG no Airflow, a tabela `refined.trip_details` já deve estar criada conforme instruções acima.
+
+## Instruções para execução em modo local
+Crie `dags-dev/refinedsynctripdetails/.env` com base em `.env.example` preenchendo todos os campos.
+Crie a tabela conforme instruções acima.
+
+Execute:
+```shell
+python ./refinedsynctripdetails-v<version number>.py
+```
+
+Exemplo: 
+```shell
+python ./refinedsynctripdetails-v2.py
 ```
