@@ -11,12 +11,12 @@ A solução adota o conceito de monorepo e é composta por alguns subprojetos. C
 ## Arquitetura
 As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada, o design do alertservice e o workflow de promoção de pipelines.
 
-![Índice de ADRs](./docs/adr/README.md)
+[Índice de ADRs](./docs/adr/README.md)
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
 - Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata e alertservice, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
-- ![extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
+- [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
 - [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
 - Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
@@ -56,13 +56,13 @@ Um template de configuração está disponível em `.env.example` na raiz do pro
 
 ## Para executar o Sptransinsights
 Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, executar alguns comandos de inicialização que estão discriminados em cada subprojeto, especialmente:
-- ![Airflow](./airflow/README.md)
-- ![gtfs](./dags-dev/gtfs/README.md)
-- ![transformlivedata](./dags-dev/transformlivedata/README.md)
-- ![refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
-- ![updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
-- ![extractloadlivedata](./extractloadlivedata/README.md)
-- ![alertservice](./alertservice/README.md)
+- [Airflow](./airflow/README.md)
+- [gtfs](./dags-dev/gtfs/README.md)
+- [transformlivedata](./dags-dev/transformlivedata/README.md)
+- [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
+- [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
+- [extractloadlivedata](./extractloadlivedata/README.md)
+- [alertservice](./alertservice/README.md)
 
 Para iniciar o projeto:
 Crie `.env` na raiz do projeto com base em `.env.example` preenchendo todos os campos:
