@@ -22,7 +22,8 @@
         "schema": "sptrans_insights",
         "login": "postgres",
         "password": "postgres",
-        "extra": "{\"sslmode\": \"prefer\"}"
+        "extra": "{\"sslmode\": \"prefer\"}",
+        "description": "Used to connect to the data warehouse"
     },
     "airflow_postgres_conn": {
         "conn_type": "postgres",
@@ -31,7 +32,7 @@
         "schema": "sptrans_insights",
         "login": "airflow",
         "password": "airflow",
-        "extra": "{\"sslmode\": \"prefer\"}"
+        "extra": "{\"sslmode\": \"prefer\"}",
+        "description": "Used to connect to the Airflow metadata DB"
     }    
 }
-

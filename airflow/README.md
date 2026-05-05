@@ -1,27 +1,26 @@
-Neste projeto estão contemplados os seguintes fluxos de acordo com o nome das pastas das DAGs e respectivos scripts:
-- gtfs: importa arquivos do GTFS, transforma arquivos para tabelas correspondentes no Postgres no schema trusted e cria a tabela trip_details no schema trusted
-- transformdatatotrusted: transforma conjunto de posicoes de onibus correspondente ao endpoint GET /posicoes, gerando, para cada veiculo, um registro na tabela trusted.positions com sua posicao e metadados enriquecidos com o conteúdo da tabela trusted.trip_details
-- refinedfinishedtrips: identifica viagens dos veiculos nas ultimas horas baseado na sequencia temporal de posicoes de cada veiculo armazenada em trusted.positions
-- updatelatestpositions: captura a última posição de cada veículo a partir do timestamp de extração do dado e salva na tabela refined.latest_positions
-- refinedsynctripdetails: processo de sincronização dos detalhes de viagens da camada trusted para a camada refined para utilização pela camada de visualização. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso.
-- maintainfinishedtrips: processo de limpeza automática das partições antigas da tabela de viagens finalizadas, executada por intermédio do SQLExecuteQueryOperator do Airflow
-- orchestratetransform: checa quais arquivos de posições de ônibus extraídos da API da SPTrans já foram disponibilizados na camada raw pelo microserviço extractloadlivedata mas ainda não foram procesados pela DAG transformlivedata e invoca esta DAG para cada arquivo não processado.
+## Objetivo
+O Airflow é o orquestrador de fluxos de trabalho utilizado neste projeto para gerenciar a execução dos pipelines por meio de schedules pré-definidos ou de eventos.
 
+As configurações de todos os pipelines são armazenadas como Variables do Airflow, que são extraídas através de chamadas de API `Variable.get` executadas pelo módulo [pipeline configurator](./dags/pipeline_configurator/README.md), conforme pode ser visto abaixo:
 
+![Variables no Airflow](./airflow_variables.png)
 
-## Inicializndo o Ambiente
+As credenciais usadas por todos os pipelines são armazenadas como Connections do Airflow, que são extraídas através de chamadas de API `BaseHook.get_connection` executadas pelo módulo [pipeline configurator](./dags/pipeline_configurator/README.md).
 
-Para inicializar os serviços específicos do Airflow, utilize o comando:
+![Connections no Airflow](./airflow_connections.png)
+[Para mais informações sobre o papel do Airflow na arquitetura do projeto e as DAGS implementadas](../README.md)
+
+Esta abordagem facilita e centraliza a administração de configurações e credenciais usadas pelos pipelines já que alterações e importações podem ser feitas por usuários do Airflow com poderes administrativos.
+
+## Inicializando o ambiente
+Para inicializar os serviços específicos do Airflow, utilize:
 
 ```shell
 docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 ```
 
-## Criar o Usuário para Fazer Login no Airflow
-
-Após inicializar o serviço, crie um usuário admin para acessar a interface do Airflow:
-
-- Executar o comando abaixo no terminal
+## Criar o usuário para login no Airflow
+Após inicializar os serviços, crie um usuário admin para acessar a interface do Airflow:
 
 ```shell
 docker compose exec airflow_webserver airflow users create \
@@ -33,14 +32,21 @@ docker compose exec airflow_webserver airflow users create \
     --password admin
 ```
 
-Para importar conexões e variáveis de ambiente usadas pelas DAGS
+## Importar connections e variables
+Para importar as connections e variables usadas pelas DAGs:
+
+O bootstrap é dividido em:
+- `connections.json`: credenciais e endpoints compartilhados via Connections do Airflow
+- `variables.json`: variables consolidadas de pipelines que não exigem arquivos dedicados adicionais neste bootstrap
+- arquivos JSON dedicados por pipeline: usados quando a configuração é mantida separadamente
+
 ```shell
-docker exec -it airflow_webserver bash
-airflow connections import variables_and_connections/connections.json 
-airflow variables import variables_and_connections/variables.json 
+docker compose exec airflow_webserver bash
+airflow connections import variables_and_connections/connections.json
+airflow variables import variables_and_connections/variables.json
 
 # transformlivedata
-airflow variables import variables_and_connections/transformlivedata_general.json 
+airflow variables import variables_and_connections/transformlivedata_general.json
 airflow variables import variables_and_connections/transformlivedata_data_expectations.json
 airflow variables import variables_and_connections/transformlivedata_raw_data_json_schema.json
 
@@ -49,17 +55,38 @@ airflow variables import variables_and_connections/gtfs_general.json
 airflow variables import variables_and_connections/gtfs_data_expectations_stops.json
 airflow variables import variables_and_connections/gtfs_data_expectations_stop_times.json
 airflow variables import variables_and_connections/gtfs_data_expectations_trip_details.json
+
+# refinedfinishedtrips
+airflow variables import variables_and_connections/refinedfinishedtrips_general.json
 ```
 
+O arquivo [variables.json](/home/andrem/projetos/sptransinsightspro/airflow/variables_and_connections/variables.json) já contém:
+- `orchestratetransform_general`
+- `updatelatestpositions_general`
+- `refinedsynctripdetails_general`
 
-### Nao esta sendo usado
-Para criar usuário do extractloadlivedata que invoca DAGs
+Ou seja, essas três configurações já são carregadas no import consolidado e não exigem arquivos adicionais separados nesta etapa.
+
+## Integração do Airflow com o serviço de ingest 
+O ingest de dados da API é efetuado pelo serviço de ingest [extractloadlivedata](../extractloadlivedata/README.md)
+Este serviço se integra da seguinte forma: 
+- para cada arquivo gerado pelo serviço e salvo na camada raw, um request de processamento é salvo na tabela `to_be_processed.raw` do banco de dados do Airflow
+- a DAG `orchestratetransform` identifica requests pendentes e dispara a DAG de transformação
+- as DAGs que consomem os dados transformados funcionam orientadas a evento usando Airflow Datasets
+
+Com isto a resiliência implementada pelo fluxo de ingest e de transformação consegue se recuperar de falhas tanto no Airflow quanto no object storage.
+
+Alternativamente pode-se configurar o serviço de ingest para efetuar o disparo direto da DAG de transformação via API do Airflow, embora este não seja o caminho adotado para a produção.
+
+## Configuração opcional de trigger via API
+Para possibilitar que o `extractloadlivedata` dispare a execução de DAGs diretamente via API do Airflow:
+
 ```shell
 airflow roles create API_Trigger
 airflow roles add-perms API_Trigger -a can_read -r "DAGs"
 airflow roles add-perms API_Trigger -a can_read -r "DAG Runs"
 airflow roles add-perms API_Trigger -a can_create -r "DAG Runs"
-airflow roles add-perms API_Trigger -a can_read -r "DAG:transformlivedata-v5"
+airflow roles add-perms API_Trigger -a can_read -r "DAG:transformlivedata-v10"
 airflow roles add-perms API_Trigger -a can_edit -r "DAGs"
 airflow users create \
     --username ingest_service \
@@ -70,8 +97,9 @@ airflow users create \
     --password ingest_password
 ```
 
- ## Para acessar o Airflow:
- http://localhost:8080/
+Feito isso, para finalizar a integração via disparo por API, é necessário configurar o serviço de ingest para utilizar as credenciais criadas, além do nome da DAG a ser disparada pelo Airflow.
 
+## Acessar o Airflow
+Interface web:
 
-
+http://localhost:8080/
