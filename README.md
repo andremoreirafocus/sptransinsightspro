@@ -16,43 +16,29 @@ As principais decisões de design do projeto — tecnologias escolhidas, alterna
 
 Para implementar a solução foram adotados os componentes:
 - Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata e alertservice, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
-- extractloadlivedata: microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio. ![Para mais informações:](./extractloadlivedata/README.md)
-- alertservice: microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline. ![Para mais informações:](./alertservice/README.md)
+- ![extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
+- [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
 - Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
-- Jupyter: usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage. ![Para mais informações:](./jupyter/README.md)
+- [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
 - PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
-- PowerBI: utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL. ![Para mais informações:](./powerbi/README.md)
-- Airflow: para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. ![Para mais informações:](./airflow/README.md). 
-O ambiente de desenvolvimento se encontra na pasta dags-dev. ![Para mais informações:](./dags-dev/README.md)
+- [PowerBI](./powerbi/README.md): utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL.
+- [Airflow](./airflow/README.md): para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. 
+O ambiente de desenvolvimento se encontra na pasta [dags-dev](./dags-dev/README.md)
 Detalhes sobre as DAGS:
-    - DAG gtfs: processo composto de 3 etapas principais.   
-        - extração e carga de arquivos: que extrai os dados GTFS da SPTRANS, valida os arquivos e salva na camada raw (ou quarentena em caso de falha).
-        - transformação: executa a transformação GTFS, checagem de qualidade (Great Expectations quando aplicável), staging de artefatos (tabelas) em formato Parquet, quarentena, em caso de falha, e promoção para caminho final em caso de sucesso.
-        - enrichment: cria a tabela `trip_details` em staging, valida com Great Expectations e só então promove para caminho final (ou quarentena em caso de falha).
-        - qualidade: gera um relatório consolidado único por execução, persistido em bucket de metadados, incluindo diagnósticos por fase e linhagem de colunas de `trip_details` com detecção de drift.
-        - emissão de sinal (dataset do Airflow) ao ser finalizada com sucesso, permitindo que a DAG de sincronização dos detalhes de viagens para a camada refined seja iniciada automaticamente.
-        ![Para mais informações:](./dags-dev/gtfs/README.md)
-    - DAG transformlivedata: processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted. 
-        - Validação do JSON bruto via JSON Schema (configuração externa)
-        - Validação pós-transformação via Great Expectations (suite externa)
-        - Quarentena de registros inválidos
-        - Relatório de qualidade em JSON com `summary` e `details`, incluindo métricas, issues e informações parciais em caso de falha
-        - a partir da versão `transformlivedata-v10.py`, a task de transformação publica um Airflow Dataset após conclusão bem sucedida. Isso explicita a dependência de orquestração para pipelines downstream e melhora o freshness dos dados consumidos, além de reduzir a necessidade de manutenção de agendamentos acoplados por cron.
-        ![Para mais informações:](./dags-dev/transformlivedata/README.md)
-    - DAG orchestratetransform: processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.  ![Para mais informações:](./dags-dev/orchestratetransform/README.md)
-    - DAG refinedfinishedtrips: processo de transformação para criação das informações de viagens na camada refined a partir dos dados da camada enriquecidos da camada trusted, incluindo checagem de qualidade com as seguintes etapas:
-        - Extração de viagens baseada principalmente em geolocalização 
-        - Sanitização de amostras anômalas de posição
-        - Maior precisão de `trip_start_time`, `trip_end_time` e `duration`
-        - Verificação de qualidade das posições (freshness e gaps de extração); falha interrompe o pipeline com relatório e notificação imediata
-        - Verificação de qualidade da extração de viagens (zero trips e low trip count) baseada na janela efetiva de extração
-        - Resultado da persistência com contagem de viagens adicionadas e de viagens que já haviam sido salvas anteriormente
-        - Relatório de qualidade consolidado com status das três fases ao final de cada execução, persistido no bucket de metadata e enviado ao `alertservice` via webhook
+    - [DAG gtfs](./dags-dev/gtfs/README.md): processo composto de 3 etapas principais, com checagem de qualidade ao longo do fluxo, geração de um relatório consolidado por execução e publicação de um Airflow Dataset ao final de uma execução bem sucedida para disparar a sincronização downstream para a camada refined.   
+        - extração e carga de arquivos: extrai os dados GTFS da SPTrans, valida os arquivos e salva na camada raw, gerando diagnóstico consolidado em caso de falha.
+        - transformação: converte as tabelas base do GTFS para Parquet, aplica checagem de qualidade (Great Expectations quando configurado), usa staging antes da promoção para o caminho final e quarentena em caso de falha.
+        - enrichment: cria a tabela `trip_details` em staging, valida sua qualidade e promove ou quarentena o artefato conforme o resultado.
+    - [DAG transformlivedata](./dags-dev/transformlivedata/README.md): processo de transformação dos dados brutos de posição da camada raw em dados enriquecidos e confiáveis na camada trusted, com quarentena de registros inválidos e geração de relatório de qualidade consolidado.
+        - Objetos configuráveis principais:
+        - JSON Schema para validação estrutural do dado bruto
+        - suite Great Expectations para validação pós-transformação
+    - [DAG orchestratetransform](./dags-dev/orchestratetransform/README.md): processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.
+    - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md): processo de transformação para criação das viagens finalizadas na camada refined a partir dos dados enriquecidos da camada trusted, com checagens de qualidade sobre posições, extração e persistência, além de geração de relatório consolidado e notificação via webhook.
         - A partir da versão 6 desta pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness das viagens finalizadas calculadas na camada refined, que passam a ser atualizadas logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
-        ![Para mais informações:](./dags-dev/refinedfinishedtrips/README.md)
-    - DAG refinedsynctripdetails: processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow. ![Para mais informações:](./dags-dev/refinedsynctripdetails/README.md)
-    - DAG updatelatestpositions: processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream. ![Para mais informações:](./dags-dev/updatelatestpositions/README.md)
+    - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README.md): processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow.
+    - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README.md): processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
 
 ### Orquestração por eventos no Airflow
 O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração orientada a eventos atualmente implementada no Airflow por meio de Datasets.
@@ -126,7 +112,7 @@ O módulo resolve automaticamente o ambiente de execução:
 - **Airflow**: usa Variables e Connections do Airflow
 
 Esse padrão reduz acoplamento entre serviços e garante consistência entre todos os pipelines.
-![Para mais informações:](./dags-dev/pipeline_configurator/README.md)
+[Mais informações sobre o pipeline configurator](./dags-dev/pipeline_configurator/README.md)
 
 
 ## Ciclo de Desenvolvimento e Deployment
@@ -175,6 +161,4 @@ Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
 | `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
-![Para mais informações:](./scripts/README.md)
-
-
+[Mais informações sobre os scripts](./scripts/README.md)

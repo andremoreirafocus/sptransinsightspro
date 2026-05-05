@@ -8,7 +8,8 @@ As configurações de todos os pipelines são armazenadas como Variables do Airf
 As credenciais usadas por todos os pipelines são armazenadas como Connections do Airflow, que são extraídas através de chamadas de API `BaseHook.get_connection` executadas pelo módulo [pipeline configurator](./dags/pipeline_configurator/README.md).
 
 ![Connections no Airflow](./airflow_connections.png)
-[Para mais informações sobre o papel do Airflow na arquitetura do projeto e as DAGS implementadas](../README.md)
+
+[Mais informações sobre o papel do Airflow na arquitetura do projeto e as DAGS implementadas](../README.md)
 
 Esta abordagem facilita e centraliza a administração de configurações e credenciais usadas pelos pipelines já que alterações e importações podem ser feitas por usuários do Airflow com poderes administrativos.
 
