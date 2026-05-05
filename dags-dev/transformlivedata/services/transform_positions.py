@@ -7,8 +7,9 @@ from transformlivedata.lineage.lineage_functions import (
     merge_lineage_fragments,
 )
 from dateutil import parser
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 from math import radians, sin, cos, sqrt, atan2
 import pandas as pd
 import logging
@@ -16,6 +17,34 @@ import logging
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class TransformPositionsDependencies:
+    get_json_raw_fields_path_from_schema: Callable[[Dict[str, Any]], Dict[str, str]]
+    load_trip_details: Callable[[Dict[str, Any]], pd.DataFrame]
+    flatten_raw_positions: Callable[[Dict[str, Any]], pd.DataFrame]
+    normalize_columns: Callable[
+        [pd.DataFrame, Dict[str, str], Dict[str, str], Dict[str, Any]],
+        Tuple[pd.DataFrame, Dict[str, Any]],
+    ]
+    enrich_with_trip_details: Callable[
+        [pd.DataFrame, pd.DataFrame], Tuple[pd.DataFrame, Dict[str, Any]]
+    ]
+    compute_distances: Callable[
+        [pd.DataFrame], Tuple[pd.DataFrame, List[Dict[str, Any]], Dict[str, Any]]
+    ]
+
+
+def get_transform_positions_dependencies() -> TransformPositionsDependencies:
+    return TransformPositionsDependencies(
+        get_json_raw_fields_path_from_schema=get_json_raw_fields_path_from_schema,
+        load_trip_details=load_trip_details,
+        flatten_raw_positions=flatten_raw_positions,
+        normalize_columns=normalize_columns,
+        enrich_with_trip_details=enrich_with_trip_details,
+        compute_distances=compute_distances,
+    )
 
 
 def calculate_quality_score(result: Dict[str, Any]) -> float:
@@ -281,7 +310,9 @@ def build_transformation_result(
 
 
 def transform_positions(
-    config: Dict[str, Any], raw_positions: Dict[str, Any]
+    config: Dict[str, Any],
+    raw_positions: Dict[str, Any],
+    deps: Optional[TransformPositionsDependencies] = None,
 ) -> Dict[str, Any]:
     def get_config(config: Dict[str, Any]) -> Dict[str, Any]:
         raw_schema = config.get("raw_data_json_schema")
@@ -290,9 +321,10 @@ def transform_positions(
             raise ValueError("raw_data_json_schema is required in config.")
         return raw_schema
 
+    deps = deps or get_transform_positions_dependencies()
     logger.info("Converting raw positions to positions table...")
     metadata = raw_positions.get("metadata")
-    df_flat = flatten_raw_positions(raw_positions)
+    df_flat = deps.flatten_raw_positions(raw_positions)
     if df_flat.empty:
         logger.error("No position data resulted from flattening.")
         raise ValueError("No position data resulted from flattening.")
@@ -309,21 +341,21 @@ def transform_positions(
         "px": "veiculo_long",
     }
     raw_schema = get_config(config)
-    raw_path_map = get_json_raw_fields_path_from_schema(raw_schema)
-    df_normalized, lineage_api = normalize_columns(
+    raw_path_map = deps.get_json_raw_fields_path_from_schema(raw_schema)
+    df_normalized, lineage_api = deps.normalize_columns(
         df_flat, rename_map, raw_path_map, metadata
     )
     if df_normalized.empty:
         logger.error("No position data resulted from normalization.")
         raise ValueError("No position data resulted from normalization.")
     logger.info("Preloading trip details from database...")
-    trip_details_df = load_trip_details(config)
+    trip_details_df = deps.load_trip_details(config)
     if trip_details_df is None or trip_details_df.empty:
         logger.error("trip_details_df is empty. Aborting transformation.")
         raise ValueError("trip_details_df is empty. Aborting transformation.")
     logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
     df_with_trip_id = add_trip_id(df_normalized)
-    df_enriched, lineage_join = enrich_with_trip_details(
+    df_enriched, lineage_join = deps.enrich_with_trip_details(
         df_with_trip_id, trip_details_df
     )
     if df_enriched.empty:
@@ -333,7 +365,7 @@ def transform_positions(
     if enriched_valid_df.empty:
         logger.error("No valid position data after enrichment.")
         raise ValueError("No valid position data after enrichment.")
-    calculated_distance_df, distance_errors, lineage_calc = compute_distances(
+    calculated_distance_df, distance_errors, lineage_calc = deps.compute_distances(
         enriched_valid_df
     )
     if calculated_distance_df.empty:

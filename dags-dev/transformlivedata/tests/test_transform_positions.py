@@ -10,7 +10,6 @@ from transformlivedata.services.transform_positions import (
     build_transformation_result,
     transform_positions,
 )
-from transformlivedata.services import transform_positions as tp
 import pytest
 import pandas as pd
 
@@ -618,31 +617,34 @@ def config_valid():
     }
 
 
-@pytest.fixture(autouse=True)
-def raw_path_map_stub(monkeypatch):
-    monkeypatch.setattr(
-        tp,
-        "get_json_raw_fields_path_from_schema",
-        lambda _: {
-            "c": "payload.l[i].c",
-            "cl": "payload.l[i].cl",
-            "sl": "payload.l[i].sl",
-            "lt0": "payload.l[i].lt0",
-            "lt1": "payload.l[i].lt1",
-            "p": "payload.l[i].vs[j].p",
-            "a": "payload.l[i].vs[j].a",
-            "ta": "payload.l[i].vs[j].ta",
-            "py": "payload.l[i].vs[j].py",
-            "px": "payload.l[i].vs[j].px",
-        },
-    )
+@pytest.fixture
+def raw_path_map():
+    return {
+        "c": "payload.l[i].c",
+        "cl": "payload.l[i].cl",
+        "sl": "payload.l[i].sl",
+        "lt0": "payload.l[i].lt0",
+        "lt1": "payload.l[i].lt1",
+        "p": "payload.l[i].vs[j].p",
+        "a": "payload.l[i].vs[j].a",
+        "ta": "payload.l[i].vs[j].ta",
+        "py": "payload.l[i].vs[j].py",
+        "px": "payload.l[i].vs[j].px",
+    }
 
 
 def test_transform_positions_success(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-    result = transform_positions(config_valid, raw_positions_valid)
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+    )
+    result = transform_positions(config_valid, raw_positions_valid, deps=deps)
 
     assert result["invalid_positions"].empty
     assert result["positions"].shape[0] == 2
@@ -658,85 +660,157 @@ def test_transform_positions_missing_schema(raw_positions_valid):
 
 
 def test_transform_positions_trip_details_empty(
-    monkeypatch, raw_positions_valid, config_valid
+    make_transform_positions_deps, raw_path_map, raw_positions_valid, config_valid
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: pd.DataFrame())
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: pd.DataFrame(),
+    )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_flatten_empty(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-    monkeypatch.setattr(tp, "flatten_raw_positions", lambda _: pd.DataFrame())
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        flatten_raw_positions=lambda _: pd.DataFrame(),
+    )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_normalize_empty(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-    monkeypatch.setattr(
-        tp, "normalize_columns", lambda *args, **kwargs: (pd.DataFrame(), {})
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        normalize_columns=lambda *args, **kwargs: (pd.DataFrame(), {}),
     )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_enrich_empty(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-    monkeypatch.setattr(
-        tp, "enrich_with_trip_details", lambda *args, **kwargs: (pd.DataFrame(), {})
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        enrich_with_trip_details=lambda *args, **kwargs: (pd.DataFrame(), {}),
     )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_no_valid_after_enrich(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-
     def enrich_left_only(df, trip_df):
         df = df.copy()
         df["_merge"] = "left_only"
         return df, {}
 
-    monkeypatch.setattr(tp, "enrich_with_trip_details", enrich_left_only)
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        enrich_with_trip_details=enrich_left_only,
+    )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_distance_calc_empty(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
-    monkeypatch.setattr(
-        tp, "compute_distances", lambda *args, **kwargs: (pd.DataFrame(), [], {})
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        compute_distances=lambda *args, **kwargs: (pd.DataFrame(), [], {}),
     )
     with pytest.raises(ValueError):
-        transform_positions(config_valid, raw_positions_valid)
+        transform_positions(config_valid, raw_positions_valid, deps=deps)
 
 
 def test_transform_positions_distance_errors(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_valid)
+    def compute_distances_with_error(df):
+        df = df.copy()
+        distance_errors = [
+            {
+                "vehicle_id": 21300,
+                "linha": "2104-10",
+                "error_type": "first_stop_distance",
+            },
+            {
+                "vehicle_id": 21300,
+                "linha": "2104-10",
+                "error_type": "last_stop_distance",
+            },
+        ]
+        df["distance_to_first_stop"] = [-1.0, 100.0]
+        df["distance_to_last_stop"] = [-1.0, 100.0]
+        lineage = {
+            "distance_to_first_stop": {
+                "inputs": [
+                    "veiculo_lat",
+                    "veiculo_long",
+                    "first_stop_lat",
+                    "first_stop_lon",
+                ],
+                "type": "float",
+                "transformation": "calculated based on current position",
+            },
+            "distance_to_last_stop": {
+                "inputs": [
+                    "veiculo_lat",
+                    "veiculo_long",
+                    "last_stop_lat",
+                    "last_stop_lon",
+                ],
+                "type": "float",
+                "transformation": "calculated based on current position",
+            },
+        }
+        return df, distance_errors, lineage
 
-    def calc_distance(lat1, lon1, lat2, lon2):
-        if lat1 == 0.0:
-            return -1.0, False
-        return 100.0, True
-
-    monkeypatch.setattr(tp, "calculate_distance", calc_distance)
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_valid,
+        compute_distances=compute_distances_with_error,
+    )
 
     raw_positions = raw_positions_valid.copy()
     raw_positions["payload"]["l"][0]["vs"][0]["py"] = 0.0
-    result = transform_positions(config_valid, raw_positions)
+    result = transform_positions(config_valid, raw_positions, deps=deps)
 
     assert set(result["positions"]["veiculo_id"].tolist()) == {21301}
     assert set(result["invalid_positions"]["veiculo_id"].tolist()) == {21300}
@@ -746,13 +820,20 @@ def test_transform_positions_distance_errors(
 
 
 def test_transform_positions_missing_trips(
-    monkeypatch, raw_positions_valid, trip_details_valid, config_valid
+    make_transform_positions_deps,
+    raw_path_map,
+    raw_positions_valid,
+    trip_details_valid,
+    config_valid,
 ):
     trip_details_partial = trip_details_valid[
         trip_details_valid["trip_id"] == "2104-10-0"
     ]
-    monkeypatch.setattr(tp, "load_trip_details", lambda _: trip_details_partial)
-    result = transform_positions(config_valid, raw_positions_valid)
+    deps = make_transform_positions_deps(
+        get_json_raw_fields_path_from_schema=lambda _: raw_path_map,
+        load_trip_details=lambda _: trip_details_partial,
+    )
+    result = transform_positions(config_valid, raw_positions_valid, deps=deps)
 
     assert set(result["positions"]["veiculo_id"].tolist()) == {21300}
     assert set(result["invalid_positions"]["veiculo_id"].tolist()) == {21301}
