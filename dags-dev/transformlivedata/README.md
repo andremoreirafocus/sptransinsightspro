@@ -166,7 +166,7 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-A tabela `to_be_processed.raw` cjá deve ter sido criada conforme instruções em [extractloadlivedata/README.md](../../extractloadlivedata/README.md).
+A tabela `to_be_processed.raw` cjá deve ter sido criada conforme instruções em [extractloadlivedata/README.md](/extractloadlivedata/README.md).
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.

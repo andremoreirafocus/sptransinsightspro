@@ -29,8 +29,6 @@ with pytest.raises(RuntimeError):
     my_service(config, duckdb_client=fake)
 ```
 
-**Usado em:** `transformlivedata`, `refinedfinishedtrips`, `refinedsynctripdetails`, `gtfs`
-
 ---
 
 ### `FakeDbEngine` e `make_fake_engine_factory` — `fake_db_engine.py`
@@ -61,8 +59,6 @@ with pytest.raises(Exception, match="DB unavailable"):
     my_service(config, engine_factory=factory)
 ```
 
-**Usado em:** `refinedfinishedtrips`
-
 ---
 
 ### `FakeObject` — `fake_object_storage.py`
@@ -78,8 +74,6 @@ def fake_list_objects(bucket, prefix):
 
 result = my_service(config, list_fn=fake_list_objects)
 ```
-
-**Usado em:** `updatelatestpositions`
 
 ---
 
