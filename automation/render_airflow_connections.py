@@ -12,6 +12,8 @@ from typing import Dict, Any
 REQUIRED_ENV_VARS = (
     "MINIO_PLATFORM_ACCESS_KEY",
     "MINIO_PLATFORM_SECRET_KEY",
+    "GTFS_LOGIN",
+    "GTFS_PASSWORD",
     "POSTGRES_DB_USER",
     "POSTGRES_DB_PASSWORD",
     "AIRFLOW_DB_USER",
@@ -32,6 +34,8 @@ def render_connections(source_path: str, target_path: str) -> None:
 
     data["minio_conn"]["login"] = require_env("MINIO_PLATFORM_ACCESS_KEY")
     data["minio_conn"]["password"] = require_env("MINIO_PLATFORM_SECRET_KEY")
+    data["gtfs_conn"]["login"] = require_env("GTFS_LOGIN")
+    data["gtfs_conn"]["password"] = require_env("GTFS_PASSWORD")
     data["postgres_conn"]["login"] = require_env("POSTGRES_DB_USER")
     data["postgres_conn"]["password"] = require_env("POSTGRES_DB_PASSWORD")
     data["airflow_postgres_conn"]["login"] = require_env("AIRFLOW_DB_USER")

@@ -3,16 +3,16 @@
         "conn_type": "s3",
         "host": "minio",
         "port": "9000",
-        "login": "datalake",
-        "password": "datalake",
+        "login": "******",
+        "password": "******",
         "description": "Object storage used long duration retention"
     },
     "gtfs_conn": {
         "conn_type": "http",
         "host": "www.sptrans.com.br",
         "schema": "/umbraco/Surface/PerfilDesenvolvedor/BaixarGTFS",
-        "login": "andre.moreira.engineer",
-        "password": "T3st3@p1",
+        "login": "******",
+        "password": "******",
         "description": "Used to download GTFS files to support SPTrans analysis and insights"
     },
     "postgres_conn": {
@@ -20,8 +20,8 @@
         "host": "postgres",
         "port": 5432,
         "schema": "sptrans_insights",
-        "login": "postgres",
-        "password": "postgres",
+        "login": "******",
+        "password": "******",
         "extra": "{\"sslmode\": \"prefer\"}",
         "description": "Used to connect to the data warehouse"
     },
@@ -30,8 +30,8 @@
         "host": "airflow_postgres",
         "port": 5432,
         "schema": "sptrans_insights",
-        "login": "airflow",
-        "password": "airflow",
+        "login": "******",
+        "password": "******",
         "extra": "{\"sslmode\": \"prefer\"}",
         "description": "Used to connect to the Airflow metadata DB"
     }    

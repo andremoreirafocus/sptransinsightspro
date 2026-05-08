@@ -56,6 +56,8 @@ O bootstrap é dividido em:
 - `variables.json`: variables consolidadas de pipelines que não exigem arquivos dedicados adicionais neste bootstrap
 - arquivos JSON dedicados por pipeline: usados quando a configuração é mantida separadamente
 
+O arquivo gerado de connections é renderizado a partir do template versionado usando as credenciais e parâmetros definidos no arquivo `.env` da raiz do projeto.
+
 ```shell
 docker compose exec airflow_webserver bash
 python /opt/airflow/dags/../variables_and_connections/render_airflow_connections.py \
