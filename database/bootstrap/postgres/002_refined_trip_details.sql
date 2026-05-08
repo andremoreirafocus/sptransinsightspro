@@ -1,6 +1,8 @@
 \connect sptrans_insights
 
-CREATE TABLE refined.trip_details (
+CREATE SCHEMA IF NOT EXISTS refined;
+
+CREATE TABLE IF NOT EXISTS refined.trip_details (
     id BIGSERIAL PRIMARY KEY,
     trip_id TEXT,
     first_stop_id INTEGER,
@@ -15,5 +17,5 @@ CREATE TABLE refined.trip_details (
     is_circular BOOLEAN
 );
 
-CREATE INDEX idx_trip_lookup
+CREATE INDEX IF NOT EXISTS idx_trip_lookup
 ON refined.trip_details (trip_id);

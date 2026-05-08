@@ -1,6 +1,6 @@
 \connect sptrans_insights
 
-CREATE SCHEMA to_be_processed;
+CREATE SCHEMA IF NOT EXISTS to_be_processed;
 
 CREATE TABLE IF NOT EXISTS to_be_processed.raw (
     id BIGSERIAL PRIMARY KEY,

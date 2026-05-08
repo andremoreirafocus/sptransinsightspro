@@ -1,6 +1,8 @@
 \connect sptrans_insights
 
-CREATE TABLE refined.latest_positions (
+CREATE SCHEMA IF NOT EXISTS refined;
+
+CREATE TABLE IF NOT EXISTS refined.latest_positions (
     id BIGSERIAL PRIMARY KEY,
     veiculo_ts TIMESTAMPTZ,
     veiculo_id INTEGER,
