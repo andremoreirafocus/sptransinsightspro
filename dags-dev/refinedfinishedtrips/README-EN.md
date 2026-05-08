@@ -260,20 +260,19 @@ To install the requirements:
 
 ## Database setup required before execution
 
-To create the tables and indexes required by this subproject:
+Before running this pipeline locally, the required refined-layer tables must exist in the `sptrans_insights` database.
 
-Database commands:
+The recommended operational path to create the required database artifacts is to run the project's PostgreSQL bootstrap:
 
 ```bash
-docker exec -it postgres bash
-psql -U postgres -W
+./automation/bootstrap_postgres.sh
 ```
 
-```sql
-CREATE DATABASE sptrans_insights;
-```
+This script applies the SQL files located in `/database/bootstrap/postgres/`.
 
-With partitioning:
+### Reference schema and partitioning for `refined.finished_trips`
+
+The block below is kept as documentation reference for the expected table structure and partitioning setup:
 
 ```sql
 CREATE SCHEMA partman;

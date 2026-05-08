@@ -182,7 +182,15 @@ To install the requirements:
 
 ## Database setup required before execution
 
-The `to_be_processed.raw` table must already have been created according to the instructions in [extractloadlivedata/README-EN.md](../../../extractloadlivedata/README-EN.md).
+The `to_be_processed.raw` table must exist in the `sptrans_insights` database before this pipeline runs.
+
+The recommended operational path to create this database artifact is to run the project's Airflow PostgreSQL bootstrap:
+
+```bash
+./automation/bootstrap_airflow_postgres.sh
+```
+
+This script applies the SQL files located in `/database/bootstrap/airflow_postgres/`.
 
 ### Airflow (production)
 

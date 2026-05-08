@@ -166,7 +166,15 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-A tabela `to_be_processed.raw` cjá deve ter sido criada conforme instruções em [extractloadlivedata/README.md](../../extractloadlivedata/README.md).
+A tabela `to_be_processed.raw` deve existir no banco `sptrans_insights` antes da execução desta pipeline.
+
+O caminho operacional recomendado para criação desse artefato de banco é executar o bootstrap do PostgreSQL do Airflow:
+
+```bash
+./automation/bootstrap_airflow_postgres.sh
+```
+
+Esse script aplica os arquivos SQL localizados em `/database/bootstrap/airflow_postgres/`.
 
 ### Airflow (produção)
 No Airflow, as configurações e credenciais são gerenciadas utilzando-se os recursos de Variables e Connections que são armazenadas pelo próprio Airflow, conforme listado a seguir. Qualquer alteração nessas informações deve ser feitas via UI do Airflow ou via linha de comando conectando-se ao webserver do Airflow via comando docker exec.

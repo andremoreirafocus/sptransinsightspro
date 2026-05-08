@@ -18,6 +18,25 @@ Automate deployment and code-promotion operations, ensuring that lint, SAST, and
 
 ## Available scripts
 
+### `platform_bootstrap_and_start.sh`
+
+Starts the platform with prior database bootstrap to avoid startup failures caused by missing required schemas, tables, and indexes.
+
+**What it does, in order:**
+1. Starts `airflow_postgres` and `postgres`
+2. Waits until both accept connections
+3. Runs `bootstrap_airflow_postgres.sh`
+4. Runs `bootstrap_postgres.sh`
+5. Starts the rest of the platform with `docker compose up -d`
+
+**Usage:**
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+---
+
 ### `promote_pipeline.py`
 
 Promotes a pipeline from the development environment to production.

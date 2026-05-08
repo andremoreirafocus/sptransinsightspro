@@ -77,7 +77,19 @@ cp .env.example .env
 # Edit .env and provide the required credentials
 ```
 
-Run:
+The recommended path to start the platform without premature failures from database-dependent services is:
+
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+This script:
+- starts the database services first
+- runs bootstrap for the required database artifacts
+- starts the rest of the platform only after bootstrap completes
+
+If you prefer to start the platform manually, the base command remains:
 
 ```bash
 docker compose up -d

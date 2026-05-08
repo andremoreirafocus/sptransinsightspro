@@ -67,7 +67,19 @@ To install the requirements:
 
 ## Database setup required before execution
 
-The table below must be created before local execution:
+Before running this pipeline locally, the `refined.latest_positions` table must exist in the `sptrans_insights` database.
+
+The recommended operational path to create the required database artifacts is to run the project's PostgreSQL bootstrap:
+
+```bash
+./automation/bootstrap_postgres.sh
+```
+
+This script applies the SQL files located in `/database/bootstrap/postgres/`.
+
+### Reference schema for `refined.latest_positions`
+
+The command below is kept as documentation reference for the expected table structure:
 
 ```sql
 CREATE TABLE refined.latest_positions (
