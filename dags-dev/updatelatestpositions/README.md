@@ -58,7 +58,19 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-A tabela abaixo precisa ser criada antes da execução local:
+Antes da execução desta pipeline, a tabela `refined.latest_positions` deve existir no banco `sptrans_insights`.
+
+O caminho operacional recomendado para criação dos artefatos de banco necessários é executar o bootstrap PostgreSQL do projeto:
+
+```bash
+./automation/bootstrap_postgres.sh
+```
+
+Esse script aplica os arquivos SQL localizados em `/database/bootstrap/postgres/`.
+
+### Schema de referência da tabela `refined.latest_positions`
+
+O comando abaixo é mantido como referência documental da estrutura esperada da tabela:
 
 ```sql
 CREATE TABLE refined.latest_positions (

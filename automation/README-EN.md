@@ -14,9 +14,67 @@ Automate deployment and code-promotion operations, ensuring that lint, SAST, and
 - `ruff`, `bandit`, and `pytest` installed in the Python environment used to run the scripts
 - `rsync` installed, for pipeline promotion
 - Docker and Docker Compose installed, for microservice deployment
-- run the scripts from the `scripts/` folder or with the correct path for helper modules
+- run the scripts from the `automation/` folder or with the correct path for helper modules
 
 ## Available scripts
+
+### `platform_bootstrap_and_start.sh`
+
+Starts the platform with prior infrastructure and Airflow bootstrap to avoid startup failures caused by missing required artifacts.
+
+**What it does, in order:**
+1. Starts `airflow_postgres`, `postgres`, and `minio`
+2. Waits until the infrastructure services become available
+3. Runs `bootstrap_minio.sh`
+4. Runs `bootstrap_airflow_postgres.sh`
+5. Runs `bootstrap_postgres.sh`
+6. Starts `airflow_webserver` and `airflow_scheduler`
+7. Runs `bootstrap_airflow_app.sh`
+8. Starts the rest of the platform with `docker compose up -d`
+
+**Usage:**
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+---
+
+### `bootstrap_minio.sh`
+
+Ensures that the platform access credential exists in MinIO.
+
+**What it does, in order:**
+1. Waits until MinIO becomes available
+2. Authenticates with `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`
+3. Ensures the access user defined by `MINIO_PLATFORM_ACCESS_KEY` and `MINIO_PLATFORM_SECRET_KEY` exists
+4. Attaches the `readwrite` policy when that user is created for the first time
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_minio.sh
+```
+
+---
+
+### `bootstrap_airflow_app.sh`
+
+Ensures bootstrap for the Airflow application layer.
+
+**What it does, in order:**
+1. Waits until the Airflow CLI is usable in `airflow_webserver`
+2. Ensures the admin user defined in `.env` exists
+3. Imports the bootstrap Airflow Variables
+4. Imports the bootstrap Airflow Connections
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_airflow_app.sh
+```
+
+---
 
 ### `promote_pipeline.py`
 
@@ -33,14 +91,14 @@ Promotes a pipeline from the development environment to production.
 **Usage:**
 ```bash
 cd dags-dev
-python3 ../scripts/promote_pipeline.py <pipeline_name>
+python3 ../automation/promote_pipeline.py <pipeline_name>
 ```
 
 **Examples:**
 ```bash
-python3 ../scripts/promote_pipeline.py transformlivedata
-python3 ../scripts/promote_pipeline.py gtfs
-python3 ../scripts/promote_pipeline.py updatelatestpositions
+python3 ../automation/promote_pipeline.py transformlivedata
+python3 ../automation/promote_pipeline.py gtfs
+python3 ../automation/promote_pipeline.py updatelatestpositions
 ```
 
 ---
@@ -59,7 +117,7 @@ Builds and redeploys a Docker microservice.
 
 **Usage:**
 ```bash
-cd scripts
+cd automation
 python3 deploy_service.py <docker_compose_service_name> <service_folder>
 ```
 

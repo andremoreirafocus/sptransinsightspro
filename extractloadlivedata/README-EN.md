@@ -64,15 +64,19 @@ Although this is not the preferred production path for full resilience, the serv
 - a template is available in `.env.example`
 - database schema and table created to store processing requests for extracted bus-position files
 
+The recommended operational path to create these database artifacts is to run the project's Airflow PostgreSQL bootstrap:
+
 ```bash
-docker exec -it airflow_postgres bash
-psql -U airflow -W
+./automation/bootstrap_airflow_postgres.sh
 ```
 
-```sql
-CREATE DATABASE sptrans_insights;
+This script applies the SQL files located in `/database/bootstrap/airflow_postgres/`.
 
-\c sptrans_insights
+### Reference schema for `to_be_processed.raw`
+
+The block below is kept as documentation reference for the expected table structure:
+
+```sql
 CREATE SCHEMA to_be_processed;
 
 CREATE TABLE IF NOT EXISTS to_be_processed.raw (

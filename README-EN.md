@@ -77,7 +77,21 @@ cp .env.example .env
 # Edit .env and provide the required credentials
 ```
 
-Run:
+The recommended path to start the platform without premature failures from database-dependent services is:
+
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+This script:
+- starts `airflow_postgres`, `postgres`, and `minio` first
+- runs MinIO bootstrap
+- runs bootstrap for the required database artifacts
+- starts the Airflow application layer and runs its bootstrap
+- starts the rest of the platform only after bootstrap completes
+
+If you prefer to start the platform manually, the base command remains:
 
 ```bash
 docker compose up -d
@@ -133,8 +147,8 @@ To preserve production-environment stability, the project adopts a promotion-bas
 To promote a pipeline, for example `transformlivedata`, use the gateway script that automatically runs syntax checks, SAST, and unit tests before synchronizing files to production:
 
 ```shell
-# Syntax: python scripts/promote_pipeline.py <pipeline_name>
-python scripts/promote_pipeline.py transformlivedata
+# Syntax: python automation/promote_pipeline.py <pipeline_name>
+python automation/promote_pipeline.py transformlivedata
 ```
 
 This script performs the following steps:
@@ -153,8 +167,8 @@ The project test suites prioritize explicit dependency injection, reusable fakes
 To update and restart a microservice, for example `extractloadlivedata`, use the deployment script:
 
 ```shell
-# Syntax: python scripts/deploy_service.py <service_name> <service_directory>
-python scripts/deploy_service.py extractloadlivedata extractloadlivedata
+# Syntax: python automation/deploy_service.py <service_name> <service_directory>
+python automation/deploy_service.py extractloadlivedata extractloadlivedata
 ```
 
 This script performs the following steps:
@@ -166,11 +180,11 @@ This script performs the following steps:
 
 ### Helper scripts
 
-Deployment scripts share two helper modules in `scripts/`:
+Deployment scripts share two helper modules in `automation/`:
 
 | Module | Responsibility |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executes subprocesses with `shell=False` and reports the exit code in case of failure |
 | `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — runs linting, SAST, and tests, returning the number of consumed steps so the step counter stays aligned |
 
-[More information about the scripts](./scripts/README-EN.md)
+[More information about the scripts](./automation/README-EN.md)

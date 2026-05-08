@@ -22,7 +22,23 @@ To initialize the Airflow-specific services, run:
 docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 ```
 
-## Create the Airflow login user
+The recommended operational path for Airflow bootstrap is:
+
+```bash
+./automation/bootstrap_airflow_app.sh
+```
+
+This script:
+- waits until the Airflow CLI is usable
+- ensures the admin user defined in `.env` exists
+- imports the bootstrap Variables
+- imports the bootstrap Connections
+
+## Manual fallback commands
+
+If you need to bootstrap Airflow manually, the commands below remain available.
+
+### Create the Airflow login user
 
 After starting the services, create an admin user to access the Airflow UI:
 
@@ -36,18 +52,21 @@ docker compose exec airflow_webserver airflow users create \
     --password admin
 ```
 
-## Import connections and variables
+### Import connections and variables
 
 To import the connections and variables used by the DAGs:
 
 Bootstrap is split into:
-- `connections.json`: shared credentials and endpoints exposed as Airflow Connections
+- `connections.json`: versioned template containing the base structure of the Airflow Connections
 - `variables.json`: consolidated variables for pipelines that do not require additional dedicated files in this bootstrap
 - dedicated JSON files per pipeline: used when configuration is maintained separately
 
 ```bash
 docker compose exec airflow_webserver bash
-airflow connections import variables_and_connections/connections.json
+python /opt/airflow/dags/../variables_and_connections/render_airflow_connections.py \
+  /opt/airflow/variables_and_connections/connections.json \
+  /opt/airflow/variables_and_connections/generated_connections.json
+airflow connections import variables_and_connections/generated_connections.json
 airflow variables import variables_and_connections/variables.json
 
 # transformlivedata

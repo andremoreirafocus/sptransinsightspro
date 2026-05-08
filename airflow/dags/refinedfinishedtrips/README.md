@@ -242,22 +242,19 @@ Para instalar os requisitos:
 - pip install -r requirements.txt
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-## Para criar as tabelas e índices necessários ao subprojeto:
+Antes da execução local desta pipeline, a tabela `refined.finished_trips` deve existir no banco `sptrans_insights`, com a configuração de particionamento necessária.
 
-Database commands:
+O caminho operacional recomendado para criação dos artefatos de banco necessários é executar o bootstrap PostgreSQL do projeto:
 
-```
-docker exec -it postgres bash
-psql -U postgres -W
-```
-
-```sql
-CREATE DATABASE sptrans_insights;
+```bash
+./automation/bootstrap_postgres.sh
 ```
 
-\c sptrans_insights
+Esse script aplica os arquivos SQL localizados em `/database/bootstrap/postgres/`.
 
-Com particonamemto:
+### Schema e particionamento de referência da tabela `refined.finished_trips`
+
+O bloco abaixo é mantido como referência documental da estrutura esperada da tabela e da configuração de particionamento:
 
 ```sql
 CREATE SCHEMA partman;

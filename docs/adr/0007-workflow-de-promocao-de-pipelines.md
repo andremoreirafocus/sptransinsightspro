@@ -20,7 +20,7 @@ Ambas as abordagens eliminam o conceito de um "gateway de qualidade" antes de o 
 Adotar um **workflow de promoção explícita** com gate de qualidade automatizado:
 
 - Todo desenvolvimento e teste ocorre em `dags-dev/`.
-- A promoção para produção é feita exclusivamente via `scripts/promote_pipeline.py <pipeline>`.
+- A promoção para produção é feita exclusivamente via `automation/promote_pipeline.py <pipeline>`.
 - O script executa automaticamente, em ordem:
   1. Lint com `ruff check` (falha se houver erros).
   2. Testes unitários com `pytest tests/` (falha se houver falhas, pulado se não houver `tests/`).
