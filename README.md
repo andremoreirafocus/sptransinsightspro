@@ -72,8 +72,23 @@ cp .env.example .env
 # Edite .env e preencha as credenciais necessárias
 ```
  
- Execute:
-  docker compose up -d 
+O caminho recomendado para iniciar a plataforma sem falhas prematuras de serviços dependentes de banco é:
+
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+Esse script:
+- sobe primeiro os serviços de banco de dados
+- executa o bootstrap dos artefatos obrigatórios de banco
+- sobe o restante da plataforma somente após a conclusão do bootstrap
+
+Caso deseje subir a plataforma manualmente, o comando base continua sendo:
+
+```bash
+docker compose up -d
+```
 
  Caso deseje iniciar serviços específicos:
  ```shell

@@ -15,6 +15,24 @@ Automatizar as operações de implantação e promoção de código, garantindo 
 
 ## Scripts disponíveis
 
+### `platform_bootstrap_and_start.sh`
+Sobe a plataforma com bootstrap prévio dos bancos de dados para evitar falhas de inicialização por ausência de schema, tabelas e índices obrigatórios.
+
+**O que faz, em ordem:**
+1. Sobe `airflow_postgres` e `postgres`
+2. Aguarda ambos aceitarem conexões
+3. Executa `bootstrap_airflow_postgres.sh`
+4. Executa `bootstrap_postgres.sh`
+5. Sobe o restante da plataforma com `docker compose up -d`
+
+**Uso:**
+```bash
+cd automation
+./platform_bootstrap_and_start.sh
+```
+
+---
+
 ### `promote_pipeline.py`
 Promove uma pipeline do ambiente de desenvolvimento para produção.
 
