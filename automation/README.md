@@ -16,19 +16,56 @@ Automatizar as operações de implantação e promoção de código, garantindo 
 ## Scripts disponíveis
 
 ### `platform_bootstrap_and_start.sh`
-Sobe a plataforma com bootstrap prévio dos bancos de dados para evitar falhas de inicialização por ausência de schema, tabelas e índices obrigatórios.
+Sobe a plataforma com bootstrap prévio da infraestrutura e do Airflow para evitar falhas de inicialização por ausência de artefatos obrigatórios.
 
 **O que faz, em ordem:**
-1. Sobe `airflow_postgres` e `postgres`
-2. Aguarda ambos aceitarem conexões
-3. Executa `bootstrap_airflow_postgres.sh`
-4. Executa `bootstrap_postgres.sh`
-5. Sobe o restante da plataforma com `docker compose up -d`
+1. Sobe `airflow_postgres`, `postgres` e `minio`
+2. Aguarda os serviços de infraestrutura ficarem disponíveis
+3. Executa `bootstrap_minio.sh`
+4. Executa `bootstrap_airflow_postgres.sh`
+5. Executa `bootstrap_postgres.sh`
+6. Sobe `airflow_webserver` e `airflow_scheduler`
+7. Executa `bootstrap_airflow_app.sh`
+8. Sobe o restante da plataforma com `docker compose up -d`
 
 **Uso:**
 ```bash
 cd automation
 ./platform_bootstrap_and_start.sh
+```
+
+---
+
+### `bootstrap_minio.sh`
+Garante que a credencial de acesso da plataforma exista no MinIO.
+
+**O que faz, em ordem:**
+1. Aguarda o MinIO ficar disponível
+2. Autentica com `MINIO_ROOT_USER` e `MINIO_ROOT_PASSWORD`
+3. Garante a existência do usuário de acesso definido por `MINIO_PLATFORM_ACCESS_KEY` e `MINIO_PLATFORM_SECRET_KEY`
+4. Anexa a policy `readwrite` no primeiro bootstrap desse usuário
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_minio.sh
+```
+
+---
+
+### `bootstrap_airflow_app.sh`
+Garante o bootstrap da camada de aplicação do Airflow.
+
+**O que faz, em ordem:**
+1. Aguarda o CLI do Airflow ficar utilizável no `airflow_webserver`
+2. Garante a existência do usuário admin definido no `.env`
+3. Importa as Airflow Variables do bootstrap
+4. Importa as Airflow Connections do bootstrap
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_airflow_app.sh
 ```
 
 ---

@@ -85,8 +85,10 @@ cd automation
 ```
 
 This script:
-- starts the database services first
+- starts `airflow_postgres`, `postgres`, and `minio` first
+- runs MinIO bootstrap
 - runs bootstrap for the required database artifacts
+- starts the Airflow application layer and runs its bootstrap
 - starts the rest of the platform only after bootstrap completes
 
 If you prefer to start the platform manually, the base command remains:

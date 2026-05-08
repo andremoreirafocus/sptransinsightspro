@@ -80,8 +80,10 @@ cd automation
 ```
 
 Esse script:
-- sobe primeiro os serviços de banco de dados
+- sobe primeiro `airflow_postgres`, `postgres` e `minio`
+- executa o bootstrap do MinIO
 - executa o bootstrap dos artefatos obrigatórios de banco
+- sobe a camada de aplicação do Airflow e executa seu bootstrap
 - sobe o restante da plataforma somente após a conclusão do bootstrap
 
 Caso deseje subir a plataforma manualmente, o comando base continua sendo:

@@ -22,7 +22,23 @@ To initialize the Airflow-specific services, run:
 docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 ```
 
-## Create the Airflow login user
+The recommended operational path for Airflow bootstrap is:
+
+```bash
+./automation/bootstrap_airflow_app.sh
+```
+
+This script:
+- waits until the Airflow CLI is usable
+- ensures the admin user defined in `.env` exists
+- imports the bootstrap Variables
+- imports the bootstrap Connections
+
+## Manual fallback commands
+
+If you need to bootstrap Airflow manually, the commands below remain available.
+
+### Create the Airflow login user
 
 After starting the services, create an admin user to access the Airflow UI:
 
@@ -36,7 +52,7 @@ docker compose exec airflow_webserver airflow users create \
     --password admin
 ```
 
-## Import connections and variables
+### Import connections and variables
 
 To import the connections and variables used by the DAGs:
 
