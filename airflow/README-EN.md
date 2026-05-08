@@ -57,13 +57,16 @@ docker compose exec airflow_webserver airflow users create \
 To import the connections and variables used by the DAGs:
 
 Bootstrap is split into:
-- `connections.json`: shared credentials and endpoints exposed as Airflow Connections
+- `connections.json`: versioned template containing the base structure of the Airflow Connections
 - `variables.json`: consolidated variables for pipelines that do not require additional dedicated files in this bootstrap
 - dedicated JSON files per pipeline: used when configuration is maintained separately
 
 ```bash
 docker compose exec airflow_webserver bash
-airflow connections import variables_and_connections/connections.json
+python /opt/airflow/dags/../variables_and_connections/render_airflow_connections.py \
+  /opt/airflow/variables_and_connections/connections.json \
+  /opt/airflow/variables_and_connections/generated_connections.json
+airflow connections import variables_and_connections/generated_connections.json
 airflow variables import variables_and_connections/variables.json
 
 # transformlivedata
