@@ -74,18 +74,19 @@ Para instalar os requisitos:
 
 
 ## Configurações de Banco de dados que devem ser feitas antes da execução:
-## Para criar as tabelas e índices necessários ao subprojeto:
+Antes da execução local desta pipeline, a tabela `refined.trip_details` deve existir no banco `sptrans_insights`.
 
-Database commands:
+O caminho operacional recomendado para criação dos artefatos de banco necessários é executar o bootstrap PostgreSQL do projeto:
 
-docker exec -it postgres bash
-psql -U postgres -W
-
-```sql
-CREATE DATABASE sptrans_insights;
+```bash
+./automation/bootstrap_postgres.sh
 ```
 
-\c sptrans_insights
+Esse script aplica os arquivos SQL localizados em `/database/bootstrap/postgres/`.
+
+### Schema de referência da tabela `refined.trip_details`
+
+O comando abaixo é mantido como referência documental da estrutura esperada da tabela:
 
 ```sql
 CREATE TABLE refined.trip_details (
@@ -120,7 +121,7 @@ Antes da execução da DAG no Airflow, a tabela `refined.trip_details` já deve 
 
 ## Instruções para execução em modo local
 Crie `dags-dev/refinedsynctripdetails/.env` com base em `.env.example` preenchendo todos os campos.
-Crie a tabela conforme instruções acima.
+Garanta que a tabela esteja criada conforme instruções acima.
 
 Execute:
 ```shell

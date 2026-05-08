@@ -57,20 +57,22 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - Um template está disponível em `.env.example`
 - Criação de schema e tabela no banco de dados para armazenamento dos reequests de processamento de arquivos de posição de ônibus extraídos da API
 
-```sh
-docker exec -it airflow_postgres bash
-psql -U airflow -W
+O caminho operacional recomendado para criação desses artefatos de banco é executar o bootstrap PostgreSQL do Airflow:
+
+```bash
+./automation/bootstrap_airflow_postgres.sh
 ```
 
-```sql
-CREATE DATABASE sptrans_insights;
+Esse script aplica os arquivos SQL localizados em `/database/bootstrap/airflow_postgres/`.
 
-\c sptrans_insights
--- First, ensure the schema exists
+### Schema de referência da tabela `to_be_processed.raw`
+
+O bloco abaixo é mantido como referência documental da estrutura esperada da tabela:
+
+```sql
 CREATE SCHEMA to_be_processed;
 
--- Create the table
-CREATE TABLE IF NOT EXISTS to_be_processed.raw (
+CREATE TABLE to_be_processed.raw (
     id BIGSERIAL PRIMARY KEY,
     filename VARCHAR(255) NOT NULL,
     logical_date TIMESTAMPTZ NOT NULL,
@@ -79,17 +81,10 @@ CREATE TABLE IF NOT EXISTS to_be_processed.raw (
     updated_at TIMESTAMPTZ NOT NULL
 );
 
--- Create index on processed column for efficient filtering of unprocessed requests
-CREATE INDEX IF NOT EXISTS idx_raw_processed ON to_be_processed.raw(processed);
-
--- Create index on filename column for efficient file lookups
-CREATE INDEX IF NOT EXISTS idx_raw_filename ON to_be_processed.raw(filename);
-
--- Create index on logical_date column for efficient date-based queries
-CREATE INDEX IF NOT EXISTS idx_raw_logical_date ON to_be_processed.raw(logical_date);
-
--- Create index on created_at for ordering queries
-CREATE INDEX IF NOT EXISTS idx_raw_created_at ON to_be_processed.raw(created_at);
+CREATE INDEX idx_raw_processed ON to_be_processed.raw(processed);
+CREATE INDEX idx_raw_filename ON to_be_processed.raw(filename);
+CREATE INDEX idx_raw_logical_date ON to_be_processed.raw(logical_date);
+CREATE INDEX idx_raw_created_at ON to_be_processed.raw(created_at);
 ```
 
 ## Configurações
