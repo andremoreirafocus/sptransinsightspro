@@ -123,8 +123,8 @@ Para garantir a estabilidade do ambiente de produção, o projeto adota um fluxo
 Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting), SAST e testes unitários antes de sincronizar os arquivos com a produção:
 
 ```shell
-# Sintaxe: python scripts/promote_pipeline.py <nome_da_pipeline>
-python scripts/promote_pipeline.py transformlivedata
+# Sintaxe: python automation/promote_pipeline.py <nome_da_pipeline>
+python automation/promote_pipeline.py transformlivedata
 ```
 
 Este script realiza os seguintes passos:
@@ -142,8 +142,8 @@ As suítes de testes do projeto priorizam injeção explícita de dependências,
 Para atualizar e reiniciar um microserviço (ex: `extractloadlivedata`), utilize o script de deployment:
 
 ```shell
-# Sintaxe: python scripts/deploy_service.py <nome_do_servico> <diretorio_do_servico>
-python scripts/deploy_service.py extractloadlivedata extractloadlivedata
+# Sintaxe: python automation/deploy_service.py <nome_do_servico> <diretorio_do_servico>
+python automation/deploy_service.py extractloadlivedata extractloadlivedata
 ```
 
 Este script realiza os seguintes passos:
@@ -154,11 +154,11 @@ Este script realiza os seguintes passos:
 5. Reinício do container via Docker Compose.
 
 ### Scripts auxiliares
-Os scripts de deployment compartilham dois módulos auxiliares em `scripts/`:
+Os scripts de deployment compartilham dois módulos auxiliares em `automation/`:
 
 | Módulo | Responsabilidade |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
 | `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
-[Mais informações sobre os scripts](./scripts/README.md)
+[Mais informações sobre os scripts](./automation/README.md)

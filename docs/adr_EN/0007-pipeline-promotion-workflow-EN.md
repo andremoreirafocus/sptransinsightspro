@@ -19,7 +19,7 @@ Both approaches eliminate the concept of a quality gate before code reaches prod
 Adopt an **explicit promotion workflow** with an automated quality gate:
 
 - All development and testing happens in `dags-dev/`.
-- Promotion to production is performed exclusively through `scripts/promote_pipeline.py <pipeline>`.
+- Promotion to production is performed exclusively through `automation/promote_pipeline.py <pipeline>`.
 - The script automatically executes, in order:
   1. Lint with `ruff check`, failing if there are errors.
   2. Unit tests with `pytest tests/`, failing if there are failures and skipped if there is no `tests/` directory.

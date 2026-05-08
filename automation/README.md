@@ -11,7 +11,7 @@ Automatizar as operações de implantação e promoção de código, garantindo 
 - `ruff`, `bandit` e `pytest` instalados no ambiente Python utilizado para executar os scripts
 - `rsync` instalado (para promoção de pipelines)
 - Docker e Docker Compose instalados (para deploy de microserviços)
-- Executar os scripts a partir da pasta `scripts/` ou com o PATH correto para os módulos auxiliares
+- Executar os scripts a partir da pasta `automation/` ou com o PATH correto para os módulos auxiliares
 
 ## Scripts disponíveis
 
@@ -29,14 +29,14 @@ Promove uma pipeline do ambiente de desenvolvimento para produção.
 **Uso:**
 ```bash
 cd dags-dev
-python3 ../scripts/promote_pipeline.py <nome_da_pipeline>
+python3 ../automation/promote_pipeline.py <nome_da_pipeline>
 ```
 
 **Exemplos:**
 ```bash
-python3 ../scripts/promote_pipeline.py transformlivedata
-python3 ../scripts/promote_pipeline.py gtfs
-python3 ../scripts/promote_pipeline.py updatelatestpositions
+python3 ../automation/promote_pipeline.py transformlivedata
+python3 ../automation/promote_pipeline.py gtfs
+python3 ../automation/promote_pipeline.py updatelatestpositions
 ```
 
 ---
@@ -54,7 +54,7 @@ Realiza o build e redeploy de um microserviço Docker.
 
 **Uso:**
 ```bash
-cd scripts
+cd automation
 python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico>
 ```
 

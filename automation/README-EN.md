@@ -14,7 +14,7 @@ Automate deployment and code-promotion operations, ensuring that lint, SAST, and
 - `ruff`, `bandit`, and `pytest` installed in the Python environment used to run the scripts
 - `rsync` installed, for pipeline promotion
 - Docker and Docker Compose installed, for microservice deployment
-- run the scripts from the `scripts/` folder or with the correct path for helper modules
+- run the scripts from the `automation/` folder or with the correct path for helper modules
 
 ## Available scripts
 
@@ -33,14 +33,14 @@ Promotes a pipeline from the development environment to production.
 **Usage:**
 ```bash
 cd dags-dev
-python3 ../scripts/promote_pipeline.py <pipeline_name>
+python3 ../automation/promote_pipeline.py <pipeline_name>
 ```
 
 **Examples:**
 ```bash
-python3 ../scripts/promote_pipeline.py transformlivedata
-python3 ../scripts/promote_pipeline.py gtfs
-python3 ../scripts/promote_pipeline.py updatelatestpositions
+python3 ../automation/promote_pipeline.py transformlivedata
+python3 ../automation/promote_pipeline.py gtfs
+python3 ../automation/promote_pipeline.py updatelatestpositions
 ```
 
 ---
@@ -59,7 +59,7 @@ Builds and redeploys a Docker microservice.
 
 **Usage:**
 ```bash
-cd scripts
+cd automation
 python3 deploy_service.py <docker_compose_service_name> <service_folder>
 ```
 
