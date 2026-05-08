@@ -8,8 +8,8 @@ services:
     volumes:
       - minio_storage:/data
     environment:
-      MINIO_ROOT_USER: admin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
       MINIO_NOTIFY_KAFKA_ENABLE_EventKafka: "on"
       MINIO_NOTIFY_KAFKA_TOPIC_EventKafka: "sink-products"
       MINIO_NOTIFY_KAFKA_QUEUE_LIMIT_EventKafka: "10000"
@@ -65,9 +65,8 @@ services:
     image: postgres:13
     container_name: airflow_postgres
     environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
+      - POSTGRES_USER=${AIRFLOW_DB_USER}
+      - POSTGRES_PASSWORD=${AIRFLOW_DB_PASSWORD}
     ports:
       - "5432:5432"
     volumes:
@@ -83,8 +82,8 @@ services:
     ports:
       - 5532:5432
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=${POSTGRES_DB_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_DB_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     command: postgres -c shared_preload_libraries='pg_partman_bgw'
