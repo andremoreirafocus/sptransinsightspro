@@ -20,6 +20,7 @@ Although this is not the preferred production path for full resilience, the serv
 - builds an in-memory JSON object with `metadata` (source, timestamp, and total vehicles) and the original `payload`
 - saves the JSON locally in a configured volume
 - persists the JSON to MinIO in the raw layer, partitioned by date, optionally compressed with Zstandard or stored as plain JSON
+- uses `metadata.extracted_at` as the single timestamp source for raw artifact naming and storage partitioning; `payload.hr` remains only as informational source reference due to drifts on this API response field value
 - the [samples](./samples) folder contains manually curated examples of the raw artifact saved by the service:
   - [posicoes_onibus-YYYYMMDDHHmm.json](./samples/posicoes_onibus-YYYYMMDDHHmm.json)
   - [posicoes_onibus-YYYYMMDDHHmm.json.zst](./samples/posicoes_onibus-YYYYMMDDHHmm.json.zst)

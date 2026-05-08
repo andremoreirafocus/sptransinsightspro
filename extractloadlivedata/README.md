@@ -14,6 +14,7 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - cria em memória um objeto JSON com `metadata` (origem, timestamp e total de veículos) e `payload` original
 - salva o JSON localmente em um volume configurado
 - persiste o JSON no MinIO na camada raw, em uma pasta por data, podendo salvar comprimido em Zstandard ou em JSON puro
+- usa `metadata.extracted_at` como fonte única para o timestamp do nome do artefato bruto e do particionamento em storage; `payload.hr` permanece apenas como referência informacional da origem devido a drifts neste campo da resposta da API
 - na pasta [samples](./samples) há exemplos curados manualmente do artefato bruto salvo pelo serviço:
   - [posicoes_onibus-YYYYMMDDHHmm.json](./samples/posicoes_onibus-YYYYMMDDHHmm.json)
   - [posicoes_onibus-YYYYMMDDHHmm.json.zst](./samples/posicoes_onibus-YYYYMMDDHHmm.json.zst)

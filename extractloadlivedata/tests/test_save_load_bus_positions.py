@@ -20,7 +20,7 @@ from tests.fakes.object_storage_client import FakeObjectStorageClient
 def build_sample_data():
     return {
         "metadata": {
-            "extracted_at": "2026-04-09T09:10:00",
+            "extracted_at": "2026-04-09T09:10:00-03:00",
             "source": "sptrans_api_v2",
             "total_vehicles": 3,
         },
@@ -37,10 +37,10 @@ def build_sample_data():
 
 def test_get_file_name_from_data_formats():
     data = build_sample_data()
+    data["payload"]["hr"] = "09:47"
     filename, partition = get_file_name_from_data(data)
-    assert filename.startswith("posicoes_onibus-")
-    assert filename.endswith(".json")
-    assert "year=" in partition and "month=" in partition and "day=" in partition
+    assert filename == "posicoes_onibus-202604090910.json"
+    assert partition == "year=2026/month=04/day=09/"
 
 
 def test_get_payload_summary_counts():
