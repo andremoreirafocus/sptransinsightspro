@@ -1,4 +1,4 @@
-# ADR-0004: Framework de qualidade de dados multi-camada
+# ADR-0005: Framework de qualidade de dados multi-camada
 
 **Data:** 2026-04-15  
 **Status:** Aceito
@@ -66,4 +66,4 @@ O módulo `lineage/lineage_functions.py` rastreia automaticamente a origem de ca
 - Complexidade de implementação e manutenção significativamente maior do que abordagens mais simples.
 - O relatório de qualidade é gerado e salvo a cada execução — em alta frequência (a cada 2 minutos), acumula muitos artefatos no bucket `metadata` que precisam de política de retenção.
 - O webhook para o `alertservice` introduz acoplamento de runtime entre o pipeline e o serviço de notificação: se o `alertservice` estiver indisponível, o envio do relatório falha (embora o pipeline em si continue).
-- As ferramentas específicas de validação (JSON Schema, Great Expectations) e a decisão de externalizar suas regras para arquivos de configuração são tratadas no [ADR-0005](./0005-validacao-orientada-a-configuracao.md).
+- As ferramentas específicas de validação (JSON Schema, Great Expectations) e a decisão de externalizar suas regras para arquivos de configuração são tratadas no [ADR-0006](./0006-validacao-orientada-a-configuracao.md).

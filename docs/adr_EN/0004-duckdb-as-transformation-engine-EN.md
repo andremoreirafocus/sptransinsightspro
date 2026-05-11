@@ -1,4 +1,4 @@
-# ADR-0002: DuckDB as the transformation engine
+# ADR-0004: DuckDB as the transformation engine
 
 **Date:** 2026-04-15  
 **Status:** Accepted
@@ -7,13 +7,15 @@
 
 The trusted layer stores data in Parquet format in MinIO (S3-compatible). The transformation pipelines need to execute analytical operations on these files: joins with GTFS tables, time-window filtering, aggregations by vehicle/route/direction, distance calculations, and report generation.
 
+In addition to pipeline processing, the solution also needed a practical way to perform analytical exploration of the same trusted data during development, validation, and data-behavior investigation, without requiring a separate analytical infrastructure.
+
 The evaluated options were: processing the data entirely in Pandas by loading DataFrames into memory, adopting a distributed SQL engine such as Presto/Trino or Spark, or using an embedded analytical engine capable of querying Parquet directly in object storage.
 
 The data volume is on the order of tens of thousands of records per execution, from bus positions every 2 minutes, not billions of records.
 
 ## Decision
 
-Use **DuckDB** as the transformation engine for all operations that involve reading Parquet from the trusted layer.
+Use **DuckDB** as the solution’s embedded analytical engine for all operations that involve reading Parquet from the trusted layer, both in transformation pipelines and in data exploration through Jupyter.
 
 DuckDB is an embedded OLAP database, with no server process, capable of:
 - Querying Parquet files directly via `httpfs`/`s3` without downloading them locally first.
@@ -22,6 +24,8 @@ DuckDB is an embedded OLAP database, with no server process, capable of:
 - Running as a Python library through `import duckdb`, with no external process.
 
 The shared abstraction in `infra/duck_db_v3.py` encapsulates creation of a configured connection with MinIO credentials, exposing a simple interface that can be replaced by fakes in tests.
+
+In the exploration environment, Jupyter was added to the solution with DuckDB preinstalled so exploratory queries and analyses over the trusted layer could use the same engine adopted by the pipelines.
 
 ## Alternatives considered
 
@@ -36,9 +40,10 @@ The shared abstraction in `infra/duck_db_v3.py` encapsulates creation of a confi
 ## Consequences
 
 **Positive:**
-- Zero infrastructure overhead: DuckDB runs in the same Python process as the Airflow operator, with no additional containers.
+- Zero infrastructure overhead for the main analytical engine: DuckDB runs in the same Python process as the Airflow operator and can also be used directly in the Jupyter environment, without additional analytical services.
 - Reads Parquet via S3 without local materialization: only the required columns and partitions are transferred.
 - Expressive SQL for GTFS joins: transformation code is readable as queries instead of long chains of DataFrame operations.
+- Reusing the same engine across pipelines and analytical exploration reduces conceptual and operational fragmentation.
 - Testable through `FakeDuckDBConnection`: any function that accepts `duckdb_client` can be tested with a fake and no real infrastructure.
 
 **Negative / Tradeoffs:**

@@ -1,11 +1,11 @@
-# ADR-0005: Validação orientada a configuração (JSON Schema + Great Expectations)
+# ADR-0006: Validação orientada a configuração (JSON Schema + Great Expectations)
 
 **Data:** 2026-04-15  
 **Status:** Aceito
 
 ## Contexto
 
-O [ADR-0004](./0004-framework-de-qualidade-de-dados.md) estabelece que o `transformlivedata` deve tratar qualidade de dados como cidadã de primeira classe, com validação em múltiplos estágios: JSON Schema antes da transformação e Great Expectations após. Esta decisão pressupõe esse framework já adotado e trata de uma questão operacional específica: **onde as regras de validação devem viver**.
+O [ADR-0005](./0005-framework-de-qualidade-de-dados.md) estabelece que o `transformlivedata` deve tratar qualidade de dados como cidadã de primeira classe, com validação em múltiplos estágios: JSON Schema antes da transformação e Great Expectations após. Esta decisão pressupõe esse framework já adotado e trata de uma questão operacional específica: **onde as regras de validação devem viver**.
 
 A abordagem mais simples — hardcodar as regras no código Python (`if "field" not in data: raise`, thresholds numéricos fixos) — funciona para regras estáticas, mas torna impossível atualizar as regras sem redeployment do pipeline, e embaralha a lógica de validação com a lógica de negócio. Em produção com Airflow, ajustar um único threshold exigiria Pull Request + merge + promoção.
 

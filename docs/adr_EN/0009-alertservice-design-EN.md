@@ -1,11 +1,11 @@
-# ADR-0008: `alertservice` design (webhook, cumulative alerts, SQLite)
+# ADR-0009: `alertservice` design (webhook, cumulative alerts, SQLite)
 
 **Date:** 2026-04-15  
 **Status:** Accepted
 
 ## Context
 
-[ADR-0004](./0004-multi-layer-data-quality-framework-EN.md) establishes that each `transformlivedata` execution generates a quality report with status `PASS`, `WARN`, or `FAIL`, and that this report must trigger notifications for proactive monitoring. The service responsible for receiving these reports and deciding whether and how to notify must solve three independent questions:
+[ADR-0005](./0005-multi-layer-data-quality-framework-EN.md) establishes that each `transformlivedata` execution generates a quality report with status `PASS`, `WARN`, or `FAIL`, and that this report must trigger notifications for proactive monitoring. The service responsible for receiving these reports and deciding whether and how to notify must solve three independent questions:
 
 1. **How the pipeline delivers the report to the alerting service:** push through webhook or pull through polling?
 2. **When a WARN should generate a notification:** immediately or only when accumulated?

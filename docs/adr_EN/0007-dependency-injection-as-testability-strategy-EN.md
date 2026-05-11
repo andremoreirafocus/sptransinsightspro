@@ -1,4 +1,4 @@
-# ADR-0006: Dependency injection as a testability strategy
+# ADR-0007: Dependency injection as a testability strategy
 
 **Date:** 2026-04-15  
 **Status:** Accepted

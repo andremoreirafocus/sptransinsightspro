@@ -1,4 +1,4 @@
-# ADR-0006: Injeção de dependência como estratégia de testabilidade
+# ADR-0007: Injeção de dependência como estratégia de testabilidade
 
 **Data:** 2026-04-15  
 **Status:** Aceito

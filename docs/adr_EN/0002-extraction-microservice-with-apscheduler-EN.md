@@ -1,4 +1,4 @@
-# ADR-0003: Extraction microservice with APScheduler
+# ADR-0002: Extraction microservice with APScheduler
 
 **Date:** 2026-04-15  
 **Status:** Accepted

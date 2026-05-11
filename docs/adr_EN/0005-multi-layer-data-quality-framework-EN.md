@@ -1,4 +1,4 @@
-# ADR-0004: Multi-layer data quality framework
+# ADR-0005: Multi-layer data quality framework
 
 **Date:** 2026-04-15  
 **Status:** Accepted
@@ -73,4 +73,4 @@ The `lineage/lineage_functions.py` module automatically tracks the origin of eac
 - Significantly higher implementation and maintenance complexity than simpler approaches.
 - The quality report is generated and saved at every execution. At high frequency, every 2 minutes, this accumulates many artifacts in the `metadata` bucket and requires a retention policy.
 - The webhook to `alertservice` introduces runtime coupling between the pipeline and the notification service: if `alertservice` is unavailable, report delivery fails even though the pipeline itself continues.
-- The specific validation tools, JSON Schema and Great Expectations, and the decision to externalize their rules into configuration files are addressed in [ADR-0005](./0005-configuration-driven-validation-EN.md).
+- The specific validation tools, JSON Schema and Great Expectations, and the decision to externalize their rules into configuration files are addressed in [ADR-0006](./0006-configuration-driven-validation-EN.md).

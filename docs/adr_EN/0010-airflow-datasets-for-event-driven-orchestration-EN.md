@@ -1,4 +1,4 @@
-# ADR-0009: Airflow Datasets for event-driven orchestration
+# ADR-0010: Airflow Datasets for event-driven orchestration
 
 **Date:** 2026-05-04  
 **Status:** Proposed

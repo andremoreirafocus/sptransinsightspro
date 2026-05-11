@@ -1,11 +1,11 @@
-# ADR-0005: Configuration-driven validation (JSON Schema + Great Expectations)
+# ADR-0006: Configuration-driven validation (JSON Schema + Great Expectations)
 
 **Date:** 2026-04-15  
 **Status:** Accepted
 
 ## Context
 
-[ADR-0004](./0004-multi-layer-data-quality-framework-EN.md) establishes that `transformlivedata` must treat data quality as a first-class concern, with multi-stage validation: JSON Schema before transformation and Great Expectations afterward. This decision assumes that framework is already adopted and addresses one specific operational question: **where validation rules should live**.
+[ADR-0005](./0005-multi-layer-data-quality-framework-EN.md) establishes that `transformlivedata` must treat data quality as a first-class concern, with multi-stage validation: JSON Schema before transformation and Great Expectations afterward. This decision assumes that framework is already adopted and addresses one specific operational question: **where validation rules should live**.
 
 The simplest approach, hardcoding the rules in Python code, such as `if "field" not in data: raise` or fixed numeric thresholds, works for static rules but makes it impossible to update them without pipeline redeployment, and mixes validation logic with business logic. In production with Airflow, changing a single threshold would require pull request, merge, and promotion.
 

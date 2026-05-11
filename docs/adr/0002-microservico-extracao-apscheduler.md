@@ -1,4 +1,4 @@
-# ADR-0003: Microserviço de extração com APScheduler
+# ADR-0002: Microserviço de extração com APScheduler
 
 **Data:** 2026-04-15  
 **Status:** Aceito

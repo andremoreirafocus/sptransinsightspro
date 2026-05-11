@@ -17,11 +17,12 @@ The goal is not to justify choices after the fact, but to record the reasoning a
 | ADR | Title | Status |
 |-----|-------|--------|
 | [ADR-0001](./0001-medallion-architecture-EN.md) | Medallion Architecture (Raw -> Trusted -> Refined) | Accepted |
-| [ADR-0002](./0002-duckdb-as-transformation-engine-EN.md) | DuckDB as the transformation engine | Accepted |
-| [ADR-0003](./0003-extraction-microservice-with-apscheduler-EN.md) | Extraction microservice with APScheduler | Accepted |
-| [ADR-0004](./0004-multi-layer-data-quality-framework-EN.md) | Multi-layer data quality framework | Accepted |
-| [ADR-0005](./0005-configuration-driven-validation-EN.md) | Configuration-driven validation (JSON Schema + Great Expectations) | Accepted |
-| [ADR-0006](./0006-dependency-injection-as-testability-strategy-EN.md) | Dependency injection as a testability strategy | Accepted |
-| [ADR-0007](./0007-pipeline-promotion-workflow-EN.md) | Pipeline promotion workflow (`dags-dev` -> `airflow/dags`) | Accepted |
-| [ADR-0008](./0008-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Accepted |
-| [ADR-0009](./0009-airflow-datasets-for-event-driven-orchestration-EN.md) | Airflow Datasets for event-driven orchestration | Proposed |
+| [ADR-0002](./0002-extraction-microservice-with-apscheduler-EN.md) | Extraction microservice with APScheduler | Accepted |
+| [ADR-0003](./0003-data-modeling-and-architecture-for-trip-duration-detection-EN.md) | Data modeling and architecture for trip-duration detection | Accepted |
+| [ADR-0004](./0004-duckdb-as-transformation-engine-EN.md) | DuckDB as the transformation engine | Accepted |
+| [ADR-0005](./0005-multi-layer-data-quality-framework-EN.md) | Multi-layer data quality framework | Accepted |
+| [ADR-0006](./0006-configuration-driven-validation-EN.md) | Configuration-driven validation (JSON Schema + Great Expectations) | Accepted |
+| [ADR-0007](./0007-dependency-injection-as-testability-strategy-EN.md) | Dependency injection as a testability strategy | Accepted |
+| [ADR-0008](./0008-pipeline-promotion-workflow-EN.md) | Pipeline promotion workflow (`dags-dev` -> `airflow/dags`) | Accepted |
+| [ADR-0009](./0009-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Accepted |
+| [ADR-0010](./0010-airflow-datasets-for-event-driven-orchestration-EN.md) | Airflow Datasets for event-driven orchestration | Proposed |

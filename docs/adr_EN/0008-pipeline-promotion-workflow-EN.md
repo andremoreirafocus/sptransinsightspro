@@ -1,4 +1,4 @@
-# ADR-0007: Pipeline promotion workflow (`dags-dev` → `airflow/dags`)
+# ADR-0008: Pipeline promotion workflow (`dags-dev` → `airflow/dags`)
 
 **Date:** 2026-04-15  
 **Status:** Accepted

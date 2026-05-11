@@ -17,11 +17,12 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 | ADR | Título | Status |
 |-----|--------|--------|
 | [ADR-0001](./0001-arquitetura-medalhao.md) | Arquitetura Medallion (Raw → Trusted → Refined) | Aceito |
-| [ADR-0002](./0002-duckdb-para-transformacao.md) | DuckDB como motor de transformação | Aceito |
-| [ADR-0003](./0003-microservico-extracao-apscheduler.md) | Microserviço de extração com APScheduler | Aceito |
-| [ADR-0004](./0004-framework-de-qualidade-de-dados.md) | Framework de qualidade de dados multi-camada | Aceito |
-| [ADR-0005](./0005-validacao-orientada-a-configuracao.md) | Validação orientada a configuração (JSON Schema + Great Expectations) | Aceito |
-| [ADR-0006](./0006-injecao-de-dependencia-para-testabilidade.md) | Injeção de dependência como estratégia de testabilidade | Aceito |
-| [ADR-0007](./0007-workflow-de-promocao-de-pipelines.md) | Workflow de promoção de pipelines (dags-dev → airflow/dags) | Aceito |
-| [ADR-0008](./0008-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Aceito |
-| [ADR-0009](./0009-airflow-datasets-para-orquestracao.md) | Airflow Datasets para orquestração orientada a eventos | Proposto |
+| [ADR-0002](./0002-microservico-extracao-apscheduler.md) | Microserviço de extração com APScheduler | Aceito |
+| [ADR-0003](./0003-modelagem-de-dados-e-arquitetura-para-deteccao-de-duracao-de-viagens.md) | Modelagem de dados e arquitetura para detecção de duração de viagens | Aceito |
+| [ADR-0004](./0004-duckdb-para-transformacao.md) | DuckDB como motor de transformação | Aceito |
+| [ADR-0005](./0005-framework-de-qualidade-de-dados.md) | Framework de qualidade de dados multi-camada | Aceito |
+| [ADR-0006](./0006-validacao-orientada-a-configuracao.md) | Validação orientada a configuração (JSON Schema + Great Expectations) | Aceito |
+| [ADR-0007](./0007-injecao-de-dependencia-para-testabilidade.md) | Injeção de dependência como estratégia de testabilidade | Aceito |
+| [ADR-0008](./0008-workflow-de-promocao-de-pipelines.md) | Workflow de promoção de pipelines (dags-dev → airflow/dags) | Aceito |
+| [ADR-0009](./0009-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Aceito |
+| [ADR-0010](./0010-airflow-datasets-para-orquestracao.md) | Airflow Datasets para orquestração orientada a eventos | Proposto |
