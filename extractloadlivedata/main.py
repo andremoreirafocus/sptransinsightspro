@@ -1,23 +1,18 @@
 from src.extractloadlivedata import extractloadlivedata
 from src.config import get_config, validate_config
-from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES
+from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
 from src.infra.structured_logging import get_structured_logger
 from apscheduler.schedulers.blocking import BlockingScheduler
 from typing import Tuple, Union
 import sys
 
 import logging
-from logging.handlers import RotatingFileHandler
-
-LOG_FILENAME = "extractlivedata.log"
 
 # In Airflow just remove this logging configuration block
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
-        # Rotation: 5MB per file, keeping the last 5 files
-        RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
         logging.StreamHandler(),  # Also keeps console output
     ],
 )
@@ -34,13 +29,13 @@ structured_logger = get_structured_logger(
 def run_extractloadlivedata_task() -> None:
     structured_logger.info(
         event="scheduler_tick_started",
-        status="STARTED",
+        status=LogStatus.STARTED,
         message="Scheduler tick execution started.",
     )
     extractloadlivedata()
     structured_logger.info(
         event="scheduler_tick_completed",
-        status="SUCCEEDED",
+        status=LogStatus.SUCCEEDED,
         message="Scheduler tick execution completed.",
     )
 
@@ -51,7 +46,7 @@ def get_scheduling_config() -> Tuple[str, Union[int, str], int, int, int]:
     if interval <= 0:
         structured_logger.error(
             event="config_validation_failed",
-            status="FAILED",
+            status=LogStatus.FAILED,
             message="Invalid scheduling configuration: EXTRACTION_INTERVAL_SECONDS must be positive.",
             metadata={"extraction_interval_seconds": interval},
         )
@@ -67,7 +62,7 @@ def get_scheduling_config() -> Tuple[str, Union[int, str], int, int, int]:
         grace_time = 10
         structured_logger.info(
             event="scheduler_config_loaded",
-            status="SUCCEEDED",
+            status=LogStatus.SUCCEEDED,
             message="Scheduler configuration loaded for minute-based cron trigger.",
             metadata={
                 "interval_seconds": interval,
@@ -83,7 +78,7 @@ def get_scheduling_config() -> Tuple[str, Union[int, str], int, int, int]:
         grace_time = 5
         structured_logger.warning(
             event="scheduler_config_loaded",
-            status="SUCCEEDED",
+            status=LogStatus.SUCCEEDED,
             message="Scheduler configuration loaded for second-based cron trigger.",
             metadata={
                 "interval_seconds": interval,
@@ -97,7 +92,7 @@ def get_scheduling_config() -> Tuple[str, Union[int, str], int, int, int]:
 def main() -> None:
     structured_logger.info(
         event="config_validation_started",
-        status="STARTED",
+        status=LogStatus.STARTED,
         message="Configuration validation started.",
     )
     validate_config(get_config())
@@ -115,14 +110,14 @@ def main() -> None:
     if minutes == 0:
         structured_logger.info(
             event="scheduler_started",
-            status="STARTED",
+            status=LogStatus.STARTED,
             message="Scheduler configured and starting with second-based cadence.",
             metadata={"seconds": seconds, "grace_time_seconds": grace_time},
         )
     else:
         structured_logger.info(
             event="scheduler_started",
-            status="STARTED",
+            status=LogStatus.STARTED,
             message="Scheduler configured and starting with minute-based cadence.",
             metadata={"minutes": minutes, "grace_time_seconds": grace_time},
         )
@@ -131,13 +126,13 @@ def main() -> None:
     except (KeyboardInterrupt, SystemExit):
         structured_logger.info(
             event="scheduler_stopped",
-            status="SUCCEEDED",
+            status=LogStatus.SUCCEEDED,
             message="Scheduler stop requested by user.",
         )
         scheduler.shutdown()
         structured_logger.info(
             event="scheduler_shutdown_completed",
-            status="SUCCEEDED",
+            status=LogStatus.SUCCEEDED,
             message="Scheduler shutdown completed.",
         )
 
@@ -147,14 +142,14 @@ if __name__ == "__main__":
         if sys.argv[1] == "dev":
             structured_logger.info(
                 event="cli_dev_mode_requested",
-                status="STARTED",
+                status=LogStatus.STARTED,
                 message="CLI dev mode detected. Running one immediate task execution.",
             )
             run_extractloadlivedata_task()
         else:
             structured_logger.error(
                 event="cli_invalid_parameter",
-                status="FAILED",
+                status=LogStatus.FAILED,
                 message="Invalid CLI parameter for extractloadlivedata.",
                 metadata={
                     "received_args": sys.argv[1:],

@@ -1,11 +1,20 @@
 """Application-level logging taxonomy for extractloadlivedata."""
 
+from enum import Enum
+
+class LogStatus(str, Enum):
+    STARTED = "STARTED"
+    SUCCEEDED = "SUCCEEDED"
+    FAILED = "FAILED"
+    RETRY = "RETRY"
+    SKIPPED = "SKIPPED"
+
 ALLOWED_STATUSES = {
-    "STARTED",
-    "SUCCEEDED",
-    "FAILED",
-    "RETRY",
-    "SKIPPED",
+    LogStatus.STARTED.value,
+    LogStatus.SUCCEEDED.value,
+    LogStatus.FAILED.value,
+    LogStatus.RETRY.value,
+    LogStatus.SKIPPED.value,
 }
 
 ALLOWED_EVENTS = {
@@ -24,7 +33,6 @@ ALLOWED_EVENTS = {
     "execution_completed",
     "notification_engine_selected",
     "extract_positions_started",
-    "extract_positions_retry",
     "extract_positions_failed",
     "extract_positions_succeeded",
     "pending_storage_scan_failed",

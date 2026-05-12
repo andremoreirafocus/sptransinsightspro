@@ -1,12 +1,18 @@
 import requests
 import time
 from datetime import datetime
-import logging
 from typing import Any, Callable, Dict, Optional, Tuple
+from src.infra.structured_logging import get_structured_logger
+from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
 from src.services.exceptions import PositionsDownloadError
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="extractloadlivedata",
+    component="extract_buses_positions",
+    logger_name=__name__,
+    allowed_events=ALLOWED_EVENTS,
+    allowed_statuses=ALLOWED_STATUSES,
+)
 DEFAULT_API_TIMEOUT_SECONDS = 10
 ConfigDict = Dict[str, Any]
 PayloadDict = Dict[str, Any]
@@ -38,8 +44,10 @@ def extract_buses_positions_with_retries(
         )
         if buses_positions_response_is_valid(buses_positions_payload):
             if retries > 0:
-                logger.info(
-                    f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}."
+                structured_logger.info(
+                    event="extract_positions_succeeded",
+                    status=LogStatus.SUCCEEDED,
+                    message=f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}.",
                 )
             if with_metrics:
                 return {
@@ -50,16 +58,20 @@ def extract_buses_positions_with_retries(
                 }
             return buses_positions_payload
         if retries >= api_max_retries:
-            logger.error(
-                "Max retries reached. Download failed. Skipping this extraction cycle."
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=LogStatus.FAILED,
+                message="Max retries reached. Download failed. Skipping this extraction cycle.",
             )
             error = PositionsDownloadError(
                 "max retries reached while downloading positions"
             )
             setattr(error, "retries", retries)
             raise error
-        logger.warning(
-            f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
+        structured_logger.warning(
+            event="extract_positions_failed",
+            status=LogStatus.RETRY,
+            message=f"Invalid buses positions response structure! Retrying in {back_off} seconds...",
         )
         sleep_fn(back_off)
         back_off *= 2
@@ -79,8 +91,10 @@ def get_buses_positions_with_metadata(
         },
         "payload": buses_positions_payload,
     }
-    logger.info(
-        f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}"
+    structured_logger.info(
+        event="extract_positions_succeeded",
+        status=LogStatus.SUCCEEDED,
+        message=f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}",
     )
     return buses_positions, reference_time
 
@@ -93,30 +107,58 @@ def extract_buses_positions(
     try:
         response_auth = session.post(auth_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
-            logger.info(
-                f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!"
+            structured_logger.info(
+                event="extract_positions_started",
+                status=LogStatus.STARTED,
+                message=f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!",
             )
         else:
-            logger.error("Authentication error. Verify your Token.")
-            logger.error(response_auth.status_code, response_auth.text)
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=LogStatus.FAILED,
+                message="Authentication error. Verify your Token.",
+            )
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=LogStatus.FAILED,
+                message=f"{response_auth.status_code} {response_auth.text}",
+            )
             return
     except Exception as e:
-        logger.error(f"Error connecting: {e}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message=f"Error connecting: {e}",
+        )
         return None
     try:
         posicao_url = f"{base_url}/Posicao"
-        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!")
+        structured_logger.info(
+            event="extract_positions_started",
+            status=LogStatus.STARTED,
+            message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!",
+        )
         response = session.get(posicao_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response.status_code == 200:
-            logger.info(
-                f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!"
+            structured_logger.info(
+                event="extract_positions_succeeded",
+                status=LogStatus.SUCCEEDED,
+                message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!",
             )
             data = response.json()
             return data
         else:
-            logger.error(f"Error getting positions: {response.status_code}")
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=LogStatus.FAILED,
+                message=f"Error getting positions: {response.status_code}",
+            )
     except Exception as e:
-        logger.error(f"Error during execution: {e}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message=f"Error during execution: {e}",
+        )
         return None
 
 
@@ -127,20 +169,36 @@ def buses_positions_response_is_valid(buses_positions: Any) -> bool:
     :return: True if valid, False otherwise
     """
     if not isinstance(buses_positions, dict):
-        logger.error("Payload does not have a valid structure.")
-        logger.error(f"Payload content: {buses_positions}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message="Payload does not have a valid structure.",
+        )
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message=f"Payload content: {buses_positions}",
+        )
         return False
     required_fields = ["hr", "l"]
     for field in required_fields:
         if field not in buses_positions:
-            logger.error(f"Missing required payload field: {field}")
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=LogStatus.FAILED,
+                message=f"Missing required payload field: {field}",
+            )
             return False
     return True
 
 
 def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
     if not isinstance(buses_positions, dict):
-        logger.error(f"Incorrect data type: {type(buses_positions)}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message=f"Incorrect data type: {type(buses_positions)}",
+        )
         return "NaN", "NaN"
     try:
         reference_time = buses_positions.get("hr", "NaN")
@@ -148,5 +206,9 @@ def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
         total_vehicles = sum([len(line.get("vs", [])) for line in lines])
         return reference_time, total_vehicles
     except Exception as e:
-        logger.error(f"Error processing positions summary: {e}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=LogStatus.FAILED,
+            message=f"Error processing positions summary: {e}",
+        )
         return "NaN", "NaN"

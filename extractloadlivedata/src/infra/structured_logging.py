@@ -2,7 +2,8 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Optional, Set
+from enum import Enum
+from typing import Any, Dict, Iterable, Optional, Set, Union
 
 ALLOWED_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 LEVEL_TO_LOGGING = {
@@ -39,6 +40,12 @@ def _normalize_optional_set(values: Optional[Iterable[str]], field_name: str) ->
     for value in values:
         normalized.add(_normalize_non_empty_string(value, field_name))
     return normalized
+
+
+def _normalize_status_value(status: Union[str, Enum], field_name: str) -> str:
+    if isinstance(status, Enum):
+        status = str(status.value)
+    return _normalize_non_empty_string(status, field_name)
 
 
 @dataclass(frozen=True)
@@ -79,7 +86,7 @@ class StructuredLogger:
         message: str,
         execution_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
-        status: Optional[str] = None,
+        status: Optional[Union[str, Enum]] = None,
         error_type: Optional[str] = None,
         error_message: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -104,7 +111,7 @@ class StructuredLogger:
         if correlation_id is not None:
             payload["correlation_id"] = correlation_id
         if status is not None:
-            normalized_status = _normalize_non_empty_string(status, "status").upper()
+            normalized_status = _normalize_status_value(status, "status").upper()
             if self.allowed_statuses and normalized_status not in self.allowed_statuses:
                 raise ValueError(
                     f"Unsupported status '{normalized_status}'. This logger allows: {sorted(self.allowed_statuses)}"
@@ -165,4 +172,3 @@ def get_structured_logger(
         allowed_events=set(allowed_events or []),
         allowed_statuses=set(allowed_statuses or []),
     )
-
