@@ -165,3 +165,4 @@ def get_structured_logger(
         allowed_events=set(allowed_events or []),
         allowed_statuses=set(allowed_statuses or []),
     )
+

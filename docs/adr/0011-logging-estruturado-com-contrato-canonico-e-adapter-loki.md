@@ -1,4 +1,4 @@
-# ADR-0011: Logging estruturado com contrato canônico e adapter Loki
+# ADR-0011: Logging estruturado com contrato canônico e transporte desacoplado
 
 **Data:** 2026-05-12  
 **Status:** Proposto
@@ -16,7 +16,7 @@ Como o projeto seguirá evoluindo com execução containerizada e integração p
 
 ## Decisão
 
-Adotar um modelo de logging estruturado, com contrato canônico único, implementado por biblioteca compartilhada na camada de infraestrutura e com integração inicial ao stack Grafana Loki.
+Adotar um modelo de logging estruturado, com contrato canônico único, implementado por biblioteca compartilhada na camada de infraestrutura, emitindo logs em `stdout` (JSON por linha), com transporte desacoplado da aplicação.
 
 ### 1. Contrato canônico de logs
 
@@ -52,19 +52,21 @@ Criar uma biblioteca de logging na camada de infraestrutura para:
 
 A camada de serviços/pipelines não deve conhecer detalhes de transporte/armazenamento de logs.
 
-### 3. Estratégia por adapters
+### 3. Transporte desacoplado da aplicação
 
-A biblioteca deve isolar transporte de logs por adapters.
+A biblioteca não deve implementar adapters específicos de backend de observabilidade.
 
-Adapters iniciais:
-- `stdout` (padrão)
-- integração com Loki no ambiente containerizado
+Estratégia:
+- aplicação emite logs estruturados em `stdout`
+- coleta e envio ficam fora da aplicação (ex.: Promtail no ambiente containerizado)
+- em ambientes de nuvem, a captura/entrega segue o runtime/plataforma (ex.: CloudWatch via Lambda/ECS)
 
-Isso permite portabilidade: o contrato e API de logging permanecem estáveis, enquanto o backend de observabilidade pode variar por ambiente.
+Isso preserva portabilidade: o contrato e API de logging permanecem estáveis, enquanto o backend e a forma de transporte variam por ambiente sem acoplamento no código de negócio.
 
 ### 4. Stack de observabilidade containerizada inicial
 
-Adotar Grafana + Loki + Promtail como solução centralizada de logs para o ambiente containerizado atual, com foco em simplicidade operacional e baixo custo de manutenção no contexto do projeto.
+Adotar Grafana + Loki + Promtail como solução centralizada de logs para o ambiente containerizado atual, com foco em simplicidade operacional e baixo custo de manutenção no contexto do projeto.  
+Nesse desenho, o Promtail atua como agente de transporte/coleta externo à aplicação.
 
 ## Alternativas consideradas
 
@@ -92,4 +94,3 @@ Foi descartado porque reduziria portabilidade e dificultaria migração entre am
 - Esforço inicial de migração dos componentes existentes.
 - Necessidade de disciplina de contrato para evitar drift de campos.
 - Necessidade de governança de labels/campos para evitar cardinalidade excessiva.
-

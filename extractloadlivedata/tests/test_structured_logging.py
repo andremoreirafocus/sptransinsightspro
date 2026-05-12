@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from infra.structured_logging import get_structured_logger
+from src.infra.structured_logging import get_structured_logger
 
 
 def test_get_structured_logger_requires_non_empty_service_and_component() -> None:
@@ -34,7 +34,9 @@ def test_emit_requires_metadata_dict() -> None:
         logger.info(event="tick", message="scheduled run", metadata="wrong-type")
 
 
-def test_emit_outputs_json_with_canonical_required_fields(caplog: pytest.LogCaptureFixture) -> None:
+def test_emit_outputs_json_with_canonical_required_fields(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     logger_name = "tests.structured.payload"
     logger = get_structured_logger(
         service="extractloadlivedata",
