@@ -26,3 +26,4 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 | [ADR-0008](./0008-workflow-de-promocao-de-pipelines.md) | Workflow de promoção de pipelines (dags-dev → airflow/dags) | Aceito |
 | [ADR-0009](./0009-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Aceito |
 | [ADR-0010](./0010-airflow-datasets-para-orquestracao.md) | Airflow Datasets para orquestração orientada a eventos | Proposto |
+| [ADR-0011](./0011-logging-estruturado-com-contrato-canonico-e-adapter-loki.md) | Logging estruturado com contrato canônico e adapter Loki | Proposto |
