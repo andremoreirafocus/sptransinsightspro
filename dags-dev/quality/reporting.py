@@ -82,7 +82,7 @@ def build_quality_summary(
     Returns:
         Dict representing the summary block.
     """
-    summary = {
+    summary: Dict[str, Any] = {
         "contract_version": "v1",
         "pipeline": pipeline,
         "execution_id": execution_id,
