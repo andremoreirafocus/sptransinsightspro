@@ -19,10 +19,23 @@ def deploy_service(service_name, service_folder):
 
     # Validation (Linting + Tests)
     steps_consumed = run_code_validations(service_path, service_name, step_offset=1)
+    mypy_step = steps_consumed + 1
+    print(f"Step {mypy_step}/?: Running mypy for {service_name}...")
+    run_command(
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--explicit-package-bases",
+            os.path.join(service_path, "src"),
+        ],
+        f"Type checking (mypy) failed for {service_name}!",
+    )
+    print("✅ Type checking Passed.")
 
     compose_file = os.path.join(project_root, "docker-compose.yml")
-    build_step = steps_consumed + 1
-    total_steps = steps_consumed + 2
+    build_step = steps_consumed + 2
+    total_steps = steps_consumed + 3
     print(f"Step {build_step}/{total_steps}: Building {service_name}...")
     run_command(
         ["docker", "compose", "-f", compose_file, "build", service_name],

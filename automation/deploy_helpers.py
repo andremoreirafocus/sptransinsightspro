@@ -4,7 +4,7 @@ import os
 from os_command_helper import run_command
 
 
-def _resolve_python_executable(folder: str) -> str:
+def resolve_python_executable(folder: str) -> str:
     for base in (folder, os.path.dirname(folder)):
         candidate = os.path.join(base, ".venv", "bin", "python")
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
@@ -20,7 +20,7 @@ def run_code_validations(folder: str, label: str, step_offset: int = 1) -> int:
     """
     test_dir = os.path.join(folder, "tests")
     has_tests = os.path.isdir(test_dir)
-    python_executable = _resolve_python_executable(folder)
+    python_executable = resolve_python_executable(folder)
 
     print(f"Step {step_offset}/?: Linting {label}...")
     run_command(
