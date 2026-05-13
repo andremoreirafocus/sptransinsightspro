@@ -9,7 +9,7 @@ class LogStatus(str, Enum):
     RETRY = "RETRY"
     SKIPPED = "SKIPPED"
 
-ALLOWED_STATUSES = {
+ALLOWED_EVENT_STATUSES = {
     LogStatus.STARTED.value,
     LogStatus.SUCCEEDED.value,
     LogStatus.FAILED.value,

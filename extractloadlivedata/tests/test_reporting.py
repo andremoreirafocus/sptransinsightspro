@@ -1,4 +1,4 @@
-from src.reporting import build_quality_summary, create_failure_quality_report
+from src.quality.reporting import build_quality_summary, create_failure_quality_report
 
 
 def test_build_quality_summary_contract_shape():

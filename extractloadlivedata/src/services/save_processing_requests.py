@@ -10,7 +10,7 @@ from src.infra.cache import (
     remove_from_cache,
 )
 from src.infra.structured_logging import get_structured_logger
-from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
+from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
 from src.services.exceptions import IngestNotificationError
 
 structured_logger = get_structured_logger(
@@ -18,7 +18,7 @@ structured_logger = get_structured_logger(
     component="save_processing_requests",
     logger_name=__name__,
     allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_STATUSES,
+    allowed_statuses=ALLOWED_EVENT_STATUSES,
 )
 
 ConfigDict = Dict[str, Any]

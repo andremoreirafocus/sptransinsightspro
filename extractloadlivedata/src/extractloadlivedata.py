@@ -28,9 +28,9 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, cast
 from uuid import uuid4
 
-from src.config import get_config
-from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
-from src.reporting import create_failure_quality_report, build_quality_summary
+from src.config.config import get_config
+from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.quality.reporting import create_failure_quality_report, build_quality_summary
 from src.infra.alertservice_client import send_alert
 from src.infra.structured_logging import get_structured_logger
 
@@ -39,7 +39,7 @@ structured_logger = get_structured_logger(
     component="orchestrator",
     logger_name=__name__,
     allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_STATUSES,
+    allowed_statuses=ALLOWED_EVENT_STATUSES,
 )
 SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX = "[SEVERE] non recoverable "
 

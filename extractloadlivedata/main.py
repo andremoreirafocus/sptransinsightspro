@@ -1,49 +1,20 @@
 from src.extractloadlivedata import extractloadlivedata
-from src.config import get_config, validate_config
-from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
-from src.infra.structured_logging import get_structured_logger
+from src.config.config import get_config, validate_config
+from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.infra.structured_logging import (
+    get_process_structured_logger,
+)
 from apscheduler.schedulers.blocking import BlockingScheduler
 from typing import Tuple, Union
 import sys
-import logging
-import json
-from datetime import datetime, timezone
 
-
-class JsonLineFormatter(logging.Formatter):
-    def format(self, record: logging.LogRecord) -> str:
-        message = record.getMessage()
-
-        try:
-            parsed = json.loads(message)
-            if isinstance(parsed, dict):
-                return message
-        except Exception:
-            pass
-
-        payload = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "level": record.levelname,
-            "service": "extractloadlivedata",
-            "component": record.name,
-            "event": "python_log",
-            "message": message,
-        }
-        return json.dumps(payload, ensure_ascii=False, default=str)
-
-logging.basicConfig(
-    level=logging.INFO,
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-for handler in logging.getLogger().handlers:
-    handler.setFormatter(JsonLineFormatter())
-
-structured_logger = get_structured_logger(
+structured_logger = get_process_structured_logger(
     service="extractloadlivedata",
     component="scheduler",
     logger_name=__name__,
     allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_STATUSES,
+    allowed_statuses=ALLOWED_EVENT_STATUSES,
+    stream=sys.stdout,
 )
 
 
