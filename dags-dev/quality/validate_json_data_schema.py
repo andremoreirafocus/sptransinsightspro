@@ -8,7 +8,7 @@ any data transformation occurs.
 import logging
 from typing import Dict, Tuple, List, Union
 
-import jsonschema
+import jsonschema  # type: ignore[import-untyped]
 import json
 
 logger = logging.getLogger(__name__)

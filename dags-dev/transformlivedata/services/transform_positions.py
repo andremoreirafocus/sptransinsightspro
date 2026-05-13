@@ -6,7 +6,7 @@ from transformlivedata.lineage.lineage_functions import (
     build_join_lineage,
     merge_lineage_fragments,
 )
-from dateutil import parser
+from dateutil import parser  # type: ignore[import-untyped]
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -323,7 +323,7 @@ def transform_positions(
 
     deps = deps or get_transform_positions_dependencies()
     logger.info("Converting raw positions to positions table...")
-    metadata = raw_positions.get("metadata")
+    metadata: Dict[str, Any] = raw_positions.get("metadata") or {}
     df_flat = deps.flatten_raw_positions(raw_positions)
     if df_flat.empty:
         logger.error("No position data resulted from flattening.")
@@ -385,7 +385,11 @@ def transform_positions(
     metrics, issues = build_metrics_and_issues(
         raw_positions, valid_df, invalid_df, distance_errors
     )
-    batch_ts = parser.parse(metadata.get("extracted_at"))
+    extracted_at = metadata.get("extracted_at")
+    if not extracted_at:
+        logger.error("metadata.extracted_at is missing in raw positions.")
+        raise ValueError("metadata.extracted_at is required in raw positions.")
+    batch_ts = parser.parse(extracted_at)
     valid_df_columns = [
         "extracao_ts",
         "veiculo_id",
