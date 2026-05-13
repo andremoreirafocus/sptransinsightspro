@@ -267,3 +267,4 @@ def trigger_pending_processing_requests(
             "result": None,
             "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
         }
+    return None

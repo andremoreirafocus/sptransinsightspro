@@ -1,5 +1,5 @@
 import os
-from typing import Dict
+from typing import Dict, Mapping
 
 from dotenv import load_dotenv
 
@@ -42,7 +42,7 @@ _ENGINE_REQUIRED_KEYS = {
 }
 
 
-def get_config() -> Dict[str, str]:
+def get_config() -> Mapping[str, str]:
     load_dotenv(override=False)
     return os.environ
 

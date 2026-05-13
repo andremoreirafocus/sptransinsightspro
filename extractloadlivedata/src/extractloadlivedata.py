@@ -25,7 +25,7 @@ from src.services.exceptions import (
     SavePositionsToRawError,
 )
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, cast
 from uuid import uuid4
 
 from src.config import get_config
@@ -96,7 +96,7 @@ def extractloadlivedata(
     send_alert_fn: AlertSender = send_alert,
 ) -> None:
     services = services or _build_services()
-    config = config or get_config()
+    config = cast(ConfigDict, config or get_config())
     execution_id = str(uuid4())
     structured_logger.info(
         event="execution_started",
@@ -162,7 +162,7 @@ def extractloadlivedata(
         )
         send_alert_fn(webhook_url, summary)
 
-    def _emit_final_summary(status: str) -> None:
+    def _emit_final_summary(status: Literal["PASS", "WARN", "FAIL"]) -> None:
         summary = build_quality_summary(
             pipeline="extractloadlivedata",
             execution_id=execution_id,

@@ -31,7 +31,12 @@ StorageSaveResult = Dict[str, Any]
 
 
 def get_file_name_from_data(data: PayloadDict) -> Tuple[str, str]:
-    iso_timestamp_str = data.get("metadata").get("extracted_at")
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        raise ValueError("Data metadata does not have a valid structure.")
+    iso_timestamp_str = metadata.get("extracted_at")
+    if not isinstance(iso_timestamp_str, str):
+        raise ValueError("Missing or invalid metadata.extracted_at.")
 
     # Parse the timestamp
     dt = datetime.fromisoformat(iso_timestamp_str)
@@ -40,7 +45,7 @@ def get_file_name_from_data(data: PayloadDict) -> Tuple[str, str]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo("UTC"))
         # Update metadata with timezone-aware ISO string for Airflow
-        data["metadata"]["extracted_at"] = dt.isoformat()
+        metadata["extracted_at"] = dt.isoformat()
 
     # Convert to São Paulo time for filename/partition
     dt_object = dt.astimezone(ZoneInfo("America/Sao_Paulo"))
@@ -279,12 +284,20 @@ def save_bus_positions_to_storage(config: ConfigDict, data: PayloadDict) -> None
 
 
 def get_payload_summary(data: PayloadDict) -> Tuple[str, int, int]:
-    hour_minute = data.get("payload").get("hr").replace(":", "")
-    total_qv = 0
     payload = data.get("payload")
-    for line in payload.get("l", []):
+    if not isinstance(payload, dict):
+        raise ValueError("Data payload does not have a valid structure.")
+    hr = payload.get("hr")
+    if not isinstance(hr, str):
+        raise ValueError("Missing or invalid payload.hr.")
+    hour_minute = hr.replace(":", "")
+    total_qv = 0
+    lines = payload.get("l", [])
+    if not isinstance(lines, list):
+        raise ValueError("Missing or invalid payload.l.")
+    for line in lines:
         total_qv += int(line.get("qv", 0))
-    total_bus_lines = len(payload.get("l"))
+    total_bus_lines = len(lines)
     return hour_minute, total_qv, total_bus_lines
 
 
@@ -317,9 +330,12 @@ def data_structure_is_valid(data: Any) -> bool:
             message="Data metadata does not have a valid structure.",
         )
         return False
+    metadata = data.get("metadata")
+    if not isinstance(metadata, dict):
+        return False
     required_fields = ["source", "extracted_at", "total_vehicles"]
     for field in required_fields:
-        if field not in data.get("metadata"):
+        if field not in metadata:
             structured_logger.error(
                 event="storage_persist_failed",
                 status=LogStatus.FAILED,
@@ -349,8 +365,11 @@ def data_structure_is_valid(data: Any) -> bool:
         )
         return False
     required_fields = ["hr", "l"]
+    payload = data.get("payload")
+    if not isinstance(payload, dict):
+        return False
     for field in required_fields:
-        if field not in data.get("payload"):
+        if field not in payload:
             structured_logger.error(
                 event="storage_persist_failed",
                 status=LogStatus.FAILED,
@@ -387,6 +406,7 @@ def save_data_to_raw_object_storage(
         filename, partition = get_file_name_from_data(json.loads(data))
         prefix = f"{app_folder}/{partition}"
         destination_object_name = f"{prefix}{filename}"
+        output_buffer: bytes
         structured_logger.info(
             event="storage_persist_started",
             status=LogStatus.STARTED,
@@ -399,7 +419,7 @@ def save_data_to_raw_object_storage(
                     status=LogStatus.STARTED,
                     message="Compressing data with zstd...",
                 )
-                data, file_name_extension = compress_data(data)
+                output_buffer, file_name_extension = compress_data(data)
                 destination_object_name += file_name_extension
                 structured_logger.info(
                     event="storage_persist_succeeded",
@@ -407,10 +427,10 @@ def save_data_to_raw_object_storage(
                     message="Data compressed successfully.",
                 )
             else:
-                data = data.encode("utf-8")
+                output_buffer = data.encode("utf-8")
             write_generic_bytes_to_object_storage(
                 connection_data,
-                buffer=data,
+                buffer=output_buffer,
                 bucket_name=raw_bucket_name,
                 object_name=destination_object_name,
                 client=client,

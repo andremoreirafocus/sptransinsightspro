@@ -1,4 +1,4 @@
-import diskcache as dc
+import diskcache as dc  # type: ignore[import-untyped]
 import os
 import logging
 from typing import Any, Callable, List, Optional

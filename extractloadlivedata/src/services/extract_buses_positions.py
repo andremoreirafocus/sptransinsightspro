@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import-untyped]
 import time
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple
@@ -123,7 +123,7 @@ def extract_buses_positions(
                 status=LogStatus.FAILED,
                 message=f"{response_auth.status_code} {response_auth.text}",
             )
-            return
+            return None
     except Exception as e:
         structured_logger.error(
             event="extract_positions_failed",
@@ -153,6 +153,7 @@ def extract_buses_positions(
                 status=LogStatus.FAILED,
                 message=f"Error getting positions: {response.status_code}",
             )
+            return None
     except Exception as e:
         structured_logger.error(
             event="extract_positions_failed",
@@ -160,6 +161,7 @@ def extract_buses_positions(
             message=f"Error during execution: {e}",
         )
         return None
+    return None
 
 
 def buses_positions_response_is_valid(buses_positions: Any) -> bool:

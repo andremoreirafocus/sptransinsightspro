@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import-untyped]
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Any, Callable, Dict, List, Optional, Tuple
@@ -142,6 +142,7 @@ def trigger_pending_airflow_dag_invokations(
             "result": None,
             "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
         }
+    return None
 
 
 def get_utc_logical_date_from_file(pending_marker: str) -> str:
