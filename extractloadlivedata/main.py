@@ -5,6 +5,38 @@ from src.infra.structured_logging import get_structured_logger
 from apscheduler.schedulers.blocking import BlockingScheduler
 from typing import Tuple, Union
 import sys
+import logging
+import json
+from datetime import datetime, timezone
+
+
+class JsonLineFormatter(logging.Formatter):
+    def format(self, record: logging.LogRecord) -> str:
+        message = record.getMessage()
+
+        try:
+            parsed = json.loads(message)
+            if isinstance(parsed, dict):
+                return message
+        except Exception:
+            pass
+
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": record.levelname,
+            "service": "extractloadlivedata",
+            "component": record.name,
+            "event": "python_log",
+            "message": message,
+        }
+        return json.dumps(payload, ensure_ascii=False, default=str)
+
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[logging.StreamHandler(sys.stdout)],
+)
+for handler in logging.getLogger().handlers:
+    handler.setFormatter(JsonLineFormatter())
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
