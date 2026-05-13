@@ -29,7 +29,7 @@ def transform_and_validate_table(
         f"{config['general']['storage']['staging_subfolder'].strip('/')}/"
         f"{file_name}"
     )
-    result = {
+    result: Dict[str, Any] = {
         "table_name": table_name,
         "staging_object_name": staging_object_name,
         "is_valid": True,

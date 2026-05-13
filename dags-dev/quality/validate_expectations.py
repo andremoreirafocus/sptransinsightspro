@@ -1,5 +1,5 @@
-import great_expectations as gx
-from great_expectations.core.expectation_suite import ExpectationSuite
+import great_expectations as gx  # type: ignore[import-untyped]
+from great_expectations.core.expectation_suite import ExpectationSuite  # type: ignore[import-untyped]
 import warnings
 import logging
 from datetime import datetime, timezone
