@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Literal, Optional
 
 from infra.object_storage import write_generic_bytes_to_object_storage
 from quality.reporting import (
@@ -11,7 +11,7 @@ from quality.reporting import (
 
 def build_data_quality_report(
     execution_id: str,
-    status: str,
+    status: Literal["PASS", "WARN", "FAIL"],
     stage_results: Dict[str, Dict[str, Any]],
     quality_report_path: str,
     failure_phase: Optional[str] = None,

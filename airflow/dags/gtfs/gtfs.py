@@ -21,7 +21,10 @@ from gtfs.lineage.trip_details_lineage import (
     get_trip_details_lineage,
     validate_trip_details_lineage,
 )
-from infra.object_storage import read_file_from_object_storage_to_bytesio
+from infra.object_storage import (
+    read_file_from_object_storage_to_bytesio,
+    write_generic_bytes_to_object_storage,
+)
 from quality.validate_expectations import validate_expectations
 from infra.notifications import send_webhook
 from pipeline_configurator.config import get_config
@@ -117,7 +120,7 @@ def apply_relocation_result(stage_result: dict, relocation: dict) -> None:
 
 def extract_load_files(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     pipeline_config = load_pipeline_config()
-    stage_result = {
+    stage_result: Dict[str, Any] = {
         "status": "FAIL",
         "validated_items_count": 0,
         "error_details": {},
@@ -181,7 +184,7 @@ def extract_load_files(run_context: Dict[str, Any], stage_results: Dict[str, Any
 
 def transform(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
     pipeline_config = load_pipeline_config()
-    stage_result = {
+    stage_result: Dict[str, Any] = {
         "status": "FAIL",
         "validated_items_count": 0,
         "error_details": {},
@@ -266,7 +269,7 @@ def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, An
     table_name = pipeline_config["general"]["tables"]["trip_details_table_name"]
     staged_result = []
     relocation_target = None
-    stage_result = {
+    stage_result: Dict[str, Any] = {
         "status": "FAIL",
         "validated_items_count": 1,
         "error_details": {"errors_by_table": {}},
@@ -410,6 +413,7 @@ def handle_unexpected_error(e: StageExecutionError, run_context: Dict[str, Any],
     pipeline_config = load_pipeline_config()
     stage_results[e.stage] = e.stage_result
     logger.error("%s failed: %s", e.stage, e)
+    effective_write_fn = write_fn or write_generic_bytes_to_object_storage
     report = create_failure_quality_report(
         config=pipeline_config,
         execution_id=run_context["execution_id"],
@@ -417,6 +421,6 @@ def handle_unexpected_error(e: StageExecutionError, run_context: Dict[str, Any],
         failure_message=str(e),
         stage_results=stage_results,
         batch_ts=run_context["batch_ts"],
-        write_fn=write_fn,
+        write_fn=effective_write_fn,
     )
     send_webhook_from_report(report, pipeline_config, "failure path")
