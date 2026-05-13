@@ -22,8 +22,70 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow. Caso a criação do do registro falhe, o mesmo continua salvo localmente até que a operação seja concluída com sucesso. Caso o Airflow esteja indisponível, ao retornar ao funcionamento, a DAG orquestradora identifica os registros de arquivos pendentes de transformação e dispara a DAG de transformação para cada arquivo, um por vez e na ordem de criação dos arquivos de posição dos ônibus, garantindo uma entrega ordenada das posições ao longo do tempo.
 - alternativamente, pode disparar diretamente a DAG de transformação via API do Airflow, sem criar registro no banco, dependendo da configuração
 
+## Observabilidade: Structured Logging
+
+O serviço implementa observabilidade de nível de produção com **logs estruturados em JSON**, **métricas por fase** e **rastreamento de linhagem de dados** via correlation ID.
+
+### Logs Estruturados
+- **Formato**: JSON com campos `timestamp`, `level`, `service`, `component`, `event`, `status`, `message`, `metadata`
+- **Saída**: stdout para ingestão por Loki
+- **Taxonomia**: eventos estruturados em [src/domain/events.py](./src/domain/events.py)
+- **Status**: enum controlado (`STARTED`, `SUCCEEDED`, `FAILED`, `RETRY`, `SKIPPED`)
+
+### Rastreamento de Execução (execution_id)
+Cada execução recebe um `execution_id` em **formato ISO 8601** (timestamp UTC de início):
+- Exemplo: `"2026-05-13T15:30:15.987654+00:00"`
+- Correlaciona todos os logs de uma execução no Loki
+
+### Métricas por Fase (Phase Instrumentation)
+O serviço rastreia **tentativas, sucessos e falhas** em três fases:
+
+1. **Fase de Extração (extract)**
+   - Tenta extrair posições da API
+   - Captura `logical_datetime` de `buses_positions["metadata"]["extracted_at"]` (timestamp do dado)
+   - Salva localmente e passa para a próxima fase
+
+2. **Fase de Salvamento (save)**
+   - Persiste arquivos locais pendentes no MinIO
+   - Cada arquivo salvo é registrado no banco como requisição de processamento
+   - Rastreia tempo total de salvamento
+
+3. **Fase de Notificação (notify)**
+   - Dispara DAG de transformação (via Airflow ou banco de dados)
+   - Rastreia sucesso/falha de cada invocação
+   - Agregação final de métricas
+
+### Evento de Métricas Finais (execution_metrics_final)
+Emitido ao final de cada execução com estrutura Prometheus-compatível:
+
+```json
+{
+  "event": "execution_metrics_final",
+  "status": "SUCCEEDED",
+  "execution_id": "2026-05-13T15:30:15.987654+00:00",
+  "correlation_id": "2026-05-13T15:30:45.123456+00:00",
+  "metadata": {
+    "phase_metrics": {
+      "extract": {"attempted": 1, "succeeded": 1, "failed": 0, "duration": 3.21},
+      "save": {"attempted": 3, "succeeded": 2, "failed": 1, "duration": 7.89},
+      "notify": {"attempted": 3, "succeeded": 3, "failed": 0, "duration": 1.35}
+    },
+    "items_total": 7,
+    "items_failed": 1,
+    "retries_seen": 4,
+    "execution_seconds": 12.45
+  }
+}
+```
+
+### Rastreamento de Linhagem de Dados (Correlation ID)
+Cada operação é marcada com `correlation_id = logical_datetime` (timestamp do dado):
+- Permite rastrear "todo o processamento do dado extraído em 2026-05-13T15:30:45.123456Z" através de todas as pipelines
+- Habilita queries no Loki: `{correlation_id="2026-05-13T15:30:45.123456Z"}` para ver todas as operações deste dado
+- Propaga de extractloadlivedata → transformlivedata → refinedfinishedtrips para lineage completo
+
 ## Execution Reporting (Alertservice)
-- Escopo: o serviço publica **somente resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
+- Escopo: o serviço publica **resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
 - Contrato de resumo enviado:
   - `contract_version`, `pipeline`, `execution_id`, `status`
   - `items_total`, `items_failed`, `retries`, `acceptance_rate`

@@ -51,6 +51,37 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
 
 
+## Observabilidade
+
+A plataforma implementa observabilidade estruturada como padrão, permitindo rastreamento completo de dados e execuções através de múltiplas pipelines. A estratégia de observabilidade cobre três dimensões: estruturação de logs, rastreamento de linhagem de dados e instrumentação de métricas.
+
+### Logs Estruturados em JSON
+
+Todos os eventos críticos são emitidos em formato JSON estruturado, pronto para ingestão por sistemas de agregação como Loki e Prometheus. Isso garante que logs sejam:
+- Máquina-legíveis para análise automatizada
+- Consistentes em formato entre componentes
+- Facilmente filtráveis e consultáveis
+
+### Rastreamento de Linhagem de Dados
+
+O `correlation_id` baseado em `logical_datetime` (timestamp do dado) permite rastrear "todo processamento deste dado" através de todas as pipelines:
+
+```
+extractloadlivedata → transformlivedata → refinedfinishedtrips → refined.latest_positions
+```
+
+Isso possibilita auditar transformações, diagnosticar perdas de dados e validar linhagem completa de dados críticos.
+
+### Instrumentação de Execução e Métricas
+
+O extractloadlivedata implementa instrumentação de nível de produção como exemplo da abordagem adotada:
+- **Rastreamento de execução**: `execution_id` em formato ISO 8601 (timestamp UTC) correlaciona todos os logs de uma execução
+- **Métricas por fase**: instrumentação das fases extract, save e notify com tentativas/sucessos/falhas e duração
+- **Evento de métricas finais**: `execution_metrics_final` estruturado para queries Prometheus/AlertManager, fornecendo visibilidade operacional de cada execução
+
+Essa abordagem permite detecção rápida de anomalias, diagnóstico eficiente de falhas e visibilidade contínua da saúde operacional da plataforma.
+
+
 ## Configuração
 Um template de configuração está disponível em `.env.example` na raiz do projeto. Este arquivo contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata).
 
