@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 def get_object_storage_connection_from_airflow(
     connection_name: str,
 ) -> Dict[str, Any]:
-    from airflow.hooks.base import BaseHook
+    from airflow.hooks.base import BaseHook  # type: ignore[import-not-found]
 
     conn = BaseHook.get_connection(connection_name)
     return {
@@ -18,7 +18,7 @@ def get_object_storage_connection_from_airflow(
 def get_database_connection_from_airflow(
     connection_name: str,
 ) -> Dict[str, Any]:
-    from airflow.hooks.base import BaseHook
+    from airflow.hooks.base import BaseHook  # type: ignore[import-not-found]
 
     conn = BaseHook.get_connection(connection_name)
     sslmode = conn.extra_dejson.get("sslmode", "prefer")
@@ -58,7 +58,7 @@ def get_database_connection_from_env(
 def get_http_connection_from_airflow(
     connection_name: str,
 ) -> Dict[str, Any]:
-    from airflow.hooks.base import BaseHook
+    from airflow.hooks.base import BaseHook  # type: ignore[import-not-found]
 
     conn = BaseHook.get_connection(connection_name)
     return {

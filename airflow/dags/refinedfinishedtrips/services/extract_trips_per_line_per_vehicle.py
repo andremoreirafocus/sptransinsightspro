@@ -17,7 +17,7 @@ def extract_trips_per_line_per_vehicle(
     start_idx: int,
     end_idx: int,
     linha_lt: str,
-    veiculo_id: int,
+    veiculo_id: str,
     stop_proximity_threshold_meters: int,
     ) -> Tuple[List[Tuple], int, int]:
     try:

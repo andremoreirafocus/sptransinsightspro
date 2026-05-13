@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
@@ -33,22 +33,23 @@ def get_all_finished_trips(
         return config["general"]["trip_detection"]["stop_proximity_threshold_meters"]
 
     stop_proximity_threshold_meters = get_config(config)
-    positions_list = df_recent_positions.to_dict("records")
+    positions_list = cast(List[Dict[str, Any]], df_recent_positions.to_dict("records"))
     total_input_position_records = len(positions_list)
     num_processed = 0
     total_source_sentido_discrepancies = 0
     total_input_position_sanitization_drops = 0
     all_finished_trips = []
-    current_vehicle = None
+    current_vehicle_key: Optional[Tuple[str, str]] = None
     start_idx = 0
     for i, position in enumerate(positions_list):
         linha_lt = position["linha_lt"]
-        veiculo_id = position["veiculo_id"]
+        veiculo_id = str(position["veiculo_id"])
         vehicle_key = (linha_lt, veiculo_id)
         is_last = i == len(positions_list) - 1
-        vehicle_changed = current_vehicle is not None and current_vehicle != vehicle_key
-        if vehicle_changed:
-            prev_linha_lt, prev_veiculo_id = current_vehicle
+        previous_vehicle_key = current_vehicle_key
+        vehicle_changed = previous_vehicle_key != vehicle_key
+        if vehicle_changed and previous_vehicle_key is not None:
+            prev_linha_lt, prev_veiculo_id = previous_vehicle_key
             finished_trips, source_sentido_discrepancies, dropped_points = extract_trips_per_line_per_vehicle(
                 positions_list, start_idx, i - 1, prev_linha_lt, prev_veiculo_id, stop_proximity_threshold_meters
             )
@@ -62,7 +63,7 @@ def get_all_finished_trips(
                     f"Progress: {num_processed} vehicle/line combinations processed."
                 )
             start_idx = i
-        current_vehicle = vehicle_key
+        current_vehicle_key = vehicle_key
         if is_last:
             finished_trips, source_sentido_discrepancies, dropped_points = extract_trips_per_line_per_vehicle(
                 positions_list, start_idx, i, linha_lt, veiculo_id, stop_proximity_threshold_meters

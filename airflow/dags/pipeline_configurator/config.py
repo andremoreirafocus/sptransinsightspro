@@ -16,9 +16,9 @@ def get_config(
     pipeline: str,
     env: Optional[str],
     general_schema: Any,
-    http_conn_name: str,
-    object_storage_conn_name: str,
-    database_conn_name: str,
+    http_conn_name: Optional[str] = None,
+    object_storage_conn_name: Optional[str] = None,
+    database_conn_name: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Load configuration for a pipeline.
@@ -52,12 +52,12 @@ def get_config(
 
 def _get_airflow_config(
     pipeline: str,
-    http_conn_name: str = None,
-    object_storage_conn_name: str = None,
-    database_conn_name: str = None,
+    http_conn_name: Optional[str] = None,
+    object_storage_conn_name: Optional[str] = None,
+    database_conn_name: Optional[str] = None,
     general_schema: Any = None,
 ) -> Dict[str, Any]:
-    from airflow.models import Variable
+    from airflow.models import Variable  # type: ignore[import-not-found]
 
     general_vars = Variable.get(f"{pipeline}_general", deserialize_json=True)
     _validate_general_input(general_vars, general_schema)
@@ -95,9 +95,9 @@ def _get_airflow_config(
 def _get_local_config(
     pipeline: str,
     env_values: Dict[str, Any],
-    http_conn_name: str = None,
-    object_storage_conn_name: str = None,
-    database_conn_name: str = None,
+    http_conn_name: Optional[str] = None,
+    object_storage_conn_name: Optional[str] = None,
+    database_conn_name: Optional[str] = None,
     general_schema: Any = None,
 ) -> Dict[str, Any]:
     base_dir = os.path.dirname(os.path.abspath(__file__))

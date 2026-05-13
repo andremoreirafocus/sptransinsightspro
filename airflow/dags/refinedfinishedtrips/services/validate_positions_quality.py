@@ -95,6 +95,7 @@ def check_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional
         .sort_values()
         .reset_index(drop=True)
     )
+    recent_ts = pd.to_datetime(recent_ts)
     distinct_count = len(recent_ts)
     logger.info(f"Recent gaps check: {distinct_count} distinct extraction timestamps in last {recent_window} min window.")
 
