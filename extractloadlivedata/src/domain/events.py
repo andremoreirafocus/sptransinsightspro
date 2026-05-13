@@ -48,6 +48,7 @@ ALLOWED_EVENTS = {
     "notification_dispatch_failed",
     "notification_dispatch_succeeded",
     "notification_metrics_invalid",
+    "execution_metrics_final",
     "execution_summary_emitted",
     "execution_failed_non_recoverable",
 }

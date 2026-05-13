@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Mapping
+from typing import Any, Dict
 
 from dotenv import load_dotenv
 
@@ -42,9 +42,9 @@ _ENGINE_REQUIRED_KEYS = {
 }
 
 
-def get_config() -> Mapping[str, str]:
+def get_config() -> Dict[str, Any]:
     load_dotenv(override=False)
-    return os.environ
+    return dict(os.environ)
 
 
 def validate_config(config: Dict[str, str]) -> None:

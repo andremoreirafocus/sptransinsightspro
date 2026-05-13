@@ -1,4 +1,7 @@
-from src.extractloadlivedata import Services, extractloadlivedata
+from dataclasses import replace
+
+from src.orchestration_dependencies import Services
+from src.extractloadlivedata import extractloadlivedata
 from src.services.exceptions import (
     IngestNotificationError,
     LocalIngestBufferSaveError,
@@ -17,7 +20,13 @@ def _build_services(call_log, pending_list, storage_success=True):
 
     def get_buses_positions_with_metadata(_payload):
         call_log.append("get_buses_positions_with_metadata")
-        return ["bus"], {}
+        return (
+            {
+                "metadata": {"extracted_at": "2026-05-13T15:30:45.123456+00:00"},
+                "payload": _payload,
+            },
+            {},
+        )
 
     def save_bus_positions_to_local_volume(_config, _buses_positions):
         call_log.append("save_bus_positions_to_local_volume")
@@ -82,10 +91,11 @@ def test_extractloadlivedata_missing_notification_engine_is_handled():
 
 def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
     call_log = []
-    services = _build_services(call_log, pending_list=["posicoes.json"])
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "airflow",
+        "NOTIFICATIONS_WEBHOOK_URL": "",
     }
     extractloadlivedata(config=config, services=services)
     assert "create_pending_invokation" in call_log
@@ -96,12 +106,14 @@ def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
 
 def test_extractloadlivedata_processing_requests_branch_uses_processing_requests_notifications():
     call_log = []
-    services = _build_services(call_log, pending_list=["posicoes.json"])
+    alerts = FakeAlertSender()
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services)
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
     assert "create_pending_processing_request" in call_log
     assert "trigger_pending_processing_requests" in call_log
     assert "create_pending_invokation" not in call_log
@@ -110,60 +122,40 @@ def test_extractloadlivedata_processing_requests_branch_uses_processing_requests
 
 def test_extractloadlivedata_positions_download_error_is_handled():
     call_log = []
+    alerts = FakeAlertSender()
 
     def extract_raises(_config, with_metrics=False):
         call_log.append("extract_buses_positions_with_retries")
         raise PositionsDownloadError("download failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services)
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
     assert "extract_buses_positions_with_retries" in call_log
     assert "get_pending_storage_save_list" in call_log
 
 
 def test_extractloadlivedata_local_save_error_keeps_pending_processing():
     call_log = []
+    alerts = FakeAlertSender()
 
     def save_local_raises(_config, _buses_positions):
         call_log.append("save_bus_positions_to_local_volume")
         raise LocalIngestBufferSaveError("local save failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=save_local_raises,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
+    services = replace(services, save_bus_positions_to_local_volume=save_local_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services)
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
     assert "save_bus_positions_to_local_volume" in call_log
     assert "save_bus_positions_to_storage_with_retries" in call_log
     assert "trigger_pending_processing_requests" in call_log
@@ -171,30 +163,20 @@ def test_extractloadlivedata_local_save_error_keeps_pending_processing():
 
 def test_extractloadlivedata_notification_error_is_handled():
     call_log = []
+    alerts = FakeAlertSender()
 
     def trigger_raises(_config, with_metrics=False):
         call_log.append("trigger_pending_processing_requests")
         raise IngestNotificationError("notification failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=trigger_raises,
-    )
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
+    services = replace(services, trigger_pending_processing_requests=trigger_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services)
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
     assert "trigger_pending_processing_requests" in call_log
 
 
@@ -207,19 +189,7 @@ def test_extractloadlivedata_phase_mapping_positions_download_uses_severe_prefix
         raise PositionsDownloadError("download failed")
 
     services = _build_services(call_log, pending_list=[])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -242,19 +212,7 @@ def test_extractloadlivedata_unknown_phase_fallback_message():
         raise RuntimeError("unexpected boom")
 
     services = _build_services(call_log, pending_list=[])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises_unknown,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = replace(services, extract_buses_positions_with_retries=extract_raises_unknown)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -278,20 +236,8 @@ def test_extractloadlivedata_counting_rules_in_notification_failure():
         setattr(error, "metrics", {"success": 2, "failed": 1, "retries": 3})
         raise error
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=trigger_raises_with_metrics,
-    )
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
+    services = replace(services, trigger_pending_processing_requests=trigger_raises_with_metrics)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -310,7 +256,7 @@ def test_extractloadlivedata_counting_rules_in_notification_failure():
 def test_extractloadlivedata_airflow_processing_requests_equivalent_summary():
     call_log_airflow = []
     alerts_airflow = FakeAlertSender()
-    services_airflow = _build_services(call_log_airflow, pending_list=["posicoes.json"])
+    services_airflow = _build_services(call_log_airflow, pending_list=["posicoes_onibus-202605131530.json"])
     config_airflow = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "airflow",
@@ -322,7 +268,7 @@ def test_extractloadlivedata_airflow_processing_requests_equivalent_summary():
 
     call_log_pr = []
     alerts_pr = FakeAlertSender()
-    services_pr = _build_services(call_log_pr, pending_list=["posicoes.json"])
+    services_pr = _build_services(call_log_pr, pending_list=["posicoes_onibus-202605131530.json"])
     config_pr = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -336,5 +282,61 @@ def test_extractloadlivedata_airflow_processing_requests_equivalent_summary():
     summary_pr = alerts_pr.calls[0]["report"]
     assert summary_airflow["status"] == "PASS"
     assert summary_pr["status"] == "PASS"
-    assert summary_airflow["items_total"] == summary_pr["items_total"] == 4
+    assert summary_airflow["items_total"] == summary_pr["items_total"] == 3
     assert summary_airflow["items_failed"] == summary_pr["items_failed"] == 0
+
+
+def test_execution_id_is_iso_format_in_pass_summary():
+    call_log = []
+    alerts = FakeAlertSender()
+    services = _build_services(call_log, pending_list=["posicoes_onibus-202605131530.json"])
+
+    def get_metadata_with_extracted_at(payload):
+        return (
+            {
+                "metadata": {
+                    "extracted_at": "2026-05-13T15:30:45.123456+00:00",
+                    "source": "sptrans_api_v2",
+                    "total_vehicles": 100,
+                },
+                "payload": payload,
+            },
+            "ref_time",
+        )
+
+    services = replace(services, get_buses_positions_with_metadata=get_metadata_with_extracted_at)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
+    }
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
+    assert len(alerts.calls) == 1
+    summary = alerts.calls[0]["report"]
+    assert "execution_id" in summary
+    execution_id = summary["execution_id"]
+    assert "T" in execution_id
+    assert "+00:00" in execution_id or execution_id.endswith("Z")
+
+
+def test_execution_id_is_iso_format_in_failure_summary():
+    call_log = []
+    alerts = FakeAlertSender()
+
+    def extract_raises(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        raise PositionsDownloadError("download failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
+    }
+    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
+    assert len(alerts.calls) == 1
+    summary = alerts.calls[0]["report"]
+    execution_id = summary["execution_id"]
+    assert "T" in execution_id
+    assert "+00:00" in execution_id or execution_id.endswith("Z")

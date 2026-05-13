@@ -1,22 +1,5 @@
-from src.services.extract_buses_positions import (
-    extract_buses_positions_with_retries,
-    get_buses_positions_with_metadata,
-)
-from src.services.save_load_bus_positions import (
-    save_bus_positions_to_local_volume,
-    save_bus_positions_to_storage_with_retries,
-    load_bus_positions_from_local_volume_file,
-    remove_local_file,
-    get_pending_storage_save_list,
-)
-
 from src.services.trigger_airflow import (
-    create_pending_invokation,
-    trigger_pending_airflow_dag_invokations,
-)
-from src.services.save_processing_requests import (
-    create_pending_processing_request,
-    trigger_pending_processing_requests,
+    get_utc_logical_date_from_file,
 )
 from src.services.exceptions import (
     IngestNotificationError,
@@ -24,12 +7,12 @@ from src.services.exceptions import (
     PositionsDownloadError,
     SavePositionsToRawError,
 )
-from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Literal, Optional, Tuple, cast
-from uuid import uuid4
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Literal, Optional, Tuple
+import time
 
-from src.config.config import get_config
 from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.orchestration_dependencies import Services, ConfigDict, build_orchestrator_dependencies
 from src.quality.reporting import create_failure_quality_report, build_quality_summary
 from src.infra.alertservice_client import send_alert
 from src.infra.structured_logging import get_structured_logger
@@ -43,72 +26,26 @@ structured_logger = get_structured_logger(
 )
 SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX = "[SEVERE] non recoverable "
 
-ConfigDict = Dict[str, Any]
-PayloadDict = Dict[str, Any]
 AlertSender = Callable[[str, Dict[str, Any]], None]
 
 
-@dataclass(frozen=True)
-class Services:
-    extract_buses_positions_with_retries: Callable[..., Any]
-    get_buses_positions_with_metadata: Callable[[PayloadDict], Tuple[PayloadDict, str]]
-    save_bus_positions_to_local_volume: Callable[[ConfigDict, PayloadDict], None]
-    save_bus_positions_to_storage_with_retries: Callable[..., Any]
-    load_bus_positions_from_local_volume_file: Callable[[str, str], PayloadDict]
-    remove_local_file: Callable[[ConfigDict, PayloadDict], None]
-    get_pending_storage_save_list: Callable[[ConfigDict], List[str]]
-    create_pending_invokation: Callable[[ConfigDict, str], None]
-    trigger_pending_airflow_dag_invokations: Callable[..., Any]
-    create_pending_processing_request: Callable[[ConfigDict, str], None]
-    trigger_pending_processing_requests: Callable[..., Any]
-
-
-def _build_services() -> Services:
-    return Services(
-        extract_buses_positions_with_retries=extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=load_bus_positions_from_local_volume_file,
-        remove_local_file=remove_local_file,
-        get_pending_storage_save_list=get_pending_storage_save_list,
-        create_pending_invokation=create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=create_pending_processing_request,
-        trigger_pending_processing_requests=trigger_pending_processing_requests,
-    )
-
-
-def _get_config_values(config: ConfigDict) -> Tuple[str, str]:
+def _get_config_values(config: ConfigDict) -> Tuple[str, str, str]:
     ingest_buffer_folder = config["INGEST_BUFFER_PATH"]
-    notification_engine = config.get("NOTIFICATION_ENGINE")
+    notification_engine = config["NOTIFICATION_ENGINE"]
+    webhook_url = config["NOTIFICATIONS_WEBHOOK_URL"]
     if notification_engine is None:
         raise KeyError(
             "NOTIFICATION_ENGINE configuration is missing."
         )
     notification_engine = notification_engine.strip()
-    return ingest_buffer_folder, notification_engine
+    return ingest_buffer_folder, notification_engine, webhook_url
 
 
 def extractloadlivedata(
-    config: Optional[ConfigDict] = None,
+    config: ConfigDict,
     services: Optional[Services] = None,
     send_alert_fn: AlertSender = send_alert,
 ) -> None:
-    services = services or _build_services()
-    config = cast(ConfigDict, config or get_config())
-    execution_id = str(uuid4())
-    structured_logger.info(
-        event="execution_started",
-        status=LogStatus.STARTED,
-        execution_id=execution_id,
-        message="extractloadlivedata execution started.",
-    )
-    webhook_url = config.get("NOTIFICATIONS_WEBHOOK_URL", "")
-    items_total = 0
-    items_failed = 0
-    retries_seen = 0
-
     def _parse_notification_metrics(metrics: Any) -> Tuple[int, int, int]:
         if not isinstance(metrics, dict):
             raise TypeError("notification metrics must be a dict")
@@ -188,6 +125,25 @@ def extractloadlivedata(
         )
         send_alert_fn(webhook_url, summary)
 
+    services = services or build_orchestrator_dependencies()
+    execution_id = datetime.now(timezone.utc).isoformat()
+    execution_start = time.time()
+    structured_logger.info(
+        event="execution_started",
+        status=LogStatus.STARTED,
+        execution_id=execution_id,
+        message="extractloadlivedata execution started.",
+    )
+    items_total = 0
+    items_failed = 0
+    retries_seen = 0
+    phase_metrics: Dict[str, Dict[str, int]] = {
+        "extract": {"attempted": 0, "succeeded": 0, "failed": 0},
+        "save": {"attempted": 0, "succeeded": 0, "failed": 0},
+        "notify": {"attempted": 0, "succeeded": 0, "failed": 0},
+    }
+    phase_durations: Dict[str, float] = {}
+    logical_datetime: Optional[str] = None
     structured_logger.info(
         event="config_validation_started",
         status=LogStatus.STARTED,
@@ -195,7 +151,7 @@ def extractloadlivedata(
         message="Runtime configuration validation started.",
     )
     try:
-        ingest_buffer_folder, notification_engine = _get_config_values(config)
+        ingest_buffer_folder, notification_engine, webhook_url = _get_config_values(config)
         structured_logger.info(
             event="config_validation_succeeded",
             status=LogStatus.SUCCEEDED,
@@ -211,8 +167,6 @@ def extractloadlivedata(
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        items_failed += 1
-        _emit_failure_alert("unknown")
         return
     structured_logger.info(
         event="notification_engine_selected",
@@ -222,6 +176,7 @@ def extractloadlivedata(
         metadata={"notification_engine": notification_engine},
     )
     download_successful = False
+    extract_start = time.time()
     try:
         structured_logger.info(
             event="extract_positions_started",
@@ -229,6 +184,7 @@ def extractloadlivedata(
             execution_id=execution_id,
             message="Bus positions extraction started.",
         )
+        phase_metrics["extract"]["attempted"] = 1
         items_total += 1
         download_result = services.extract_buses_positions_with_retries(
             config, with_metrics=True
@@ -254,6 +210,7 @@ def extractloadlivedata(
         )
         retries_seen += int(getattr(e, "retries", 0))
         items_failed += 1
+        phase_metrics["extract"]["failed"] = 1
         _emit_failure_alert("positions_download")
     except Exception as e:
         structured_logger.error(
@@ -265,17 +222,23 @@ def extractloadlivedata(
             error_message=str(e),
         )
         items_failed += 1
+        phase_metrics["extract"]["failed"] = 1
         _emit_failure_alert("unknown")
+    finally:
+        phase_durations["extract"] = time.time() - extract_start
     if download_successful:
         try:
             items_total += 1
             buses_positions, _ = services.get_buses_positions_with_metadata(
                 buses_positions_payload
             )
+            logical_datetime = buses_positions["metadata"]["extracted_at"]
+            phase_metrics["extract"]["succeeded"] = 1
             structured_logger.debug(
                 event="storage_persist_started",
                 status=LogStatus.STARTED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Starting storage persistence for current extraction payload.",
             )
             services.save_bus_positions_to_local_volume(config, buses_positions)
@@ -283,6 +246,7 @@ def extractloadlivedata(
                 event="storage_persist_succeeded",
                 status=LogStatus.SUCCEEDED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Storage persistence completed for current extraction payload.",
             )
         except LocalIngestBufferSaveError as e:
@@ -290,6 +254,7 @@ def extractloadlivedata(
                 event="storage_persist_failed",
                 status=LogStatus.FAILED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Local ingest buffer save failed.",
                 error_type=type(e).__name__,
                 error_message=str(e),
@@ -301,6 +266,7 @@ def extractloadlivedata(
                 event="storage_persist_failed",
                 status=LogStatus.FAILED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Unexpected local buffer persistence failure.",
                 error_type=type(e).__name__,
                 error_message=str(e),
@@ -340,99 +306,116 @@ def extractloadlivedata(
             },
         )
         save_on_storage_failure = False
-        for pending_storage_save_file in pending_storage_save_list:
-            items_total += 1
-            structured_logger.info(
-                event="pending_storage_file_started",
-                status=LogStatus.STARTED,
-                execution_id=execution_id,
-                message="Attempting storage persistence for pending file.",
-                metadata={"pending_file": pending_storage_save_file},
-            )
-            try:
-                pending_storage_save_file_content = (
-                    services.load_bus_positions_from_local_volume_file(
-                        ingest_buffer_folder, pending_storage_save_file
-                    )
-                )
-                structured_logger.debug(
-                    event="storage_persist_started",
+        save_start = time.time()
+        try:
+            for pending_storage_save_file in pending_storage_save_list:
+                items_total += 1
+                phase_metrics["save"]["attempted"] += 1
+                file_logical_datetime = get_utc_logical_date_from_file(pending_storage_save_file)
+                structured_logger.info(
+                    event="pending_storage_file_started",
                     status=LogStatus.STARTED,
                     execution_id=execution_id,
-                    message="Starting storage persistence for pending file payload.",
+                    correlation_id=file_logical_datetime,
+                    message="Attempting storage persistence for pending file.",
                     metadata={"pending_file": pending_storage_save_file},
                 )
-                save_result = services.save_bus_positions_to_storage_with_retries(
-                    config, pending_storage_save_file_content, with_metrics=True
-                )
-                retries_seen += int(save_result.get("metrics", {}).get("retries", 0))
-                structured_logger.debug(
-                    event="storage_persist_succeeded",
-                    status=LogStatus.SUCCEEDED,
-                    execution_id=execution_id,
-                    message="Storage persistence completed for pending file payload.",
-                    metadata={"pending_file": pending_storage_save_file},
-                )
-                structured_logger.info(
-                    event="pending_storage_file_succeeded",
-                    status=LogStatus.SUCCEEDED,
-                    execution_id=execution_id,
-                    message="Pending file saved to storage successfully.",
-                    metadata={
-                        "pending_file": pending_storage_save_file,
-                        "retries_seen": retries_seen,
-                    },
-                )
-                services.remove_local_file(
-                    config, pending_storage_save_file_content
-                )
-                if notification_engine == "airflow":
-                    services.create_pending_invokation(
-                        config, pending_storage_save_file
+                try:
+                    pending_storage_save_file_content = (
+                        services.load_bus_positions_from_local_volume_file(
+                            ingest_buffer_folder, pending_storage_save_file
+                        )
                     )
-                else:
-                    services.create_pending_processing_request(
-                        config, pending_storage_save_file
+                    structured_logger.debug(
+                        event="storage_persist_started",
+                        status=LogStatus.STARTED,
+                        execution_id=execution_id,
+                        correlation_id=file_logical_datetime,
+                        message="Starting storage persistence for pending file payload.",
+                        metadata={"pending_file": pending_storage_save_file},
                     )
-            except SavePositionsToRawError as e:
+                    save_result = services.save_bus_positions_to_storage_with_retries(
+                        config, pending_storage_save_file_content, with_metrics=True
+                    )
+                    retries_seen += int(save_result.get("metrics", {}).get("retries", 0))
+                    structured_logger.debug(
+                        event="storage_persist_succeeded",
+                        status=LogStatus.SUCCEEDED,
+                        execution_id=execution_id,
+                        correlation_id=file_logical_datetime,
+                        message="Storage persistence completed for pending file payload.",
+                        metadata={"pending_file": pending_storage_save_file},
+                    )
+                    structured_logger.info(
+                        event="pending_storage_file_succeeded",
+                        status=LogStatus.SUCCEEDED,
+                        execution_id=execution_id,
+                        correlation_id=file_logical_datetime,
+                        message="Pending file saved to storage successfully.",
+                        metadata={
+                            "pending_file": pending_storage_save_file,
+                            "retries_seen": retries_seen,
+                        },
+                    )
+                    phase_metrics["save"]["succeeded"] += 1
+                    services.remove_local_file(
+                        config, pending_storage_save_file_content
+                    )
+                    if notification_engine == "airflow":
+                        services.create_pending_invokation(
+                            config, pending_storage_save_file
+                        )
+                    else:
+                        services.create_pending_processing_request(
+                            config, pending_storage_save_file
+                        )
+                except SavePositionsToRawError as e:
+                    structured_logger.error(
+                        event="pending_storage_file_failed",
+                        status=LogStatus.FAILED,
+                        execution_id=execution_id,
+                        correlation_id=file_logical_datetime,
+                        message="Raw storage save failed for pending file.",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        metadata={"pending_file": pending_storage_save_file},
+                    )
+                    retries_seen += int(getattr(e, "retries", 0))
+                    items_failed += 1
+                    phase_metrics["save"]["failed"] += 1
+                    _emit_failure_alert("save_positions_to_raw")
+                    save_on_storage_failure = True
+                    break
+                except Exception as e:
+                    structured_logger.error(
+                        event="pending_storage_file_failed",
+                        status=LogStatus.FAILED,
+                        execution_id=execution_id,
+                        correlation_id=file_logical_datetime,
+                        message="Unexpected pending file processing error.",
+                        error_type=type(e).__name__,
+                        error_message=str(e),
+                        metadata={"pending_file": pending_storage_save_file},
+                    )
+                    items_failed += 1
+                    phase_metrics["save"]["failed"] += 1
+                    _emit_failure_alert("unknown")
+            if save_on_storage_failure:
                 structured_logger.error(
-                    event="pending_storage_file_failed",
+                    event="storage_persist_failed",
                     status=LogStatus.FAILED,
                     execution_id=execution_id,
-                    message="Raw storage save failed for pending file.",
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    metadata={"pending_file": pending_storage_save_file},
+                    message="One or more pending files failed to save to storage.",
                 )
-                retries_seen += int(getattr(e, "retries", 0))
-                items_failed += 1
-                _emit_failure_alert("save_positions_to_raw")
-                save_on_storage_failure = True
-                break
-            except Exception as e:
-                structured_logger.error(
-                    event="pending_storage_file_failed",
-                    status=LogStatus.FAILED,
-                    execution_id=execution_id,
-                    message="Unexpected pending file processing error.",
-                    error_type=type(e).__name__,
-                    error_message=str(e),
-                    metadata={"pending_file": pending_storage_save_file},
-                )
-                items_failed += 1
-                _emit_failure_alert("unknown")
-        if save_on_storage_failure:
-            structured_logger.error(
-                event="storage_persist_failed",
-                status=LogStatus.FAILED,
-                execution_id=execution_id,
-                message="One or more pending files failed to save to storage.",
-            )
+        finally:
+            phase_durations["save"] = time.time() - save_start
+        notify_start = time.time()
         try:
             structured_logger.info(
                 event="notification_dispatch_started",
                 status=LogStatus.STARTED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Notification dispatch started.",
                 metadata={"notification_engine": notification_engine},
             )
@@ -450,10 +433,14 @@ def extractloadlivedata(
             items_total += success_count + failed_count
             items_failed += failed_count
             retries_seen += retries_count
+            phase_metrics["notify"]["attempted"] = success_count + failed_count
+            phase_metrics["notify"]["succeeded"] = success_count
+            phase_metrics["notify"]["failed"] = failed_count
             structured_logger.info(
                 event="notification_dispatch_succeeded",
                 status=LogStatus.SUCCEEDED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Notification dispatch completed.",
                 metadata={
                     "success_count": success_count,
@@ -466,6 +453,7 @@ def extractloadlivedata(
                 event="notification_dispatch_failed",
                 status=LogStatus.FAILED,
                 execution_id=execution_id,
+                correlation_id=logical_datetime,
                 message="Ingest notification failed.",
                 error_type=type(e).__name__,
                 error_message=str(e),
@@ -478,6 +466,9 @@ def extractloadlivedata(
                 items_total += success_count + failed_count
                 items_failed += failed_count
                 retries_seen += retries_count
+                phase_metrics["notify"]["attempted"] = success_count + failed_count
+                phase_metrics["notify"]["succeeded"] = success_count
+                phase_metrics["notify"]["failed"] = failed_count
             except (KeyError, TypeError) as metrics_error:
                 structured_logger.error(
                     event="notification_metrics_invalid",
@@ -500,6 +491,29 @@ def extractloadlivedata(
             )
             items_failed += 1
             _emit_failure_alert("unknown")
+        finally:
+            phase_durations["notify"] = time.time() - notify_start
+
+    execution_end = time.time()
+    execution_seconds = execution_end - execution_start
+    items_total = sum(phase_metrics[op]["attempted"] for op in phase_metrics)
+    items_failed = sum(phase_metrics[op]["failed"] for op in phase_metrics)
+
+    structured_logger.info(
+        event="execution_metrics_final",
+        status=LogStatus.SUCCEEDED,
+        execution_id=execution_id,
+        message="Execution metrics finalized.",
+        metadata={
+            "execution_seconds": execution_seconds,
+            "phase_metrics": phase_metrics,
+            "phase_durations": phase_durations,
+            "logical_datetime": logical_datetime,
+            "items_total": items_total,
+            "items_failed": items_failed,
+            "retries_seen": retries_seen,
+        },
+    )
 
     if items_failed > 0:
         structured_logger.error(

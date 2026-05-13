@@ -24,7 +24,8 @@ def run_extractloadlivedata_task() -> None:
         status=LogStatus.STARTED,
         message="Scheduler tick execution started.",
     )
-    extractloadlivedata()
+    config = get_config()
+    extractloadlivedata(config=config)
     structured_logger.info(
         event="scheduler_tick_completed",
         status=LogStatus.SUCCEEDED,
