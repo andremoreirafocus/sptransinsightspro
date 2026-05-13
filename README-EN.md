@@ -144,7 +144,7 @@ To preserve production-environment stability, the project adopts a promotion-bas
 
 ### Pipeline promotion (DAGs)
 
-To promote a pipeline, for example `transformlivedata`, use the gateway script that automatically runs syntax checks, SAST, and unit tests before synchronizing files to production:
+To promote a pipeline, for example `transformlivedata`, use the gateway script that automatically runs syntax checks, SAST, type checking, and unit tests before synchronizing files to production:
 
 ```shell
 # Syntax: python automation/promote_pipeline.py <pipeline_name>
@@ -154,9 +154,10 @@ python automation/promote_pipeline.py transformlivedata
 This script performs the following steps:
 1. Static analysis: runs `ruff` on the pipeline subdirectory.
 2. SAST: runs `bandit` with high-severity filtering on the pipeline subdirectory.
-3. Unit tests: runs `pytest` in the pipeline `tests/` folder if it exists.
-4. Code synchronization: synchronizes the pipeline subdirectory to production.
-5. Shared infrastructure synchronization: synchronizes `infra`, `quality`, and `pipeline_configurator` to production.
+3. Type checking: runs `mypy` on the pipeline subdirectory.
+4. Unit tests: runs `pytest` in the pipeline `tests/` folder if it exists.
+5. Code synchronization: synchronizes the pipeline subdirectory to production.
+6. Shared infrastructure synchronization: synchronizes `infra`, `quality`, and `pipeline_configurator` to production.
 
 The total number of displayed steps is automatically adjusted based on the presence of tests.
 
@@ -174,9 +175,10 @@ python automation/deploy_service.py extractloadlivedata extractloadlivedata
 This script performs the following steps:
 1. Static analysis: runs `ruff` on the service directory.
 2. SAST: runs `bandit` with high-severity filtering on the service directory.
-3. Unit tests: runs `pytest` in the service `tests/` folder if it exists.
-4. Builds the Docker image through Docker Compose.
-5. Restarts the container through Docker Compose.
+3. Type checking: runs `mypy` on the service directory.
+4. Unit tests: runs `pytest` in the service `tests/` folder if it exists.
+5. Builds the Docker image through Docker Compose.
+6. Restarts the container through Docker Compose.
 
 ### Helper scripts
 
@@ -185,6 +187,6 @@ Deployment scripts share two helper modules in `automation/`:
 | Module | Responsibility |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executes subprocesses with `shell=False` and reports the exit code in case of failure |
-| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — runs linting, SAST, and tests, returning the number of consumed steps so the step counter stays aligned |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — runs linting, SAST, type checking, and tests, returning the number of consumed steps so the step counter stays aligned |
 
 [More information about the scripts](./automation/README-EN.md)

@@ -137,7 +137,7 @@ Esse padrão reduz acoplamento entre serviços e garante consistência entre tod
 Para garantir a estabilidade do ambiente de produção, o projeto adota um fluxo de Promotion-based Development. No caso dos pipelines, todo o código é desenvolvido e testado no diretório `dags-dev` e, após validado, é "promovido" para o diretório de produção do Airflow (`airflow/dags`).
 
 ### Promoção de Pipelines (DAGs)
-Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting), SAST e testes unitários antes de sincronizar os arquivos com a produção:
+Para promover uma pipeline (ex: `transformlivedata`), utilize o script de gateway que realiza automaticamente a verificação de sintaxe (Linting), SAST, type checking e testes unitários antes de sincronizar os arquivos com a produção:
 
 ```shell
 # Sintaxe: python automation/promote_pipeline.py <nome_da_pipeline>
@@ -147,9 +147,10 @@ python automation/promote_pipeline.py transformlivedata
 Este script realiza os seguintes passos:
 1. Análise estática: executa o `ruff` no subdiretório da pipeline.
 2. SAST: executa o `bandit` (alta severidade) no subdiretório da pipeline.
-3. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
-4. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
-5. Sincronização de infraestrutura compartilhada: sincroniza as pastas `infra`, `quality` e `pipeline_configurator` para produção.
+3. Type checking: executa o `mypy` no subdiretório da pipeline.
+4. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
+5. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
+6. Sincronização de infraestrutura compartilhada: sincroniza as pastas `infra`, `quality` e `pipeline_configurator` para produção.
 
 O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
@@ -166,9 +167,10 @@ python automation/deploy_service.py extractloadlivedata extractloadlivedata
 Este script realiza os seguintes passos:
 1. Análise estática: executa o `ruff` no diretório do serviço.
 2. SAST: executa o `bandit` (alta severidade) no diretório do serviço.
-3. Testes de unidade: executa o `pytest` na pasta `tests/` do serviço (se existir).
-4. Build da imagem Docker via Docker Compose.
-5. Reinício do container via Docker Compose.
+3. Type checking: executa o `mypy` no diretório do serviço.
+4. Testes de unidade: executa o `pytest` na pasta `tests/` do serviço (se existir).
+5. Build da imagem Docker via Docker Compose.
+6. Reinício do container via Docker Compose.
 
 ### Scripts auxiliares
 Os scripts de deployment compartilham dois módulos auxiliares em `automation/`:
@@ -176,6 +178,6 @@ Os scripts de deployment compartilham dois módulos auxiliares em `automation/`:
 | Módulo | Responsabilidade |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
-| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST, type checking e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
 [Mais informações sobre os scripts](./automation/README.md)
