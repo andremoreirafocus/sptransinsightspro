@@ -50,7 +50,7 @@ def extract_non_circular_trips_metadata(
     position_records: List[Dict[str, Any]],
     stop_proximity_threshold_meters: int,
 ) -> List[Dict[str, Any]]:
-    trips_metadata = []
+    trips_metadata: List[Dict[str, Any]] = []
     if len(position_records) < 2:
         return trips_metadata
 
@@ -86,6 +86,8 @@ def extract_non_circular_trips_metadata(
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_last_stop:
                     derived_sentido = 1
+                    if trip_start_record_index is None:
+                        continue
                     _emit_trip(
                         trips_metadata,
                         position_records,
@@ -105,6 +107,8 @@ def extract_non_circular_trips_metadata(
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_first_stop:
                     derived_sentido = 2
+                    if trip_start_record_index is None:
+                        continue
                     _emit_trip(
                         trips_metadata,
                         position_records,
@@ -126,7 +130,7 @@ def extract_circular_trips_metadata(
     position_records: List[Dict[str, Any]],
     stop_proximity_threshold_meters: int,
 ) -> List[Dict[str, Any]]:
-    trips_metadata = []
+    trips_metadata: List[Dict[str, Any]] = []
     if len(position_records) < 2:
         return trips_metadata
 
@@ -346,7 +350,7 @@ def get_trip_id(linha: str, sentido: int) -> str:
     return this_trip_id
 
 
-def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata: List[Dict[str, Any]], linha_lt: str, veiculo_id: int) -> List[Tuple]:
+def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata: List[Dict[str, Any]], linha_lt: str, veiculo_id: str) -> List[Tuple]:
     trips = []
     for trip_metadata in trips_metadata:
         sentido = trip_metadata["sentido"]

@@ -185,7 +185,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     positions_result = None
     trips_result = None
     persistence_result = None
-    extraction_metrics = {}
+    extraction_metrics: Dict[str, Any] = {}
     column_lineage = None
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     df_recent_positions = get_recent_positions_fn(config)

@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, Literal, Optional
 
 from infra.object_storage import write_generic_bytes_to_object_storage
 from quality.reporting import (
@@ -17,7 +17,7 @@ def _count_failed_checks(result: Dict[str, Any]) -> int:
     return sum(1 for c in result.get("checks", []) if c.get("status") == "FAIL")
 
 
-def _derive_overall_status(*results: Dict[str, Any]) -> str:
+def _derive_overall_status(*results: Dict[str, Any]) -> Literal["PASS", "WARN", "FAIL"]:
     statuses = [r["status"] for r in results]
     if "FAIL" in statuses:
         return "FAIL"
@@ -43,7 +43,7 @@ def build_quality_report(
     execution_id: str,
     positions_result: Dict[str, Any],
     quality_report_path: str,
-    status: str,
+    status: Literal["PASS", "WARN", "FAIL"],
     failure_phase: Optional[str] = None,
     failure_message: Optional[str] = None,
     trips_result: Optional[Dict[str, Any]] = None,
