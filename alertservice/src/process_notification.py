@@ -1,11 +1,11 @@
 import json
 import logging
-from typing import Any, Callable, Dict, Iterable
+from typing import Any, Callable, Dict, Iterable, Mapping, Optional
 
 from .notifications_evaluator import evaluate_cumulative_warn
 
 SummaryStore = Callable[[Dict[str, Any]], None]
-QueryWindow = Callable[[str, str, int], Iterable[Dict[str, Any]]]
+QueryWindow = Callable[[str, str, int], Iterable[Mapping[str, Any]]]
 EmailSender = Callable[[str, str], None]
 Formatter = Callable[[Dict[str, Any]], str]
 
@@ -15,7 +15,7 @@ VALID_STATUSES = {"FAIL", "WARN", "PASS"}
 
 
 def process_notification(
-    summary: Dict[str, Any],
+    summary: Optional[Dict[str, Any]],
     pipeline_config: Dict[str, Any],
     subject_prefix: str,
     store_summary: SummaryStore,

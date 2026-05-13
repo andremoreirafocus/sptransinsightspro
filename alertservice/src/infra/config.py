@@ -2,9 +2,9 @@ import logging
 import os
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any, Dict
+from typing import Any, Dict, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,8 @@ class Settings(BaseSettings):
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    return Settings()
+    # BaseSettings pulls values from env/.env at runtime, but mypy does not model this.
+    return cast(Settings, Settings())  # type: ignore[call-arg]
 
 
 @dataclass(frozen=True)
