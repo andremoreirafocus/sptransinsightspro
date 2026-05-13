@@ -26,12 +26,20 @@ def promote_pipeline(pipeline_name):
     # 2. Validation (Linting + SAST + Tests)
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
-    total_steps = (3 if has_tests else 2) + 2
+    total_steps = (3 if has_tests else 2) + 3
     steps_consumed = run_code_validations(
         pipeline_dev_path, pipeline_name, step_offset=1
     )
-    # 3. Atomic Sync Folder
-    sync_step = steps_consumed + 1
+    # 3. Type checking (mypy)
+    mypy_step = steps_consumed + 1
+    print(f"Step {mypy_step}/{total_steps}: Running mypy for {pipeline_name}...")
+    run_command(
+        [sys.executable, "-m", "mypy", "--exclude", "tests", pipeline_dev_path],
+        f"Type checking (mypy) failed for {pipeline_name}!",
+    )
+    print("✅ Type checking Passed.")
+    # 4. Atomic Sync Folder
+    sync_step = steps_consumed + 2
     print(
         f"Step {sync_step}/{total_steps}: Syncing folder '{pipeline_name}' to production..."
     )
