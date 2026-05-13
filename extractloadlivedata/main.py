@@ -6,17 +6,6 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 from typing import Tuple, Union
 import sys
 
-import logging
-
-# In Airflow just remove this logging configuration block
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Also keeps console output
-    ],
-)
-logger = logging.getLogger(__name__)
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="scheduler",

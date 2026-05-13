@@ -1,6 +1,5 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
-import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.infra.sql_db_v2 import save_row
@@ -10,10 +9,17 @@ from src.infra.cache import (
     get_cache_value,
     remove_from_cache,
 )
+from src.infra.structured_logging import get_structured_logger
+from src.logging_taxonomy import ALLOWED_EVENTS, ALLOWED_STATUSES, LogStatus
 from src.services.exceptions import IngestNotificationError
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="extractloadlivedata",
+    component="save_processing_requests",
+    logger_name=__name__,
+    allowed_events=ALLOWED_EVENTS,
+    allowed_statuses=ALLOWED_STATUSES,
+)
 
 ConfigDict = Dict[str, Any]
 DbConnection = Dict[str, Any]
@@ -32,7 +38,11 @@ def create_pending_processing_request(
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
-    logger.info(f"Creating pending processing request for '{pending_marker}'")
+    structured_logger.info(
+        event="pending_storage_file_started",
+        status=LogStatus.STARTED,
+        message=f"Creating pending processing request for '{pending_marker}'",
+    )
     # Use marker name without extension as key
     marker_name = f"{pending_marker.split('.')[0]}.pending"
     cache_dir = get_config(config)
@@ -71,7 +81,11 @@ def remove_pending_processing_request(
 def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
     """Extract logical date from filename and convert to UTC timezone-aware datetime."""
     try:
-        logger.info(f"Extracting logical date from: {pending_marker}")
+        structured_logger.info(
+            event="notification_dispatch_started",
+            status=LogStatus.STARTED,
+            message=f"Extracting logical date from: {pending_marker}",
+        )
         # Remove extension(s) to get the timestamp
         # e.g., "posicoes_onibus-202602150936.json" or "posicoes_onibus-202602150936.json.zst"
         filename_without_ext = pending_marker.split(".")[0]
@@ -91,12 +105,19 @@ def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
         # Convert to UTC
         dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
 
-        logger.info(f"Logical date extracted: {dt_utc}")
+        structured_logger.info(
+            event="notification_dispatch_succeeded",
+            status=LogStatus.SUCCEEDED,
+            message=f"Logical date extracted: {dt_utc}",
+        )
         return dt_utc
     except Exception as e:
-        logger.error(
-            f"Error extracting logical date from file '{pending_marker}': {e}",
-            exc_info=True,
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=LogStatus.FAILED,
+            message=f"Error extracting logical date from file '{pending_marker}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
         )
         raise
 
@@ -120,12 +141,18 @@ def save_processing_request(
 
     def get_config(config: ConfigDict) -> Tuple[DbConnection, str, str]:
         if "RAW_EVENTS_TABLE_NAME" not in config:
-            logger.error("RAW_EVENTS_TABLE_NAME configuration is missing.")
+            structured_logger.error(
+                event="config_validation_failed",
+                status=LogStatus.FAILED,
+                message="RAW_EVENTS_TABLE_NAME configuration is missing.",
+            )
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
         raw_events_table = config["RAW_EVENTS_TABLE_NAME"]
         if "." not in raw_events_table:
-            logger.error(
-                f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
+            structured_logger.error(
+                event="config_validation_failed",
+                status=LogStatus.FAILED,
+                message=f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'",
             )
             raise ValueError(
                 "RAW_EVENTS_TABLE_NAME must be in 'schema.table' format."
@@ -141,7 +168,11 @@ def save_processing_request(
         return connection, schema, table
 
     try:
-        logger.info(f"Saving processing request for: '{pending_marker}'")
+        structured_logger.info(
+            event="notification_dispatch_started",
+            status=LogStatus.STARTED,
+            message=f"Saving processing request for: '{pending_marker}'",
+        )
         connection, schema, table = get_config(config)
         # Get logical date from filename
         logical_date = get_utc_logical_date_from_file(pending_marker)
@@ -168,20 +199,27 @@ def save_processing_request(
             engine_factory=engine_factory,
         )
         if success:
-            logger.info(
-                f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'"
+            structured_logger.info(
+                event="notification_dispatch_succeeded",
+                status=LogStatus.SUCCEEDED,
+                message=f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'",
             )
             return True
-        logger.error(
-            f"Failed to save processing request for marker '{pending_marker}'"
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=LogStatus.FAILED,
+            message=f"Failed to save processing request for marker '{pending_marker}'",
         )
         raise IngestNotificationError(
             f"failed to save processing request for marker '{pending_marker}'"
         )
     except Exception as e:
-        logger.error(
-            f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
-            exc_info=True,
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=LogStatus.FAILED,
+            message=f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
         )
         if isinstance(e, IngestNotificationError):
             raise
@@ -212,7 +250,11 @@ def trigger_pending_processing_requests(
     failure_count = 0
     if pending_markers:
         for pending_marker_key in pending_markers:
-            logger.info(f"Processing pending request: {pending_marker_key}")
+            structured_logger.info(
+                event="pending_storage_file_started",
+                status=LogStatus.STARTED,
+                message=f"Processing pending request: {pending_marker_key}",
+            )
             pending_marker_value = get_cache_value(
                 cache_dir, pending_marker_key, cache_factory=cache_factory
             )
@@ -228,8 +270,10 @@ def trigger_pending_processing_requests(
                         success_count += 1
                     else:
                         failure_count += 1
-                        logger.warning(
-                            f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
+                        structured_logger.warning(
+                            event="notification_dispatch_failed",
+                            status=LogStatus.RETRY,
+                            message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
                         error = IngestNotificationError(
                             f"failed to save processing request for marker '{pending_marker_value}'"
@@ -247,8 +291,10 @@ def trigger_pending_processing_requests(
                 except IngestNotificationError as e:
                     if not getattr(e, "metrics", None):
                         failure_count += 1
-                        logger.warning(
-                            f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution."
+                        structured_logger.warning(
+                            event="notification_dispatch_failed",
+                            status=LogStatus.RETRY,
+                            message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
                     setattr(
                         e,
@@ -261,7 +307,11 @@ def trigger_pending_processing_requests(
                     )
                     raise
     else:
-        logger.info("No pending processing requests found.")
+        structured_logger.info(
+            event="pending_storage_scan_succeeded",
+            status=LogStatus.SKIPPED,
+            message="No pending processing requests found.",
+        )
     if with_metrics:
         return {
             "result": None,
