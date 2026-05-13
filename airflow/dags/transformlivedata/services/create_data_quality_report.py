@@ -2,6 +2,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 import json
 import logging
 from datetime import datetime
+import pandas as pd
 from infra.object_storage import write_generic_bytes_to_object_storage
 from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
@@ -24,15 +25,21 @@ def _build_quality_details(
     metrics = transform_result.get("metrics", {})
     issues = transform_result.get("issues", {})
     total_vehicles = metrics.get("total_vehicles_processed", 0)
+    positions_df = transform_result.get("positions")
+    if positions_df is None:
+        positions_df = pd.DataFrame()
+    invalid_positions_df = transform_result.get("invalid_positions")
+    if invalid_positions_df is None:
+        invalid_positions_df = pd.DataFrame()
     return {
         "execution_id": execution_id,
         "logical_date_utc": logical_date_utc,
         "source_file": source_file,
         "transformation_row_counts": {
             "raw_records": total_vehicles,
-            "transformed_records": transform_result.get("positions").shape[0],
+            "transformed_records": positions_df.shape[0],
             "accepted_records": valid_df.shape[0],
-            "rejected_records": transform_result.get("invalid_positions").shape[0],
+            "rejected_records": invalid_positions_df.shape[0],
         },
         "transformation_metrics": {
             "total_vehicles_processed": total_vehicles,
@@ -90,7 +97,10 @@ def _compute_quality_metrics(
 
     if transform_result is not None and expectations_result is not None:
         invalid_df = expectations_result.get("invalid_df")
-        transform_invalid_records = transform_result.get("invalid_positions").shape[0]
+        transform_invalid_positions = transform_result.get("invalid_positions")
+        if transform_invalid_positions is None:
+            transform_invalid_positions = pd.DataFrame()
+        transform_invalid_records = transform_invalid_positions.shape[0]
         gx_invalid_records = 0 if invalid_df is None else invalid_df.shape[0]
         total_raw_records = transform_result.get("metrics", {}).get(
             "total_vehicles_processed", 0
