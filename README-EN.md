@@ -16,8 +16,8 @@ The project’s main design decisions, chosen technologies, rejected alternative
 ![Solution diagram](./diagrama_solucao.png)
 
 The following components were adopted to implement the solution:
-- Docker and Docker Compose: used to package and run the solution components in containers, and to orchestrate local environment startup with services such as Airflow, PostgreSQL, MinIO, Jupyter, `extractloadlivedata`, and `alertservice`, reducing manual setup effort and increasing environment reproducibility.
-- [extractloadlivedata](./extractloadlivedata/README-EN.md): microservice that extracts data from the SPTrans API at regular intervals, initially every 2 minutes, while allowing this interval to be reduced, which would not be feasible with an Airflow job because execution delays would compromise interval precision. It saves data first to a local volume and then to the raw layer implemented with MinIO.
+- Docker and Docker Compose: used to package and run the solution components in containers, and to orchestrate local environment startup with services such as Airflow, PostgreSQL, MinIO, Jupyter, `extractloadlivedata`, `alertservice`, Loki, Promtail, and Grafana, reducing manual setup effort and increasing environment reproducibility.
+- [extractloadlivedata](./extractloadlivedata/README-EN.md): microservice that extracts data from the SPTrans API at regular intervals, initially every 2 minutes, while allowing this interval to be reduced, which would not be feasible with an Airflow job because execution delays would compromise interval precision. It saves data first to a local volume and then to the raw layer implemented with MinIO. Implements production-grade observability with structured JSON logs, execution tracking, per-phase metrics (extract/save/notify) with timing, and data lineage tracking via `correlation_id` based on the data timestamp.
 - [alertservice](./alertservice/README-EN.md): microservice that receives quality summaries via webhook from the ingest microservice and the pipelines, and sends email notifications with immediate failure alerts and cumulative warning alerts based on per-pipeline thresholds.
 - MinIO: used to implement the raw layer for storing raw data extracted from the SPTrans API and GTFS data, and also the trusted layer for transformed data with quality checks applied.
 - DuckDB: used in transformation processes to run SQL queries directly on Parquet tables stored in the trusted layer implemented through MinIO, with excellent performance and without requiring SQL engines such as Presto, therefore reducing infrastructure complexity. It is also used for exploratory analysis through Jupyter.
@@ -53,6 +53,48 @@ The diagram below complements the DAG descriptions by showing the event-driven o
 - `refinedsynctripdetails` is triggered by that Dataset, which means it runs automatically after successful completion of the `gtfs` pipeline
 - `transformlivedata` publishes the Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` and `updatelatestpositions` are triggered by that Dataset, which means they run automatically after successful completion of the `transformlivedata` pipeline
+
+### Local Centralised Log Stack (Loki + Promtail + Grafana)
+
+- `loki`: log backend for ingestion, indexing, and querying of structured events
+- `promtail`: Docker container log collector that ships logs to Loki
+- `grafana`: log exploration and visualisation interface
+
+Minimal observability stack startup:
+
+```bash
+docker compose up -d loki promtail grafana
+```
+
+## Observability
+
+The platform implements structured observability as a standard, enabling full tracing of data and executions across multiple pipelines. The observability strategy covers three dimensions: log structuring, data lineage tracking, and metrics instrumentation.
+
+### Structured JSON Logs
+
+All critical events are emitted in structured JSON format, ready for ingestion by aggregation systems such as Loki and Prometheus. This ensures logs are:
+- Machine-readable for automated analysis
+- Consistent in format across components
+- Easily filterable and queryable
+
+### Data Lineage Tracking
+
+The `correlation_id` based on `logical_datetime` (data timestamp) enables tracing "all processing of this data" across all pipelines:
+
+```
+extractloadlivedata → transformlivedata → refinedfinishedtrips → refined.latest_positions
+```
+
+This makes it possible to audit transformations, diagnose data loss, and validate full lineage of critical data.
+
+### Execution and Metrics Instrumentation
+
+`extractloadlivedata` implements production-grade instrumentation as an example of the adopted approach:
+- **Execution tracking**: ISO 8601 `execution_id` (UTC timestamp) correlates all logs from one execution
+- **Per-phase metrics**: extract, save, and notify phases instrumented with attempt/success/failure counts and durations
+- **Execution metrics final event**: `execution_metrics_final` structured for Prometheus/AlertManager queries, providing operational visibility for each execution
+
+This approach enables fast anomaly detection, efficient failure diagnosis, and continuous visibility into the platform's operational health.
 
 ## Configuration
 

@@ -28,6 +28,68 @@ Although this is not the preferred production path for full resilience, the serv
 - records a processing request in the Airflow-hosted database for each raw-layer file that must be processed by the pipeline. If request creation fails, the file remains stored locally until the operation succeeds. If Airflow is unavailable, the orchestration DAG later detects the pending requests and triggers the transformation DAG one file at a time, in creation order, preserving ordered delivery over time
 - alternatively, can trigger the transformation DAG directly through the Airflow API without creating a database request, depending on configuration
 
+## Observability: Structured Logging
+
+The service implements production-grade observability with **structured JSON logs**, **per-phase metrics**, and **data lineage tracking** via correlation ID.
+
+### Structured Logs
+- **Format**: JSON with fields `timestamp`, `level`, `service`, `component`, `event`, `status`, `message`, `metadata`
+- **Output**: stdout for Loki ingestion
+- **Taxonomy**: structured events defined in [src/domain/events.py](./src/domain/events.py)
+- **Status**: controlled enum (`STARTED`, `SUCCEEDED`, `FAILED`, `RETRY`, `SKIPPED`)
+
+### Execution Tracking (execution_id)
+Each execution receives an `execution_id` in **ISO 8601 format** (UTC start timestamp):
+- Example: `"2026-05-13T15:30:15.987654+00:00"`
+- Correlates all logs from one execution in Loki
+
+### Per-Phase Metrics (Phase Instrumentation)
+The service tracks **attempts, successes and failures** across three phases:
+
+1. **Extract phase**
+   - Attempts to extract positions from the API
+   - Captures `logical_datetime` from `buses_positions["metadata"]["extracted_at"]` (data timestamp)
+   - Saves locally and proceeds to the next phase
+
+2. **Save phase**
+   - Persists pending local files to MinIO
+   - Each saved file is registered in the database as a processing request
+   - Tracks total save duration
+
+3. **Notify phase**
+   - Triggers the transformation DAG (via Airflow or database)
+   - Tracks success/failure per invocation
+   - Final metrics aggregation
+
+### Execution Metrics Final Event (execution_metrics_final)
+Emitted at the end of each execution with Prometheus-compatible structure:
+
+```json
+{
+  "event": "execution_metrics_final",
+  "status": "SUCCEEDED",
+  "execution_id": "2026-05-13T15:30:15.987654+00:00",
+  "correlation_id": "2026-05-13T15:30:45.123456+00:00",
+  "metadata": {
+    "phase_metrics": {
+      "extract": {"attempted": 1, "succeeded": 1, "failed": 0, "duration": 3.21},
+      "save": {"attempted": 3, "succeeded": 2, "failed": 1, "duration": 7.89},
+      "notify": {"attempted": 3, "succeeded": 3, "failed": 0, "duration": 1.35}
+    },
+    "items_total": 7,
+    "items_failed": 1,
+    "retries_seen": 4,
+    "execution_seconds": 12.45
+  }
+}
+```
+
+### Data Lineage Tracking (Correlation ID)
+Every operation is tagged with `correlation_id = logical_datetime` (data timestamp):
+- Enables tracing "all processing of data extracted at 2026-05-13T15:30:45.123456Z" across all pipelines
+- Enables Loki queries: `{correlation_id="2026-05-13T15:30:45.123456Z"}` to see all operations on this data
+- Propagates from extractloadlivedata → transformlivedata → refinedfinishedtrips for full lineage
+
 ## Execution reporting (`alertservice`)
 
 - Scope: the service publishes **only an execution summary** to `alertservice`; no JSON report artifact is persisted

@@ -295,16 +295,25 @@ def extractloadlivedata(
         _emit_failure_alert("unknown")
         return
     if pending_storage_save_list:
-        structured_logger.warning(
-            event="pending_storage_detected",
-            status=LogStatus.STARTED,
-            execution_id=execution_id,
-            message="Pending files detected for storage save.",
-            metadata={
-                "pending_files_count": len(pending_storage_save_list),
-                "pending_files": pending_storage_save_list,
-            },
-        )
+        if  len(pending_storage_save_list) > 1:
+            structured_logger.warning(
+                event="pending_multiple_storage_files_detected",
+                status=LogStatus.STARTED,
+                execution_id=execution_id,
+                message="Multiple pending files detected for storage save. This may indicate a recurring failure pattern that should be investigated.",
+                metadata={"pending_files_count": len(pending_storage_save_list)},
+            )
+        else:
+            structured_logger.info(
+                event="pending_storage_detected",
+                status=LogStatus.STARTED,
+                execution_id=execution_id,
+                message="Pending files detected for storage save.",
+                metadata={
+                    "pending_files_count": len(pending_storage_save_list),
+                    "pending_files": pending_storage_save_list,
+                },
+            )
         save_on_storage_failure = False
         save_start = time.time()
         try:
