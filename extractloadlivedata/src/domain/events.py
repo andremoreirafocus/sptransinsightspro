@@ -41,6 +41,7 @@ ALLOWED_EVENTS = {
     "pending_storage_file_started",
     "pending_storage_file_succeeded",
     "pending_storage_file_failed",
+    "pending_storage_multiple_files_detected",
     "storage_persist_started",
     "storage_persist_failed",
     "storage_persist_succeeded",

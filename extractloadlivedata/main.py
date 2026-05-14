@@ -4,6 +4,7 @@ from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
 from src.infra.structured_logging import (
     get_process_structured_logger,
 )
+from src.orchestration_dependencies import build_orchestrator_dependencies
 from apscheduler.schedulers.blocking import BlockingScheduler
 from typing import Tuple, Union
 import sys
@@ -25,7 +26,8 @@ def run_extractloadlivedata_task() -> None:
         message="Scheduler tick execution started.",
     )
     config = get_config()
-    extractloadlivedata(config=config)
+    services = build_orchestrator_dependencies()
+    extractloadlivedata(config=config, services=services)
     structured_logger.info(
         event="scheduler_tick_completed",
         status=LogStatus.SUCCEEDED,

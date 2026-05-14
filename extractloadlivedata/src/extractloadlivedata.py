@@ -43,7 +43,7 @@ def _get_config_values(config: ConfigDict) -> Tuple[str, str, str]:
 
 def extractloadlivedata(
     config: ConfigDict,
-    services: Optional[Services] = None,
+    services: Services,
     send_alert_fn: AlertSender = send_alert,
 ) -> None:
     def _parse_notification_metrics(metrics: Any) -> Tuple[int, int, int]:
@@ -125,7 +125,6 @@ def extractloadlivedata(
         )
         send_alert_fn(webhook_url, summary)
 
-    services = services or build_orchestrator_dependencies()
     execution_id = datetime.now(timezone.utc).isoformat()
     execution_start = time.time()
     structured_logger.info(
@@ -190,7 +189,7 @@ def extractloadlivedata(
             config, with_metrics=True
         )
         buses_positions_payload = download_result["result"]
-        retries_seen += int(download_result.get("metrics", {}).get("retries", 0))
+        retries_seen = int(download_result["metrics"]["retries"])
         download_successful = buses_positions_payload is not None
         structured_logger.info(
             event="extract_positions_succeeded",
@@ -208,7 +207,6 @@ def extractloadlivedata(
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        retries_seen += int(getattr(e, "retries", 0))
         items_failed += 1
         phase_metrics["extract"]["failed"] = 1
         _emit_failure_alert("positions_download")
@@ -297,7 +295,7 @@ def extractloadlivedata(
     if pending_storage_save_list:
         if  len(pending_storage_save_list) > 1:
             structured_logger.warning(
-                event="pending_multiple_storage_files_detected",
+                event="pending_storage_multiple_files_detected",
                 status=LogStatus.STARTED,
                 execution_id=execution_id,
                 message="Multiple pending files detected for storage save. This may indicate a recurring failure pattern that should be investigated.",
