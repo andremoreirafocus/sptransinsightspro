@@ -2,7 +2,7 @@ import json
 import logging
 import sys
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, Optional, TextIO
+from typing import Any, Dict, Optional, TextIO
 
 from src.infra.structured_event_logger import (
     StructuredEventLogger,
@@ -42,8 +42,6 @@ def get_process_structured_logger(
     component: str,
     logger_name: Optional[str] = None,
     base_metadata: Optional[Dict[str, Any]] = None,
-    allowed_events: Optional[Iterable[str]] = None,
-    allowed_statuses: Optional[Iterable[str]] = None,
     level: int = logging.INFO,
     stream: Optional[TextIO] = None,
 ) -> StructuredEventLogger:
@@ -60,6 +58,4 @@ def get_process_structured_logger(
         component=component,
         logger_name=logger_name,
         base_metadata=base_metadata,
-        allowed_events=allowed_events,
-        allowed_statuses=allowed_statuses,
     )

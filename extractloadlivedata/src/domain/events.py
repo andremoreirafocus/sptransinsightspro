@@ -1,23 +1,34 @@
 """Application-level logging taxonomy for extractloadlivedata."""
 
-from enum import Enum
+from typing import Final, Literal, TypeAlias
 
-class LogStatus(str, Enum):
-    STARTED = "STARTED"
-    SUCCEEDED = "SUCCEEDED"
-    FAILED = "FAILED"
-    RETRY = "RETRY"
-    SKIPPED = "SKIPPED"
+LOG_LEVEL_DEBUG: Final = "DEBUG"
+LOG_LEVEL_INFO: Final = "INFO"
+LOG_LEVEL_WARNING: Final = "WARNING"
+LOG_LEVEL_ERROR: Final = "ERROR"
+LOG_LEVEL_CRITICAL: Final = "CRITICAL"
 
-ALLOWED_EVENT_STATUSES = {
-    LogStatus.STARTED.value,
-    LogStatus.SUCCEEDED.value,
-    LogStatus.FAILED.value,
-    LogStatus.RETRY.value,
-    LogStatus.SKIPPED.value,
-}
+EVENT_STATUS_STARTED: Final = "STARTED"
+EVENT_STATUS_SUCCEEDED: Final = "SUCCEEDED"
+EVENT_STATUS_FAILED: Final = "FAILED"
+EVENT_STATUS_RETRY: Final = "RETRY"
+EVENT_STATUS_SKIPPED: Final = "SKIPPED"
 
-ALLOWED_EVENTS = {
+LogLevel: TypeAlias = Literal[
+    "DEBUG",
+    "INFO",
+    "WARNING",
+    "ERROR",
+    "CRITICAL",
+]
+LogStatusType: TypeAlias = Literal[
+    "STARTED",
+    "SUCCEEDED",
+    "FAILED",
+    "RETRY",
+    "SKIPPED",
+]
+LogEventType: TypeAlias = Literal[
     "scheduler_tick_started",
     "scheduler_tick_completed",
     "scheduler_config_loaded",
@@ -52,4 +63,4 @@ ALLOWED_EVENTS = {
     "execution_metrics_final",
     "execution_summary_emitted",
     "execution_failed_non_recoverable",
-}
+]

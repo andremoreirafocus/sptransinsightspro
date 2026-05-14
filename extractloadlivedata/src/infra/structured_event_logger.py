@@ -2,8 +2,8 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import Enum
-from typing import Any, Dict, Iterable, Optional, Set, Union
+from typing import Any, Dict, Optional
+from src.domain.events import LogEventType, LogLevel, LogStatusType
 
 ALLOWED_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 LEVEL_TO_LOGGING = {
@@ -33,18 +33,7 @@ def _normalize_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     return metadata
 
 
-def _normalize_optional_set(values: Optional[Iterable[str]], field_name: str) -> Set[str]:
-    if values is None:
-        return set()
-    normalized = set()
-    for value in values:
-        normalized.add(_normalize_non_empty_string(value, field_name))
-    return normalized
-
-
-def _normalize_status_value(status: Union[str, Enum], field_name: str) -> str:
-    if isinstance(status, Enum):
-        status = str(status.value)
+def _normalize_status_value(status: LogStatusType, field_name: str) -> str:
     return _normalize_non_empty_string(status, field_name)
 
 
@@ -54,8 +43,6 @@ class StructuredEventLogger:
     component: str
     logger: logging.Logger
     base_metadata: Dict[str, Any] = field(default_factory=dict)
-    allowed_events: Set[str] = field(default_factory=set)
-    allowed_statuses: Set[str] = field(default_factory=set)
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -67,26 +54,16 @@ class StructuredEventLogger:
         object.__setattr__(
             self, "base_metadata", _normalize_metadata(self.base_metadata)
         )
-        object.__setattr__(
-            self,
-            "allowed_events",
-            _normalize_optional_set(self.allowed_events, "allowed_events"),
-        )
-        object.__setattr__(
-            self,
-            "allowed_statuses",
-            {s.upper() for s in _normalize_optional_set(self.allowed_statuses, "allowed_statuses")},
-        )
 
     def emit(
         self,
         *,
-        level: str,
-        event: str,
+        level: LogLevel,
+        event: LogEventType,
         message: str,
         execution_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
-        status: Optional[Union[str, Enum]] = None,
+        status: Optional[LogStatusType] = None,
         error_type: Optional[str] = None,
         error_message: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
@@ -112,20 +89,11 @@ class StructuredEventLogger:
             payload["correlation_id"] = correlation_id
         if status is not None:
             normalized_status = _normalize_status_value(status, "status").upper()
-            if self.allowed_statuses and normalized_status not in self.allowed_statuses:
-                raise ValueError(
-                    f"Unsupported status '{normalized_status}'. This logger allows: {sorted(self.allowed_statuses)}"
-                )
             payload["status"] = normalized_status
         if error_type is not None:
             payload["error_type"] = error_type
         if error_message is not None:
             payload["error_message"] = error_message
-
-        if self.allowed_events and payload["event"] not in self.allowed_events:
-            raise ValueError(
-                f"Unsupported event '{payload['event']}'. This logger allows: {sorted(self.allowed_events)}"
-            )
 
         merged_metadata = dict(self.base_metadata)
         merged_metadata.update(_normalize_metadata(metadata))
@@ -138,19 +106,19 @@ class StructuredEventLogger:
         )
         return payload
 
-    def debug(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def debug(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="DEBUG", event=event, message=message, **kwargs)
 
-    def info(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def info(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="INFO", event=event, message=message, **kwargs)
 
-    def warning(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def warning(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="WARNING", event=event, message=message, **kwargs)
 
-    def error(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def error(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="ERROR", event=event, message=message, **kwargs)
 
-    def critical(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def critical(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="CRITICAL", event=event, message=message, **kwargs)
 
 
@@ -160,8 +128,6 @@ def get_structured_logger(
     component: str,
     logger_name: Optional[str] = None,
     base_metadata: Optional[Dict[str, Any]] = None,
-    allowed_events: Optional[Iterable[str]] = None,
-    allowed_statuses: Optional[Iterable[str]] = None,
 ) -> StructuredEventLogger:
     target_name = logger_name.strip() if logger_name and logger_name.strip() else service
     return StructuredEventLogger(
@@ -169,6 +135,4 @@ def get_structured_logger(
         component=component,
         logger=logging.getLogger(target_name),
         base_metadata=base_metadata or {},
-        allowed_events=set(allowed_events or []),
-        allowed_statuses=set(allowed_statuses or []),
     )

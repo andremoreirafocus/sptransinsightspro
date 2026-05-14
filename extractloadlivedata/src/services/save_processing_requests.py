@@ -10,16 +10,13 @@ from src.infra.cache import (
     remove_from_cache,
 )
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_RETRY, EVENT_STATUS_SKIPPED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 from src.services.exceptions import IngestNotificationError
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="save_processing_requests",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 ConfigDict = Dict[str, Any]
 DbConnection = Dict[str, Any]
@@ -40,7 +37,7 @@ def create_pending_processing_request(
 
     structured_logger.info(
         event="pending_storage_file_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Creating pending processing request for '{pending_marker}'",
     )
     # Use marker name without extension as key
@@ -83,7 +80,7 @@ def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
     try:
         structured_logger.info(
             event="notification_dispatch_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Extracting logical date from: {pending_marker}",
         )
         # Remove extension(s) to get the timestamp
@@ -107,14 +104,14 @@ def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
 
         structured_logger.info(
             event="notification_dispatch_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message=f"Logical date extracted: {dt_utc}",
         )
         return dt_utc
     except Exception as e:
         structured_logger.error(
             event="notification_dispatch_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Error extracting logical date from file '{pending_marker}': {e}",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -143,7 +140,7 @@ def save_processing_request(
         if "RAW_EVENTS_TABLE_NAME" not in config:
             structured_logger.error(
                 event="config_validation_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message="RAW_EVENTS_TABLE_NAME configuration is missing.",
             )
             raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
@@ -151,7 +148,7 @@ def save_processing_request(
         if "." not in raw_events_table:
             structured_logger.error(
                 event="config_validation_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'",
             )
             raise ValueError(
@@ -170,7 +167,7 @@ def save_processing_request(
     try:
         structured_logger.info(
             event="notification_dispatch_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Saving processing request for: '{pending_marker}'",
         )
         connection, schema, table = get_config(config)
@@ -201,13 +198,13 @@ def save_processing_request(
         if success:
             structured_logger.info(
                 event="notification_dispatch_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 message=f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'",
             )
             return True
         structured_logger.error(
             event="notification_dispatch_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Failed to save processing request for marker '{pending_marker}'",
         )
         raise IngestNotificationError(
@@ -216,7 +213,7 @@ def save_processing_request(
     except Exception as e:
         structured_logger.error(
             event="notification_dispatch_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -252,7 +249,7 @@ def trigger_pending_processing_requests(
         for pending_marker_key in pending_markers:
             structured_logger.info(
                 event="pending_storage_file_started",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 message=f"Processing pending request: {pending_marker_key}",
             )
             pending_marker_value = get_cache_value(
@@ -272,7 +269,7 @@ def trigger_pending_processing_requests(
                         failure_count += 1
                         structured_logger.warning(
                             event="notification_dispatch_failed",
-                            status=LogStatus.RETRY,
+                            status=EVENT_STATUS_RETRY,
                             message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
                         error = IngestNotificationError(
@@ -293,7 +290,7 @@ def trigger_pending_processing_requests(
                         failure_count += 1
                         structured_logger.warning(
                             event="notification_dispatch_failed",
-                            status=LogStatus.RETRY,
+                            status=EVENT_STATUS_RETRY,
                             message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
                     setattr(
@@ -309,7 +306,7 @@ def trigger_pending_processing_requests(
     else:
         structured_logger.info(
             event="pending_storage_scan_succeeded",
-            status=LogStatus.SKIPPED,
+            status=EVENT_STATUS_SKIPPED,
             message="No pending processing requests found.",
         )
     if with_metrics:

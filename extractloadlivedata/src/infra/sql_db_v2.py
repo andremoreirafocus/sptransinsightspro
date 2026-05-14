@@ -1,15 +1,12 @@
 from sqlalchemy import create_engine, text
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="sql_db_v2",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 
 def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tuple, columns: List[str], engine_factory: Optional[Callable[..., Any]] = None) -> bool:
@@ -35,7 +32,7 @@ def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tup
     except KeyError as e:
         structured_logger.error(
             event="config_validation_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Missing required connection key: {e}",
         )
         raise ValueError(f"Missing required connection key: {e}")
@@ -54,7 +51,7 @@ def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tup
 
         structured_logger.info(
             event="storage_persist_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Executing INSERT into {schema}.{table}: {columns}",
         )
         with engine.begin() as conn:
@@ -62,14 +59,14 @@ def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tup
 
         structured_logger.info(
             event="storage_persist_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message=f"Row inserted successfully into {schema}.{table}",
         )
         return True
     except Exception as e:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Database error while saving row to {schema}.{table}: {e}",
         )
         raise ValueError(f"Database error while saving row to {schema}.{table}: {e}")
@@ -88,7 +85,7 @@ def execute_select_query(connection: Dict[str, Any], query: str, engine_factory:
     except KeyError as e:
         structured_logger.error(
             event="config_validation_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Missing required connection key: {e}",
         )
         raise ValueError(f"Missing required connection key: {e}")
@@ -100,7 +97,7 @@ def execute_select_query(connection: Dict[str, Any], query: str, engine_factory:
 
         structured_logger.info(
             event="storage_persist_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Executing SELECT query: {query[:100]}...",
         )
         with engine.begin() as conn:
@@ -109,14 +106,14 @@ def execute_select_query(connection: Dict[str, Any], query: str, engine_factory:
             rows_as_dicts = [dict(row._mapping) for row in rows]
         structured_logger.info(
             event="storage_persist_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message=f"Query returned {len(rows_as_dicts)} row(s)",
         )
         return rows_as_dicts
     except Exception as e:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Database error while executing SELECT query: {e}",
         )
         raise ValueError(f"Database error while executing SELECT query: {e}")
@@ -135,7 +132,7 @@ def execute_update_query(connection: Dict[str, Any], query: str, params: Optiona
     except KeyError as e:
         structured_logger.error(
             event="config_validation_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Missing required connection key: {e}",
         )
         raise ValueError(f"Missing required connection key: {e}")
@@ -147,7 +144,7 @@ def execute_update_query(connection: Dict[str, Any], query: str, params: Optiona
 
         structured_logger.info(
             event="storage_persist_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Executing UPDATE query: {query[:100]}...",
         )
         with engine.begin() as conn:
@@ -158,14 +155,14 @@ def execute_update_query(connection: Dict[str, Any], query: str, params: Optiona
 
         structured_logger.info(
             event="storage_persist_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message="Update query executed successfully",
         )
         return True
     except Exception as e:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Database error while executing UPDATE query: {e}",
         )
         raise ValueError(f"Database error while executing UPDATE query: {e}")

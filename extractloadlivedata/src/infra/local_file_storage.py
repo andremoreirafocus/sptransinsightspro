@@ -2,15 +2,12 @@ from src.infra.compression import compress_data
 import os
 from typing import Any, Callable, Optional
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="local_file_storage",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 
 def save_data_to_json_file(
@@ -27,7 +24,7 @@ def save_data_to_json_file(
         if compression:
             structured_logger.info(
                 event="storage_persist_started",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 message="Compressing data..",
             )
             mode = "wb"
@@ -35,7 +32,7 @@ def save_data_to_json_file(
             file_name += file_name_extension
             structured_logger.info(
                 event="storage_persist_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 message="Data compressed successfully.",
             )
         else:
@@ -44,21 +41,21 @@ def save_data_to_json_file(
         file_with_path = os.path.join(downloads_folder, file_name)
         structured_logger.info(
             event="storage_persist_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Writing buses_positions to file {file_with_path} ...",
         )
         with open_fn(file_with_path, mode) as file:
             file.write(data)
         structured_logger.info(
             event="storage_persist_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message="File saved successfully!!!",
         )
         return True
     except Exception as e:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Failed to save file: {e}",
             error_type=type(e).__name__,
             error_message=str(e),

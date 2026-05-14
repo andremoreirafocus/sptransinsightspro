@@ -11,7 +11,7 @@ import os
 import glob
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_RETRY, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 from src.services.exceptions import (
     LocalIngestBufferSaveError,
     SavePositionsToRawError,
@@ -20,10 +20,7 @@ from src.services.exceptions import (
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="save_load_bus_positions",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 ConfigDict = Dict[str, Any]
 PayloadDict = Dict[str, Any]
@@ -79,7 +76,7 @@ def save_bus_positions_to_local_volume(
     except Exception as e:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Failed to save buses positions to local volume for file '{filename}': {e}",
         )
         raise LocalIngestBufferSaveError(
@@ -98,7 +95,7 @@ def load_bus_positions_from_local_volume_file(
         if file.split(".")[-1] != "json":
             structured_logger.info(
                 event="pending_storage_file_started",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 message=f"Pending file '{file}' is compressed.",
             )
             file_is_compressed = True
@@ -115,7 +112,7 @@ def load_bus_positions_from_local_volume_file(
     except Exception as e:
         structured_logger.error(
             event="pending_storage_file_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Error getting pending file '{file}': {e}",
         )
         raise ValueError(f"Error getting pending file '{file}': {e}")
@@ -139,26 +136,26 @@ def remove_local_file(
     filename = f"{ingest_buffer_folder}/{filename_without_path}*"
     structured_logger.info(
         event="pending_storage_file_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Attempting to remove local file(s) matching '{filename}' from '{ingest_buffer_folder}'",
     )
     matching_files = glob_fn(filename)
     structured_logger.debug(
         event="pending_storage_file_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Matching files found: {matching_files}",
     )
     if not matching_files:
         structured_logger.error(
             event="pending_storage_file_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"No matching local file found for '{filename}' to remove.",
         )
         return
     if len(matching_files) > 1:
         structured_logger.warning(
             event="pending_storage_file_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Multiple matching local files found for '{filename}'. Attempting to remove all matches.",
         )
     for file in matching_files:
@@ -168,13 +165,13 @@ def remove_local_file(
             remove_fn(file_path)
             structured_logger.info(
                 event="pending_storage_file_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 message=f"Local file '{file_path}' removed successfully.",
             )
         except Exception as e:
             structured_logger.error(
                 event="pending_storage_file_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Error removing local file '{file_path}': {e}",
             )
 
@@ -223,7 +220,7 @@ def save_bus_positions_to_storage_with_retries(
             if retries > 0:
                 structured_logger.info(
                     event="storage_persist_succeeded",
-                    status=LogStatus.SUCCEEDED,
+                    status=EVENT_STATUS_SUCCEEDED,
                     message=f"Storage save successful after {retries} retries.",
                 )
             if with_metrics:
@@ -239,7 +236,7 @@ def save_bus_positions_to_storage_with_retries(
             if retries >= storage_max_retries:
                 structured_logger.error(
                     event="storage_persist_failed",
-                    status=LogStatus.FAILED,
+                    status=EVENT_STATUS_FAILED,
                     message=f"Max retries reached for Storage. Persistence failed. Error: {e}",
                 )
                 error = SavePositionsToRawError(
@@ -249,7 +246,7 @@ def save_bus_positions_to_storage_with_retries(
                 raise error from e
             structured_logger.warning(
                 event="storage_persist_failed",
-                status=LogStatus.RETRY,
+                status=EVENT_STATUS_RETRY,
                 message=f"Storage save failed! Retrying in {back_off} seconds... Error: {e}",
             )
             sleep_fn(back_off)
@@ -265,14 +262,14 @@ def save_bus_positions_to_storage(config: ConfigDict, data: PayloadDict) -> None
     if not data_structure_is_valid(data):
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message="Data structure is invalid. Skipping processing.",
         )
         raise ValueError("Data structure is invalid.")
     hour_minute, total_qv, total_bus_lines = get_payload_summary(data)
     structured_logger.info(
         event="storage_persist_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Received data for {total_qv} vehicles from {total_bus_lines} bus lines.",
     )
     data_json = json.dumps(data)
@@ -305,7 +302,7 @@ def data_structure_is_valid(data: Any) -> bool:
     if not isinstance(data, dict):
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message="Data does not have a valid structure.",
         )
         return False
@@ -314,19 +311,19 @@ def data_structure_is_valid(data: Any) -> bool:
         if field not in data:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Missing required field: {field}",
             )
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Data content: {data}",
             )
             return False
     if not isinstance(data.get("metadata"), dict):
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message="Data metadata does not have a valid structure.",
         )
         return False
@@ -338,29 +335,29 @@ def data_structure_is_valid(data: Any) -> bool:
         if field not in metadata:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Missing required metadata field: {field}",
             )
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Metadata content: {data.get('metadata')}",
             )
             return False
     if not isinstance(data.get("payload"), dict):
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message="Data payload does not have a valid structure.",
         )
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Payload content: {data.get('payload')}",
         )
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Metadata content: {data.get('metadata')}",
         )
         return False
@@ -372,7 +369,7 @@ def data_structure_is_valid(data: Any) -> bool:
         if field not in payload:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Missing required payload field: {field}",
             )
             return False
@@ -398,7 +395,7 @@ def save_data_to_raw_object_storage(
 
     structured_logger.info(
         event="storage_persist_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message="Preparing to save data to storage...",
     )
     raw_bucket_name, app_folder, connection_data = get_config(config)
@@ -409,21 +406,21 @@ def save_data_to_raw_object_storage(
         output_buffer: bytes
         structured_logger.info(
             event="storage_persist_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             message=f"Saving data to storage with object name: {destination_object_name}",
         )
         try:
             if compression:
                 structured_logger.info(
                     event="storage_persist_started",
-                    status=LogStatus.STARTED,
+                    status=EVENT_STATUS_STARTED,
                     message="Compressing data with zstd...",
                 )
                 output_buffer, file_name_extension = compress_data(data)
                 destination_object_name += file_name_extension
                 structured_logger.info(
                     event="storage_persist_succeeded",
-                    status=LogStatus.SUCCEEDED,
+                    status=EVENT_STATUS_SUCCEEDED,
                     message="Data compressed successfully.",
                 )
             else:
@@ -437,13 +434,13 @@ def save_data_to_raw_object_storage(
             )
             structured_logger.info(
                 event="storage_persist_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 message=f"Data written to storage with object name: {destination_object_name}",
             )
         except Exception as e:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=(
                     "Error writing data to MinIO bucket "
                     f"'{raw_bucket_name}' with object name '{destination_object_name}'."
@@ -451,13 +448,13 @@ def save_data_to_raw_object_storage(
             )
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 message=f"Exception details: {e}",
             )
             raise ValueError("Data structure is invalid.")
     else:
         structured_logger.error(
             event="storage_persist_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message="No records found to write to the destination bucket.",
         )

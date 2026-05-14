@@ -2,15 +2,12 @@ import json
 from typing import Any, Dict
 from urllib import request
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_SKIPPED, EVENT_STATUS_SUCCEEDED
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="alertservice_client",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 
 def build_alert_payload(report: Dict[str, Any]) -> bytes:
@@ -21,7 +18,7 @@ def send_alert(webhook_url: str, report: Dict[str, Any]) -> None:
     if not webhook_url or webhook_url.strip().lower() in {"disabled", "none", "null"}:
         structured_logger.info(
             event="notification_dispatch_succeeded",
-            status=LogStatus.SKIPPED,
+            status=EVENT_STATUS_SKIPPED,
             message="Alertservice webhook disabled or missing. Skipping alert send.",
         )
         return
@@ -39,18 +36,18 @@ def send_alert(webhook_url: str, report: Dict[str, Any]) -> None:
             if status and status >= 400:
                 structured_logger.error(
                     event="notification_dispatch_failed",
-                    status=LogStatus.FAILED,
+                    status=EVENT_STATUS_FAILED,
                     message=f"Alertservice webhook returned status {status}",
                 )
                 return
             structured_logger.info(
                 event="execution_summary_emitted",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 message=f"Alertservice notification sent successfully (status={status}).",
             )
     except Exception as e:
         structured_logger.error(
             event="notification_dispatch_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Failed to send alertservice notification: {e}",
         )

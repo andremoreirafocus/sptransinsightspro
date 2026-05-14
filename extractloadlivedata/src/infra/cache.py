@@ -2,15 +2,12 @@ import diskcache as dc  # type: ignore[import-untyped]
 import os
 from typing import Any, Callable, List, Optional
 from src.infra.structured_logging import get_structured_logger
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="cache",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 
 # Global cache instance
 _cache = None
@@ -33,7 +30,7 @@ def get_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] = None
         _cache = cache_factory(cache_dir)
         structured_logger.info(
             event="pending_storage_file_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message=f"Cache initialized at {cache_dir}",
         )
     return _cache
@@ -50,14 +47,14 @@ def add_to_cache(cache_dir: str, key: str, value: Any, cache_factory: Optional[C
     """
     structured_logger.info(
         event="pending_storage_file_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Adding to cache with key '{key}'",
     )
     cache = get_cache(cache_dir, cache_factory=cache_factory)
     cache[key] = value
     structured_logger.info(
         event="pending_storage_file_succeeded",
-        status=LogStatus.SUCCEEDED,
+        status=EVENT_STATUS_SUCCEEDED,
         message=f"Cache entry created with key '{key}' and value '{value}'",
     )
 
@@ -74,14 +71,14 @@ def get_from_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] =
     """
     structured_logger.info(
         event="pending_storage_scan_succeeded",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message="Retrieving all items from cache...",
     )
     cache = get_cache(cache_dir, cache_factory=cache_factory)
     items = sorted(list(cache))
     structured_logger.info(
         event="pending_storage_scan_succeeded",
-        status=LogStatus.SUCCEEDED,
+        status=EVENT_STATUS_SUCCEEDED,
         message=f"Found {len(items)} item(s) in cache.",
     )
     return items
@@ -112,7 +109,7 @@ def remove_from_cache(cache_dir: str, key: str, cache_factory: Optional[Callable
     """
     structured_logger.info(
         event="pending_storage_file_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         message=f"Removing cache entry with key '{key}'",
     )
     cache = get_cache(cache_dir, cache_factory=cache_factory)
@@ -120,12 +117,12 @@ def remove_from_cache(cache_dir: str, key: str, cache_factory: Optional[Callable
         del cache[key]
         structured_logger.info(
             event="pending_storage_file_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             message=f"Cache entry '{key}' removed successfully.",
         )
     else:
         structured_logger.warning(
             event="pending_storage_file_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             message=f"Cache entry '{key}' not found in cache.",
         )

@@ -11,8 +11,8 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Literal, Optional, Tuple
 import time
 
-from src.domain.events import ALLOWED_EVENTS, ALLOWED_EVENT_STATUSES, LogStatus
-from src.orchestration_dependencies import Services, ConfigDict, build_orchestrator_dependencies
+from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
+from src.orchestration_dependencies import Services, ConfigDict
 from src.quality.reporting import create_failure_quality_report, build_quality_summary
 from src.infra.alertservice_client import send_alert
 from src.infra.structured_logging import get_structured_logger
@@ -20,10 +20,7 @@ from src.infra.structured_logging import get_structured_logger
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="orchestrator",
-    logger_name=__name__,
-    allowed_events=ALLOWED_EVENTS,
-    allowed_statuses=ALLOWED_EVENT_STATUSES,
-)
+    logger_name=__name__,)
 SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX = "[SEVERE] non recoverable "
 
 AlertSender = Callable[[str, Dict[str, Any]], None]
@@ -86,7 +83,7 @@ def extractloadlivedata(
         )
         structured_logger.info(
             event="execution_summary_emitted",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
             message="Failure quality summary emitted to alertservice.",
             metadata={
@@ -112,7 +109,7 @@ def extractloadlivedata(
         )
         structured_logger.info(
             event="execution_summary_emitted",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
             message="Final quality summary emitted to alertservice.",
             metadata={
@@ -129,7 +126,7 @@ def extractloadlivedata(
     execution_start = time.time()
     structured_logger.info(
         event="execution_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         execution_id=execution_id,
         message="extractloadlivedata execution started.",
     )
@@ -145,7 +142,7 @@ def extractloadlivedata(
     logical_datetime: Optional[str] = None
     structured_logger.info(
         event="config_validation_started",
-        status=LogStatus.STARTED,
+        status=EVENT_STATUS_STARTED,
         execution_id=execution_id,
         message="Runtime configuration validation started.",
     )
@@ -153,14 +150,14 @@ def extractloadlivedata(
         ingest_buffer_folder, notification_engine, webhook_url = _get_config_values(config)
         structured_logger.info(
             event="config_validation_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
             message="Runtime configuration validation succeeded.",
         )
     except Exception as e:
         structured_logger.error(
             event="config_validation_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Runtime configuration validation failed.",
             error_type=type(e).__name__,
@@ -169,7 +166,7 @@ def extractloadlivedata(
         return
     structured_logger.info(
         event="notification_engine_selected",
-        status=LogStatus.SUCCEEDED,
+        status=EVENT_STATUS_SUCCEEDED,
         execution_id=execution_id,
         message="Notification engine selected.",
         metadata={"notification_engine": notification_engine},
@@ -179,7 +176,7 @@ def extractloadlivedata(
     try:
         structured_logger.info(
             event="extract_positions_started",
-            status=LogStatus.STARTED,
+            status=EVENT_STATUS_STARTED,
             execution_id=execution_id,
             message="Bus positions extraction started.",
         )
@@ -193,7 +190,7 @@ def extractloadlivedata(
         download_successful = buses_positions_payload is not None
         structured_logger.info(
             event="extract_positions_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
             message="Bus positions extraction succeeded.",
             metadata={"download_successful": download_successful, "retries_seen": retries_seen},
@@ -201,7 +198,7 @@ def extractloadlivedata(
     except PositionsDownloadError as e:
         structured_logger.error(
             event="extract_positions_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Bus positions extraction failed.",
             error_type=type(e).__name__,
@@ -213,7 +210,7 @@ def extractloadlivedata(
     except Exception as e:
         structured_logger.error(
             event="extract_positions_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Unexpected bus positions extraction failure.",
             error_type=type(e).__name__,
@@ -234,7 +231,7 @@ def extractloadlivedata(
             phase_metrics["extract"]["succeeded"] = 1
             structured_logger.debug(
                 event="storage_persist_started",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Starting storage persistence for current extraction payload.",
@@ -242,7 +239,7 @@ def extractloadlivedata(
             services.save_bus_positions_to_local_volume(config, buses_positions)
             structured_logger.debug(
                 event="storage_persist_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Storage persistence completed for current extraction payload.",
@@ -250,7 +247,7 @@ def extractloadlivedata(
         except LocalIngestBufferSaveError as e:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Local ingest buffer save failed.",
@@ -262,7 +259,7 @@ def extractloadlivedata(
         except Exception as e:
             structured_logger.error(
                 event="storage_persist_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Unexpected local buffer persistence failure.",
@@ -275,7 +272,7 @@ def extractloadlivedata(
         pending_storage_save_list = services.get_pending_storage_save_list(config)
         structured_logger.info(
             event="pending_storage_scan_succeeded",
-            status=LogStatus.SUCCEEDED,
+            status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
             message="Pending storage scan completed.",
             metadata={"pending_files_count": len(pending_storage_save_list)},
@@ -283,7 +280,7 @@ def extractloadlivedata(
     except Exception as e:
         structured_logger.error(
             event="pending_storage_scan_failed",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Failed to list pending storage save files.",
             error_type=type(e).__name__,
@@ -296,7 +293,7 @@ def extractloadlivedata(
         if  len(pending_storage_save_list) > 1:
             structured_logger.warning(
                 event="pending_storage_multiple_files_detected",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 execution_id=execution_id,
                 message="Multiple pending files detected for storage save. This may indicate a recurring failure pattern that should be investigated.",
                 metadata={"pending_files_count": len(pending_storage_save_list)},
@@ -304,7 +301,7 @@ def extractloadlivedata(
         else:
             structured_logger.info(
                 event="pending_storage_detected",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 execution_id=execution_id,
                 message="Pending files detected for storage save.",
                 metadata={
@@ -321,7 +318,7 @@ def extractloadlivedata(
                 file_logical_datetime = get_utc_logical_date_from_file(pending_storage_save_file)
                 structured_logger.info(
                     event="pending_storage_file_started",
-                    status=LogStatus.STARTED,
+                    status=EVENT_STATUS_STARTED,
                     execution_id=execution_id,
                     correlation_id=file_logical_datetime,
                     message="Attempting storage persistence for pending file.",
@@ -335,7 +332,7 @@ def extractloadlivedata(
                     )
                     structured_logger.debug(
                         event="storage_persist_started",
-                        status=LogStatus.STARTED,
+                        status=EVENT_STATUS_STARTED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
                         message="Starting storage persistence for pending file payload.",
@@ -347,7 +344,7 @@ def extractloadlivedata(
                     retries_seen += int(save_result.get("metrics", {}).get("retries", 0))
                     structured_logger.debug(
                         event="storage_persist_succeeded",
-                        status=LogStatus.SUCCEEDED,
+                        status=EVENT_STATUS_SUCCEEDED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
                         message="Storage persistence completed for pending file payload.",
@@ -355,7 +352,7 @@ def extractloadlivedata(
                     )
                     structured_logger.info(
                         event="pending_storage_file_succeeded",
-                        status=LogStatus.SUCCEEDED,
+                        status=EVENT_STATUS_SUCCEEDED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
                         message="Pending file saved to storage successfully.",
@@ -379,7 +376,7 @@ def extractloadlivedata(
                 except SavePositionsToRawError as e:
                     structured_logger.error(
                         event="pending_storage_file_failed",
-                        status=LogStatus.FAILED,
+                        status=EVENT_STATUS_FAILED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
                         message="Raw storage save failed for pending file.",
@@ -396,7 +393,7 @@ def extractloadlivedata(
                 except Exception as e:
                     structured_logger.error(
                         event="pending_storage_file_failed",
-                        status=LogStatus.FAILED,
+                        status=EVENT_STATUS_FAILED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
                         message="Unexpected pending file processing error.",
@@ -410,7 +407,7 @@ def extractloadlivedata(
             if save_on_storage_failure:
                 structured_logger.error(
                     event="storage_persist_failed",
-                    status=LogStatus.FAILED,
+                    status=EVENT_STATUS_FAILED,
                     execution_id=execution_id,
                     message="One or more pending files failed to save to storage.",
                 )
@@ -420,7 +417,7 @@ def extractloadlivedata(
         try:
             structured_logger.info(
                 event="notification_dispatch_started",
-                status=LogStatus.STARTED,
+                status=EVENT_STATUS_STARTED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Notification dispatch started.",
@@ -445,7 +442,7 @@ def extractloadlivedata(
             phase_metrics["notify"]["failed"] = failed_count
             structured_logger.info(
                 event="notification_dispatch_succeeded",
-                status=LogStatus.SUCCEEDED,
+                status=EVENT_STATUS_SUCCEEDED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Notification dispatch completed.",
@@ -458,7 +455,7 @@ def extractloadlivedata(
         except IngestNotificationError as e:
             structured_logger.error(
                 event="notification_dispatch_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Ingest notification failed.",
@@ -479,7 +476,7 @@ def extractloadlivedata(
             except (KeyError, TypeError) as metrics_error:
                 structured_logger.error(
                     event="notification_metrics_invalid",
-                    status=LogStatus.FAILED,
+                    status=EVENT_STATUS_FAILED,
                     execution_id=execution_id,
                     message="Invalid ingest notification metrics contract.",
                     error_type=type(metrics_error).__name__,
@@ -490,7 +487,7 @@ def extractloadlivedata(
         except Exception as e:
             structured_logger.error(
                 event="notification_dispatch_failed",
-                status=LogStatus.FAILED,
+                status=EVENT_STATUS_FAILED,
                 execution_id=execution_id,
                 message="Unexpected ingest notification error.",
                 error_type=type(e).__name__,
@@ -508,7 +505,7 @@ def extractloadlivedata(
 
     structured_logger.info(
         event="execution_metrics_final",
-        status=LogStatus.SUCCEEDED,
+        status=EVENT_STATUS_SUCCEEDED,
         execution_id=execution_id,
         message="Execution metrics finalized.",
         metadata={
@@ -525,7 +522,7 @@ def extractloadlivedata(
     if items_failed > 0:
         structured_logger.error(
             event="execution_failed_non_recoverable",
-            status=LogStatus.FAILED,
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Execution finished with non-recoverable failures.",
             metadata={"items_total": items_total, "items_failed": items_failed, "retries_seen": retries_seen},
@@ -537,7 +534,7 @@ def extractloadlivedata(
         _emit_final_summary("PASS")
     structured_logger.info(
         event="execution_completed",
-        status=LogStatus.SUCCEEDED,
+        status=EVENT_STATUS_SUCCEEDED,
         execution_id=execution_id,
         message="extractloadlivedata execution completed successfully.",
         metadata={"items_total": items_total, "items_failed": items_failed, "retries_seen": retries_seen},
