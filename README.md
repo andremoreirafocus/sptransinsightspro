@@ -15,7 +15,7 @@ As principais decisões de design do projeto — tecnologias escolhidas, alterna
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
-- Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata e alertservice, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
+- Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, alertservice, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
 - [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
 - [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
 - Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada
@@ -49,6 +49,18 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `refinedsynctripdetails` é disparada por esse Dataset, ou seja, é executado automaticamente após a conclusão com sucesso do pipeline gtfs
 - `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+
+### Stack local de logs cenralizados (Loki + Promtail + Grafana)
+
+- `loki`: backend de logs para ingestão, indexação e consulta de eventos estruturados
+- `promtail`: agente de coleta de logs dos containers Docker com envio para o Loki
+- `grafana`: interface de exploração e visualização de logs
+
+Subida mínima da stack de observabilidade:
+
+```bash
+docker compose up -d loki promtail grafana
+```
 
 
 ## Observabilidade
@@ -131,6 +143,7 @@ docker compose up -d
   docker compose up -d extractloadlivedata
   docker compose up -d alertservice
   docker compose up -d jupyter
+  docker compose up -d loki promtail grafana
 ```
 
 
@@ -144,6 +157,15 @@ docker compose up -d
 
  Jupyter:
  http://localhost:8888/
+
+ Loki (readiness):
+ http://localhost:3100/ready
+
+ Promtail (readiness):
+ http://localhost:9080/ready
+
+ Grafana:
+ http://localhost:3000/
 
 ## Configuração unificada de pipelines
 Para padronizar a configuração entre pipelines e ambientes, o projeto utiliza o módulo `pipeline_configurator` (em `dags-dev/pipeline_configurator` e promovido para `airflow/dags/pipeline_configurator`).  

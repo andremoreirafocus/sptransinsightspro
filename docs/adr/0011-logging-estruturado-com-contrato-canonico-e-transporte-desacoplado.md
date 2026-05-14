@@ -1,7 +1,7 @@
 # ADR-0011: Logging estruturado com contrato canônico e transporte desacoplado
 
 **Data:** 2026-05-12  
-**Status:** Proposto
+**Status:** Aceito
 
 ## Contexto
 
@@ -94,3 +94,10 @@ Foi descartado porque reduziria portabilidade e dificultaria migração entre am
 - Esforço inicial de migração dos componentes existentes.
 - Necessidade de disciplina de contrato para evitar drift de campos.
 - Necessidade de governança de labels/campos para evitar cardinalidade excessiva.
+
+## Status de implementação
+
+Implementação local inicial concluída para observabilidade de logs estruturados no ambiente containerizado:
+- `loki` adicionado ao `docker-compose.yml` com configuração em `observability/loki/loki-config.yml`
+- `promtail` adicionado ao `docker-compose.yml` com configuração em `observability/promtail/promtail-config.yml`
+- `grafana` adicionado ao `docker-compose.yml` com datasource Loki provisionado em `observability/grafana/provisioning/datasources/loki.yml`
