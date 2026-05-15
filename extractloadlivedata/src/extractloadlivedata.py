@@ -140,15 +140,9 @@ def extractloadlivedata(
     }
     phase_durations: Dict[str, float] = {}
     logical_datetime: Optional[str] = None
-    structured_logger.info(
-        event="config_validation_started",
-        status=EVENT_STATUS_STARTED,
-        execution_id=execution_id,
-        message="Runtime configuration validation started.",
-    )
     try:
         ingest_buffer_folder, notification_engine, webhook_url = _get_config_values(config)
-        structured_logger.info(
+        structured_logger.debug(
             event="config_validation_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
@@ -230,15 +224,15 @@ def extractloadlivedata(
             logical_datetime = buses_positions["metadata"]["extracted_at"]
             phase_metrics["extract"]["succeeded"] = 1
             structured_logger.debug(
-                event="storage_persist_started",
+                event="local_storage_persist_started",
                 status=EVENT_STATUS_STARTED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
                 message="Starting storage persistence for current extraction payload.",
             )
             services.save_bus_positions_to_local_volume(config, buses_positions)
-            structured_logger.debug(
-                event="storage_persist_succeeded",
+            structured_logger.info(
+                event="local_storage_persist_succeeded",
                 status=EVENT_STATUS_SUCCEEDED,
                 execution_id=execution_id,
                 correlation_id=logical_datetime,
@@ -270,7 +264,7 @@ def extractloadlivedata(
             _emit_failure_alert("unknown")
     try:
         pending_storage_save_list = services.get_pending_storage_save_list(config)
-        structured_logger.info(
+        structured_logger.debug(
             event="pending_storage_scan_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
@@ -316,7 +310,7 @@ def extractloadlivedata(
                 items_total += 1
                 phase_metrics["save"]["attempted"] += 1
                 file_logical_datetime = get_utc_logical_date_from_file(pending_storage_save_file)
-                structured_logger.info(
+                structured_logger.debug(
                     event="pending_storage_file_started",
                     status=EVENT_STATUS_STARTED,
                     execution_id=execution_id,
@@ -331,23 +325,23 @@ def extractloadlivedata(
                         )
                     )
                     structured_logger.debug(
-                        event="storage_persist_started",
+                        event="object_storage_persist_started",
                         status=EVENT_STATUS_STARTED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
-                        message="Starting storage persistence for pending file payload.",
+                        message="Starting object storage persistence for pending file payload.",
                         metadata={"pending_file": pending_storage_save_file},
                     )
                     save_result = services.save_bus_positions_to_storage_with_retries(
                         config, pending_storage_save_file_content, with_metrics=True
                     )
-                    retries_seen += int(save_result.get("metrics", {}).get("retries", 0))
+                    retries_seen = int(save_result["metrics"]["retries"])
                     structured_logger.debug(
-                        event="storage_persist_succeeded",
+                        event="object_storage_persist_succeeded",
                         status=EVENT_STATUS_SUCCEEDED,
                         execution_id=execution_id,
                         correlation_id=file_logical_datetime,
-                        message="Storage persistence completed for pending file payload.",
+                        message="Object storage persistence completed for pending file payload.",
                         metadata={"pending_file": pending_storage_save_file},
                     )
                     structured_logger.info(

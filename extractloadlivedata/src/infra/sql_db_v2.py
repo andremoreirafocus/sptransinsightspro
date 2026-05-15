@@ -49,23 +49,23 @@ def save_row(connection: Dict[str, Any], schema: str, table: str, row_tuple: Tup
         )
         params = dict(zip(columns, row_tuple))
 
-        structured_logger.info(
-            event="storage_persist_started",
+        structured_logger.debug(
+            event="db_storage_persist_started",
             status=EVENT_STATUS_STARTED,
             message=f"Executing INSERT into {schema}.{table}: {columns}",
         )
         with engine.begin() as conn:
             conn.execute(text(insert_query), params)
 
-        structured_logger.info(
-            event="storage_persist_succeeded",
+        structured_logger.debug(
+            event="db_storage_persist_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message=f"Row inserted successfully into {schema}.{table}",
         )
         return True
     except Exception as e:
         structured_logger.error(
-            event="storage_persist_failed",
+            event="db_storage_persist_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Database error while saving row to {schema}.{table}: {e}",
         )
@@ -95,8 +95,8 @@ def execute_select_query(connection: Dict[str, Any], query: str, engine_factory:
         engine_factory = engine_factory or create_engine
         engine = engine_factory(db_uri)
 
-        structured_logger.info(
-            event="storage_persist_started",
+        structured_logger.debug(
+            event="db_storage_persist_started",
             status=EVENT_STATUS_STARTED,
             message=f"Executing SELECT query: {query[:100]}...",
         )
@@ -104,15 +104,15 @@ def execute_select_query(connection: Dict[str, Any], query: str, engine_factory:
             result = conn.execute(text(query))
             rows = result.fetchall()
             rows_as_dicts = [dict(row._mapping) for row in rows]
-        structured_logger.info(
-            event="storage_persist_succeeded",
+        structured_logger.debug(
+            event="db_storage_persist_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message=f"Query returned {len(rows_as_dicts)} row(s)",
         )
         return rows_as_dicts
     except Exception as e:
         structured_logger.error(
-            event="storage_persist_failed",
+            event="db_storage_persist_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Database error while executing SELECT query: {e}",
         )
@@ -142,8 +142,8 @@ def execute_update_query(connection: Dict[str, Any], query: str, params: Optiona
         engine_factory = engine_factory or create_engine
         engine = engine_factory(db_uri)
 
-        structured_logger.info(
-            event="storage_persist_started",
+        structured_logger.debug(
+            event="db_storage_persist_started",
             status=EVENT_STATUS_STARTED,
             message=f"Executing UPDATE query: {query[:100]}...",
         )
@@ -153,15 +153,15 @@ def execute_update_query(connection: Dict[str, Any], query: str, params: Optiona
             else:
                 conn.execute(text(query))
 
-        structured_logger.info(
-            event="storage_persist_succeeded",
+        structured_logger.debug(
+            event="db_storage_persist_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message="Update query executed successfully",
         )
         return True
     except Exception as e:
         structured_logger.error(
-            event="storage_persist_failed",
+            event="db_storage_persist_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Database error while executing UPDATE query: {e}",
         )

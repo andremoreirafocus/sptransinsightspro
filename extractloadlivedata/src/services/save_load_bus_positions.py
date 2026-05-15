@@ -93,7 +93,7 @@ def load_bus_positions_from_local_volume_file(
         file_path = f"{folder}/{file}"
         open_fn = open_fn or open
         if file.split(".")[-1] != "json":
-            structured_logger.info(
+            structured_logger.debug(
                 event="pending_storage_file_started",
                 status=EVENT_STATUS_STARTED,
                 message=f"Pending file '{file}' is compressed.",
@@ -134,7 +134,7 @@ def remove_local_file(
     remove_fn = remove_fn or os.remove
     filename_without_path, _ = get_file_name_from_data(data)
     filename = f"{ingest_buffer_folder}/{filename_without_path}*"
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_file_started",
         status=EVENT_STATUS_STARTED,
         message=f"Attempting to remove local file(s) matching '{filename}' from '{ingest_buffer_folder}'",
@@ -201,9 +201,7 @@ def save_bus_positions_to_storage_with_retries(
     with_metrics: bool = False,
 ) -> Any:
     def get_config(config):
-        # Usamos uma chave específica para retries de storage,
-        # ou reaproveitamos a da API conforme sua preferência
-        storage_max_retries = int(config.get("STORAGE_MAX_RETRIES", 5))
+        storage_max_retries = config["STORAGE_MAX_RETRIES"]
         return storage_max_retries
 
     storage_max_retries = get_config(config)
@@ -267,7 +265,7 @@ def save_bus_positions_to_storage(config: ConfigDict, data: PayloadDict) -> None
         )
         raise ValueError("Data structure is invalid.")
     hour_minute, total_qv, total_bus_lines = get_payload_summary(data)
-    structured_logger.info(
+    structured_logger.debug(
         event="storage_persist_started",
         status=EVENT_STATUS_STARTED,
         message=f"Received data for {total_qv} vehicles from {total_bus_lines} bus lines.",
@@ -334,12 +332,12 @@ def data_structure_is_valid(data: Any) -> bool:
     for field in required_fields:
         if field not in metadata:
             structured_logger.error(
-                event="storage_persist_failed",
+                event="metadata_validation_failed",
                 status=EVENT_STATUS_FAILED,
                 message=f"Missing required metadata field: {field}",
             )
             structured_logger.error(
-                event="storage_persist_failed",
+                event="metadata_validation_failed",
                 status=EVENT_STATUS_FAILED,
                 message=f"Metadata content: {data.get('metadata')}",
             )
@@ -393,33 +391,28 @@ def save_data_to_raw_object_storage(
         }
         return raw_bucket_name, app_folder, connection_data
 
-    structured_logger.info(
-        event="storage_persist_started",
-        status=EVENT_STATUS_STARTED,
-        message="Preparing to save data to storage...",
-    )
     raw_bucket_name, app_folder, connection_data = get_config(config)
     if data:
         filename, partition = get_file_name_from_data(json.loads(data))
         prefix = f"{app_folder}/{partition}"
         destination_object_name = f"{prefix}{filename}"
         output_buffer: bytes
-        structured_logger.info(
+        structured_logger.debug(
             event="storage_persist_started",
             status=EVENT_STATUS_STARTED,
             message=f"Saving data to storage with object name: {destination_object_name}",
         )
         try:
             if compression:
-                structured_logger.info(
-                    event="storage_persist_started",
+                structured_logger.debug(
+                    event="object_storage_compression_started",
                     status=EVENT_STATUS_STARTED,
                     message="Compressing data with zstd...",
                 )
                 output_buffer, file_name_extension = compress_data(data)
                 destination_object_name += file_name_extension
                 structured_logger.info(
-                    event="storage_persist_succeeded",
+                    event="object_storage_compression_succeeded",
                     status=EVENT_STATUS_SUCCEEDED,
                     message="Data compressed successfully.",
                 )

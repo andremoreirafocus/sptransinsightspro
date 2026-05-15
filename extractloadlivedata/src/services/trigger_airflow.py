@@ -143,17 +143,6 @@ def trigger_pending_airflow_dag_invokations(
 
 
 def get_utc_logical_date_from_file(pending_marker: str) -> str:
-    current_timezone_name = datetime.now(ZoneInfo("localtime")).tzname()
-    structured_logger.info(
-        event="notification_dispatch_started",
-        status=EVENT_STATUS_STARTED,
-        message=f"Current timezone: {current_timezone_name}",
-    )
-    structured_logger.info(
-        event="notification_dispatch_started",
-        status=EVENT_STATUS_STARTED,
-        message=f"pending_marker : {pending_marker}",
-    )
     timestamp = pending_marker.split("-")[1].split(".")[0]
     year = timestamp[0:4]
     month = timestamp[4:6]
@@ -164,6 +153,11 @@ def get_utc_logical_date_from_file(pending_marker: str) -> str:
     dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
     dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
     logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+    structured_logger.debug(
+        event="get_utc_logical_date_succeeded",
+        status=EVENT_STATUS_SUCCEEDED,
+        message=f"Logical date extracted: {dt_utc}",
+    )
     return logical_date
 
 

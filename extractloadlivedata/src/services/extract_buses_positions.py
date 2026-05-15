@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple
 import re
 from html import unescape
+import json
 
 
 structured_logger = get_structured_logger(
@@ -42,16 +43,16 @@ def extract_buses_positions_with_retries(
             base_url=api_base_url,
             session=session,
         )
-        structured_logger.info(
-            event="extract_positions_succeeded",
+        structured_logger.debug(
+            event="api_get_successful",
             status=EVENT_STATUS_SUCCEEDED,
-            message=f"valor de buses_positions_payload: {buses_positions_payload}",
+            message=f"Size of buses_positions_payload in bytes: {len(json.dumps(buses_positions_payload, ensure_ascii=False).encode('utf-8'))}",
         )
         if buses_positions_payload is not None:
             if buses_positions_response_is_valid(buses_positions_payload):
                 if retries > 0:
-                    structured_logger.info(
-                        event="extract_positions_succeeded",
+                    structured_logger.warning(
+                        event="extract_positions_succeeded_after_retries",
                         status=EVENT_STATUS_SUCCEEDED,
                         message=f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}.",
                     )
@@ -98,7 +99,7 @@ def get_buses_positions_with_metadata(
         "payload": buses_positions_payload,
     }
     structured_logger.info(
-        event="extract_positions_succeeded",
+        event="summarize_extracted_positions_succeeded",
         status=EVENT_STATUS_SUCCEEDED,
         message=f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}",
     )
@@ -122,35 +123,35 @@ def extract_buses_positions(
     try:
         response_auth = session.post(auth_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
-            structured_logger.info(
-                event="extract_positions_started",
+            structured_logger.debug(
+                event="api_authentication_successful",
                 status=EVENT_STATUS_STARTED,
                 message=f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!",
             )
         else:
             structured_logger.error(
-                event="extract_positions_failed",
+                event="api_authentication_failed",
                 status=EVENT_STATUS_FAILED,
                 message=f"Error during authentication. {sanitize_html_text(response_auth.text)}",
             )
             return None
     except Exception as e:
         structured_logger.error(
-            event="extract_positions_failed",
+            event="api_authentication_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Error connecting: {str(e)}",
         )
         return None
     try:
-        structured_logger.info(
-            event="extract_positions_started",
+        structured_logger.debug(
+            event="api_get_started",
             status=EVENT_STATUS_STARTED,
             message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!",
         )
         response = session.get(posicao_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response.status_code == 200:
-            structured_logger.info(
-                event="extract_positions_succeeded",
+            structured_logger.debug(
+                event="api_get_successful",
                 status=EVENT_STATUS_SUCCEEDED,
                 message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!",
             )
@@ -158,14 +159,14 @@ def extract_buses_positions(
             return data
         else:
             structured_logger.error(
-                event="extract_positions_failed",
+                event="api_get_failed",
                 status=EVENT_STATUS_FAILED,
                 message=f"Error {response.status_code} getting positions from {posicao_url}: {sanitize_html_text(response.text)}",
             )
             return None
     except Exception as e:
         structured_logger.error(
-            event="extract_positions_failed",
+            event="api_get_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Error during execution: {str(e)}",
         )

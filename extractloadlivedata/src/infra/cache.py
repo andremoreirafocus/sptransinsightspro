@@ -28,7 +28,7 @@ def get_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] = None
     if _cache is None:
         os.makedirs(cache_dir, exist_ok=True)
         _cache = cache_factory(cache_dir)
-        structured_logger.info(
+        structured_logger.debug(
             event="pending_storage_file_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message=f"Cache initialized at {cache_dir}",
@@ -45,7 +45,7 @@ def add_to_cache(cache_dir: str, key: str, value: Any, cache_factory: Optional[C
         key: Cache key
         value: Value to store
     """
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_file_started",
         status=EVENT_STATUS_STARTED,
         message=f"Adding to cache with key '{key}'",
@@ -69,14 +69,14 @@ def get_from_cache(cache_dir: str, cache_factory: Optional[Callable[..., Any]] =
     Returns:
         list: Sorted list of all cache keys
     """
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_scan_succeeded",
         status=EVENT_STATUS_STARTED,
         message="Retrieving all items from cache...",
     )
     cache = get_cache(cache_dir, cache_factory=cache_factory)
     items = sorted(list(cache))
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_scan_succeeded",
         status=EVENT_STATUS_SUCCEEDED,
         message=f"Found {len(items)} item(s) in cache.",
@@ -107,7 +107,7 @@ def remove_from_cache(cache_dir: str, key: str, cache_factory: Optional[Callable
         cache_dir: Cache directory path
         key: Cache key to remove
     """
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_file_started",
         status=EVENT_STATUS_STARTED,
         message=f"Removing cache entry with key '{key}'",
@@ -115,14 +115,14 @@ def remove_from_cache(cache_dir: str, key: str, cache_factory: Optional[Callable
     cache = get_cache(cache_dir, cache_factory=cache_factory)
     if key in cache:
         del cache[key]
-        structured_logger.info(
-            event="pending_storage_file_succeeded",
+        structured_logger.debug(
+            event="remove_pending_storage_file_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message=f"Cache entry '{key}' removed successfully.",
         )
     else:
         structured_logger.warning(
-            event="pending_storage_file_failed",
+            event="remove_pending_storage_file_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Cache entry '{key}' not found in cache.",
         )

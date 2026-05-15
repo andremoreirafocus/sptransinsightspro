@@ -35,7 +35,7 @@ def create_pending_processing_request(
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
-    structured_logger.info(
+    structured_logger.debug(
         event="pending_storage_file_started",
         status=EVENT_STATUS_STARTED,
         message=f"Creating pending processing request for '{pending_marker}'",
@@ -78,39 +78,27 @@ def remove_pending_processing_request(
 def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
     """Extract logical date from filename and convert to UTC timezone-aware datetime."""
     try:
-        structured_logger.info(
-            event="notification_dispatch_started",
-            status=EVENT_STATUS_STARTED,
-            message=f"Extracting logical date from: {pending_marker}",
-        )
-        # Remove extension(s) to get the timestamp
-        # e.g., "posicoes_onibus-202602150936.json" or "posicoes_onibus-202602150936.json.zst"
         filename_without_ext = pending_marker.split(".")[0]
         timestamp = filename_without_ext.split("-")[-1]
-        # Parse timestamp: YYYYMMDDHHMM format
         year = int(timestamp[0:4])
         month = int(timestamp[4:6])
         day = int(timestamp[6:8])
         hour = int(timestamp[8:10])
         minute = int(timestamp[10:12])
-
-        # Create datetime in São Paulo timezone
         dt_obj = datetime(
             year, month, day, hour, minute, tzinfo=ZoneInfo("America/Sao_Paulo")
         )
-
-        # Convert to UTC
         dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
 
-        structured_logger.info(
-            event="notification_dispatch_succeeded",
+        structured_logger.debug(
+            event="get_utc_logical_date_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
-            message=f"Logical date extracted: {dt_utc}",
+            message=f"Logical date extracted: {dt_utc}. From: {pending_marker}",
         )
         return dt_utc
     except Exception as e:
         structured_logger.error(
-            event="notification_dispatch_failed",
+            event="get_utc_logical_date_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Error extracting logical date from file '{pending_marker}': {e}",
             error_type=type(e).__name__,
@@ -165,7 +153,7 @@ def save_processing_request(
         return connection, schema, table
 
     try:
-        structured_logger.info(
+        structured_logger.debug(
             event="notification_dispatch_started",
             status=EVENT_STATUS_STARTED,
             message=f"Saving processing request for: '{pending_marker}'",
@@ -197,7 +185,7 @@ def save_processing_request(
         )
         if success:
             structured_logger.info(
-                event="notification_dispatch_succeeded",
+                event="db_storage_persist_succeeded",
                 status=EVENT_STATUS_SUCCEEDED,
                 message=f"Processing request saved successfully for marker '{pending_marker}' with logical_date '{logical_date}'",
             )

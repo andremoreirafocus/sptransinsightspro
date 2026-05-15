@@ -22,8 +22,8 @@ def save_data_to_json_file(
     makedirs_fn = makedirs_fn or os.makedirs
     try:
         if compression:
-            structured_logger.info(
-                event="storage_persist_started",
+            structured_logger.debug(
+                event="local_storage_persist_started",
                 status=EVENT_STATUS_STARTED,
                 message="Compressing data..",
             )
@@ -31,7 +31,7 @@ def save_data_to_json_file(
             data, file_name_extension = compress_data(data)
             file_name += file_name_extension
             structured_logger.info(
-                event="storage_persist_succeeded",
+                event="local_storage_compression_succeeded",
                 status=EVENT_STATUS_SUCCEEDED,
                 message="Data compressed successfully.",
             )
@@ -39,22 +39,22 @@ def save_data_to_json_file(
             mode = "w"
         makedirs_fn(downloads_folder, exist_ok=True)
         file_with_path = os.path.join(downloads_folder, file_name)
-        structured_logger.info(
-            event="storage_persist_started",
+        structured_logger.debug(
+            event="local_storage_persist_started",
             status=EVENT_STATUS_STARTED,
             message=f"Writing buses_positions to file {file_with_path} ...",
         )
         with open_fn(file_with_path, mode) as file:
             file.write(data)
-        structured_logger.info(
-            event="storage_persist_succeeded",
+        structured_logger.debug(
+            event="local_storage_persist_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
             message="File saved successfully!!!",
         )
         return True
     except Exception as e:
         structured_logger.error(
-            event="storage_persist_failed",
+            event="local_storage_persist_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Failed to save file: {e}",
             error_type=type(e).__name__,

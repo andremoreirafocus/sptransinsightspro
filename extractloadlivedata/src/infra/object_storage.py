@@ -41,7 +41,7 @@ def list_objects_in_object_storage_bucket(
         return [obj.object_name for obj in objects]
     except Exception as e:
         structured_logger.error(
-            event="pending_storage_scan_failed",
+            event="object_storage_list_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Error listing files in MinIO folder: {e}",
         )
@@ -70,7 +70,7 @@ def read_file_from_object_storage(
         return content
     except Exception as e:
         structured_logger.error(
-            event="storage_persist_failed",
+            event="object_storage_persist_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Error reading JSON from MinIO: {e}",
         )
@@ -113,8 +113,8 @@ def write_generic_bytes_to_object_storage(
         length=data_length,
         content_type="application/octet-stream",
     )
-    structured_logger.info(
-        event="storage_persist_succeeded",
+    structured_logger.debug(
+        event="object_storage_persist_succeeded",
         status=EVENT_STATUS_SUCCEEDED,
         message=f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'",
     )
