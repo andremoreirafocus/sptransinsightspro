@@ -1,6 +1,6 @@
 # Observabilidade
 
-Este diretório contém a configuração da stack centralizada de observabilidade de logs da plataforma, baseada em **Grafana + Loki + Promtail**.
+Este diretório contém a configuração da stack centralizada de observabilidade de logs da plataforma, baseada em **Grafana + Loki + Promtail + Alertmanager**.
 
 A observabilidade é tratada como capacidade transversal da plataforma e não apenas como monitoramento de um serviço isolado. A estratégia do projeto cobre três dimensões complementares: estruturação de logs, rastreamento de linhagem de dados e instrumentação de métricas de execução.
 
@@ -21,6 +21,7 @@ Como referência de instrumentação de execução e métricas, o `extractloadli
 | **Loki** | Backend de agregação de logs. Recebe streams de logs estruturados e os armazena indexados por labels. |
 | **Promtail** | Agente de envio de logs. Coleta logs dos containers via Docker socket e os encaminha ao Loki. |
 | **Grafana** | Camada de visualização. Consulta o Loki via LogQL e renderiza dashboards. |
+| **Alertmanager** | Gerenciador de alertas. Recebe alertas de regras (ex.: Loki Ruler) e aplica roteamento, agrupamento e deduplicação. |
 
 Os três serviços estão definidos no `docker-compose.yml` raiz e compartilham a rede `rede_fia`.
 
@@ -87,6 +88,8 @@ curl -X POST http://admin:<senha>@localhost:3000/api/admin/provisioning/dashboar
 observability/
   loki/
     loki-config.yml          # Configuração do Loki (armazenamento em filesystem, nó único)
+  alertmanager/
+    alertmanager.yml         # Configuração do Alertmanager (roteamento e receivers)
   promtail/
     promtail-config.yml      # Configuração do Promtail (Docker socket, filtro extractloadlivedata)
   grafana/
@@ -103,3 +106,4 @@ observability/
 | Serviço | URL |
 |---|---|
 | Grafana | http://localhost:3000 |
+| Alertmanager | http://localhost:9093 |

@@ -59,16 +59,17 @@ The diagram below complements the DAG descriptions by showing the event-driven o
 - `transformlivedata` publishes the Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` and `updatelatestpositions` are triggered by that Dataset, which means they run automatically after successful completion of the `transformlivedata` pipeline
 
-### Local Centralised Log Stack (Loki + Promtail + Grafana)
+### Local Centralised Log Stack (Loki + Promtail + Grafana + Alertmanager)
 
 - `loki`: log backend for ingestion, indexing, and querying of structured events
 - `promtail`: Docker container log collector that ships logs to Loki
 - `grafana`: log exploration and visualisation interface
+- `alertmanager`: alert manager for routing and grouping alerts emitted by the observability layer
 
 Minimal observability stack startup:
 
 ```bash
-docker compose up -d loki promtail grafana
+docker compose up -d loki promtail grafana alertmanager
 ```
 
 ## Configuration
@@ -123,6 +124,7 @@ docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
 docker compose up -d alertservice
 docker compose up -d jupyter
+docker compose up -d loki promtail grafana alertmanager
 ```
 
 ## Monitoring and configuration access
@@ -135,6 +137,18 @@ Airflow:
 
 Jupyter:
 `http://localhost:8888/`
+
+Loki (readiness):
+`http://localhost:3100/ready`
+
+Promtail (readiness):
+`http://localhost:9080/ready`
+
+Grafana:
+`http://localhost:3000/`
+
+Alertmanager:
+`http://localhost:9093/`
 
 ## Unified pipeline configuration
 

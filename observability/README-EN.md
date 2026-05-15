@@ -1,6 +1,6 @@
 # Observability
 
-This directory contains the configuration for the platform's centralized log observability stack, based on **Grafana + Loki + Promtail**.
+This directory contains the configuration for the platform's centralized log observability stack, based on **Grafana + Loki + Promtail + Alertmanager**.
 
 Observability is treated as a cross-platform capability, not only as monitoring for a single service. The project strategy covers three complementary dimensions: log structuring, data-lineage tracking, and execution metrics instrumentation.
 
@@ -21,6 +21,7 @@ As an execution/metrics instrumentation reference, `extractloadlivedata` records
 | **Loki** | Log aggregation backend. Receives structured log streams and stores them indexed by labels. |
 | **Promtail** | Log shipping agent. Scrapes container logs via the Docker socket and forwards them to Loki. |
 | **Grafana** | Visualization layer. Queries Loki using LogQL and renders dashboards. |
+| **Alertmanager** | Alert management component. Receives rule-based alerts (for example from Loki Ruler) and applies routing, grouping, and deduplication. |
 
 All three services are defined in the root `docker-compose.yml` and share the `rede_fia` network.
 
@@ -87,6 +88,8 @@ curl -X POST http://admin:<password>@localhost:3000/api/admin/provisioning/dashb
 observability/
   loki/
     loki-config.yml          # Loki server config (filesystem storage, single-node)
+  alertmanager/
+    alertmanager.yml         # Alertmanager config (routing and receivers)
   promtail/
     promtail-config.yml      # Promtail scrape config (Docker socket, extractloadlivedata filter)
   grafana/
@@ -103,3 +106,4 @@ observability/
 | Service | URL |
 |---|---|
 | Grafana | http://localhost:3000 |
+| Alertmanager | http://localhost:9093 |

@@ -55,16 +55,17 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
 
-### Stack local de logs cenralizados (Loki + Promtail + Grafana)
+### Stack local de logs centralizados (Loki + Promtail + Grafana + Alertmanager)
 
 - `loki`: backend de logs para ingestão, indexação e consulta de eventos estruturados
 - `promtail`: agente de coleta de logs dos containers Docker com envio para o Loki
 - `grafana`: interface de exploração e visualização de logs
+- `alertmanager`: gerenciador de alertas para roteamento e consolidação de alertas emitidos pela camada de observabilidade
 
 Subida mínima da stack de observabilidade:
 
 ```bash
-docker compose up -d loki promtail grafana
+docker compose up -d loki promtail grafana alertmanager
 ```
 
 ## Configuração
@@ -116,7 +117,7 @@ docker compose up -d
   docker compose up -d extractloadlivedata
   docker compose up -d alertservice
   docker compose up -d jupyter
-  docker compose up -d loki promtail grafana
+  docker compose up -d loki promtail grafana alertmanager
 ```
 
 
@@ -139,6 +140,9 @@ docker compose up -d
 
  Grafana:
  http://localhost:3000/
+
+ Alertmanager:
+ http://localhost:9093/
 
 ## Configuração unificada de pipelines
 Para padronizar a configuração entre pipelines e ambientes, o projeto utiliza o módulo `pipeline_configurator` (em `dags-dev/pipeline_configurator` e promovido para `airflow/dags/pipeline_configurator`).  

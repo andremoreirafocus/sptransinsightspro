@@ -205,6 +205,19 @@ services:
       - rede_fia
     restart: always
 
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - rede_fia
+    restart: always
+
 networks:
   rede_fia:
     driver: bridge
