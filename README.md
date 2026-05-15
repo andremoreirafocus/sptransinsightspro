@@ -18,19 +18,19 @@ A plataforma adota observabilidade estruturada, gerando ganhos diretos de rastre
 
 Para implementar a solução foram adotados os componentes:
 - Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, alertservice, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
-- [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
+- [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTrans a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
 - [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
-- Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada.
+- Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados transformados e com qualidade checada.
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
-- PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
+- PostgreSQL: utilizado para armazenar a camada refined, proporcionando consultas com baixa latência na camada de visualização.
 - [PowerBI](./powerbi/README.md): utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL.
 - Loki: backend de agregação e consulta de logs estruturados, responsável por indexar streams de logs por labels e disponibilizar consultas LogQL para monitoramento operacional. [Mais informações de Observabilidade](./observability/README.md).
 - Promtail: agente de coleta e envio de logs dos containers Docker para o Loki, realizando descoberta via Docker socket e etapas de parsing para logs JSON. [Mais informações de Observabilidade](./observability/README.md).
 - Grafana: camada de visualização da observabilidade, com datasource Loki e dashboards provisionados para análise de execução, falhas, warnings e métricas operacionais. [Mais informações de Observabilidade](./observability/README.md).
 - [Airflow](./airflow/README.md): para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. 
 O ambiente de desenvolvimento se encontra na pasta [dags-dev](./dags-dev/README.md)
-Detalhes sobre as DAGS:
+Detalhes sobre as DAGs:
     - [DAG gtfs](./dags-dev/gtfs/README.md): processo composto de 3 etapas principais, com checagem de qualidade ao longo do fluxo, geração de um relatório consolidado por execução e publicação de um Airflow Dataset ao final de uma execução bem sucedida para disparar a sincronização downstream para a camada refined.   
         - extração e carga de arquivos: extrai os dados GTFS da SPTrans, valida os arquivos e salva na camada raw, gerando diagnóstico consolidado em caso de falha.
         - transformação: converte as tabelas base do GTFS para Parquet, aplica checagem de qualidade (Great Expectations quando configurado), usa staging antes da promoção para o caminho final e quarentena em caso de falha.
@@ -55,40 +55,11 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
 
-### Stack local de logs centralizados (Loki + Promtail + Grafana + Alertmanager)
-
-- `loki`: backend de logs para ingestão, indexação e consulta de eventos estruturados
-- `promtail`: agente de coleta de logs dos containers Docker com envio para o Loki
-- `grafana`: interface de exploração e visualização de logs
-- `alertmanager`: gerenciador de alertas para roteamento e consolidação de alertas emitidos pela camada de observabilidade
-
-Subida mínima da stack de observabilidade:
-
-```bash
-docker compose up -d loki promtail grafana alertmanager
-```
-
 ## Configuração
-Um template de configuração está disponível em `.env.example` na raiz do projeto. Este arquivo contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata).
+O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
+Para detalhes específicos de observabilidade e alertas, consulte [observability/README.md](./observability/README.md).
 
 ## Para executar o Sptransinsights
-Ao iniciar o projeto seguindo as instruções abaixo, deve-se em seguida, executar alguns comandos de inicialização que estão discriminados em cada subprojeto, especialmente:
-- [Airflow](./airflow/README.md)
-- [gtfs](./dags-dev/gtfs/README.md)
-- [transformlivedata](./dags-dev/transformlivedata/README.md)
-- [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
-- [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
-- [extractloadlivedata](./extractloadlivedata/README.md)
-- [alertservice](./alertservice/README.md)
-
-Para iniciar o projeto:
-Crie `.env` na raiz do projeto com base em `.env.example` preenchendo todos os campos:
-
-```bash
-cp .env.example .env
-# Edite .env e preencha as credenciais necessárias
-```
- 
 O caminho recomendado para iniciar a plataforma sem falhas prematuras de serviços dependentes de banco é:
 
 ```bash
@@ -109,19 +80,27 @@ Caso deseje subir a plataforma manualmente, o comando base continua sendo:
 docker compose up -d
 ```
 
- Caso deseje iniciar serviços específicos:
- ```shell
-  docker compose up -d minio
-  docker compose up -d postgres
-  docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
-  docker compose up -d extractloadlivedata
-  docker compose up -d alertservice
-  docker compose up -d jupyter
-  docker compose up -d loki promtail grafana alertmanager
+Caso deseje iniciar serviços específicos:
+```shell
+docker compose up -d minio
+docker compose up -d postgres
+docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
+docker compose up -d extractloadlivedata
+docker compose up -d alertservice
+docker compose up -d jupyter
+docker compose up -d loki promtail grafana alertmanager
 ```
 
+Porém será necessário seguir as instruções abaixo, executando alguns comandos de inicialização que estão discriminados em cada subprojeto:
+- [Airflow](./airflow/README.md)
+- [gtfs](./dags-dev/gtfs/README.md)
+- [transformlivedata](./dags-dev/transformlivedata/README.md)
+- [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
+- [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
+- [extractloadlivedata](./extractloadlivedata/README.md)
+- [alertservice](./alertservice/README.md)
 
-## Para monitorar os serviços ou efetuar configurações:
+## Para monitorar os serviços ou efetuar configurações
 
  Minio:
  http://localhost:9001/login

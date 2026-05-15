@@ -145,13 +145,13 @@ services:
     ports:
       - "8000:8000"
     environment:
-      SMTP_HOST: sandbox.smtp.mailtrap.io
-      SMTP_PORT: "587"
+      SMTP_HOST: ${ALERTSERVICE_SMTP_HOST:-sandbox.smtp.mailtrap.io}
+      SMTP_PORT: ${ALERTSERVICE_SMTP_PORT:-587}
       SMTP_USER: ${ALERTSERVICE_SMTP_USER}
       SMTP_PASSWORD: ${ALERTSERVICE_SMTP_PASSWORD}
-      SMTP_USE_TLS: "true"
-      EMAIL_FROM: andre.moreira.engineer@gmail.com
-      EMAIL_TO: andremoreira.focus@gmail.com
+      SMTP_USE_TLS: ${ALERTSERVICE_SMTP_USE_TLS:-true}
+      EMAIL_FROM: ${ALERTSERVICE_EMAIL_FROM:-andre.moreira.engineer@gmail.com}
+      EMAIL_TO: ${ALERTSERVICE_EMAIL_TO:-andremoreira.focus@gmail.com}
       EMAIL_SUBJECT_PREFIX: "[DQ] status update for pipeline"
     volumes:
       - alertservice_data:/app/storage
@@ -167,6 +167,7 @@ services:
       - "3100:3100"
     volumes:
       - ./observability/loki/loki-config.yml:/etc/loki/local-config.yml:ro
+      - ./observability/loki/rules:/loki/rules:ro
       - loki_data:/loki
     networks:
       - rede_fia
@@ -210,6 +211,14 @@ services:
     container_name: alertmanager
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
+    environment:
+      ALERTSERVICE_SMTP_HOST: ${ALERTSERVICE_SMTP_HOST:-sandbox.smtp.mailtrap.io}
+      ALERTSERVICE_SMTP_PORT: ${ALERTSERVICE_SMTP_PORT:-587}
+      ALERTSERVICE_SMTP_USER: ${ALERTSERVICE_SMTP_USER}
+      ALERTSERVICE_SMTP_PASSWORD: ${ALERTSERVICE_SMTP_PASSWORD}
+      ALERTSERVICE_SMTP_USE_TLS: ${ALERTSERVICE_SMTP_USE_TLS:-true}
+      ALERTSERVICE_EMAIL_FROM: ${ALERTSERVICE_EMAIL_FROM:-andre.moreira.engineer@gmail.com}
+      ALERTSERVICE_EMAIL_TO: ${ALERTSERVICE_EMAIL_TO:-andremoreira.focus@gmail.com}
     ports:
       - "9093:9093"
     volumes:

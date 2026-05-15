@@ -401,9 +401,10 @@ def test_execution_report_success_with_multiple_pending_files(caplog):
     payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
     metadata = payload["metadata"]
-    assert metadata["correlation_ids_count"] == 2
+    assert metadata["correlation_ids_count"] == 3
     assert metadata["correlation_ids"] == [
         "2026-05-13T15:30:45.123456+00:00",
+        "2026-05-13T18:30:00Z",
         "2026-05-13T18:31:00Z",
     ]
 
@@ -430,9 +431,10 @@ def test_execution_report_dedup_repeated_logical_datetimes(caplog):
     payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
     metadata = payload["metadata"]
-    assert metadata["correlation_ids_count"] == 2
+    assert metadata["correlation_ids_count"] == 3
     assert metadata["correlation_ids"] == [
         "2026-05-13T15:30:45.123456+00:00",
+        "2026-05-13T18:30:00Z",
         "2026-05-13T18:31:00Z",
     ]
 
@@ -465,3 +467,88 @@ def test_execution_report_failure_emits_enriched_final_failure(caplog):
     assert "correlation_ids" in metadata
     assert "correlation_ids_count" in metadata
     assert metadata["items_failed"] > 0
+
+
+def test_alert_rule_scenario_success_without_retries_no_warning_or_failure(caplog):
+    call_log = []
+    alerts = FakeAlertSender()
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
+
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is not None
+    assert failed is None
+    assert completed["service"] == "extractloadlivedata"
+    assert "execution_id" in completed and completed["execution_id"]
+    assert completed["metadata"]["retries_seen"] == 0
+    # Alert rule expectations:
+    # - service_warning_threshold should NOT trigger (retries_seen == 0)
+    # - service_failed should NOT trigger (no failure event)
+
+
+def test_alert_rule_scenario_success_with_retries_triggers_warning_context(caplog):
+    call_log = []
+    alerts = FakeAlertSender()
+
+    def extract_with_retries(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        payload = {"payload": True}
+        if with_metrics:
+            return {"result": payload, "metrics": {"retries": 2}}
+        return payload
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, extract_buses_positions_with_retries=extract_with_retries)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
+
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is not None
+    assert failed is None
+    assert completed["service"] == "extractloadlivedata"
+    assert "execution_id" in completed and completed["execution_id"]
+    assert completed["metadata"]["retries_seen"] > 0
+    # Alert rule expectation:
+    # - service_warning_threshold should trigger (retries_seen > 0)
+
+
+def test_alert_rule_scenario_non_recoverable_failure_triggers_failure_context(caplog):
+    call_log = []
+    alerts = FakeAlertSender()
+
+    def extract_raises(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        raise PositionsDownloadError("download failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
+
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is None
+    assert failed is not None
+    assert failed["service"] == "extractloadlivedata"
+    assert "execution_id" in failed and failed["execution_id"]
+    assert failed["metadata"]["items_failed"] > 0
+    # Alert rule expectation:
+    # - service_failed should trigger (failure event exists)

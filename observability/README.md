@@ -47,6 +47,22 @@ Significado dos campos de correlação no execution report:
 
 Os três serviços estão definidos no `docker-compose.yml` raiz e compartilham a rede `rede_fia`.
 
+## Alertas por E-mail
+
+O Loki Ruler avalia as regras e envia alertas para o Alertmanager, que aplica roteamento por severidade e envia notificações por e-mail.
+
+Regras atualmente configuradas para `extractloadlivedata`:
+- `ServiceFailed` (`severity=critical`): dispara quando há `execution_failed_non_recoverable`.
+- `ServiceWarningThreshold` (`severity=warning`): dispara quando a execução finaliza com `retries_seen > 0`.
+
+Configuração de e-mail usada pelo Alertmanager:
+- `ALERTSERVICE_SMTP_HOST`
+- `ALERTSERVICE_SMTP_PORT`
+- `ALERTSERVICE_SMTP_USER`
+- `ALERTSERVICE_SMTP_PASSWORD`
+- `ALERTSERVICE_EMAIL_FROM`
+- `ALERTSERVICE_EMAIL_TO`
+
 ## Arquitetura
 
 ```

@@ -66,6 +66,8 @@ The diagram below complements the DAG descriptions by showing the event-driven o
 - `grafana`: log exploration and visualisation interface
 - `alertmanager`: alert manager for routing and grouping alerts emitted by the observability layer
 
+In this stack, Loki Ruler evaluates alert rules and forwards events to Alertmanager, which sends email notifications by severity.
+
 Minimal observability stack startup:
 
 ```bash
@@ -74,7 +76,8 @@ docker compose up -d loki promtail grafana alertmanager
 
 ## Configuration
 
-A configuration template is available in `.env.example` at the project root. This file contains all environment variables required for the infrastructure to work, including MinIO, Airflow, `alertservice`, and `extractloadlivedata`.
+The `.env` file at the project root contains all environment variables required for the infrastructure to work (MinIO, Airflow, `alertservice`, and `extractloadlivedata`), using `.env.example` as the configuration template.
+For observability and alert-specific details, see [observability/README-EN.md](./observability/README-EN.md).
 
 ## Running Sptransinsights
 
@@ -86,14 +89,6 @@ After starting the project following the instructions below, you must then execu
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README-EN.md)
 - [extractloadlivedata](./extractloadlivedata/README-EN.md)
 - [alertservice](./alertservice/README-EN.md)
-
-To start the project:
-Create `.env` at the project root based on `.env.example` and fill in all required fields:
-
-```bash
-cp .env.example .env
-# Edit .env and provide the required credentials
-```
 
 The recommended path to start the platform without premature failures from database-dependent services is:
 
