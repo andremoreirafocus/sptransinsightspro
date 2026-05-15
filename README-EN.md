@@ -12,18 +12,23 @@ The solution adopts a monorepo structure and is composed of several subprojects.
 
 The project’s main design decisions, chosen technologies, rejected alternatives, and accepted tradeoffs are documented as Architecture Decision Records in `docs/adr_EN/`. The ADRs cover topics ranging from the choice of Medallion Architecture and DuckDB as the transformation engine to the durable PostgreSQL queue design, the multi-layer data quality framework, the `alertservice` design, and the pipeline promotion workflow.
 
+The platform adopts structured observability, generating direct gains in end-to-end traceability across components and pipelines, reduced failure diagnosis time, and stronger operational reliability through continuous service health monitoring. This approach delivers execution traceability across multiple pipelines through metrics instrumentation, with correlation via `correlation_id` based on ingest date/time (processed data) and `execution_id` (execution). The result is end-to-end auditability and consistent operational monitoring with data-lineage visibility.
+
 [ADR index](./docs/adr_EN/README-EN.md)
 ![Solution diagram](./diagrama_solucao.png)
 
 The following components were adopted to implement the solution:
 - Docker and Docker Compose: used to package and run the solution components in containers, and to orchestrate local environment startup with services such as Airflow, PostgreSQL, MinIO, Jupyter, `extractloadlivedata`, `alertservice`, Loki, Promtail, and Grafana, reducing manual setup effort and increasing environment reproducibility.
-- [extractloadlivedata](./extractloadlivedata/README-EN.md): microservice that extracts data from the SPTrans API at regular intervals, initially every 2 minutes, while allowing this interval to be reduced, which would not be feasible with an Airflow job because execution delays would compromise interval precision. It saves data first to a local volume and then to the raw layer implemented with MinIO. Implements production-grade observability with structured JSON logs, execution tracking, per-phase metrics (extract/save/notify) with timing, and data lineage tracking via `correlation_id` based on the data timestamp.
+- [extractloadlivedata](./extractloadlivedata/README-EN.md): microservice that extracts data from the SPTrans API at regular intervals, initially every 2 minutes, while allowing this interval to be reduced, which would not be feasible with an Airflow job because execution delays would compromise interval precision. It saves data first to a local volume and then to the raw layer implemented with MinIO.
 - [alertservice](./alertservice/README-EN.md): microservice that receives quality summaries via webhook from the ingest microservice and the pipelines, and sends email notifications with immediate failure alerts and cumulative warning alerts based on per-pipeline thresholds.
 - MinIO: used to implement the raw layer for storing raw data extracted from the SPTrans API and GTFS data, and also the trusted layer for transformed data with quality checks applied.
 - DuckDB: used in transformation processes to run SQL queries directly on Parquet tables stored in the trusted layer implemented through MinIO, with excellent performance and without requiring SQL engines such as Presto, therefore reducing infrastructure complexity. It is also used for exploratory analysis through Jupyter.
 - [Jupyter](./jupyter/README-EN.md): used to create notebooks for exploratory data analysis over the trusted layer stored in object storage.
 - PostgreSQL: used to store the refined layer, enabling low-latency queries for the visualization layer.
 - [Power BI](./powerbi/README-EN.md): used to implement the visualization layer because of its flexibility, power, and wide adoption, consuming data directly from the refined layer through PostgreSQL DirectQuery.
+- Loki: structured-log aggregation and query backend, responsible for indexing log streams by labels and enabling LogQL queries for operational monitoring. [More observability information](./observability/README-EN.md).
+- Promtail: log collection and shipping agent that gathers Docker container logs and forwards them to Loki, including parsing stages for structured JSON logs. [More observability information](./observability/README-EN.md).
+- Grafana: observability visualization layer, with Loki datasource and provisioned dashboards for execution analysis, failures, warnings, and operational metrics. [More observability information](./observability/README-EN.md).
 - [Airflow](./airflow/README-EN.md): used for orchestration of recurring pipeline processes through multiple DAGs using Python Operator. The production environment for this module is in the `airflow` folder.
 
 The development environment is located in [dags-dev](./dags-dev/README-EN.md).
@@ -65,36 +70,6 @@ Minimal observability stack startup:
 ```bash
 docker compose up -d loki promtail grafana
 ```
-
-## Observability
-
-The platform implements structured observability as a standard, enabling full tracing of data and executions across multiple pipelines. The observability strategy covers three dimensions: log structuring, data lineage tracking, and metrics instrumentation.
-
-### Structured JSON Logs
-
-All critical events are emitted in structured JSON format, ready for ingestion by aggregation systems such as Loki and Prometheus. This ensures logs are:
-- Machine-readable for automated analysis
-- Consistent in format across components
-- Easily filterable and queryable
-
-### Data Lineage Tracking
-
-The `correlation_id` based on `logical_datetime` (data timestamp) enables tracing "all processing of this data" across all pipelines:
-
-```
-extractloadlivedata → transformlivedata → refinedfinishedtrips → refined.latest_positions
-```
-
-This makes it possible to audit transformations, diagnose data loss, and validate full lineage of critical data.
-
-### Execution and Metrics Instrumentation
-
-`extractloadlivedata` implements production-grade instrumentation as an example of the adopted approach:
-- **Execution tracking**: ISO 8601 `execution_id` (UTC timestamp) correlates all logs from one execution
-- **Per-phase metrics**: extract, save, and notify phases instrumented with attempt/success/failure counts and durations
-- **Execution metrics final event**: `execution_metrics_final` structured for Prometheus/AlertManager queries, providing operational visibility for each execution
-
-This approach enables fast anomaly detection, efficient failure diagnosis, and continuous visibility into the platform's operational health.
 
 ## Configuration
 

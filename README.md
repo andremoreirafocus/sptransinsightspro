@@ -11,6 +11,8 @@ A solução adota o conceito de monorepo e é composta por alguns subprojetos. C
 ## Arquitetura
 As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada, o design do alertservice e o workflow de promoção de pipelines.
 
+A plataforma adota observabilidade estruturada, gerando ganhos diretos de rastreabilidade ponta a ponta entre componentes e pipelines, redução do tempo de diagnóstico de falhas e maior confiabilidade operacional no acompanhamento contínuo da saúde dos serviços. Essa abordagem entrega rastreamento de execuções ao longo dos múltiplos pipelines por meio de instrumentação de métricas, com correlação por `correlation_id` baseado na data/hora do ingest (dado processado) e `execution_id` (execução). O resultado é auditoria ponta a ponta e monitoramento operacional consistente com visão da linhagem de dados.
+
 [Índice de ADRs](./docs/adr/README.md)
 ![Diagrama da solução](./diagrama_solucao.png)
 
@@ -18,11 +20,14 @@ Para implementar a solução foram adotados os componentes:
 - Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, alertservice, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
 - [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTRANS a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
 - [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
-- Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada
-- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter
+- Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados trasnformados e com qualidade checada.
+- DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
 - PostgreSQL: utilizado para armazenar a camada refined, porporcionando consultas com baixa latência na camada de visualização.
 - [PowerBI](./powerbi/README.md): utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL.
+- Loki: backend de agregação e consulta de logs estruturados, responsável por indexar streams de logs por labels e disponibilizar consultas LogQL para monitoramento operacional. [Mais informações de Observabilidade](./observability/README.md).
+- Promtail: agente de coleta e envio de logs dos containers Docker para o Loki, realizando descoberta via Docker socket e etapas de parsing para logs JSON. [Mais informações de Observabilidade](./observability/README.md).
+- Grafana: camada de visualização da observabilidade, com datasource Loki e dashboards provisionados para análise de execução, falhas, warnings e métricas operacionais. [Mais informações de Observabilidade](./observability/README.md).
 - [Airflow](./airflow/README.md): para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. 
 O ambiente de desenvolvimento se encontra na pasta [dags-dev](./dags-dev/README.md)
 Detalhes sobre as DAGS:
@@ -61,38 +66,6 @@ Subida mínima da stack de observabilidade:
 ```bash
 docker compose up -d loki promtail grafana
 ```
-
-
-## Observabilidade
-
-A plataforma implementa observabilidade estruturada como padrão, permitindo rastreamento completo de dados e execuções através de múltiplas pipelines. A estratégia de observabilidade cobre três dimensões: estruturação de logs, rastreamento de linhagem de dados e instrumentação de métricas.
-
-### Logs Estruturados em JSON
-
-Todos os eventos críticos são emitidos em formato JSON estruturado, pronto para ingestão por sistemas de agregação como Loki e Prometheus. Isso garante que logs sejam:
-- Máquina-legíveis para análise automatizada
-- Consistentes em formato entre componentes
-- Facilmente filtráveis e consultáveis
-
-### Rastreamento de Linhagem de Dados
-
-O `correlation_id` baseado em `logical_datetime` (timestamp do dado) permite rastrear "todo processamento deste dado" através de todas as pipelines:
-
-```
-extractloadlivedata → transformlivedata → refinedfinishedtrips → refined.latest_positions
-```
-
-Isso possibilita auditar transformações, diagnosticar perdas de dados e validar linhagem completa de dados críticos.
-
-### Instrumentação de Execução e Métricas
-
-O extractloadlivedata implementa instrumentação de nível de produção como exemplo da abordagem adotada:
-- **Rastreamento de execução**: `execution_id` em formato ISO 8601 (timestamp UTC) correlaciona todos os logs de uma execução
-- **Métricas por fase**: instrumentação das fases extract, save e notify com tentativas/sucessos/falhas e duração
-- **Evento de métricas finais**: `execution_metrics_final` estruturado para queries Prometheus/AlertManager, fornecendo visibilidade operacional de cada execução
-
-Essa abordagem permite detecção rápida de anomalias, diagnóstico eficiente de falhas e visibilidade contínua da saúde operacional da plataforma.
-
 
 ## Configuração
 Um template de configuração está disponível em `.env.example` na raiz do projeto. Este arquivo contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata).
