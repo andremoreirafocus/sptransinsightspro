@@ -14,6 +14,28 @@ Fluxo de informação entre pipelines monitorado pela observabilidade:
 
 Como referência de instrumentação de execução e métricas, o `extractloadlivedata` registra métricas por fase (`extract`, `save`, `notify`) com tentativas, sucessos, falhas e duração, além do evento final `execution_metrics_final`, estruturado para consultas em Prometheus/AlertManager e visibilidade operacional de cada execução.
 
+## Contrato de Execution Report
+
+Para alertas e monitoramento de resultado de execução, os eventos finais de relatório são:
+- `execution_completed`
+- `execution_failed_non_recoverable`
+
+Semântica de correlação:
+- `execution_id`: identificador primário de correlação no nível da execução (chave principal para alertas e monitoramento de resultado).
+- `correlation_id`: identificador de escopo de requisição/dado (item individual processado); não é obrigatório em eventos finais de resultado da execução.
+
+Campos obrigatórios no `metadata` de execution report:
+- `execution_seconds`
+- `items_total`
+- `items_failed`
+- `retries_seen`
+- `correlation_ids` (lista de correlações trabalhadas na execução, ordenada e sem duplicidades)
+- `correlation_ids_count` (quantidade total de correlações únicas trabalhadas)
+
+Significado dos campos de correlação no execution report:
+- `correlation_ids`: subconjunto ordenado (e eventualmente truncado) das correlações únicas processadas na execução, útil para diagnóstico rápido e amostragem operacional.
+- `correlation_ids_count`: quantidade total de correlações únicas processadas na execução, incluindo itens que não aparecem em `correlation_ids` quando houver truncamento.
+
 ## Stack
 
 | Componente | Papel |

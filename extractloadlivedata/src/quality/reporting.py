@@ -1,6 +1,58 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Literal, Optional
 
+MAX_CORRELATION_IDS_IN_REPORT = 50
+
+
+def _dedup_keep_order(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))
+
+
+def _prepare_correlation_ids_payload(
+    worked_correlation_ids: list[str],
+    *,
+    max_items: int = MAX_CORRELATION_IDS_IN_REPORT,
+) -> Dict[str, Any]:
+    deduped_ids = _dedup_keep_order(worked_correlation_ids)
+    correlation_ids_count = len(deduped_ids)
+    correlation_ids = deduped_ids[:max_items]
+    correlation_ids_truncated = correlation_ids_count > len(correlation_ids)
+    return {
+        "correlation_ids": correlation_ids,
+        "correlation_ids_count": correlation_ids_count,
+        "correlation_ids_truncated": correlation_ids_truncated,
+    }
+
+
+def build_execution_report_metadata(
+    *,
+    execution_seconds: float,
+    items_total: int,
+    items_failed: int,
+    retries_seen: int,
+    worked_correlation_ids: list[str],
+    phase_metrics: Optional[Dict[str, Dict[str, int]]] = None,
+    phase_durations: Optional[Dict[str, float]] = None,
+    logical_datetime: Optional[str] = None,
+) -> Dict[str, Any]:
+    correlation_payload = _prepare_correlation_ids_payload(worked_correlation_ids)
+    metadata: Dict[str, Any] = {
+        "execution_seconds": execution_seconds,
+        "items_total": items_total,
+        "items_failed": items_failed,
+        "retries_seen": retries_seen,
+        "correlation_ids": correlation_payload["correlation_ids"],
+        "correlation_ids_count": correlation_payload["correlation_ids_count"],
+        "correlation_ids_truncated": correlation_payload["correlation_ids_truncated"],
+    }
+    if phase_metrics is not None:
+        metadata["phase_metrics"] = phase_metrics
+    if phase_durations is not None:
+        metadata["phase_durations"] = phase_durations
+    if logical_datetime is not None:
+        metadata["logical_datetime"] = logical_datetime
+    return metadata
+
 
 def build_quality_summary(
     pipeline: str,

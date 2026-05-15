@@ -1,4 +1,8 @@
-from src.quality.reporting import build_quality_summary, create_failure_quality_report
+from src.quality.reporting import (
+    build_execution_report_metadata,
+    build_quality_summary,
+    create_failure_quality_report,
+)
 
 
 def test_build_quality_summary_contract_shape():
@@ -44,3 +48,59 @@ def test_create_failure_quality_report_returns_summary_only():
     assert report["acceptance_rate"] == 1.0
     assert report["retries"] == 3
     assert "details" not in report
+
+
+def test_build_execution_report_metadata_includes_required_fields():
+    metadata = build_execution_report_metadata(
+        execution_seconds=12.5,
+        items_total=10,
+        items_failed=1,
+        retries_seen=2,
+        worked_correlation_ids=["2026-05-10T12:00:00Z"],
+    )
+    assert metadata["execution_seconds"] == 12.5
+    assert metadata["items_total"] == 10
+    assert metadata["items_failed"] == 1
+    assert metadata["retries_seen"] == 2
+    assert metadata["correlation_ids"] == ["2026-05-10T12:00:00Z"]
+    assert metadata["correlation_ids_count"] == 1
+    assert metadata["correlation_ids_truncated"] is False
+
+
+def test_build_execution_report_metadata_dedups_and_preserves_order():
+    metadata = build_execution_report_metadata(
+        execution_seconds=3.2,
+        items_total=4,
+        items_failed=0,
+        retries_seen=0,
+        worked_correlation_ids=[
+            "2026-05-10T12:02:00Z",
+            "2026-05-10T12:01:00Z",
+            "2026-05-10T12:02:00Z",
+            "2026-05-10T12:03:00Z",
+            "2026-05-10T12:01:00Z",
+        ],
+    )
+    assert metadata["correlation_ids"] == [
+        "2026-05-10T12:02:00Z",
+        "2026-05-10T12:01:00Z",
+        "2026-05-10T12:03:00Z",
+    ]
+    assert metadata["correlation_ids_count"] == 3
+    assert metadata["correlation_ids_truncated"] is False
+
+
+def test_build_execution_report_metadata_applies_truncation_with_count():
+    worked_correlation_ids = [f"corr-{i:03d}" for i in range(60)]
+    metadata = build_execution_report_metadata(
+        execution_seconds=9.0,
+        items_total=60,
+        items_failed=0,
+        retries_seen=0,
+        worked_correlation_ids=worked_correlation_ids,
+    )
+    assert len(metadata["correlation_ids"]) == 50
+    assert metadata["correlation_ids"][0] == "corr-000"
+    assert metadata["correlation_ids"][-1] == "corr-049"
+    assert metadata["correlation_ids_count"] == 60
+    assert metadata["correlation_ids_truncated"] is True

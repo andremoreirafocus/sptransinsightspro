@@ -14,6 +14,28 @@ Pipeline information flow monitored by observability:
 
 As an execution/metrics instrumentation reference, `extractloadlivedata` records per-phase metrics (`extract`, `save`, `notify`) with attempts, successes, failures, and duration, plus the final `execution_metrics_final` event, structured for Prometheus/AlertManager queries and per-execution operational visibility.
 
+## Execution Report Contract
+
+For execution-outcome alerting and monitoring, the final report events are:
+- `execution_completed`
+- `execution_failed_non_recoverable`
+
+Correlation semantics:
+- `execution_id`: primary execution-level correlation key (main key for alerting and execution-outcome monitoring).
+- `correlation_id`: request/data-scope correlation key (individual processed item); not required in final execution-outcome events.
+
+Required `metadata` fields for execution report events:
+- `execution_seconds`
+- `items_total`
+- `items_failed`
+- `retries_seen`
+- `correlation_ids` (list of correlations worked during the execution, ordered and deduplicated)
+- `correlation_ids_count` (total number of unique correlations worked)
+
+Meaning of correlation fields in execution report:
+- `correlation_ids`: ordered subset (and possibly truncated) of unique correlations processed in the execution, useful for quick diagnosis and operational sampling.
+- `correlation_ids_count`: total number of unique correlations processed in the execution, including items not present in `correlation_ids` when truncation occurs.
+
 ## Stack
 
 | Component | Role |

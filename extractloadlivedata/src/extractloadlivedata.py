@@ -13,7 +13,11 @@ import time
 
 from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 from src.orchestration_dependencies import Services, ConfigDict
-from src.quality.reporting import create_failure_quality_report, build_quality_summary
+from src.quality.reporting import (
+    build_execution_report_metadata,
+    build_quality_summary,
+    create_failure_quality_report,
+)
 from src.infra.alertservice_client import send_alert
 from src.infra.structured_logging import get_structured_logger
 
@@ -140,6 +144,7 @@ def extractloadlivedata(
     }
     phase_durations: Dict[str, float] = {}
     logical_datetime: Optional[str] = None
+    worked_correlation_ids: list[str] = []
     try:
         ingest_buffer_folder, notification_engine, webhook_url = _get_config_values(config)
         structured_logger.debug(
@@ -222,6 +227,8 @@ def extractloadlivedata(
                 buses_positions_payload
             )
             logical_datetime = buses_positions["metadata"]["extracted_at"]
+            if logical_datetime:
+                worked_correlation_ids.append(logical_datetime)
             phase_metrics["extract"]["succeeded"] = 1
             structured_logger.debug(
                 event="local_storage_persist_started",
@@ -310,6 +317,8 @@ def extractloadlivedata(
                 items_total += 1
                 phase_metrics["save"]["attempted"] += 1
                 file_logical_datetime = get_utc_logical_date_from_file(pending_storage_save_file)
+                if file_logical_datetime:
+                    worked_correlation_ids.append(file_logical_datetime)
                 structured_logger.debug(
                     event="pending_storage_file_started",
                     status=EVENT_STATUS_STARTED,
@@ -491,26 +500,26 @@ def extractloadlivedata(
             _emit_failure_alert("unknown")
         finally:
             phase_durations["notify"] = time.time() - notify_start
-
     execution_end = time.time()
     execution_seconds = execution_end - execution_start
     items_total = sum(phase_metrics[op]["attempted"] for op in phase_metrics)
     items_failed = sum(phase_metrics[op]["failed"] for op in phase_metrics)
-
+    execution_report_metadata = build_execution_report_metadata(
+        execution_seconds=execution_seconds,
+        items_total=items_total,
+        items_failed=items_failed,
+        retries_seen=retries_seen,
+        worked_correlation_ids=worked_correlation_ids,
+        phase_metrics=phase_metrics,
+        phase_durations=phase_durations,
+        logical_datetime=logical_datetime,
+    )
     structured_logger.info(
         event="execution_metrics_final",
         status=EVENT_STATUS_SUCCEEDED,
         execution_id=execution_id,
         message="Execution metrics finalized.",
-        metadata={
-            "execution_seconds": execution_seconds,
-            "phase_metrics": phase_metrics,
-            "phase_durations": phase_durations,
-            "logical_datetime": logical_datetime,
-            "items_total": items_total,
-            "items_failed": items_failed,
-            "retries_seen": retries_seen,
-        },
+        metadata=execution_report_metadata,
     )
 
     if items_failed > 0:
@@ -519,7 +528,7 @@ def extractloadlivedata(
             status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
             message="Execution finished with non-recoverable failures.",
-            metadata={"items_total": items_total, "items_failed": items_failed, "retries_seen": retries_seen},
+            metadata=execution_report_metadata,
         )
         return
     if retries_seen > 0:
@@ -531,5 +540,5 @@ def extractloadlivedata(
         status=EVENT_STATUS_SUCCEEDED,
         execution_id=execution_id,
         message="extractloadlivedata execution completed successfully.",
-        metadata={"items_total": items_total, "items_failed": items_failed, "retries_seen": retries_seen},
+        metadata=execution_report_metadata,
     )
