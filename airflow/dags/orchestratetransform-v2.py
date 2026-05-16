@@ -6,6 +6,7 @@ from airflow.models.dagrun import DagRunState
 from airflow.api.common.trigger_dag import trigger_dag
 from airflow.utils.db import create_session
 from airflow.utils import timezone
+from airflow.exceptions import DagRunAlreadyExists
 from orchestratetransform.services.processed_requests_helper import (
     get_unprocessed_requests,
 )
@@ -114,11 +115,20 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
                             f"Run with run_id: {existing_run.run_id} is already {existing_run.state}. Skipping new trigger."
                         )
                         return "SKIPPED_RUNNING"
-                    else:
+                    elif existing_run.state == DagRunState.SUCCESS:
                         logger.info(
                             f"Run with run_id: {existing_run.run_id} is in state: {existing_run.state}. "
-                            f"Creating a new run anyway."
+                            "Skipping new trigger for the same logical_date."
                         )
+                        return "SKIPPED_EXISTING"
+                    else:
+                        logger.info(
+                            "Run with run_id: %s is in terminal state %s. "
+                            "Skipping new trigger for the same logical_date.",
+                            existing_run.run_id,
+                            existing_run.state,
+                        )
+                        return "SKIPPED_EXISTING"
                 session.commit()
         logger.info(
             "Triggering DAG '%s' for logical_date: %s", dag_name, logical_date_str
@@ -135,6 +145,13 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
             f"(dag_id: {dag_name})"
         )
         return "TRIGGERED"
+    except DagRunAlreadyExists as e:
+        logger.info(
+            "DAG run already exists for logical_date %s. Skipping trigger. Details: %s",
+            logical_date,
+            e,
+        )
+        return "SKIPPED_EXISTING"
 
     except Exception as e:
         logger.error(
@@ -182,6 +199,11 @@ def trigger_dag_for_unprocessed_requests():
                     "Skipping trigger because DAG is already running for logical_date: %s",
                     request["logical_date"],
                 )
+            if result == "SKIPPED_EXISTING":
+                logger.info(
+                    "Skipping trigger because a DAG run already exists for logical_date: %s",
+                    request["logical_date"],
+                )
     else:
         logger.info("No unprocessed requests found.")
 
@@ -191,6 +213,7 @@ with DAG(
     default_args=default_args,
     description="Orchestrate transform for unprocessed requests",
     schedule_interval="*/2 * * * *",  # Use cron expression for every minute
+    max_active_runs=1,
     catchup=False,
     tags=["sptrans"],
 ) as dag:
