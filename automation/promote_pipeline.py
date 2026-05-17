@@ -18,6 +18,14 @@ def promote_pipeline(pipeline_name):
     quality_prod_path = os.path.join(prod_dir, "quality")
     pipeline_configurator_dev_path = os.path.join(dev_dir, "pipeline_configurator")
     pipeline_configurator_prod_path = os.path.join(prod_dir, "pipeline_configurator")
+    rsync_excludes = [
+        "--exclude",
+        "__pycache__",
+        "--exclude",
+        ".pytest_cache",
+        "--exclude",
+        "tests",
+    ]
     # 1. Check if pipeline exists
     if not os.path.isdir(pipeline_dev_path):
         print(f"❌ Pipeline folder '{pipeline_name}' not found in dags-dev/")
@@ -49,12 +57,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
-            "--exclude",
-            ".pytest_cache",
-            "--exclude",
-            "tests",
+            *rsync_excludes,
             f"{pipeline_dev_path}/",
             f"{pipeline_prod_path}/",
         ],
@@ -69,8 +72,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{infra_dev_path}/",
             f"{infra_prod_path}/",
         ],
@@ -82,8 +84,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{quality_dev_path}/",
             f"{quality_prod_path}/",
         ],
@@ -95,8 +96,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{pipeline_configurator_dev_path}/",
             f"{pipeline_configurator_prod_path}/",
         ],
