@@ -19,7 +19,7 @@
             "raw_data_compression_extension": ".zst"
         },
         "notifications": {
-            "webhook_url": "http://localhost:8000/notify"
+            "webhook_url": "disabled"
         },
         "data_validations": {
             "json_validation": {
