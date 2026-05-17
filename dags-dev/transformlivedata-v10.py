@@ -68,7 +68,7 @@ if _IN_AIRFLOW:
         transform_positions_task
 else:
     def main():
-        logical_date_string = "2026-04-27T15:14:00+00:00"
+        logical_date_string = "2026-05-16T16:08:00+00:00"
         result = transform_positions(logical_date_string)
         logger.info(f"Pipeline result: {result}")
 
