@@ -179,33 +179,124 @@ def trigger_dag_for_unprocessed_requests():
         f"Waiting {wait_time_seconds} seconds for ingest service to complete file processing..."
     )
     time.sleep(wait_time_seconds)
-    unprocessed_requests = get_unprocessed_requests(config)
-    if unprocessed_requests:
-        logger.info(f"Found {len(unprocessed_requests)} unprocessed requests.")
-        for request in unprocessed_requests:
-            logger.info(
-                f"Found request with filename: {request['filename']} and logical_date: {request['logical_date']}"
+
+    metrics = {
+        "pending_requests_total": 0,
+        "pending_logical_dates_total": 0,
+        "target_dag_state_counts": {
+            "no_run": 0,
+            "queued": 0,
+            "running": 0,
+            "success": 0,
+            "failed": 0,
+            "other": 0,
+        },
+        "trigger_outcomes": {
+            "triggered": 0,
+            "skipped_running": 0,
+            "skipped_existing": 0,
+            "failed": 0,
+        },
+    }
+
+    def _normalize_state(state):
+        if state == DagRunState.QUEUED:
+            return "queued"
+        if state == DagRunState.RUNNING:
+            return "running"
+        if state == DagRunState.SUCCESS:
+            return "success"
+        if state == DagRunState.FAILED:
+            return "failed"
+        return "other"
+
+    def _count_existing_run_states_for_logical_dates(dag_id, logical_dates):
+        if not logical_dates:
+            return
+        with create_session() as session:
+            existing_runs = (
+                session.query(DagRun)
+                .filter(
+                    and_(
+                        DagRun.dag_id == dag_id,
+                        DagRun.execution_date.in_(logical_dates),
+                    )
+                )
+                .all()
             )
-            result = run_dag_for_unprocessed_request(dag_name, request["logical_date"])
-            if result == "FAILED":
-                logger.error(
-                    f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
-                )
-                raise RuntimeError(
-                    f"Failed to trigger DAG for request with logical_date: {request['logical_date']}"
-                )
-            if result == "SKIPPED_RUNNING":
+
+        by_logical_date = {}
+        for run in existing_runs:
+            by_logical_date.setdefault(run.execution_date, []).append(run.state)
+
+        for logical_date in logical_dates:
+            states = by_logical_date.get(logical_date, [])
+            if not states:
+                metrics["target_dag_state_counts"]["no_run"] += 1
+                continue
+            for state in states:
+                metrics["target_dag_state_counts"][_normalize_state(state)] += 1
+
+    unprocessed_requests = get_unprocessed_requests(config)
+    failure_reason = None
+    try:
+        if unprocessed_requests:
+            metrics["pending_requests_total"] = len(unprocessed_requests)
+            pending_logical_dates = sorted(
+                {
+                    request["logical_date"]
+                    for request in unprocessed_requests
+                    if request.get("logical_date")
+                }
+            )
+            metrics["pending_logical_dates_total"] = len(pending_logical_dates)
+            _count_existing_run_states_for_logical_dates(dag_name, pending_logical_dates)
+
+            logger.info(f"Found {len(unprocessed_requests)} unprocessed requests.")
+            for request in unprocessed_requests:
                 logger.info(
-                    "Skipping trigger because DAG is already running for logical_date: %s",
-                    request["logical_date"],
+                    f"Found request with filename: {request['filename']} and logical_date: {request['logical_date']}"
                 )
-            if result == "SKIPPED_EXISTING":
-                logger.info(
-                    "Skipping trigger because a DAG run already exists for logical_date: %s",
-                    request["logical_date"],
+                result = run_dag_for_unprocessed_request(
+                    dag_name, request["logical_date"]
                 )
-    else:
-        logger.info("No unprocessed requests found.")
+                if result == "TRIGGERED":
+                    metrics["trigger_outcomes"]["triggered"] += 1
+                elif result == "SKIPPED_RUNNING":
+                    metrics["trigger_outcomes"]["skipped_running"] += 1
+                    logger.info(
+                        "Skipping trigger because DAG is already running for logical_date: %s",
+                        request["logical_date"],
+                    )
+                elif result == "SKIPPED_EXISTING":
+                    metrics["trigger_outcomes"]["skipped_existing"] += 1
+                    logger.info(
+                        "Skipping trigger because a DAG run already exists for logical_date: %s",
+                        request["logical_date"],
+                    )
+                else:
+                    metrics["trigger_outcomes"]["failed"] += 1
+                    failure_reason = (
+                        "Failed to trigger DAG for request with logical_date: "
+                        f"{request['logical_date']}"
+                    )
+                    logger.error(failure_reason)
+                    break
+        else:
+            logger.info("No unprocessed requests found.")
+    finally:
+        logger.info(
+            "orchestratetransform execution summary | "
+            "pending_requests_total=%s | pending_logical_dates_total=%s | "
+            "target_dag_state_counts=%s | trigger_outcomes=%s",
+            metrics["pending_requests_total"],
+            metrics["pending_logical_dates_total"],
+            metrics["target_dag_state_counts"],
+            metrics["trigger_outcomes"],
+        )
+
+    if failure_reason:
+        raise RuntimeError(failure_reason)
 
 
 with DAG(
