@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 VARIABLES_DIR="${PROJECT_ROOT}/airflow/variables_and_connections"
 GENERATED_CONNECTIONS_FILE="${VARIABLES_DIR}/generated_connections.json"
 ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/wait_helpers.sh"
 
 SERVICE_NAME="airflow_webserver"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
@@ -33,21 +35,11 @@ docker_compose_exec() {
 }
 
 wait_for_airflow() {
-  local elapsed=0
-
-  echo "Waiting for Airflow CLI to become available..."
-
-  until docker_compose_exec airflow users list --output json >/dev/null 2>&1; do
-    sleep "${WAIT_INTERVAL_SECONDS}"
-    elapsed=$((elapsed + WAIT_INTERVAL_SECONDS))
-
-    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SECONDS}" ]; then
-      echo "Timed out waiting for Airflow CLI to become available."
-      exit 1
-    fi
-  done
-
-  echo "Airflow CLI is available."
+  wait_for_condition \
+    "Airflow CLI to become available" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    docker_compose_exec airflow users list --output json
 }
 
 admin_user_exists() {

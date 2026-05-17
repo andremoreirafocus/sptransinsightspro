@@ -31,7 +31,8 @@ Starts the platform with prior infrastructure and Airflow bootstrap to avoid sta
 5. Runs `bootstrap_postgres.sh`
 6. Starts `airflow_webserver` and `airflow_scheduler`
 7. Runs `bootstrap_airflow_app.sh`
-8. Starts the rest of the platform with `docker compose up -d`
+8. Runs `bootstrap_observability.sh`
+9. Starts the rest of the platform with `docker compose up -d`
 
 **Usage:**
 ```bash
@@ -73,6 +74,22 @@ Ensures bootstrap for the Airflow application layer.
 ```bash
 cd automation
 ./bootstrap_airflow_app.sh
+```
+
+---
+
+### `bootstrap_observability.sh`
+
+Ensures bootstrap for the observability stack.
+
+**What it does, in order:**
+1. Starts `loki`, `promtail`, `grafana`, and `alertmanager`
+2. Waits for the stack readiness/health endpoints
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_observability.sh
 ```
 
 ---
@@ -147,6 +164,16 @@ Note: when `<folder>/.venv/bin/python` exists, that interpreter is automatically
 Internal helper module. Not executed directly.
 
 Exposes the function `run_command(command, error_msg)`, which executes subprocesses and stops execution with an error message if a command fails.
+
+---
+
+### `wait_helpers.sh`
+
+Internal helper module for DRY service-wait logic.
+
+Exposes functions reused by bootstrap scripts:
+- `wait_for_condition(label, timeout_seconds, interval_seconds, cmd...)`
+- `check_http_url(url)`
 
 ## Typical development flow
 

@@ -72,6 +72,7 @@ Esse script:
 - executa o bootstrap do MinIO
 - executa o bootstrap dos artefatos obrigatórios de banco
 - sobe a camada de aplicação do Airflow e executa seu bootstrap
+- executa o bootstrap da stack de observabilidade
 - sobe o restante da plataforma somente após a conclusão do bootstrap
 
 Caso deseje subir a plataforma manualmente, o comando base continua sendo:

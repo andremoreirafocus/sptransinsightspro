@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/wait_helpers.sh"
 
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-2}"
@@ -21,42 +23,21 @@ load_env_file() {
 wait_for_postgres_service() {
   local service_name="$1"
   local db_user="$2"
-  local elapsed=0
-
-  echo "Waiting for service '${service_name}' to accept connections..."
-
-  until docker compose exec -T "${service_name}" pg_isready -U "${db_user}" -d postgres >/dev/null 2>&1; do
-    sleep "${WAIT_INTERVAL_SECONDS}"
-    elapsed=$((elapsed + WAIT_INTERVAL_SECONDS))
-
-    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SECONDS}" ]; then
-      echo "❌ Timed out waiting for service '${service_name}' to become available."
-      exit 1
-    fi
-  done
-
-  echo "✅ Service '${service_name}' is available."
+  wait_for_condition \
+    "service '${service_name}' to accept connections" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    docker compose exec -T "${service_name}" pg_isready -U "${db_user}" -d postgres
 }
 
 wait_for_http_service() {
   local service_label="$1"
   local service_url="$2"
-  local elapsed=0
-
-  echo "Waiting for service '${service_label}' to become available..."
-
-  until python3 -c 'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=2)' \
-    "${service_url}" >/dev/null 2>&1; do
-    sleep "${WAIT_INTERVAL_SECONDS}"
-    elapsed=$((elapsed + WAIT_INTERVAL_SECONDS))
-
-    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SECONDS}" ]; then
-      echo "Timed out waiting for service '${service_label}' to become available."
-      exit 1
-    fi
-  done
-
-  echo "Service '${service_label}' is available."
+  wait_for_condition \
+    "service '${service_label}' to become available" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    check_http_url "${service_url}"
 }
 
 cd "${PROJECT_ROOT}"
@@ -86,6 +67,9 @@ docker compose up -d airflow_webserver airflow_scheduler
 
 echo "==> Running Airflow application bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_airflow_app.sh"
+
+echo "==> Running observability bootstrap..."
+bash "${SCRIPT_DIR}/bootstrap_observability.sh"
 
 echo "==> Starting the remaining platform services..."
 docker compose up -d

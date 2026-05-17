@@ -27,7 +27,8 @@ Sobe a plataforma com bootstrap prévio da infraestrutura e do Airflow para evit
 5. Executa `bootstrap_postgres.sh`
 6. Sobe `airflow_webserver` e `airflow_scheduler`
 7. Executa `bootstrap_airflow_app.sh`
-8. Sobe o restante da plataforma com `docker compose up -d`
+8. Executa `bootstrap_observability.sh`
+9. Sobe o restante da plataforma com `docker compose up -d`
 
 **Uso:**
 ```bash
@@ -67,6 +68,21 @@ Garante o bootstrap da camada de aplicação do Airflow.
 ```bash
 cd automation
 ./bootstrap_airflow_app.sh
+```
+
+---
+
+### `bootstrap_observability.sh`
+Garante o bootstrap da stack de observabilidade.
+
+**O que faz, em ordem:**
+1. Sobe `loki`, `promtail`, `grafana` e `alertmanager`
+2. Aguarda os endpoints de readiness/health dessa stack
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_observability.sh
 ```
 
 ---
@@ -137,6 +153,15 @@ Observação: quando existir `<folder>/.venv/bin/python`, este interpretador é 
 Módulo auxiliar interno. Não é executado diretamente.
 
 Expõe a função `run_command(command, error_msg)` que executa subprocessos e interrompe a execução com mensagem de erro em caso de falha.
+
+---
+
+### `wait_helpers.sh`
+Módulo auxiliar interno para evitar duplicação de lógica de espera por serviços.
+
+Expõe funções reutilizadas pelos scripts de bootstrap:
+- `wait_for_condition(label, timeout_seconds, interval_seconds, cmd...)`
+- `check_http_url(url)`
 
 ## Fluxo típico de desenvolvimento
 
