@@ -208,7 +208,6 @@ def transform(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_
                 transform_and_validate_table(pipeline_config, table_name)
             )
         stage_result["validated_items_count"] = len(table_results)
-
         errors_by_table = {
             row["table_name"]: row["errors"]
             for row in table_results

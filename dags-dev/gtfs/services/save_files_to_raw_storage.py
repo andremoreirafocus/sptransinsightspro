@@ -15,28 +15,24 @@ def save_files_to_raw_storage(
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> None:
     def get_config(config):
-        try:
-            general = config["general"]
-            extraction = general["extraction"]
-            storage = general["storage"]
-            folder = extraction["local_downloads_folder"]
-            bucket_name = storage["raw_bucket"]
-            app_folder = storage["gtfs_folder"]
-            quarantined_subfolder = storage["quarantined_subfolder"]
-            connection_data = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return (
-                folder,
-                bucket_name,
-                app_folder,
-                quarantined_subfolder.strip("/"),
-                connection_data,
-            )
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        extraction = general["extraction"]
+        storage = general["storage"]
+        folder = extraction["local_downloads_folder"]
+        bucket_name = storage["raw_bucket"]
+        app_folder = storage["gtfs_folder"]
+        quarantined_subfolder = storage["quarantined_subfolder"]
+        connection_data = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return (
+            folder,
+            bucket_name,
+            app_folder,
+            quarantined_subfolder.strip("/"),
+            connection_data,
+        )
 
     (
         folder,

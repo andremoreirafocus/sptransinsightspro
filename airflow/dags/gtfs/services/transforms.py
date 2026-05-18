@@ -22,7 +22,7 @@ def transform_and_validate_table(
     save_fn: Callable[..., Any] = save_buffer_to_storage,
     validate_expectations_fn: Callable[..., Any] = validate_expectations,
 ) -> Dict[str, Any]:
-    logger.info("TRANSFORMATION STAGE - Processing table '%s'...", table_name)
+    logger.info("Processing table '%s'...", table_name)
     file_name = f"{table_name}.parquet"
     staging_object_name = (
         f"{config['general']['storage']['gtfs_folder']}/"
@@ -41,13 +41,22 @@ def transform_and_validate_table(
     try:
         csv_bytes = load_fn(config, table_name)
     except Exception as e:
+        logger.error(
+            "Failed to load raw csv for table '%s': %s",
+            table_name,
+            e,
+        )
         result["is_valid"] = False
         result["errors"].append(f"load_failed:{e}")
         return result
-
     try:
         df = pd.read_csv(csv_bytes)
     except Exception as e:
+        logger.error(
+            "Failed to parse csv for table '%s': %s",
+            table_name,
+            e,
+        )
         result["is_valid"] = False
         result["errors"].append(f"csv_parse_failed:{e}")
         return result
@@ -56,7 +65,7 @@ def transform_and_validate_table(
     suite = config.get(suite_key)
     if isinstance(suite, dict) and len(suite.get("expectations", [])) > 0:
         logger.info(
-            "TRANSFORMATION STAGE - Running expectations validation for table '%s' using suite key '%s'",
+            "Running expectations validation for table '%s' using suite key '%s'",
             table_name,
             suite_key,
         )
@@ -72,20 +81,20 @@ def transform_and_validate_table(
                 result["is_valid"] = False
                 result["errors"].append(f"gx_validation_failed:{summary}")
                 logger.error(
-                    "TRANSFORMATION STAGE - Validation failed for table '%s': %s",
+                    "Validation failed for table '%s': %s",
                     table_name,
                     summary,
                 )
             else:
                 logger.info(
-                    "TRANSFORMATION STAGE - Validation passed for table '%s'",
+                    "Validation passed for table '%s'",
                     table_name,
                 )
         except Exception as e:
             result["is_valid"] = False
             result["errors"].append(f"gx_validation_exception:{e}")
             logger.error(
-                "TRANSFORMATION STAGE - Validation exception for table '%s': %s",
+                "Validation exception for table '%s': %s",
                 table_name,
                 e,
             )
@@ -102,6 +111,11 @@ def transform_and_validate_table(
         )
         result["staged_written"] = True
     except Exception as e:
+        logger.error(
+            "Failed to stage parquet for table '%s': %s",
+            table_name,
+            e,
+        )
         result["is_valid"] = False
         result["errors"].append(f"staging_save_failed:{e}")
 

@@ -1,6 +1,5 @@
 from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
 import csv
-import pytest
 
 
 def make_config(folder):
@@ -90,8 +89,3 @@ def test_flags_unexpected_validation_error(tmp_path):
     assert result["errors_by_file"]["stops.txt"][0].startswith(
         "unexpected_validation_error:"
     )
-
-
-def test_missing_config_key_raises_value_error():
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        validate_raw_gtfs_files({}, ["stops.txt"])

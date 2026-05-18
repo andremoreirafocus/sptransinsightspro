@@ -8,25 +8,21 @@ logger = logging.getLogger(__name__)
 
 def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> Dict[str, Any]:
     def get_config(config):
-        try:
-            general = config["general"]
-            storage = general["storage"]
-            tables = general["tables"]
-            bucket_name = storage["trusted_bucket"]
-            app_folder = storage["gtfs_folder"]
-            trip_details = tables["trip_details_table_name"]
-            connection = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return bucket_name, app_folder, trip_details, connection
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        storage = general["storage"]
+        tables = general["tables"]
+        bucket_name = storage["trusted_bucket"]
+        app_folder = storage["gtfs_folder"]
+        trip_details = tables["trip_details_table_name"]
+        connection = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return bucket_name, app_folder, trip_details, connection
 
+    bucket_name, app_folder, trip_details, connection = get_config(config)
     con = None
     try:
-        bucket_name, app_folder, trip_details, connection = get_config(config)
         con = duckdb_client or get_duckdb_connection(connection)
         stop_times_table_path = f"{bucket_name}/{app_folder}/stop_times"
         stops_table_path = f"{bucket_name}/{app_folder}/stops"

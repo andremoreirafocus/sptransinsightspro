@@ -19,19 +19,15 @@ def load_raw_csv_to_buffer_from_storage(
     """
 
     def get_config(config):
-        try:
-            general = config["general"]
-            storage = general["storage"]
-            source_bucket = storage["raw_bucket"]
-            app_folder = storage["gtfs_folder"]
-            connection_data = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return source_bucket, app_folder, connection_data
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        storage = general["storage"]
+        source_bucket = storage["raw_bucket"]
+        app_folder = storage["gtfs_folder"]
+        connection_data = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return source_bucket, app_folder, connection_data
 
     source_bucket, app_folder, connection_data = get_config(config)
     logger.info(
@@ -39,6 +35,14 @@ def load_raw_csv_to_buffer_from_storage(
     )
     object_name = f"{app_folder}/{file_name}.txt"
     logger.info(f"Reading object: {object_name} from bucket: {source_bucket} ...")
-    data = read_fn(connection_data, source_bucket, object_name)
+    try:
+        data = read_fn(connection_data, source_bucket, object_name)
+    except Exception as e:
+        error_message = (
+            "Failed to load raw csv buffer from object storage: "
+            f"bucket='{source_bucket}', object='{object_name}'"
+        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e
     logger.info(f"Loaded {data.getbuffer().nbytes} bytes from {object_name}")
     return data

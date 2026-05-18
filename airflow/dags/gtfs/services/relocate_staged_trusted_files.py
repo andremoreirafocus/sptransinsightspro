@@ -43,21 +43,17 @@ def relocate_staged_trusted_files(
     move_fn: Callable[..., Any] = _move_object_with_minio,
 ) -> Dict[str, Any]:
     def get_config(cfg):
-        try:
-            storage = cfg["general"]["storage"]
-            connection_data = {
-                **cfg["connections"]["object_storage"],
-                "secure": False,
-            }
-            return (
-                storage["trusted_bucket"],
-                storage["gtfs_folder"],
-                storage["quarantined_subfolder"].strip("/"),
-                connection_data,
-            )
-        except KeyError as e:
-            logger.error("Missing required configuration key: %s", e)
-            raise ValueError(f"Missing required configuration key: {e}")
+        storage = cfg["general"]["storage"]
+        connection_data = {
+            **cfg["connections"]["object_storage"],
+            "secure": False,
+        }
+        return (
+            storage["trusted_bucket"],
+            storage["gtfs_folder"],
+            storage["quarantined_subfolder"].strip("/"),
+            connection_data,
+        )
 
     if target not in {"quarantine", "final"}:
         raise ValueError(f"Invalid relocation target: {target}")

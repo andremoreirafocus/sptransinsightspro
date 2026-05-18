@@ -15,19 +15,15 @@ def save_buffer_to_storage(
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> None:
     def get_config(config):
-        try:
-            general = config["general"]
-            storage = general["storage"]
-            destination_bucket = storage["trusted_bucket"]
-            app_folder = storage["gtfs_folder"]
-            connection_data = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return destination_bucket, app_folder, connection_data
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        storage = general["storage"]
+        destination_bucket = storage["trusted_bucket"]
+        app_folder = storage["gtfs_folder"]
+        connection_data = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return destination_bucket, app_folder, connection_data
 
     destination_bucket, app_folder, connection_data = get_config(config)
     logger.info(
@@ -48,12 +44,10 @@ def save_buffer_to_storage(
         )
         logger.info("Save data successful!")
     except Exception as e:
-        logger.error(
-            "Error writing data to MinIO bucket "
-            f"'{destination_bucket}' with object name '{destination_object_name}'."
+        error_message = (
+            "Error writing data to object storage while saving parquet buffer: "
+            f"bucket='{destination_bucket}', object='{destination_object_name}', "
+            f"error_type='{type(e).__name__}', error='{e}'"
         )
-        logger.error(f"Exception details: {e}")
-        raise ValueError(
-            "Failed to save parquet buffer to object storage: "
-            f"bucket='{destination_bucket}', object='{destination_object_name}', error='{e}'"
-        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e

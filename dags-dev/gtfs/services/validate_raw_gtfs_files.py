@@ -28,12 +28,8 @@ def validate_raw_gtfs_files(
     """
 
     def get_config(cfg):
-        try:
-            extraction = cfg["general"]["extraction"]
-            return extraction["local_downloads_folder"]
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        extraction = cfg["general"]["extraction"]
+        return extraction["local_downloads_folder"]
 
     folder = get_config(config)
     errors_by_file = {}
@@ -47,22 +43,49 @@ def validate_raw_gtfs_files(
                 for _ in reader:
                     line_count += 1
         except FileNotFoundError:
+            logger.error(
+                "RAW GTFS VALIDATION - file_not_found: file='%s', folder='%s'",
+                file_name,
+                folder,
+            )
             file_errors.append("file_not_found")
             errors_by_file[file_name] = file_errors
             continue
         except PermissionError:
+            logger.error(
+                "RAW GTFS VALIDATION - file_not_readable: file='%s', folder='%s'",
+                file_name,
+                folder,
+            )
             file_errors.append("file_not_readable")
             errors_by_file[file_name] = file_errors
             continue
         except UnicodeDecodeError:
+            logger.error(
+                "RAW GTFS VALIDATION - invalid_encoding_utf8: file='%s', folder='%s'",
+                file_name,
+                folder,
+            )
             file_errors.append("invalid_encoding_utf8")
             errors_by_file[file_name] = file_errors
             continue
         except csv.Error as e:
+            logger.error(
+                "RAW GTFS VALIDATION - invalid_csv: file='%s', folder='%s', error='%s'",
+                file_name,
+                folder,
+                e,
+            )
             file_errors.append(f"invalid_csv:{e}")
             errors_by_file[file_name] = file_errors
             continue
         except Exception as e:
+            logger.error(
+                "RAW GTFS VALIDATION - unexpected_validation_error: file='%s', folder='%s', error='%s'",
+                file_name,
+                folder,
+                e,
+            )
             file_errors.append(f"unexpected_validation_error:{e}")
             errors_by_file[file_name] = file_errors
             continue

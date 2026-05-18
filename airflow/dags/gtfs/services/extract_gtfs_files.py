@@ -24,18 +24,14 @@ def _is_safe_zip_member(base_dir: Path, member_name: str) -> bool:
 
 def extract_gtfs_files(config: Dict[str, Any], http_get_fn: Callable[..., Any] = requests.get) -> List[str]:
     def get_config(config):
-        try:
-            general = config["general"]
-            extraction = general["extraction"]
-            connection = config["connections"]["http"]
-            url = f"{connection['conn_type']}://{connection['host']}{connection['schema']}"
-            login = connection["login"]
-            password = connection["password"]
-            downloads_folder = extraction["local_downloads_folder"]
-            return url, login, password, downloads_folder
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        extraction = general["extraction"]
+        connection = config["connections"]["http"]
+        url = f"{connection['conn_type']}://{connection['host']}{connection['schema']}"
+        login = connection["login"]
+        password = connection["password"]
+        downloads_folder = extraction["local_downloads_folder"]
+        return url, login, password, downloads_folder
 
     url, login, password, downloads_folder = get_config(config)
     response = http_get_fn(url, auth=(login, password))

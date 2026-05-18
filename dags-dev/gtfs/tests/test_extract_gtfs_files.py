@@ -63,13 +63,6 @@ def test_raises_on_non_404_http_error():
         extract_gtfs_files(make_config(), http_get_fn=fake_get)
 
 
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["connections"]["http"]["host"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        extract_gtfs_files(config)
-
-
 def test_files_extracted_to_folder(tmp_path):
     zip_bytes = make_zip_bytes(["agency.txt"])
 
