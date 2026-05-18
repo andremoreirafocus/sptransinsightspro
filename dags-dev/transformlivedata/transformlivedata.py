@@ -119,7 +119,7 @@ def load_transform_save_positions(
             logical_date_context["partition_path"],
             logical_date_context["source_file"],
         )
-    except Exception as e:
+    except Exception:
         tracker.finish("load_positions", "failed")
         error_msg = "Load positions failed."
         logger.error(error_msg)
@@ -152,7 +152,7 @@ def load_transform_save_positions(
     tracker.begin("transform")
     try:
         transform_result = deps.transform_positions(pipeline_config, raw_positions)
-    except Exception as e:
+    except Exception:
         tracker.finish("transform", "failed")
         error_msg = "Transform failed."
         logger.error(error_msg)
@@ -181,7 +181,7 @@ def load_transform_save_positions(
             pipeline_config["data_expectations"],
         )
         tracker.finish("expectations_validation", "success")
-    except Exception as e:
+    except Exception:
         tracker.finish("expectations_validation", "failed")
         error_msg = "Expectations validation failed."
         logger.error(error_msg)
@@ -197,7 +197,7 @@ def load_transform_save_positions(
         deps.save_positions_to_storage(pipeline_config, valid_positions_df, "trusted")
         tracker.finish("save_trusted", "success")
         logger.info(f"Saved {valid_positions_df.shape[0]} records to trusted layer")
-    except Exception as e:
+    except Exception:
         tracker.finish("save_trusted", "failed")
         error_msg = "Failed to save trusted positions."
         logger.error(error_msg)
@@ -243,7 +243,7 @@ def load_transform_save_positions(
     try:
         deps.mark_request_as_processed(pipeline_config, logical_date_string)
         tracker.finish("mark_processed", "success")
-    except Exception as e:
+    except Exception:
         tracker.finish("mark_processed", "failed")
         error_msg = "Failed to mark request as processed."
         logger.error(error_msg)

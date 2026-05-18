@@ -13,19 +13,14 @@ def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], st
         Tuple of (connection_dict, schema_name, table_name)
 
     Raises:
-        KeyError: if configuration is missing
         ValueError: if raw_events_table_name is not in 'schema.table' format
     """
     general = config["general"]
-    if "tables" not in general or "raw_events_table_name" not in general["tables"]:
-        raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
-
     raw_events_table = general["tables"]["raw_events_table_name"]
     if "." not in raw_events_table:
         raise ValueError(
             f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
         )
-
     schema, table = raw_events_table.split(".", 1)
     db = config["connections"]["database"]
     connection = {
@@ -55,19 +50,15 @@ def get_unprocessed_requests(
               Each dictionary contains: id, filename, logical_date, processed, created_at, updated_at
               Returns empty list if table not found or query fails
     """
-    try:
-        connection, schema, table = _extract_database_config(config)
-        query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
-        logger.info(f"Fetching unprocessed requests from {schema}.{table}")
-        results = select_fn(connection, query)
-        if results:
-            logger.info(f"Found {len(results)} unprocessed request(s)")
-        else:
-            logger.info("No unprocessed requests found")
-        return results
-    except Exception as e:
-        logger.error(f"Error while fetching unprocessed requests: {e}", exc_info=True)
-        return []
+    connection, schema, table = _extract_database_config(config)
+    query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
+    logger.info(f"Fetching unprocessed requests from {schema}.{table}")
+    results = select_fn(connection, query)
+    if results:
+        logger.info(f"Found {len(results)} unprocessed request(s)")
+    else:
+        logger.info("No unprocessed requests found")
+    return results
 
 
 def mark_request_as_processed(
@@ -86,27 +77,23 @@ def mark_request_as_processed(
     Returns:
         bool: True if update was successful, False otherwise
     """
-    try:
-        connection, schema, table = _extract_database_config(config)
-        query = f"""
-            UPDATE "{schema}"."{table}"
-            SET processed = true, updated_at = NOW()
-            WHERE logical_date = :logical_date
-        """
-        logger.info(
-            f"Marking request as processed for logical_date: {logical_date} in {schema}.{table}"
+    connection, schema, table = _extract_database_config(config)
+    query = f"""
+        UPDATE "{schema}"."{table}"
+        SET processed = true, updated_at = NOW()
+        WHERE logical_date = :logical_date
+    """
+    logger.info(
+        f"Marking request as processed for logical_date: {logical_date} in {schema}.{table}"
+    )
+    success = update_fn(connection, query, {"logical_date": logical_date})
+    if success:
+        logger.info(f"Request with logical_date={logical_date} marked as processed")
+    else:
+        logger.error(
+            f"Failed to mark request as processed for logical_date={logical_date}"
         )
-        success = update_fn(connection, query, {"logical_date": logical_date})
-        if success:
-            logger.info(f"Request with logical_date={logical_date} marked as processed")
-        else:
-            logger.error(
-                f"Failed to mark request as processed for logical_date={logical_date}"
-            )
-        return success
-    except Exception as e:
-        logger.error(f"Error while marking request as processed: {e}", exc_info=True)
-        return False
+    return success
 
 
 def mark_request_as_processed_by_filename(
@@ -125,22 +112,18 @@ def mark_request_as_processed_by_filename(
     Returns:
         bool: True if update was successful, False otherwise
     """
-    try:
-        connection, schema, table = _extract_database_config(config)
-        query = f"""
-            UPDATE "{schema}"."{table}"
-            SET processed = true, updated_at = NOW()
-            WHERE filename = :filename
-        """
-        logger.info(
-            f"Marking request as processed for filename: {filename} in {schema}.{table}"
-        )
-        success = update_fn(connection, query, {"filename": filename})
-        if success:
-            logger.info(f"Request with filename={filename} marked as processed")
-        else:
-            logger.error(f"Failed to mark request as processed for filename={filename}")
-        return success
-    except Exception as e:
-        logger.error(f"Error while marking request as processed: {e}", exc_info=True)
-        return False
+    connection, schema, table = _extract_database_config(config)
+    query = f"""
+        UPDATE "{schema}"."{table}"
+        SET processed = true, updated_at = NOW()
+        WHERE filename = :filename
+    """
+    logger.info(
+        f"Marking request as processed for filename: {filename} in {schema}.{table}"
+    )
+    success = update_fn(connection, query, {"filename": filename})
+    if success:
+        logger.info(f"Request with filename={filename} marked as processed")
+    else:
+        logger.error(f"Failed to mark request as processed for filename={filename}")
+    return success

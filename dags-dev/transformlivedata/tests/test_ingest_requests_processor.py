@@ -57,7 +57,7 @@ def test_get_unprocessed_raises_on_exception():
 def test_get_unprocessed_missing_table_config_raises_key_error():
     config = make_config()
     del config["general"]["tables"]["raw_events_table_name"]
-    with pytest.raises(KeyError, match="RAW_EVENTS_TABLE_NAME"):
+    with pytest.raises(KeyError, match="raw_events_table_name"):
         get_unprocessed_requests(config)
 
 

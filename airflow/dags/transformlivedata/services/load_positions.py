@@ -49,24 +49,44 @@ def load_positions(
         compression_extension,
         connection_data,
     ) = get_config(config)
-    try:
-        prefix = f"{app_folder}/{partition_path}"
-        object_name = f"{prefix}{source_file}"
-    except Exception as e:
-        logger.error("Error building object_name: %s", e)
-        raise ValueError(f"Error building object_name: {e}")
+    prefix = f"{app_folder}/{partition_path}"
+    object_name = f"{prefix}{source_file}"
     if raw_data_compression:
         object_name += compression_extension
     logger.info(
         f"Loading position data {object_name} from bucket: {source_bucket}, folder: {app_folder}"
     )
     if raw_data_compression:
-        data = read_bytes_fn(connection_data, source_bucket, object_name)
-        logger.info("Data is compressed, decompressing...")
-        datastr = decompress_fn(data.getvalue())
-        logger.info("Data decompressed successfully.")
+        try:
+            data = read_bytes_fn(connection_data, source_bucket, object_name)
+            logger.info("Data is compressed, decompressing...")
+            datastr = decompress_fn(data.getvalue())
+            logger.info("Data decompressed successfully.")
+        except Exception as e:
+            logger.error(
+                "Failed to read/decompress object storage payload '%s': %s",
+                object_name,
+                e,
+            )
+            raise ValueError(
+                f"Failed to read/decompress object storage payload '{object_name}': {e}"
+            ) from e
     else:
-        datastr = read_str_fn(connection_data, source_bucket, object_name)
+        try:
+            datastr = read_str_fn(connection_data, source_bucket, object_name)
+        except Exception as e:
+            logger.error(
+                "Failed to read object storage payload '%s': %s",
+                object_name,
+                e,
+            )
+            raise ValueError(
+                f"Failed to read object storage payload '{object_name}': {e}"
+            ) from e
     logger.info(f"Loaded {len(datastr)} bytes from {object_name}")
-    data = json.loads(datastr)
+    try:
+        data = json.loads(datastr)
+    except Exception as e:
+        logger.error("Invalid JSON payload for '%s': %s", object_name, e)
+        raise ValueError(f"Invalid JSON payload for '{object_name}': {e}") from e
     return data

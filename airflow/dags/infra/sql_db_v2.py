@@ -12,20 +12,19 @@ def save_dataframe_to_db(connection, df, full_table_name):
         dbname = connection["database"]
         dbuser = connection["user"]
         password = connection["password"]
-    except KeyError as e:
-        logger.error(f"Missing required connection key: {e}")
-        raise ValueError(f"Missing required connection key: {e}")
-    db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-    engine = create_engine(db_uri)
-    schema = full_table_name.split(".")[0]
-    table_name = full_table_name.split(".")[1]
-    df.to_sql(
-        name=table_name,
-        con=engine,
-        schema=schema,
-        if_exists="replace",
-        index=False,
-    )
+        db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
+        engine = create_engine(db_uri)
+        schema = full_table_name.split(".")[0]
+        table_name = full_table_name.split(".")[1]
+        df.to_sql(
+            name=table_name,
+            con=engine,
+            schema=schema,
+            if_exists="replace",
+            index=False,
+        )
+    except Exception as e:
+        raise ValueError(f"Database error while saving dataframe to {full_table_name}: {e}") from e
 
 
 def update_db_table_with_dataframe(connection, df, full_table_name):
@@ -35,24 +34,25 @@ def update_db_table_with_dataframe(connection, df, full_table_name):
         dbname = connection["database"]
         dbuser = connection["user"]
         password = connection["password"]
-    except KeyError as e:
-        logger.error(f"Missing required connection key: {e}")
-        raise ValueError(f"Missing required connection key: {e}")
-    db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
-    schema = full_table_name.split(".")[0]
-    table_name = full_table_name.split(".")[1]
-    engine = create_engine(db_uri)
-    with engine.begin() as conn:
-        conn.execute(text(f'TRUNCATE TABLE refined."{table_name}"'))
-        df.to_sql(
-            name=table_name,
-            con=conn,
-            schema=schema,
-            if_exists="append",
-            index=False,
-        )
-        # Update statistics so query stays fast
-        conn.execute(text(f'ANALYZE {schema}."{table_name}"'))
+        db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
+        schema = full_table_name.split(".")[0]
+        table_name = full_table_name.split(".")[1]
+        engine = create_engine(db_uri)
+        with engine.begin() as conn:
+            conn.execute(text(f'TRUNCATE TABLE refined."{table_name}"'))
+            df.to_sql(
+                name=table_name,
+                con=conn,
+                schema=schema,
+                if_exists="append",
+                index=False,
+            )
+            # Update statistics so query stays fast
+            conn.execute(text(f'ANALYZE {schema}."{table_name}"'))
+    except Exception as e:
+        raise ValueError(
+            f"Database error while updating table with dataframe {full_table_name}: {e}"
+        ) from e
 
 
 def save_row(connection, schema, table, row_tuple, columns):
@@ -108,11 +108,9 @@ def save_row(connection, schema, table, row_tuple, columns):
         return True
 
     except Exception as e:
-        logger.error(
-            f"Database error while saving row to {schema}.{table}: {e}",
-            exc_info=True,
-        )
-        return False
+        raise ValueError(
+            f"Database error while saving row to {schema}.{table}: {e}"
+        ) from e
 
 
 def execute_select_query(connection, query):
@@ -149,8 +147,7 @@ def execute_select_query(connection, query):
         logger.info(f"Query returned {len(rows_as_dicts)} row(s)")
         return rows_as_dicts
     except Exception as e:
-        logger.error(f"Database error while executing SELECT query: {e}", exc_info=True)
-        return []
+        raise ValueError(f"Database error while executing SELECT query: {e}") from e
 
 
 def execute_update_query(connection, query, params=None):
@@ -190,5 +187,4 @@ def execute_update_query(connection, query, params=None):
         logger.info("Update query executed successfully")
         return True
     except Exception as e:
-        logger.error(f"Database error while executing UPDATE query: {e}", exc_info=True)
-        return False
+        raise ValueError(f"Database error while executing UPDATE query: {e}") from e

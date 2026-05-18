@@ -1,6 +1,9 @@
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from typing import Dict
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def build_logical_date_context(logical_date_string: str) -> Dict[str, str]:
@@ -20,4 +23,5 @@ def build_logical_date_context(logical_date_string: str) -> Dict[str, str]:
             "source_file": source_file,
         }
     except Exception as e:
-        raise RuntimeError(f"Failed to build logical date context: {e}") from e
+        logger.error("Failed to build logical date context for '%s': %s", logical_date_string, e)
+        raise ValueError(f"Failed to build logical date context: {e}") from e

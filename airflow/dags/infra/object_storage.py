@@ -1,9 +1,5 @@
 from minio import Minio
 import io
-import logging
-
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
 
 client_factory = Minio
 
@@ -38,10 +34,9 @@ def list_objects_in_object_storage_bucket(
         )
         return objects
     except Exception as e:
-        logger.error(
+        raise ValueError(
             f"Error listing files in bucket '{bucket_name}' with prefix '{prefix}': {e}"
-        )
-        raise
+        ) from e
 
 
 
@@ -55,16 +50,19 @@ def read_file_from_object_storage_to_str(
     :param object_name: Object name for the file in object storage
     :return: file content as a string
     """
+    response = None
     try:
         client = _get_object_storage_client(connection, client)
         response = client.get_object(bucket_name, object_name)
-        content = response.read().decode("utf-8")
-        response.close()
-        response.release_conn()
-        return content
+        return response.read().decode("utf-8")
     except Exception as e:
-        logger.error(f"Error reading file from {bucket_name}/{object_name}: {e}")
-        raise
+        raise ValueError(
+            f"Error reading file from {bucket_name}/{object_name}: {e}"
+        ) from e
+    finally:
+        if response is not None:
+            response.close()
+            response.release_conn()
 
 
 def read_file_from_object_storage_to_bytesio(
@@ -77,16 +75,19 @@ def read_file_from_object_storage_to_bytesio(
     :param object_name: Object name for the file in object storage
     :return: file content as io.BytesIO
     """
+    response = None
     try:
         client = _get_object_storage_client(connection, client)
         response = client.get_object(bucket_name, object_name)
-        content = io.BytesIO(response.read())
-        response.close()
-        response.release_conn()
-        return content
+        return io.BytesIO(response.read())
     except Exception as e:
-        logger.error(f"Error reading bytes from {bucket_name}/{object_name}: {e}")
-        raise
+        raise ValueError(
+            f"Error reading bytes from {bucket_name}/{object_name}: {e}"
+        ) from e
+    finally:
+        if response is not None:
+            response.close()
+            response.release_conn()
 
 
 def write_generic_bytes_to_object_storage(
@@ -122,12 +123,8 @@ def write_generic_bytes_to_object_storage(
             length=data_length,
             content_type="application/octet-stream",
         )
-        logger.info(
-            f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'"
-        )
     except Exception as e:
-        logger.error(
+        raise ValueError(
             "Error writing bytes to object storage "
             f"(bucket='{bucket_name}', object='{object_name}'): {e}"
-        )
-        raise
+        ) from e

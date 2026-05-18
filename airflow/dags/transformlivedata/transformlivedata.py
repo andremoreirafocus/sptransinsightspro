@@ -106,8 +106,8 @@ def load_transform_save_positions(
     except Exception as e:
         tracker.finish("config_load", "failed")
         tracker.emit(logger, "failed")
-        logger.error(f"Pipeline configuration validation failed: {e}")
-        raise ValueError(f"Pipeline configuration validation failed: {e}")
+        logger.error("Pipeline configuration validation failed")
+        raise ValueError("Pipeline configuration validation failed") from e
     logger.info(f"Starting execution {execution_id}")
     logger.info(f"Transforming position for {logical_date_string}...")
 
@@ -119,9 +119,9 @@ def load_transform_save_positions(
             logical_date_context["partition_path"],
             logical_date_context["source_file"],
         )
-    except Exception as e:
+    except Exception:
         tracker.finish("load_positions", "failed")
-        error_msg = f"Load positions failed: {e}"
+        error_msg = "Load positions failed."
         logger.error(error_msg)
         write_failure_report("load_positions", error_msg)
         tracker.emit(logger, "failed")
@@ -152,9 +152,9 @@ def load_transform_save_positions(
     tracker.begin("transform")
     try:
         transform_result = deps.transform_positions(pipeline_config, raw_positions)
-    except Exception as e:
+    except Exception:
         tracker.finish("transform", "failed")
-        error_msg = f"Transform failed: {e}"
+        error_msg = "Transform failed."
         logger.error(error_msg)
         write_failure_report("transform", error_msg)
         tracker.emit(logger, "failed")
@@ -181,9 +181,9 @@ def load_transform_save_positions(
             pipeline_config["data_expectations"],
         )
         tracker.finish("expectations_validation", "success")
-    except Exception as e:
+    except Exception:
         tracker.finish("expectations_validation", "failed")
-        error_msg = f"Expectations validation failed: {e}"
+        error_msg = "Expectations validation failed."
         logger.error(error_msg)
         write_failure_report("expectations", error_msg)
         tracker.emit(logger, "failed")
@@ -197,9 +197,9 @@ def load_transform_save_positions(
         deps.save_positions_to_storage(pipeline_config, valid_positions_df, "trusted")
         tracker.finish("save_trusted", "success")
         logger.info(f"Saved {valid_positions_df.shape[0]} records to trusted layer")
-    except Exception as e:
+    except Exception:
         tracker.finish("save_trusted", "failed")
-        error_msg = f"Failed to save trusted positions: {e}"
+        error_msg = "Failed to save trusted positions."
         logger.error(error_msg)
         write_failure_report("save_trusted", error_msg)
         tracker.emit(logger, "failed")
@@ -231,7 +231,7 @@ def load_transform_save_positions(
             tracker.finish("save_quarantine", "failed")
             quarantine_save_status = "FAILED"
             quarantine_save_error = str(e)
-            error_msg = f"Failed to save quarantined positions: {e}"
+            error_msg = "Failed to save quarantined positions."
             logger.error(error_msg)
             write_failure_report("save_quarantine", error_msg)
             tracker.emit(logger, "failed")
@@ -243,9 +243,9 @@ def load_transform_save_positions(
     try:
         deps.mark_request_as_processed(pipeline_config, logical_date_string)
         tracker.finish("mark_processed", "success")
-    except Exception as e:
+    except Exception:
         tracker.finish("mark_processed", "failed")
-        error_msg = f"Failed to mark request as processed: {e}"
+        error_msg = "Failed to mark request as processed."
         logger.error(error_msg)
         write_failure_report("mark_processed", error_msg)
         tracker.emit(logger, "failed")

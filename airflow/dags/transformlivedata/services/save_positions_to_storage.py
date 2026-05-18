@@ -25,29 +25,25 @@ def save_positions_to_storage(
     def get_config(
         config: Dict[str, Any], target_bucket: str
     ) -> Tuple[str, str, str, Dict[str, Any]]:
-        try:
-            general = config["general"]
-            connections = config["connections"]
-            storage = general["storage"]
-            tables = general["tables"]
-            if target_bucket == "trusted":
-                bucket_name = storage["trusted_bucket"]
-            elif target_bucket == "quarantined":
-                bucket_name = storage["quarantined_bucket"]
-            else:
-                raise ValueError(
-                    f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'."
-                )
-            app_folder = storage["app_folder"]
-            positions_table_name = tables["positions_table_name"]
-            connection_data = {
-                **connections["object_storage"],
-                "secure": False,
-            }
-            return bucket_name, app_folder, positions_table_name, connection_data
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        connections = config["connections"]
+        storage = general["storage"]
+        tables = general["tables"]
+        if target_bucket == "trusted":
+            bucket_name = storage["trusted_bucket"]
+        elif target_bucket == "quarantined":
+            bucket_name = storage["quarantined_bucket"]
+        else:
+            raise ValueError(
+                f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'."
+            )
+        app_folder = storage["app_folder"]
+        positions_table_name = tables["positions_table_name"]
+        connection_data = {
+            **connections["object_storage"],
+            "secure": False,
+        }
+        return bucket_name, app_folder, positions_table_name, connection_data
 
     bucket_name, app_folder, positions_table_name, connection_data = get_config(
         config, target_bucket
@@ -55,6 +51,8 @@ def save_positions_to_storage(
     if positions_df is None or positions_df.empty:
         logger.warning("No positions to save. DataFrame is empty.")
         return
+    con = None
+    owns_connection = False
     try:
         positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"], utc=True).dt.tz_convert(ZoneInfo("America/Sao_Paulo"))
         batch_ts = positions_df["extracao_ts"].iloc[0] 
@@ -63,7 +61,11 @@ def save_positions_to_storage(
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
         positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
-        con = duckdb_client or get_duckdb_connection(connection_data)
+        if duckdb_client is None:
+            con = get_duckdb_connection(connection_data)
+            owns_connection = True
+        else:
+            con = duckdb_client
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         logger.info(
             f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."
@@ -80,9 +82,9 @@ def save_positions_to_storage(
         """)
         logger.info(f"Successfully saved {file_name} to {target_bucket} layer.")
     except Exception as e:
-        logger.error(f"Failed to save positions to {target_bucket} layer: {e}")
-        raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}")
+        logger.error("Failed to save positions to %s layer: %s", target_bucket, e)
+        raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}") from e
     finally:
-        if "con" in locals():
+        if owns_connection and con is not None:
             con.close()
             logger.info("DuckDB connection closed.")

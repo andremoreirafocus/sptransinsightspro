@@ -15,7 +15,7 @@ from transformlivedata.services.create_data_quality_report import (
     create_failure_quality_report,
 )
 from transformlivedata.services.load_positions import load_positions
-from transformlivedata.services.processed_requests_helper import (
+from transformlivedata.services.ingest_requests_processor import (
     mark_request_as_processed,
 )
 from transformlivedata.services.save_positions_to_storage import (
