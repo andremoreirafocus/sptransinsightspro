@@ -55,17 +55,17 @@ def test_duckdb_error_raises_value_error():
         )
 
 
-def test_missing_storage_key_raises_value_error():
+def test_missing_storage_key_raises_key_error():
     config = make_config()
     del config["general"]["storage"]["trusted_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
+    with pytest.raises(KeyError, match="trusted_bucket"):
         load_trip_details_from_storage_to_dataframe(config)
 
 
-def test_missing_tables_key_raises_value_error():
+def test_missing_tables_key_raises_key_error():
     config = make_config()
     del config["general"]["tables"]["trip_details_table_name"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
+    with pytest.raises(KeyError, match="trip_details_table_name"):
         load_trip_details_from_storage_to_dataframe(config)
 
 

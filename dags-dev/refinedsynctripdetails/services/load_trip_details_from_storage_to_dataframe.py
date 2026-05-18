@@ -6,22 +6,18 @@ logger = logging.getLogger(__name__)
 
 def load_trip_details_from_storage_to_dataframe(config, duckdb_client=None):
     def get_config(config):
-        try:
-            storage = config["general"]["storage"]
-            tables = config["general"]["tables"]
-            bucket_name = storage["trusted_bucket"]
-            gtfs_folder = storage["gtfs_folder"]
-            trip_details_table_name = tables["trip_details_table_name"]
-            if len(trip_details_table_name.split(".")) == 2:
-                trip_details_table_name = trip_details_table_name.split(".")[1]
-            connection = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return connection, bucket_name, gtfs_folder, trip_details_table_name
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        storage = config["general"]["storage"]
+        tables = config["general"]["tables"]
+        bucket_name = storage["trusted_bucket"]
+        gtfs_folder = storage["gtfs_folder"]
+        trip_details_table_name = tables["trip_details_table_name"]
+        if len(trip_details_table_name.split(".")) == 2:
+            trip_details_table_name = trip_details_table_name.split(".")[1]
+        connection = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return connection, bucket_name, gtfs_folder, trip_details_table_name
 
     connection, bucket_name, gtfs_folder, trip_details_table_name = get_config(config)
     s3_path = f"s3://{bucket_name}/{gtfs_folder}/{trip_details_table_name}/{trip_details_table_name}.parquet"

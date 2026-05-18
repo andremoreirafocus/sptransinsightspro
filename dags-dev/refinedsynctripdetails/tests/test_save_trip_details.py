@@ -59,17 +59,17 @@ def test_save_fn_receives_correct_connection_keys():
     assert conn["password"] == "pass"
 
 
-def test_missing_tables_key_raises_value_error():
+def test_missing_tables_key_raises_key_error():
     config = make_config()
     del config["general"]["tables"]["trip_details_table_name"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
+    with pytest.raises(KeyError, match="trip_details_table_name"):
         save_trip_details_from_dataframe_to_refined(config, pd.DataFrame())
 
 
-def test_missing_database_key_raises_value_error():
+def test_missing_database_key_raises_key_error():
     config = make_config()
     del config["connections"]["database"]["host"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
+    with pytest.raises(KeyError, match="host"):
         save_trip_details_from_dataframe_to_refined(config, pd.DataFrame())
 
 
@@ -78,7 +78,7 @@ def test_save_fn_error_propagates():
         raise RuntimeError("db write failed")
 
     df = pd.DataFrame({"trip_id": ["t1"]})
-    with pytest.raises(RuntimeError, match="db write failed"):
+    with pytest.raises(ValueError, match="Failed to update table"):
         save_trip_details_from_dataframe_to_refined(
             make_config(), df, save_fn=fail_save
         )
