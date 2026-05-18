@@ -2,8 +2,16 @@ import json
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
-from src.domain.events import LogEventType, LogLevel, LogStatusType
+from typing import Any, Dict, Literal, Optional, TypeAlias
+
+EVENT_STATUS_STARTED = "STARTED"
+EVENT_STATUS_SUCCEEDED = "SUCCEEDED"
+EVENT_STATUS_FAILED = "FAILED"
+EVENT_STATUS_RETRY = "RETRY"
+EVENT_STATUS_SKIPPED = "SKIPPED"
+
+LogLevel: TypeAlias = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+LogStatusType: TypeAlias = Literal["STARTED", "SUCCEEDED", "FAILED", "RETRY", "SKIPPED"]
 
 ALLOWED_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 LEVEL_TO_LOGGING = {
@@ -59,7 +67,7 @@ class StructuredEventLogger:
         self,
         *,
         level: LogLevel,
-        event: LogEventType,
+        event: str,
         message: str,
         execution_id: Optional[str] = None,
         correlation_id: Optional[str] = None,
@@ -106,19 +114,19 @@ class StructuredEventLogger:
         )
         return payload
 
-    def debug(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def debug(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="DEBUG", event=event, message=message, **kwargs)
 
-    def info(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def info(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="INFO", event=event, message=message, **kwargs)
 
-    def warning(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def warning(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="WARNING", event=event, message=message, **kwargs)
 
-    def error(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def error(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="ERROR", event=event, message=message, **kwargs)
 
-    def critical(self, *, event: LogEventType, message: str, **kwargs: Any) -> Dict[str, Any]:
+    def critical(self, *, event: str, message: str, **kwargs: Any) -> Dict[str, Any]:
         return self.emit(level="CRITICAL", event=event, message=message, **kwargs)
 
 

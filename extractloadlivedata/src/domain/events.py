@@ -2,33 +2,12 @@
 
 from typing import Final, Literal, TypeAlias
 
-LOG_LEVEL_DEBUG: Final = "DEBUG"
-LOG_LEVEL_INFO: Final = "INFO"
-LOG_LEVEL_WARNING: Final = "WARNING"
-LOG_LEVEL_ERROR: Final = "ERROR"
-LOG_LEVEL_CRITICAL: Final = "CRITICAL"
-
 EVENT_STATUS_STARTED: Final = "STARTED"
 EVENT_STATUS_SUCCEEDED: Final = "SUCCEEDED"
 EVENT_STATUS_FAILED: Final = "FAILED"
 EVENT_STATUS_RETRY: Final = "RETRY"
 EVENT_STATUS_SKIPPED: Final = "SKIPPED"
-
-LogLevel: TypeAlias = Literal[
-    "DEBUG",
-    "INFO",
-    "WARNING",
-    "ERROR",
-    "CRITICAL",
-]
-LogStatusType: TypeAlias = Literal[
-    "STARTED",
-    "SUCCEEDED",
-    "FAILED",
-    "RETRY",
-    "SKIPPED",
-]
-LogEventType: TypeAlias = Literal[
+EventType: TypeAlias = Literal[
     "api_authentication_successful",
     "api_authentication_failed",
     "api_get_started",

@@ -3,7 +3,7 @@ import logging
 
 import pytest
 
-from src.infra.structured_logging import get_structured_logger
+from src.observability.process_structured_logger import get_structured_logger
 
 
 def test_get_structured_logger_requires_non_empty_service_and_component() -> None:

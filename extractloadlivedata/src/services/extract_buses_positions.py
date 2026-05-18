@@ -1,4 +1,4 @@
-from src.infra.structured_logging import get_structured_logger
+from src.observability.process_structured_logger import get_structured_logger
 from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_RETRY, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 from src.services.exceptions import PositionsDownloadError
 import requests  # type: ignore[import-untyped]

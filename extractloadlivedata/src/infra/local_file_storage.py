@@ -1,8 +1,8 @@
 from src.infra.compression import compress_data
 import os
 from typing import Any, Callable, Optional
-from src.infra.structured_logging import get_structured_logger
-from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
+from src.observability.process_structured_logger import get_structured_logger
+from src.observability.structured_event_logger import EVENT_STATUS_FAILED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",

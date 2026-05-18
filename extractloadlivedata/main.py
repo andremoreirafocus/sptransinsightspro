@@ -5,7 +5,7 @@ from src.domain.events import (
     EVENT_STATUS_STARTED,
     EVENT_STATUS_SUCCEEDED,
 )
-from src.infra.structured_logging import (
+from src.observability.process_structured_logger import (
     get_process_structured_logger,
 )
 from src.orchestration_dependencies import build_orchestrator_dependencies

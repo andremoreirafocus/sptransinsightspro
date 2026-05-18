@@ -4,7 +4,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, TextIO
 
-from src.infra.structured_event_logger import (
+from src.observability.structured_event_logger import (
     StructuredEventLogger,
     get_structured_logger,
 )

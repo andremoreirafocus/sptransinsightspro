@@ -19,7 +19,7 @@ from src.quality.reporting import (
     create_failure_quality_report,
 )
 from src.infra.alertservice_client import send_alert
-from src.infra.structured_logging import get_structured_logger
+from src.observability.process_structured_logger import get_structured_logger
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
