@@ -136,6 +136,16 @@ Expectations artifacts loaded automatically through `pipeline_configurator`:
 - The summary contains status, failure-phase information, and validation metrics to trigger immediate alerts (`FAIL`) or cumulative alerts (`WARN`) configured in `alertservice`.
 - Notification is triggered by the DAG (`_send_webhook_from_report`) after report persistence, separately from the report-building service.
 
+### Execution phase metrics
+- The pipeline emits a structured `execution_phase_metrics` event at the end of each run.
+- The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
+- Tracked phases:
+  - `extract_load_files`
+  - `transformation`
+  - `enrichment`
+  - `quality_report`
+- On failures, the event is emitted with `overall_status="failed"` before exception propagation.
+
 ### Test rules
 
 - GTFS pipeline tests use fakes under `gtfs/tests/fakes/` and dependency injection.
@@ -169,5 +179,5 @@ python ./gtfs-v<version number>.py
 
 Example:
 ```bash
-python ./gtfs-v3.py
+python ./gtfs-v6.py
 ```

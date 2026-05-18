@@ -126,6 +126,16 @@ Artefatos de expectations carregados automaticamente via `pipeline_configurator`
 - O resumo contém informações de status, fases de falha e métricas de validação para disparar alertas imediatos (FAIL) ou cumulativos (WARN) configurados no alertservice.
 - A notificação é disparada pela DAG (`_send_webhook_from_report`) após a persistência do relatório, de forma separada do serviço de construção do relatório.
 
+### Métricas de execução por fase
+- A pipeline emite um evento estruturado `execution_phase_metrics` ao final da execução.
+- O evento contém `execution_id`, `overall_status`, `total_duration_seconds` e `phase_metrics`.
+- Fases rastreadas:
+  - `extract_load_files`
+  - `transformation`
+  - `enrichment`
+  - `quality_report`
+- Em falhas, o evento é emitido com `overall_status="failed"` antes da propagação da exceção.
+
 ### Regras de teste
 - Os testes da pipeline GTFS usam fakes em `gtfs/tests/fakes/` e injeção de dependências.
 - Não usar `monkeypatch`: os cenários devem ser cobertos com doubles explícitos (fakes/stubs) reutilizáveis.
@@ -156,5 +166,5 @@ python ./gtfs-v<version number>.py
 
 Exemplo: 
 ```shell
-python ./gtfs-v3.py
+python ./gtfs-v6.py
 ```

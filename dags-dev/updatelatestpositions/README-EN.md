@@ -57,6 +57,14 @@ Expected keys in `general`:
 }
 ```
 
+### Execution phase metrics
+- The DAG emits a structured `execution_phase_metrics` event at the end of each run.
+- The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
+- Tracked phases:
+  - `config_load`
+  - `update_latest_positions`
+- On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
+
 ## Installation instructions
 
 To install the requirements:
@@ -113,5 +121,5 @@ python ./updatelatestpositions-v<version number>.py
 
 Example:
 ```bash
-python ./updatelatestpositions-v2.py
+python ./updatelatestpositions-v4.py
 ```

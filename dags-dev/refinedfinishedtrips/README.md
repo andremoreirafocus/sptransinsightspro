@@ -171,6 +171,18 @@ O envio do webhook é explicitamente registrado em log, indicando se:
 - a tentativa falhou
 - Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
 
+## Métricas de execução por fase
+- A pipeline emite um evento estruturado `execution_phase_metrics` ao final de cada execução.
+- O evento inclui `execution_id`, `overall_status`, `total_duration_seconds` e `phase_metrics`.
+- Fases rastreadas:
+  - `config_load`
+  - `positions_load`
+  - `positions_quality`
+  - `trip_extraction`
+  - `persistence`
+  - `quality_report`
+- Em falhas, o evento é emitido com `overall_status="failed"` antes da exceção final.
+
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
 - Disponibilidade do bucket da camada metadata no serviço de object storage para armazenamento dos relatórios de qualidade
@@ -343,5 +355,5 @@ python ./refinedfinishedtrips-v<version number>.py
 
 Exemplo: 
 ```shell
-python ./refinedfinishedtrips-v4.py
+python ./refinedfinishedtrips-v6.py
 ```

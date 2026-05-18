@@ -181,6 +181,18 @@ Webhook delivery is explicitly logged, indicating whether:
 
 The [samples](./samples) folder contains a manually curated example of the consolidated quality report: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
 
+## Execution phase metrics
+- The pipeline emits a structured `execution_phase_metrics` event at the end of each run.
+- The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
+- Tracked phases:
+  - `config_load`
+  - `positions_load`
+  - `positions_quality`
+  - `trip_extraction`
+  - `persistence`
+  - `quality_report`
+- On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
+
 ## Prerequisites
 
 - availability of the trusted-layer bucket, already created in the object storage service
@@ -362,5 +374,5 @@ python ./refinedfinishedtrips-v<version number>.py
 
 Example:
 ```bash
-python ./refinedfinishedtrips-v4.py
+python ./refinedfinishedtrips-v6.py
 ```

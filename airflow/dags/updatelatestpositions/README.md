@@ -50,6 +50,14 @@ Chaves esperadas em `general`
 }
 ```
 
+### Métricas de execução por fase
+- A DAG emite um evento estruturado `execution_phase_metrics` ao final da execução.
+- O evento inclui `execution_id`, `overall_status`, `total_duration_seconds` e `phase_metrics`.
+- Fases rastreadas:
+  - `config_load`
+  - `update_latest_positions`
+- Em falhas, o evento é emitido com `overall_status="failed"` antes da exceção final.
+
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
@@ -102,5 +110,5 @@ python ./updatelatestpositions-v<version number>.py
 
 Exemplo: 
 ```shell
-python ./updatelatestpositions-v2.py
+python ./updatelatestpositions-v4.py
 ```
