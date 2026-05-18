@@ -26,6 +26,12 @@ from infra.object_storage import (
     write_generic_bytes_to_object_storage,
 )
 from quality.validate_expectations import validate_expectations
+from quality.execution_phase_metrics_state import (
+    begin_phase,
+    emit_phase_metrics,
+    ensure_tracker_context,
+    finish_phase,
+)
 from infra.notifications import send_webhook
 from pipeline_configurator.config import get_config
 import pandas as pd
@@ -33,6 +39,12 @@ import pandas as pd
 logger = logging.getLogger(__name__)
 
 PIPELINE_NAME = "gtfs"
+PHASE_ORDER = [
+    "extract_load_files",
+    "transformation",
+    "enrichment",
+    "quality_report",
+]
 
 
 class StageExecutionError(ValueError):
@@ -119,6 +131,7 @@ def apply_relocation_result(stage_result: dict, relocation: dict) -> None:
 
 
 def extract_load_files(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    begin_phase(run_context, PHASE_ORDER, "extract_load_files")
     pipeline_config = load_pipeline_config()
     stage_result: Dict[str, Any] = {
         "status": "FAIL",
@@ -173,16 +186,27 @@ def extract_load_files(run_context: Dict[str, Any], stage_results: Dict[str, Any
         stage_result["status"] = "PASS"
         logger.info("EXTRACT & LOAD STAGE completed successfully.")
         stage_results["extract_load_files"] = stage_result
+        finish_phase(run_context, PHASE_ORDER, "extract_load_files", "success")
         return stage_results
     except Exception as e:
+        finish_phase(run_context, PHASE_ORDER, "extract_load_files", "failed")
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("extract_load_files", str(e), stage_result)
         handle_unexpected_error(err, run_context, stage_results, write_fn)
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
         raise err from e
 
 
 def transform(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    begin_phase(run_context, PHASE_ORDER, "transformation")
     pipeline_config = load_pipeline_config()
     stage_result: Dict[str, Any] = {
         "status": "FAIL",
@@ -254,16 +278,27 @@ def transform(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_
         stage_result["status"] = "PASS"
         logger.info("TRANSFORMATION STAGE completed successfully.")
         stage_results["transformation"] = stage_result
+        finish_phase(run_context, PHASE_ORDER, "transformation", "success")
         return stage_results
     except Exception as e:
+        finish_phase(run_context, PHASE_ORDER, "transformation", "failed")
         if not stage_result.get("error_details"):
             stage_result["error_details"] = {"errors": [str(e)]}
         err = StageExecutionError("transformation", str(e), stage_result)
         handle_unexpected_error(err, run_context, stage_results, write_fn)
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
         raise err from e
 
 
 def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, Any], write_fn: Optional[Callable[..., Any]] = None) -> Dict[str, Any]:
+    begin_phase(run_context, PHASE_ORDER, "enrichment")
     pipeline_config = load_pipeline_config()
     table_name = pipeline_config["general"]["tables"]["trip_details_table_name"]
     staged_result = []
@@ -356,8 +391,10 @@ def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, An
         stage_result["status"] = "PASS"
         logger.info("ENRICHMENT STAGE completed successfully.")
         stage_results["enrichment"] = stage_result
+        finish_phase(run_context, PHASE_ORDER, "enrichment", "success")
         return stage_results
     except Exception as e:
+        finish_phase(run_context, PHASE_ORDER, "enrichment", "failed")
         if not stage_result["error_details"].get("errors_by_table"):
             stage_result["error_details"]["errors_by_table"] = {
                 table_name: [str(e)]
@@ -383,6 +420,14 @@ def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, An
                 }
         err = StageExecutionError("enrichment", str(e), stage_result)
         handle_unexpected_error(err, run_context, stage_results, write_fn)
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
         raise err from e
 
 
@@ -390,10 +435,12 @@ def build_run_context() -> Dict[str, Any]:
     execution_id = str(uuid.uuid4())
     batch_ts = datetime.now(timezone.utc).isoformat()
     run_context = {"execution_id": execution_id, "batch_ts": batch_ts}
+    ensure_tracker_context(run_context, PHASE_ORDER)
     return run_context
 
 
 def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_results: Dict[str, Any]) -> None:
+    begin_phase(run_context, PHASE_ORDER, "quality_report")
     pipeline_config = load_pipeline_config()
     try:
         report = create_data_quality_report(
@@ -403,8 +450,26 @@ def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_res
             batch_ts=run_context["batch_ts"],
         )
         send_webhook_from_report(report, pipeline_config, "success path")
+        finish_phase(run_context, PHASE_ORDER, "quality_report", "success")
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="success",
+        )
     except Exception as e:
+        finish_phase(run_context, PHASE_ORDER, "quality_report", "failed")
         logger.error("build_quality_report_and_send_webhook failed: %s", e)
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
         raise
 
 

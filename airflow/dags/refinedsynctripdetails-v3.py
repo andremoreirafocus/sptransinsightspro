@@ -7,10 +7,18 @@ from refinedsynctripdetails.services.save_trip_details_from_dataframe_to_refined
 from refinedsynctripdetails.services.transform_trip_details_for_refined import (
     transform_trip_details_for_refined,
 )
+from quality.execution_phase_metrics_state import (
+    begin_phase,
+    emit_phase_metrics,
+    ensure_tracker_context,
+    finish_phase,
+)
 from pipeline_configurator.config import get_config
 from refinedsynctripdetails.config.refinedsynctripdetails_config_schema import (
     GeneralConfig,
 )
+from datetime import datetime, timezone
+import uuid
 import os
 import logging
 
@@ -36,6 +44,12 @@ else:
     )
 
 logger = logging.getLogger(__name__)
+PHASE_ORDER = [
+    "config_load",
+    "load_trip_details",
+    "transform_trip_details",
+    "save_trip_details",
+]
 
 
 def _load_pipeline_config():
@@ -54,13 +68,58 @@ def _load_pipeline_config():
     return pipeline_config
 
 
+def _build_run_context():
+    run_context = {
+        "execution_id": str(uuid.uuid4()),
+        "batch_ts": datetime.now(timezone.utc).isoformat(),
+    }
+    ensure_tracker_context(run_context, PHASE_ORDER)
+    return run_context
+
+
 def refined_sync_trip_details():
+    run_context = _build_run_context()
     try:
+        begin_phase(run_context, PHASE_ORDER, "config_load")
         pipeline_config = _load_pipeline_config()
+        finish_phase(run_context, PHASE_ORDER, "config_load", "success")
+
+        begin_phase(run_context, PHASE_ORDER, "load_trip_details")
         df_trip_details = load_trip_details_from_storage_to_dataframe(pipeline_config)
+        finish_phase(run_context, PHASE_ORDER, "load_trip_details", "success")
+
+        begin_phase(run_context, PHASE_ORDER, "transform_trip_details")
         df_trip_details = transform_trip_details_for_refined(df_trip_details)
+        finish_phase(run_context, PHASE_ORDER, "transform_trip_details", "success")
+
+        begin_phase(run_context, PHASE_ORDER, "save_trip_details")
         save_trip_details_from_dataframe_to_refined(pipeline_config, df_trip_details)
+        finish_phase(run_context, PHASE_ORDER, "save_trip_details", "success")
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="success",
+        )
     except Exception:
+        tracker = ensure_tracker_context(run_context, PHASE_ORDER)
+        phase_starts = tracker.get("phase_starts", {})
+        for phase in PHASE_ORDER:
+            if phase_starts.get(phase) is not None:
+                phase_metric = tracker["phase_metrics"].get(phase, {})
+                if phase_metric.get("status") == "skipped":
+                    finish_phase(run_context, PHASE_ORDER, phase, "failed")
+                    break
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
         logger.error("refinedsynctripdetails orchestration failed")
         raise
 

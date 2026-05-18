@@ -1,10 +1,18 @@
 from updatelatestpositions.services.create_latest_positions import (
     create_latest_positions_table,
 )
+from quality.execution_phase_metrics_state import (
+    begin_phase,
+    emit_phase_metrics,
+    ensure_tracker_context,
+    finish_phase,
+)
 from pipeline_configurator.config import get_config
 from updatelatestpositions.config.updatelatestpositions_config_schema import (
     GeneralConfig,
 )
+from datetime import datetime, timezone
+import uuid
 import os
 import logging
 
@@ -30,6 +38,7 @@ else:
     )
 
 logger = logging.getLogger(__name__)
+PHASE_ORDER = ["config_load", "update_latest_positions"]
 
 
 def _load_pipeline_config():
@@ -48,9 +57,52 @@ def _load_pipeline_config():
     return pipeline_config
 
 
+def _build_run_context():
+    run_context = {
+        "execution_id": str(uuid.uuid4()),
+        "batch_ts": datetime.now(timezone.utc).isoformat(),
+    }
+    ensure_tracker_context(run_context, PHASE_ORDER)
+    return run_context
+
+
 def update_latest_positions_table():
-    pipeline_config = _load_pipeline_config()
-    create_latest_positions_table(pipeline_config)
+    run_context = _build_run_context()
+    try:
+        begin_phase(run_context, PHASE_ORDER, "config_load")
+        pipeline_config = _load_pipeline_config()
+        finish_phase(run_context, PHASE_ORDER, "config_load", "success")
+
+        begin_phase(run_context, PHASE_ORDER, "update_latest_positions")
+        create_latest_positions_table(pipeline_config)
+        finish_phase(run_context, PHASE_ORDER, "update_latest_positions", "success")
+
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="success",
+        )
+    except Exception:
+        tracker = ensure_tracker_context(run_context, PHASE_ORDER)
+        phase_starts = tracker.get("phase_starts", {})
+        for phase in PHASE_ORDER:
+            if phase_starts.get(phase) is not None:
+                phase_metric = tracker["phase_metrics"].get(phase, {})
+                if phase_metric.get("status") == "skipped":
+                    finish_phase(run_context, PHASE_ORDER, phase, "failed")
+                    break
+        emit_phase_metrics(
+            run_context,
+            PHASE_ORDER,
+            logger,
+            pipeline=PIPELINE_NAME,
+            logical_date_utc=run_context["batch_ts"],
+            overall_status="failed",
+        )
+        raise
 
 
 if _IN_AIRFLOW:
