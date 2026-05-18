@@ -30,9 +30,6 @@ def test_transform_and_validate_table_skips_validation_when_suite_missing():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         calls.append((file_name, subfolder))
 
@@ -40,7 +37,6 @@ def test_transform_and_validate_table_skips_validation_when_suite_missing():
         make_config(),
         "routes",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
     )
 
@@ -62,9 +58,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_fails():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -81,7 +74,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_fails():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -132,9 +124,6 @@ def test_transform_and_validate_table_marks_valid_when_gx_passes():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -151,7 +140,6 @@ def test_transform_and_validate_table_marks_valid_when_gx_passes():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -171,9 +159,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_raises_exception():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -184,7 +169,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_raises_exception():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -198,9 +182,6 @@ def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         raise RuntimeError("save boom")
 
@@ -208,7 +189,6 @@ def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
         make_config(),
         "routes",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
     )
 

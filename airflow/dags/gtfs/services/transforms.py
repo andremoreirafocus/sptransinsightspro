@@ -1,24 +1,28 @@
 from gtfs.services.load_raw_csv_to_buffer_from_storage import (
     load_raw_csv_to_buffer_from_storage,
 )
-from infra.buffer_manipulation_functions import (
-    convert_df_to_parquet_buffer,
-)
 from gtfs.services.save_buffer_to_storage import save_buffer_to_storage
 from quality.validate_expectations import validate_expectations
 import pandas as pd
 import logging
+from io import BytesIO
 from typing import Any, Callable, Dict
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
 
 
+def convert_df_to_parquet_buffer(df: pd.DataFrame) -> BytesIO:
+    buffer = BytesIO()
+    df.to_parquet(buffer, index=False, compression="snappy")
+    buffer.seek(0)
+    return buffer
+
+
 def transform_and_validate_table(
     config: Dict[str, Any],
     table_name: str,
     load_fn: Callable[..., Any] = load_raw_csv_to_buffer_from_storage,
-    convert_fn: Callable[..., Any] = convert_df_to_parquet_buffer,
     save_fn: Callable[..., Any] = save_buffer_to_storage,
     validate_expectations_fn: Callable[..., Any] = validate_expectations,
 ) -> Dict[str, Any]:
@@ -102,7 +106,7 @@ def transform_and_validate_table(
         logger.info("Validation not required and skipped for table %s", table_name)
 
     try:
-        parquet_buffer = convert_fn(df)
+        parquet_buffer = convert_df_to_parquet_buffer(df)
         save_fn(
             config,
             file_name,
