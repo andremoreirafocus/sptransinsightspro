@@ -13,19 +13,14 @@ def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], st
         Tuple of (connection_dict, schema_name, table_name)
 
     Raises:
-        KeyError: if configuration is missing
         ValueError: if raw_events_table_name is not in 'schema.table' format
     """
     general = config["general"]
-    if "tables" not in general or "raw_events_table_name" not in general["tables"]:
-        raise KeyError("RAW_EVENTS_TABLE_NAME configuration is missing.")
-
     raw_events_table = general["tables"]["raw_events_table_name"]
     if "." not in raw_events_table:
         raise ValueError(
             f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'"
         )
-
     schema, table = raw_events_table.split(".", 1)
     db = config["connections"]["database"]
     connection = {
