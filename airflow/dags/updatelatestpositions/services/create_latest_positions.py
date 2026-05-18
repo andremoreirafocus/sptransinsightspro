@@ -15,26 +15,22 @@ def create_latest_positions_table(
     save_fn=update_db_table_with_dataframe,
 ):
     def get_config(config):
-        try:
-            general = config["general"]
-            tables = general["tables"]
-            database = config["connections"]["database"]
-            latest_positions_table_name = tables["latest_positions_table_name"]
-            storage_connection = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            database_connection = {
-                "host": database["host"],
-                "port": database["port"],
-                "database": database["database"],
-                "user": database["user"],
-                "password": database["password"],
-            }
-            return latest_positions_table_name, storage_connection, database_connection
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        tables = general["tables"]
+        database = config["connections"]["database"]
+        latest_positions_table_name = tables["latest_positions_table_name"]
+        storage_connection = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        database_connection = {
+            "host": database["host"],
+            "port": database["port"],
+            "database": database["database"],
+            "user": database["user"],
+            "password": database["password"],
+        }
+        return latest_positions_table_name, storage_connection, database_connection
 
     latest_positions_table_name, storage_connection, database_connection = get_config(
         config
@@ -60,8 +56,13 @@ def create_latest_positions_table(
         logger.info(f"Updated table {latest_positions_table_name} successfully!")
 
     except Exception as e:
-        logger.error(f"Update failed: {e}")
-        raise ValueError(f"Update failed: {e}")
+        logger.error(
+            "Update failed for table %s (rows=%s): %s",
+            latest_positions_table_name,
+            total_records if "total_records" in locals() else "unknown",
+            e,
+        )
+        raise ValueError(f"Update failed for {latest_positions_table_name}: {e}") from e
     finally:
         if "con" in locals():
             con.close()
