@@ -14,20 +14,16 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
     """
 
     def get_config(config):
-        try:
-            general = config["general"]
-            tables = general["tables"]
-            database = config["connections"]["database"]
-            table_name = tables["finished_trips_table_name"]
-            host = database["host"]
-            port = database["port"]
-            dbname = database["database"]
-            dbuser = database["user"]
-            password = database["password"]
-            return (table_name, host, port, dbname, dbuser, password)
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        tables = general["tables"]
+        database = config["connections"]["database"]
+        table_name = tables["finished_trips_table_name"]
+        host = database["host"]
+        port = database["port"]
+        dbname = database["database"]
+        dbuser = database["user"]
+        password = database["password"]
+        return (table_name, host, port, dbname, dbuser, password)
 
     (table_name, host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
@@ -101,8 +97,11 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             "previously_saved_rows": previously_saved_rows,
         }
     except Exception as e:
-        logger.error(f"Persistence failed: {e}")
-        raise ValueError(f"Persistence failed: {e}")
+        error_message = (
+            "Persistence failed while saving finished trips to database"
+        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e
     finally:
         try:
             with engine.begin() as conn:
