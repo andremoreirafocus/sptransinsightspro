@@ -2,6 +2,9 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
+from transformlivedata.orchestration_dependencies import (
+    get_transformlivedata_orchestration_dependencies,
+)
 from transformlivedata.transformlivedata import load_transform_save_positions
 
 PIPELINE_NAME = "transformlivedata"
@@ -30,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 
 def transform_positions(logical_date_string: str) -> None:
-    load_transform_save_positions(PIPELINE_NAME, logical_date_string)
+    deps = get_transformlivedata_orchestration_dependencies()
+    load_transform_save_positions(PIPELINE_NAME, logical_date_string, deps)
 
 
 if _IN_AIRFLOW:
@@ -72,6 +76,7 @@ else:
     def main():
         current_logical_date = BACKFILL_START
         total_runs = 0
+
         while current_logical_date <= BACKFILL_END:
             logical_date_string = current_logical_date.isoformat()
             logger.info(f"Running local backfill for logical date {logical_date_string}")

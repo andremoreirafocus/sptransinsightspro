@@ -1,6 +1,9 @@
 import logging
 import os
 
+from transformlivedata.orchestration_dependencies import (
+    get_transformlivedata_orchestration_dependencies,
+)
 from transformlivedata.transformlivedata import load_transform_save_positions
 
 PIPELINE_NAME = "transformlivedata"
@@ -26,7 +29,8 @@ logger = logging.getLogger(__name__)
 
 
 def transform_positions(logical_date_string: str) -> None:
-    load_transform_save_positions(PIPELINE_NAME, logical_date_string)
+    deps = get_transformlivedata_orchestration_dependencies()
+    load_transform_save_positions(PIPELINE_NAME, logical_date_string, deps)
 
 
 if _IN_AIRFLOW:
@@ -68,7 +72,7 @@ if _IN_AIRFLOW:
         transform_positions_task
 else:
     def main():
-        logical_date_string = "2026-04-27T15:14:00+00:00"
+        logical_date_string = "2026-05-16T16:08:00+00:00"
         result = transform_positions(logical_date_string)
         logger.info(f"Pipeline result: {result}")
 
