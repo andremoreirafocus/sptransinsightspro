@@ -1,7 +1,7 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 from airflow.utils.dates import days_ago
-from airflow.models import DagRun, DagBag
+from airflow.models import DagRun, DagModel
 from airflow.models.dagrun import DagRunState
 from airflow.api.common.trigger_dag import trigger_dag
 from airflow.utils.db import create_session
@@ -70,18 +70,14 @@ def run_dag_for_unprocessed_request(dag_name, logical_date):
     logger.info(
         f"Starting DAG for unprocessed request with logical_date: {logical_date}..."
     )
-    if isinstance(logical_date, datetime):
-        logical_date_dt = logical_date
-        logical_date_str = logical_date.isoformat()
-    else:
-        logical_date_str = str(logical_date)
-        logical_date_dt = datetime.fromisoformat(logical_date_str)
-
-        dagbag = DagBag(read_dags_from_db=True)
-        if dag_name not in dagbag.dags:
-            logger.error("Target DAG not found: %s", dag_name)
-            return False
     try:
+        if isinstance(logical_date, datetime):
+            logical_date_dt = logical_date
+            logical_date_str = logical_date.isoformat()
+        else:
+            logical_date_str = str(logical_date)
+            logical_date_dt = datetime.fromisoformat(logical_date_str)
+
         # Check for existing failed DAG runs with the same logical_date
         with create_session() as session:
             existing_runs = (
@@ -164,17 +160,28 @@ def trigger_dag_for_unprocessed_requests():
     config = _load_pipeline_config()
 
     def get_config_values(config):
-        try:
-            general = config["general"]
-            orchestration = general["orchestration"]
-            dag_name = orchestration["target_dag"]
-            wait_time_seconds = int(orchestration["wait_time_seconds"])
-            return dag_name, wait_time_seconds
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise
+        general = config["general"]
+        orchestration = general["orchestration"]
+        dag_name = orchestration["target_dag"]
+        wait_time_seconds = int(orchestration["wait_time_seconds"])
+        return dag_name, wait_time_seconds
 
     dag_name, wait_time_seconds = get_config_values(config)
+    with create_session() as session:
+        dag_model = (
+            session.query(DagModel)
+            .filter(DagModel.dag_id == dag_name)
+            .one_or_none()
+        )
+    logger.info(
+        "Target DAG lookup | dag_name=%s | found=%s",
+        dag_name,
+        dag_model is not None,
+    )
+    if dag_model is None:
+        logger.error("Target DAG not found: %s", dag_name)
+        raise ValueError(f"Target DAG not found: {dag_name}")
+
     logger.info(
         f"Waiting {wait_time_seconds} seconds for ingest service to complete file processing..."
     )
@@ -237,9 +244,10 @@ def trigger_dag_for_unprocessed_requests():
             for state in states:
                 metrics["target_dag_state_counts"][_normalize_state(state)] += 1
 
-    unprocessed_requests = get_unprocessed_requests(config)
+    unprocessed_requests = []
     failure_reason = None
     try:
+        unprocessed_requests = get_unprocessed_requests(config)
         if unprocessed_requests:
             metrics["pending_requests_total"] = len(unprocessed_requests)
             pending_logical_dates = sorted(
