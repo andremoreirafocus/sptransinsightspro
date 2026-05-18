@@ -55,5 +55,9 @@ def extract_trips_per_line_per_vehicle(
             sanitization["dropped_points_count"],
         )
     except Exception as e:
-        logger.error(f"Error processing {linha_lt}/{veiculo_id}: {e}")
-        raise TypeError(f"Error processing {linha_lt}/{veiculo_id}:")
+        error_message = (
+            "Trip extraction failed while processing line/vehicle: "
+            f"linha_lt='{linha_lt}', veiculo_id='{veiculo_id}'"
+        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e

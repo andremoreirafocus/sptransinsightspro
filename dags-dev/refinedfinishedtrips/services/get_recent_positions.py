@@ -12,29 +12,25 @@ logger = logging.getLogger(__name__)
 
 def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config):
-        try:
-            general = config["general"]
-            analysis = general["analysis"]
-            storage = general["storage"]
-            tables = general["tables"]
-            hours_interval = int(analysis["hours_window"])
-            bucket_name = storage["trusted_bucket"]
-            app_folder = storage["app_folder"]
-            positions_table_name = tables["positions_table_name"]
-            connection = {
-                **config["connections"]["object_storage"],
-                "secure": False,
-            }
-            return (
-                hours_interval,
-                bucket_name,
-                app_folder,
-                positions_table_name,
-                connection,
-            )
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        analysis = general["analysis"]
+        storage = general["storage"]
+        tables = general["tables"]
+        hours_interval = int(analysis["hours_window"])
+        bucket_name = storage["trusted_bucket"]
+        app_folder = storage["app_folder"]
+        positions_table_name = tables["positions_table_name"]
+        connection = {
+            **config["connections"]["object_storage"],
+            "secure": False,
+        }
+        return (
+            hours_interval,
+            bucket_name,
+            app_folder,
+            positions_table_name,
+            connection,
+        )
 
     (
         hours_interval,
@@ -83,8 +79,11 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
             con.close()
             logger.info("DuckDB connection closed.")
     except Exception as e:
-        logger.error(f"Data retrieval failed: {e}")
-        raise ValueError(f"Data retrieval failed: {e}")
+        error_message = (
+            "Data retrieval failed for recent positions query in object storage/duckdb"
+        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e
     finally:
         if "con" in locals():
             con.close()

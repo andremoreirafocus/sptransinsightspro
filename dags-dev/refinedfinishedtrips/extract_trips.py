@@ -45,8 +45,12 @@ def _load_pipeline_config(pipeline_name: str) -> Dict[str, Any]:
             "postgres_conn",
         )
     except Exception as e:
-        logger.error(f"Pipeline configuration validation failed: {e}")
-        raise ValueError(f"Pipeline configuration validation failed: {e}")
+        error_message = (
+            "Pipeline configuration validation failed for refinedfinishedtrips: "
+            f"pipeline_name='{pipeline_name}'"
+        )
+        logger.error(error_message)
+        raise ValueError(error_message) from e
     return pipeline_config
 
 
