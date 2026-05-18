@@ -55,10 +55,14 @@ def _load_pipeline_config():
 
 
 def refined_sync_trip_details():
-    pipeline_config = _load_pipeline_config()
-    df_trip_details = load_trip_details_from_storage_to_dataframe(pipeline_config)
-    df_trip_details = transform_trip_details_for_refined(df_trip_details)
-    save_trip_details_from_dataframe_to_refined(pipeline_config, df_trip_details)
+    try:
+        pipeline_config = _load_pipeline_config()
+        df_trip_details = load_trip_details_from_storage_to_dataframe(pipeline_config)
+        df_trip_details = transform_trip_details_for_refined(df_trip_details)
+        save_trip_details_from_dataframe_to_refined(pipeline_config, df_trip_details)
+    except Exception:
+        logger.error("refinedsynctripdetails orchestration failed")
+        raise
 
 
 if _IN_AIRFLOW:
