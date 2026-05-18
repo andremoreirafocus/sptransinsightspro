@@ -23,5 +23,5 @@ def test_source_file_includes_hhmm():
 
 
 def test_invalid_date_raises_runtime_error():
-    with pytest.raises(RuntimeError, match="Failed to build logical date context"):
+    with pytest.raises(ValueError, match="Failed to build logical date context"):
         build_logical_date_context("not-a-date")

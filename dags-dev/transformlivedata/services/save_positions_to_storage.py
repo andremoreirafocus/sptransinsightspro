@@ -82,6 +82,7 @@ def save_positions_to_storage(
         """)
         logger.info(f"Successfully saved {file_name} to {target_bucket} layer.")
     except Exception as e:
+        logger.error("Failed to save positions to %s layer: %s", target_bucket, e)
         raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}") from e
     finally:
         if owns_connection and con is not None:

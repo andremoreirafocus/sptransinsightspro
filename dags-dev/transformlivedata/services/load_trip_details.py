@@ -33,6 +33,7 @@ def load_trip_details(
         logger.info(f"Successfully loaded {df.shape[0]} trips from storage.")
         return df
     except Exception as e:
+        logger.error("Error fetching trip_details from storage '%s': %s", s3_path, e)
         raise ValueError(f"Error fetching trip_details from storage: {e}") from e
     finally:
         if "con" in locals():

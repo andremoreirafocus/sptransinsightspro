@@ -63,6 +63,11 @@ def load_positions(
             datastr = decompress_fn(data.getvalue())
             logger.info("Data decompressed successfully.")
         except Exception as e:
+            logger.error(
+                "Failed to read/decompress object storage payload '%s': %s",
+                object_name,
+                e,
+            )
             raise ValueError(
                 f"Failed to read/decompress object storage payload '{object_name}': {e}"
             ) from e
@@ -70,6 +75,11 @@ def load_positions(
         try:
             datastr = read_str_fn(connection_data, source_bucket, object_name)
         except Exception as e:
+            logger.error(
+                "Failed to read object storage payload '%s': %s",
+                object_name,
+                e,
+            )
             raise ValueError(
                 f"Failed to read object storage payload '{object_name}': {e}"
             ) from e
@@ -77,5 +87,6 @@ def load_positions(
     try:
         data = json.loads(datastr)
     except Exception as e:
+        logger.error("Invalid JSON payload for '%s': %s", object_name, e)
         raise ValueError(f"Invalid JSON payload for '{object_name}': {e}") from e
     return data
