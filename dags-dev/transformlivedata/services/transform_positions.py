@@ -315,10 +315,7 @@ def transform_positions(
     deps: Optional[TransformPositionsDependencies] = None,
 ) -> Dict[str, Any]:
     def get_config(config: Dict[str, Any]) -> Dict[str, Any]:
-        raw_schema = config.get("raw_data_json_schema")
-        if not raw_schema:
-            logger.error("raw_data_json_schema is missing in config.")
-            raise ValueError("raw_data_json_schema is required in config.")
+        raw_schema = config["raw_data_json_schema"]
         return raw_schema
 
     deps = deps or get_transform_positions_dependencies()

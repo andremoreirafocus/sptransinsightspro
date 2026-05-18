@@ -1,4 +1,6 @@
-from transformlivedata.services.processed_requests_helper import (
+import pytest
+
+from transformlivedata.services.ingest_requests_processor import (
     get_unprocessed_requests,
     mark_request_as_processed,
     mark_request_as_processed_by_filename,
@@ -44,26 +46,26 @@ def test_get_unprocessed_returns_empty_list_when_none():
     assert result == []
 
 
-def test_get_unprocessed_returns_empty_list_on_exception():
+def test_get_unprocessed_raises_on_exception():
     def fake_select(connection, query):
         raise RuntimeError("db down")
 
-    result = get_unprocessed_requests(make_config(), select_fn=fake_select)
-    assert result == []
+    with pytest.raises(RuntimeError, match="db down"):
+        get_unprocessed_requests(make_config(), select_fn=fake_select)
 
 
-def test_get_unprocessed_missing_table_config_returns_empty_list():
+def test_get_unprocessed_missing_table_config_raises_key_error():
     config = make_config()
     del config["general"]["tables"]["raw_events_table_name"]
-    result = get_unprocessed_requests(config)
-    assert result == []
+    with pytest.raises(KeyError, match="RAW_EVENTS_TABLE_NAME"):
+        get_unprocessed_requests(config)
 
 
-def test_get_unprocessed_table_name_without_dot_returns_empty_list():
+def test_get_unprocessed_table_name_without_dot_raises_value_error():
     config = make_config()
     config["general"]["tables"]["raw_events_table_name"] = "nodot"
-    result = get_unprocessed_requests(config)
-    assert result == []
+    with pytest.raises(ValueError, match="schema.table"):
+        get_unprocessed_requests(config)
 
 
 # --- mark_request_as_processed ---
@@ -89,14 +91,14 @@ def test_mark_as_processed_returns_false_on_failure():
     assert result is False
 
 
-def test_mark_as_processed_returns_false_on_exception():
+def test_mark_as_processed_raises_on_exception():
     def fake_update(connection, query, params):
         raise RuntimeError("db error")
 
-    result = mark_request_as_processed(
-        make_config(), "2026-02-15T10:00:00", update_fn=fake_update
-    )
-    assert result is False
+    with pytest.raises(RuntimeError, match="db error"):
+        mark_request_as_processed(
+            make_config(), "2026-02-15T10:00:00", update_fn=fake_update
+        )
 
 
 def test_mark_as_processed_passes_logical_date_as_param():
@@ -138,11 +140,11 @@ def test_mark_by_filename_passes_filename_as_param():
     assert calls[0]["filename"] == "file.json"
 
 
-def test_mark_by_filename_returns_false_on_exception():
+def test_mark_by_filename_raises_on_exception():
     def fake_update(connection, query, params):
         raise RuntimeError("db error")
 
-    result = mark_request_as_processed_by_filename(
-        make_config(), "file.json", update_fn=fake_update
-    )
-    assert result is False
+    with pytest.raises(RuntimeError, match="db error"):
+        mark_request_as_processed_by_filename(
+            make_config(), "file.json", update_fn=fake_update
+        )

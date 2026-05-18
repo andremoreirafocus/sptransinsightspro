@@ -1,4 +1,4 @@
-from orchestratetransform.services.processed_requests_helper import (
+from orchestratetransform.services.ingest_requests_processor import (
     get_unprocessed_requests,
 )
 from pipeline_configurator.config import get_config

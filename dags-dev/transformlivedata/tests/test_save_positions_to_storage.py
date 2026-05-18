@@ -73,10 +73,10 @@ def test_quarantined_bucket_resolved_from_config():
     )
 
 
-def test_missing_config_key_raises_value_error():
+def test_missing_config_key_raises_key_error():
     config = make_config()
     del config["general"]["storage"]["trusted_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
+    with pytest.raises(KeyError, match="trusted_bucket"):
         save_positions_to_storage(config, make_df(), "trusted")
 
 
