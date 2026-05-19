@@ -615,9 +615,7 @@ def test_create_failure_quality_report_emits_metrics_event_without_results(monke
     assert event["metadata"]["record_counts"] == {}
     assert event["metadata"]["transformation_processing_metrics"] == {}
     assert event["metadata"]["transformation_processing_issues"] == {}
-    assert event["metadata"]["post_transformation_validation_summary"] == {
-        "records_failed": 0
-    }
+    assert event["metadata"]["post_transformation_validation_summary"] == {}
     assert event["metadata"]["failure_phase"] == "load"
     assert event["metadata"]["failure_message"] == "err"
 
@@ -653,6 +651,46 @@ def test_create_failure_quality_report_emits_metrics_event_with_results(monkeypa
     assert event["metadata"]["record_counts"]["raw_input_records"] == 10
     assert event["metadata"]["failure_phase"] == "expectations_validation"
     assert event["metadata"]["failure_message"] == "expectation failed"
+
+
+def test_create_failure_quality_report_uses_collected_metrics_when_results_missing(
+    monkeypatch,
+):
+    emitted = []
+
+    class _FakeStructuredLogger:
+        def info(self, **kwargs):
+            emitted.append(kwargs)
+
+    monkeypatch.setattr(
+        "transformlivedata.services.create_data_quality_report.structured_logger",
+        _FakeStructuredLogger(),
+    )
+
+    collected_metrics = {
+        "record_counts": {"raw_input_records": 9835, "transformed_records": 9834},
+        "transformation_processing_metrics": {"total_vehicles_processed": 9835},
+        "transformation_processing_issues": {"invalid_trips_count": 1},
+        "post_transformation_validation_summary": {"total_checks": 11},
+    }
+    phase_metrics = {"overall_status": "failed", "phase_metrics": {"load": {}}}
+
+    create_failure_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        failure_phase="load_positions",
+        failure_message="boom",
+        collected_metrics=collected_metrics,
+        execution_phase_metrics=phase_metrics,
+        write_fn=lambda *a, **kw: None,
+    )
+
+    event = emitted[-1]
+    assert event["metadata"]["record_counts"]["raw_input_records"] == 9835
+    assert event["metadata"]["transformation_processing_issues"]["invalid_trips_count"] == 1
+    assert event["metadata"]["execution_phase_metrics"] == phase_metrics
 
 
 # --- build_quarantine_path ---
