@@ -18,9 +18,14 @@ def deploy_service(service_name, service_folder):
     print(f"🚀 Deploying microservice: {service_name} (folder: {service_folder})")
 
     # Validation (Linting + Tests)
-    steps_consumed = run_code_validations(service_path, service_name, step_offset=1)
-    mypy_step = steps_consumed + 1
+    test_dir = os.path.join(service_path, "tests")
+    has_tests = os.path.isdir(test_dir)
+    steps_consumed = 3 if has_tests else 2
     total_steps = steps_consumed + 3
+    steps_consumed = run_code_validations(
+        service_path, service_name, step_offset=1, total_steps=total_steps
+    )
+    mypy_step = steps_consumed + 1
     print(f"Step {mypy_step}/{total_steps}: Running mypy for {service_name}...")
     run_command(
         [

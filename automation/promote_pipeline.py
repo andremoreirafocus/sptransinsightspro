@@ -16,6 +16,8 @@ def promote_pipeline(pipeline_name):
     infra_prod_path = os.path.join(prod_dir, "infra")
     quality_dev_path = os.path.join(dev_dir, "quality")
     quality_prod_path = os.path.join(prod_dir, "quality")
+    observability_dev_path = os.path.join(dev_dir, "observability")
+    observability_prod_path = os.path.join(prod_dir, "observability")
     pipeline_configurator_dev_path = os.path.join(dev_dir, "pipeline_configurator")
     pipeline_configurator_prod_path = os.path.join(prod_dir, "pipeline_configurator")
     rsync_excludes = [
@@ -36,7 +38,7 @@ def promote_pipeline(pipeline_name):
     has_tests = os.path.isdir(test_dir)
     total_steps = (3 if has_tests else 2) + 3
     steps_consumed = run_code_validations(
-        pipeline_dev_path, pipeline_name, step_offset=1
+        pipeline_dev_path, pipeline_name, step_offset=1, total_steps=total_steps
     )
     # 3. Type checking (mypy)
     mypy_step = steps_consumed + 1
@@ -64,7 +66,7 @@ def promote_pipeline(pipeline_name):
         "Folder sync failed!",
     )
     print(
-        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality and pipeline_configurator files..."
+        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality, observability and pipeline_configurator files..."
     )
     os.makedirs(infra_prod_path, exist_ok=True)
     run_command(
@@ -89,6 +91,18 @@ def promote_pipeline(pipeline_name):
             f"{quality_prod_path}/",
         ],
         "quality sync failed!",
+    )
+    os.makedirs(observability_prod_path, exist_ok=True)
+    run_command(
+        [
+            "rsync",
+            "-av",
+            "--delete",
+            *rsync_excludes,
+            f"{observability_dev_path}/",
+            f"{observability_prod_path}/",
+        ],
+        "observability sync failed!",
     )
     os.makedirs(pipeline_configurator_prod_path, exist_ok=True)
     run_command(
