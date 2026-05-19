@@ -16,6 +16,117 @@ structured_logger = get_structured_logger(
 )
 
 
+def _emit_quality_report_metrics_event(
+    *,
+    execution_id: str,
+    logical_date_utc: str,
+    status: str,
+    summary: Dict[str, Any],
+    report_metrics: Dict[str, Any],
+    failure_phase: Optional[str] = None,
+    failure_message: Optional[str] = None,
+) -> None:
+    metadata = {
+        **report_metrics,
+        "summary_status": summary["status"],
+        "quality_report_path": summary["quality_report_path"],
+    }
+    if failure_phase is not None:
+        metadata["failure_phase"] = failure_phase
+    if failure_message is not None:
+        metadata["failure_message"] = failure_message
+    structured_logger.info(
+        event="quality_report_metrics",
+        message="Quality report metrics",
+        execution_id=execution_id,
+        correlation_id=logical_date_utc,
+        status=status,
+        metadata=metadata,
+    )
+
+
+def _save_quality_report_to_storage(
+    *,
+    config: Dict[str, Any],
+    report: Dict[str, Any],
+    write_fn: Callable[..., Any],
+) -> None:
+    connection_data = {
+        **config["connections"]["object_storage"],
+        "secure": False,
+    }
+    save_quality_report(
+        report=report,
+        path=report["summary"]["quality_report_path"],
+        connection_data=connection_data,
+        write_fn=write_fn,
+    )
+
+
+def initialize_collected_quality_metrics() -> Dict[str, Dict[str, Any]]:
+    return {
+        "record_counts": {},
+        "transformation_processing_metrics": {},
+        "transformation_processing_issues": {},
+        "post_transformation_validation_summary": {},
+    }
+
+
+def update_collected_metrics_from_transform_result(
+    collected_metrics: Dict[str, Dict[str, Any]],
+    transform_result: Dict[str, Any],
+) -> None:
+    positions_df = transform_result["positions"]
+    collected_metrics["record_counts"]["transformed_records"] = positions_df.shape[0]
+    invalid_positions = transform_result.get("invalid_positions")
+    if invalid_positions is not None:
+        collected_metrics["record_counts"]["rejected_records"] = invalid_positions.shape[0]
+    transform_metrics = transform_result.get("metrics")
+    if transform_metrics is not None:
+        collected_metrics["record_counts"]["raw_input_records"] = transform_metrics[
+            "total_vehicles_processed"
+        ]
+        collected_metrics["transformation_processing_metrics"] = {
+            "total_vehicles_processed": transform_metrics["total_vehicles_processed"],
+            "valid_vehicles": transform_metrics["valid_vehicles"],
+            "invalid_vehicles": transform_metrics["invalid_vehicles"],
+            "expected_vehicles": transform_metrics["expected_vehicles"],
+            "lines_processed": transform_metrics["total_lines_processed"],
+        }
+    transform_issues = transform_result.get("issues")
+    if transform_issues is not None:
+        collected_metrics["transformation_processing_issues"] = {
+            "invalid_trips_count": len(transform_issues["invalid_trips"]),
+            "invalid_vehicle_ids_count": len(transform_issues["invalid_vehicle_ids"]),
+            "distance_calculation_errors_count": len(
+                transform_issues["distance_calculation_errors"]
+            ),
+            "lines_with_invalid_vehicles": transform_issues[
+                "lines_with_invalid_vehicles"
+            ],
+        }
+
+
+def update_collected_metrics_from_expectations_result(
+    collected_metrics: Dict[str, Dict[str, Any]],
+    expectations_result: Dict[str, Any],
+) -> None:
+    valid_positions_df = expectations_result["valid_df"]
+    collected_metrics["record_counts"]["accepted_records"] = valid_positions_df.shape[0]
+    expectations_summary = expectations_result.get("expectations_summary")
+    if expectations_summary is not None:
+        collected_metrics["post_transformation_validation_summary"] = {
+            "total_checks": expectations_summary["total_checks"],
+            "expectations_successful": expectations_summary[
+                "expectations_successful"
+            ],
+            "expectations_with_violations": expectations_summary[
+                "expectations_with_violations"
+            ],
+            "records_failed": expectations_summary["rows_failed"],
+        }
+
+
 def _build_quality_details(
     execution_id: str,
     logical_date_utc: str,
@@ -247,26 +358,16 @@ def create_data_quality_report(
     _ = format_data_quality_report(data_quality_report)
     report_metrics = create_data_quality_metrics(data_quality_report)
     summary = data_quality_report["summary"]
-    structured_logger.info(
-        event="quality_report_metrics",
-        message="Quality report metrics",
+    _emit_quality_report_metrics_event(
         execution_id=execution_id,
-        correlation_id=logical_date_utc,
+        logical_date_utc=logical_date_utc,
         status="SUCCEEDED",
-        metadata={
-            **report_metrics,
-            "summary_status": summary["status"],
-            "quality_report_path": summary["quality_report_path"],
-        },
+        summary=summary,
+        report_metrics=report_metrics,
     )
-    connection_data = {
-        **config["connections"]["object_storage"],
-        "secure": False,
-    }
-    save_quality_report(
+    _save_quality_report_to_storage(
+        config=config,
         report=data_quality_report,
-        path=data_quality_report["summary"]["quality_report_path"],
-        connection_data=connection_data,
         write_fn=write_fn,
     )
     return data_quality_report
@@ -286,6 +387,8 @@ def create_failure_quality_report(
     expectations_result: Optional[Dict[str, Any]] = None,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
+    collected_metrics: Optional[Dict[str, Any]] = None,
+    execution_phase_metrics: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
@@ -350,41 +453,38 @@ def create_failure_quality_report(
             "summary": summary,
             "details": details,
         }
-    connection_data = {
-        **config["connections"]["object_storage"],
-        "secure": False,
-    }
-    save_quality_report(
+    _save_quality_report_to_storage(
+        config=config,
         report=data_quality_report,
-        path=data_quality_report["summary"]["quality_report_path"],
-        connection_data=connection_data,
         write_fn=write_fn,
     )
+    report_metrics: Dict[str, Any]
     if has_full_results:
         report_metrics = create_data_quality_metrics(data_quality_report)
+    elif collected_metrics is not None:
+        report_metrics = collected_metrics
     else:
         report_metrics = {
             "record_counts": {},
             "transformation_processing_metrics": {},
             "transformation_processing_issues": {},
-            "post_transformation_validation_summary": {
-                "records_failed": summary["items_failed"],
-            },
+            "post_transformation_validation_summary": {},
+        }
+
+    if execution_phase_metrics is not None:
+        report_metrics = {
+            **report_metrics,
+            "execution_phase_metrics": execution_phase_metrics,
         }
     summary = data_quality_report["summary"]
-    structured_logger.info(
-        event="quality_report_metrics",
-        message="Quality report metrics",
+    _emit_quality_report_metrics_event(
         execution_id=execution_id,
-        correlation_id=logical_date_utc,
+        logical_date_utc=logical_date_utc,
         status="FAILED",
-        metadata={
-            **report_metrics,
-            "summary_status": summary["status"],
-            "quality_report_path": summary["quality_report_path"],
-            "failure_phase": failure_phase,
-            "failure_message": failure_message,
-        },
+        summary=summary,
+        report_metrics=report_metrics,
+        failure_phase=failure_phase,
+        failure_message=failure_message,
     )
     return data_quality_report
 

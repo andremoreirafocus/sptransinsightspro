@@ -2,6 +2,11 @@ from transformlivedata.config.transformlivedata_config_schema import GeneralConf
 from transformlivedata.orchestration_dependencies import (
     TransformLiveDataOrchestrationDependencies,
 )
+from transformlivedata.services.create_data_quality_report import (
+    initialize_collected_quality_metrics,
+    update_collected_metrics_from_expectations_result,
+    update_collected_metrics_from_transform_result,
+)
 from observability.third_party_log_bridge import configure_third_party_log_bridge
 from quality.execution_phase_metrics import (
     ExecutionPhaseMetricsTracker,
@@ -47,20 +52,6 @@ def load_transform_save_positions(
     logical_date_string: str,
     deps: TransformLiveDataOrchestrationDependencies,
 ) -> None:
-    execution_id = str(uuid.uuid4())
-    correlation_id = logical_date_string
-    structured_logger: StructuredEventLogger = get_structured_logger(
-        service=pipeline_name,
-        component="orchestrator",
-        logger_name=__name__,
-    )
-    configure_third_party_log_bridge(
-        structured_logger=structured_logger,
-        execution_id=execution_id,
-        correlation_id=correlation_id,
-        namespaces=THIRD_PARTY_LOGGER_NAMESPACES,
-    )
-
     def write_failure_report(phase: str, message: str) -> None:
         if pipeline_config is None:
             logger.error(
@@ -84,11 +75,28 @@ def load_transform_save_positions(
                 expectations_result=expectations_result,
                 quarantine_save_status=quarantine_save_status,
                 quarantine_save_error=quarantine_save_error,
+                collected_metrics=collected_metrics,
+                execution_phase_metrics=tracker.to_log_payload("failed"),
             )
             summary = failure_report.get("summary", {})
             _send_quality_summary_webhook(summary, pipeline_config, deps.send_webhook)
         except Exception as e:
             logger.error("Failed to write quality report on failure: %s", e)
+
+    execution_id = str(uuid.uuid4())
+    correlation_id = logical_date_string
+    structured_logger: StructuredEventLogger = get_structured_logger(
+        service=pipeline_name,
+        component="orchestrator",
+        logger_name=__name__,
+    )
+    configure_third_party_log_bridge(
+        structured_logger=structured_logger,
+        execution_id=execution_id,
+        correlation_id=correlation_id,
+        namespaces=THIRD_PARTY_LOGGER_NAMESPACES,
+    )
+    collected_metrics = initialize_collected_quality_metrics()
 
     phase_order = [
         "config_load",
@@ -293,6 +301,7 @@ def load_transform_save_positions(
         raise ValueError(error_msg)
     tracker.finish("transform", "success")
     positions_df = transform_result["positions"]
+    update_collected_metrics_from_transform_result(collected_metrics, transform_result)
     structured_logger.info(
         event="expectations_validation_started",
         message="Starting expectations validation",
@@ -331,6 +340,9 @@ def load_transform_save_positions(
         raise
     valid_positions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
+    update_collected_metrics_from_expectations_result(
+        collected_metrics, expectations_result
+    )
     structured_logger.info(
         event="save_trusted_started",
         message="Starting trusted positions save",
