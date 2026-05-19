@@ -50,7 +50,7 @@ def test_get_unprocessed_raises_on_exception():
     def fake_select(connection, query):
         raise RuntimeError("db down")
 
-    with pytest.raises(RuntimeError, match="db down"):
+    with pytest.raises(ValueError, match="Error fetching unprocessed requests"):
         get_unprocessed_requests(make_config(), select_fn=fake_select)
 
 
@@ -74,21 +74,21 @@ def test_mark_as_processed_returns_true_on_success():
     assert result is True
 
 
-def test_mark_as_processed_returns_false_on_failure():
+def test_mark_as_processed_raises_value_error_on_failure():
     def fake_update(connection, query, params):
         return False
 
-    result = mark_request_as_processed(
-        make_config(), "2026-02-15T10:00:00", update_fn=fake_update
-    )
-    assert result is False
+    with pytest.raises(ValueError, match="Failed to mark request as processed"):
+        mark_request_as_processed(
+            make_config(), "2026-02-15T10:00:00", update_fn=fake_update
+        )
 
 
 def test_mark_as_processed_raises_on_exception():
     def fake_update(connection, query, params):
         raise RuntimeError("db error")
 
-    with pytest.raises(RuntimeError, match="db error"):
+    with pytest.raises(ValueError, match="Error marking request as processed"):
         mark_request_as_processed(
             make_config(), "2026-02-15T10:00:00", update_fn=fake_update
         )
@@ -137,7 +137,7 @@ def test_mark_by_filename_raises_on_exception():
     def fake_update(connection, query, params):
         raise RuntimeError("db error")
 
-    with pytest.raises(RuntimeError, match="db error"):
+    with pytest.raises(ValueError, match="Error marking request as processed"):
         mark_request_as_processed_by_filename(
             make_config(), "file.json", update_fn=fake_update
         )

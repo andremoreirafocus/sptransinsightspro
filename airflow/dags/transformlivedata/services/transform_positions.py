@@ -81,8 +81,7 @@ def calculate_distance(
         distance = round(R * c)
         return float(distance), True
     except Exception as e:
-        logger.error(f"Error calculating distance: {e}")
-        logger.error(f"lat1, lon1, lat2, lon2 = {lat1}, {lon1}, {lat2}, {lon2}")
+        logger.error(f"Error calculating distance for lat1, lon1, lat2, lon2 = {lat1}, {lon1}, {lat2}, {lon2}: {str(e)}")
         return -1.0, False
 
 
@@ -419,12 +418,13 @@ def transform_positions(
         batch_ts,
         lineage,
     )
-    logger.info(f"Processed {metrics['valid_vehicles']} valid vehicles.")
-    logger.info(f"Skipped {metrics['invalid_vehicles']} invalid vehicles.")
-    logger.warning(
-        f"Total invalid trips: {len(issues['invalid_trips'])} - {issues['invalid_trips']}"
-    )
-    logger.warning(
-        f"Total invalid vehicles ids: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids']}"
-    )
+    logger.info(f"Processed {metrics['valid_vehicles']} valid vehicles. Skipped {metrics['invalid_vehicles']} invalid vehicles.")
+    if len(issues['invalid_trips']) > 0:
+        logger.warning(
+            f"Total invalid trips: {len(issues['invalid_trips'])} - {issues['invalid_trips']}"
+        )
+    if len(issues['invalid_vehicle_ids']) > 0:
+        logger.warning(
+            f"Total invalid vehicles ids: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids']}"
+        )
     return result

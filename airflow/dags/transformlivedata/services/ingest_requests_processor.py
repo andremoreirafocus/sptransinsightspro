@@ -48,17 +48,25 @@ def get_unprocessed_requests(
     Returns:
         list: List of unprocessed request records as dictionaries
               Each dictionary contains: id, filename, logical_date, processed, created_at, updated_at
-              Returns empty list if table not found or query fails
+
+    Raises:
+        ValueError: if query execution fails
     """
     connection, schema, table = _extract_database_config(config)
     query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
     logger.info(f"Fetching unprocessed requests from {schema}.{table}")
-    results = select_fn(connection, query)
-    if results:
-        logger.info(f"Found {len(results)} unprocessed request(s)")
-    else:
-        logger.info("No unprocessed requests found")
-    return results
+    try:
+        results = select_fn(connection, query)
+        if results:
+            logger.info(f"Found {len(results)} unprocessed request(s)")
+        else:
+            logger.info("No unprocessed requests found")
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching unprocessed requests from {schema}.{table}: {e}")
+        raise ValueError(
+            f"Error fetching unprocessed requests from {schema}.{table}: {e}"
+        ) from e
 
 
 def mark_request_as_processed(
@@ -86,15 +94,22 @@ def mark_request_as_processed(
     logger.info(
         f"Marking request as processed for logical_date: {logical_date} in {schema}.{table}"
     )
-    success = update_fn(connection, query, {"logical_date": logical_date})
-    if success:
-        logger.info(f"Request with logical_date={logical_date} marked as processed")
-    else:
+    try:
+        success = update_fn(connection, query, {"logical_date": logical_date})
+        if success:
+            logger.info(f"Request with logical_date={logical_date} marked as processed")
+        else:
+            raise ValueError(
+                f"Failed to mark request as processed for logical_date={logical_date}"
+            )
+        return success
+    except Exception as e:
         logger.error(
-            f"Failed to mark request as processed for logical_date={logical_date}"
+            f"Error marking request as processed for logical_date={logical_date}: {str(e)}"
         )
-    return success
-
+        raise ValueError(
+            f"Error marking request as processed for logical_date={logical_date}: {str(e)}"
+        ) from e
 
 def mark_request_as_processed_by_filename(
     config: Dict[str, Any], filename: str, update_fn: Callable[..., Any] = execute_update_query
@@ -121,9 +136,13 @@ def mark_request_as_processed_by_filename(
     logger.info(
         f"Marking request as processed for filename: {filename} in {schema}.{table}"
     )
-    success = update_fn(connection, query, {"filename": filename})
-    if success:
-        logger.info(f"Request with filename={filename} marked as processed")
-    else:
-        logger.error(f"Failed to mark request as processed for filename={filename}")
-    return success
+    try:
+        success = update_fn(connection, query, {"filename": filename})
+        if success:
+            logger.info(f"Request with filename={filename} marked as processed")
+        else:
+            raise ValueError(f"Failed to mark request as processed for filename={filename}")
+        return success
+    except Exception as e:
+        logger.error(f"Error marking request as processed for filename={filename}: {str(e)}")
+        raise ValueError(f"Error marking request as processed for filename={filename}: {str(e)}") from e

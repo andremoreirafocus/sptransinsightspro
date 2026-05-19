@@ -2,7 +2,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 from infra.duck_db_v3 import get_duckdb_connection
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ def save_positions_to_storage(
     config: Dict[str, Any],
     positions_df: Optional[pd.DataFrame],
     target_bucket: str,
-    duckdb_client: Optional[Any] = None,
+    get_duckdb_connection_fn: Callable[[Dict[str, Any]], Any] = get_duckdb_connection,
 ) -> None:
     """
     Storage Layer:
@@ -34,6 +34,7 @@ def save_positions_to_storage(
         elif target_bucket == "quarantined":
             bucket_name = storage["quarantined_bucket"]
         else:
+            logger.error(f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'.")
             raise ValueError(
                 f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'."
             )
@@ -51,8 +52,6 @@ def save_positions_to_storage(
     if positions_df is None or positions_df.empty:
         logger.warning("No positions to save. DataFrame is empty.")
         return
-    con = None
-    owns_connection = False
     try:
         positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"], utc=True).dt.tz_convert(ZoneInfo("America/Sao_Paulo"))
         batch_ts = positions_df["extracao_ts"].iloc[0] 
@@ -61,11 +60,7 @@ def save_positions_to_storage(
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
         positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
-        if duckdb_client is None:
-            con = get_duckdb_connection(connection_data)
-            owns_connection = True
-        else:
-            con = duckdb_client
+        con = get_duckdb_connection_fn(connection_data)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         logger.info(
             f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."
@@ -85,6 +80,5 @@ def save_positions_to_storage(
         logger.error("Failed to save positions to %s layer: %s", target_bucket, e)
         raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}") from e
     finally:
-        if owns_connection and con is not None:
+        if "con" in locals():
             con.close()
-            logger.info("DuckDB connection closed.")

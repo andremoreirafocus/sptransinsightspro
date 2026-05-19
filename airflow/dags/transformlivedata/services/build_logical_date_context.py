@@ -24,4 +24,4 @@ def build_logical_date_context(logical_date_string: str) -> Dict[str, str]:
         }
     except Exception as e:
         logger.error("Failed to build logical date context for '%s': %s", logical_date_string, e)
-        raise ValueError(f"Failed to build logical date context: {e}") from e
+        raise ValueError("Failed to build logical date context") from e

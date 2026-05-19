@@ -41,14 +41,22 @@ def make_df():
 def test_returns_early_when_df_is_none():
     fake_con = FakeDuckDBConnection()
     # Should not raise
-    save_positions_to_storage(make_config(), None, "trusted", duckdb_client=fake_con)
-    assert not fake_con.closed  # execute never called
+    save_positions_to_storage(
+        make_config(),
+        None,
+        "trusted",
+        get_duckdb_connection_fn=lambda _connection_data: fake_con,
+    )
+    assert not fake_con.closed  # connection was never created
 
 
 def test_returns_early_when_df_is_empty():
     fake_con = FakeDuckDBConnection()
     save_positions_to_storage(
-        make_config(), pd.DataFrame(), "trusted", duckdb_client=fake_con
+        make_config(),
+        pd.DataFrame(),
+        "trusted",
+        get_duckdb_connection_fn=lambda _connection_data: fake_con,
     )
     assert not fake_con.closed
 
@@ -62,14 +70,20 @@ def test_trusted_bucket_resolved_from_config():
     fake_con = FakeDuckDBConnection()
     # Should not raise — trusted_bucket exists
     save_positions_to_storage(
-        make_config(), make_df(), "trusted", duckdb_client=fake_con
+        make_config(),
+        make_df(),
+        "trusted",
+        get_duckdb_connection_fn=lambda _connection_data: fake_con,
     )
 
 
 def test_quarantined_bucket_resolved_from_config():
     fake_con = FakeDuckDBConnection()
     save_positions_to_storage(
-        make_config(), make_df(), "quarantined", duckdb_client=fake_con
+        make_config(),
+        make_df(),
+        "quarantined",
+        get_duckdb_connection_fn=lambda _connection_data: fake_con,
     )
 
 
@@ -84,5 +98,8 @@ def test_duckdb_error_raises_value_error():
     fake_con = FakeDuckDBConnection(raises=RuntimeError("copy failed"))
     with pytest.raises(ValueError, match="Failed to save positions"):
         save_positions_to_storage(
-            make_config(), make_df(), "trusted", duckdb_client=fake_con
+            make_config(),
+            make_df(),
+            "trusted",
+            get_duckdb_connection_fn=lambda _connection_data: fake_con,
         )

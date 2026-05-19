@@ -38,4 +38,3 @@ def load_trip_details(
     finally:
         if "con" in locals():
             con.close()
-            logger.info("DuckDB connection closed.")

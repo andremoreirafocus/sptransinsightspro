@@ -60,16 +60,25 @@ def load_positions(
         try:
             data = read_bytes_fn(connection_data, source_bucket, object_name)
             logger.info("Data is compressed, decompressing...")
-            datastr = decompress_fn(data.getvalue())
-            logger.info("Data decompressed successfully.")
         except Exception as e:
             logger.error(
-                "Failed to read/decompress object storage payload '%s': %s",
+                "Failed to read object storage payload '%s': %s",
                 object_name,
                 e,
             )
             raise ValueError(
-                f"Failed to read/decompress object storage payload '{object_name}': {e}"
+                f"Failed to read object storage payload '{object_name}': {e}"
+            ) from e
+        try:
+            datastr = decompress_fn(data.getvalue())
+        except Exception as e:
+            logger.error(
+                "Failed to decompress object storage payload '%s': %s",
+                object_name,
+                e,
+            )
+            raise ValueError(
+                f"Failed to decompress object storage payload '{object_name}': {e}"
             ) from e
     else:
         try:
