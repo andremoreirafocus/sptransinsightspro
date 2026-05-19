@@ -1,11 +1,15 @@
 from zoneinfo import ZoneInfo
 
 import pandas as pd
-import logging
 from typing import Any, Callable, Dict, Optional, Tuple
 from infra.duck_db_v3 import get_duckdb_connection
+from observability.structured_event_logger import get_structured_logger
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="transformlivedata",
+    component="save_positions_to_storage",
+    logger_name=__name__,
+)
 
 
 def save_positions_to_storage(
@@ -34,7 +38,12 @@ def save_positions_to_storage(
         elif target_bucket == "quarantined":
             bucket_name = storage["quarantined_bucket"]
         else:
-            logger.error(f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'.")
+            structured_logger.error(
+                event="save_positions_invalid_target_bucket",
+                message="Invalid target_bucket. Use 'trusted' or 'quarantined'.",
+                status="FAILED",
+                metadata={"target_bucket": target_bucket},
+            )
             raise ValueError(
                 f"Invalid target_bucket '{target_bucket}'. Use 'trusted' or 'quarantined'."
             )
@@ -50,9 +59,20 @@ def save_positions_to_storage(
         config, target_bucket
     )
     if positions_df is None or positions_df.empty:
-        logger.warning("No positions to save. DataFrame is empty.")
+        structured_logger.warning(
+            event="save_positions_skipped_empty",
+            message="No positions to save. DataFrame is empty.",
+            status="SKIPPED",
+            metadata={"target_bucket": target_bucket},
+        )
         return
     try:
+        structured_logger.info(
+            event="save_positions_started",
+            message="Starting positions save",
+            status="STARTED",
+            metadata={"target_bucket": target_bucket, "rows": int(len(positions_df))},
+        )
         positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"], utc=True).dt.tz_convert(ZoneInfo("America/Sao_Paulo"))
         batch_ts = positions_df["extracao_ts"].iloc[0] 
         file_name = batch_ts.strftime("positions_%H%M.parquet")
@@ -62,8 +82,15 @@ def save_positions_to_storage(
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
         con = get_duckdb_connection_fn(connection_data)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
-        logger.info(
-            f"Exporting {len(positions_df)} rows to {output_base_path} partitioned by hour..."
+        structured_logger.info(
+            event="save_positions_export_started",
+            message="Exporting positions to storage",
+            status="STARTED",
+            metadata={
+                "target_bucket": target_bucket,
+                "rows": int(len(positions_df)),
+                "output_base_path": output_base_path,
+            },
         )
         con.execute(f"""
             COPY (SELECT * FROM positions_df) 
@@ -75,9 +102,21 @@ def save_positions_to_storage(
                 OVERWRITE_OR_IGNORE 1
             );
         """)
-        logger.info(f"Successfully saved {file_name} to {target_bucket} layer.")
+        structured_logger.info(
+            event="save_positions_succeeded",
+            message="Positions saved successfully",
+            status="SUCCEEDED",
+            metadata={"target_bucket": target_bucket, "file_name": file_name},
+        )
     except Exception as e:
-        logger.error("Failed to save positions to %s layer: %s", target_bucket, e)
+        structured_logger.error(
+            event="save_positions_failed",
+            message=f"Failed to save positions to {target_bucket} layer.",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            metadata={"target_bucket": target_bucket},
+        )
         raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}") from e
     finally:
         if "con" in locals():

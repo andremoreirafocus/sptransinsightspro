@@ -12,11 +12,14 @@ from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from math import radians, sin, cos, sqrt, atan2
 import pandas as pd
-import logging
+from observability.structured_event_logger import get_structured_logger
 
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="transformlivedata",
+    component="transform_positions",
+    logger_name=__name__,
+)
 
 
 @dataclass(frozen=True)
@@ -81,7 +84,14 @@ def calculate_distance(
         distance = round(R * c)
         return float(distance), True
     except Exception as e:
-        logger.error(f"Error calculating distance for lat1, lon1, lat2, lon2 = {lat1}, {lon1}, {lat2}, {lon2}: {str(e)}")
+        structured_logger.error(
+            event="distance_calculation_failed",
+            message="Error calculating distance",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            metadata={"lat1": lat1, "lon1": lon1, "lat2": lat2, "lon2": lon2},
+        )
         return -1.0, False
 
 
@@ -318,11 +328,19 @@ def transform_positions(
         return raw_schema
 
     deps = deps or get_transform_positions_dependencies()
-    logger.info("Converting raw positions to positions table...")
+    structured_logger.info(
+        event="transform_positions_started",
+        message="Converting raw positions to positions table",
+        status="STARTED",
+    )
     metadata: Dict[str, Any] = raw_positions.get("metadata") or {}
     df_flat = deps.flatten_raw_positions(raw_positions)
     if df_flat.empty:
-        logger.error("No position data resulted from flattening.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="No position data resulted from flattening.",
+            status="FAILED",
+        )
         raise ValueError("No position data resulted from flattening.")
     rename_map = {
         "c": "linha_lt",
@@ -342,30 +360,59 @@ def transform_positions(
         df_flat, rename_map, raw_path_map, metadata
     )
     if df_normalized.empty:
-        logger.error("No position data resulted from normalization.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="No position data resulted from normalization.",
+            status="FAILED",
+        )
         raise ValueError("No position data resulted from normalization.")
-    logger.info("Preloading trip details from database...")
+    structured_logger.info(
+        event="transform_positions_load_trip_details_started",
+        message="Preloading trip details from storage",
+        status="STARTED",
+    )
     trip_details_df = deps.load_trip_details(config)
     if trip_details_df is None or trip_details_df.empty:
-        logger.error("trip_details_df is empty. Aborting transformation.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="trip_details_df is empty. Aborting transformation.",
+            status="FAILED",
+        )
         raise ValueError("trip_details_df is empty. Aborting transformation.")
-    logger.info(f"Built trip details cache with {trip_details_df.shape[0]} entries")
+    structured_logger.info(
+        event="transform_positions_load_trip_details_succeeded",
+        message="Trip details cache built",
+        status="SUCCEEDED",
+        metadata={"rows": int(trip_details_df.shape[0])},
+    )
     df_with_trip_id = add_trip_id(df_normalized)
     df_enriched, lineage_join = deps.enrich_with_trip_details(
         df_with_trip_id, trip_details_df
     )
     if df_enriched.empty:
-        logger.error("No position data resulted from enrichment.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="No position data resulted from enrichment.",
+            status="FAILED",
+        )
         raise ValueError("No position data resulted from enrichment.")
     enriched_valid_df, enriched_invalid_df = split_enriched_valid_invalid(df_enriched)
     if enriched_valid_df.empty:
-        logger.error("No valid position data after enrichment.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="No valid position data after enrichment.",
+            status="FAILED",
+        )
         raise ValueError("No valid position data after enrichment.")
     calculated_distance_df, distance_errors, lineage_calc = deps.compute_distances(
         enriched_valid_df
     )
     if calculated_distance_df.empty:
-        logger.error("No position data after distance calculation.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="No position data after distance calculation.",
+            status="FAILED",
+        )
         raise ValueError("No position data after distance calculation.")
     valid_df, distance_invalid_df = split_calculated_valid_invalid(
         calculated_distance_df
@@ -383,7 +430,11 @@ def transform_positions(
     )
     extracted_at = metadata.get("extracted_at")
     if not extracted_at:
-        logger.error("metadata.extracted_at is missing in raw positions.")
+        structured_logger.error(
+            event="transform_positions_failed",
+            message="metadata.extracted_at is missing in raw positions.",
+            status="FAILED",
+        )
         raise ValueError("metadata.extracted_at is required in raw positions.")
     batch_ts = parser.parse(extracted_at)
     valid_df_columns = [
@@ -418,13 +469,34 @@ def transform_positions(
         batch_ts,
         lineage,
     )
-    logger.info(f"Processed {metrics['valid_vehicles']} valid vehicles. Skipped {metrics['invalid_vehicles']} invalid vehicles.")
+    structured_logger.info(
+        event="transform_positions_succeeded",
+        message="Transformation finished",
+        status="SUCCEEDED",
+        metadata={
+            "valid_vehicles": int(metrics["valid_vehicles"]),
+            "invalid_vehicles": int(metrics["invalid_vehicles"]),
+            "total_vehicles_processed": int(metrics["total_vehicles_processed"]),
+        },
+    )
     if len(issues['invalid_trips']) > 0:
-        logger.warning(
-            f"Total invalid trips: {len(issues['invalid_trips'])} - {issues['invalid_trips']}"
+        structured_logger.warning(
+            event="transform_positions_invalid_trips_detected",
+            message="Invalid trips detected",
+            status="SUCCEEDED",
+            metadata={
+                "invalid_trips_count": int(len(issues["invalid_trips"])),
+                "invalid_trips": issues["invalid_trips"],
+            },
         )
     if len(issues['invalid_vehicle_ids']) > 0:
-        logger.warning(
-            f"Total invalid vehicles ids: {len(issues['invalid_vehicle_ids'])} - {issues['invalid_vehicle_ids']}"
+        structured_logger.warning(
+            event="transform_positions_invalid_vehicle_ids_detected",
+            message="Invalid vehicle ids detected",
+            status="SUCCEEDED",
+            metadata={
+                "invalid_vehicle_ids_count": int(len(issues["invalid_vehicle_ids"])),
+                "invalid_vehicle_ids": issues["invalid_vehicle_ids"],
+            },
         )
     return result

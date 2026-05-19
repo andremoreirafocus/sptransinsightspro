@@ -7,6 +7,7 @@ from transformlivedata.services.create_data_quality_report import (
     _compute_quality_metrics,
     build_data_quality_report,
     build_quarantine_path,
+    create_data_quality_metrics,
     create_data_quality_report,
     create_failure_quality_report,
     format_data_quality_report,
@@ -453,6 +454,61 @@ def test_create_data_quality_report_calls_write_fn():
     assert len(calls) == 1
 
 
+def test_create_data_quality_metrics_returns_expected_compact_counts():
+    report = build_data_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        transform_result=make_transform_result(invalid_count=1, total=10),
+        expectations_result=make_expectations_result(gx_invalid_count=2, rows_failed=3),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
+        batch_ts="2026-02-15T10:30:00",
+    )
+    metrics = create_data_quality_metrics(report)
+
+    assert metrics["record_counts"]["raw_input_records"] == 10
+    assert metrics["record_counts"]["transformed_records"] == 9
+    assert metrics["record_counts"]["accepted_records"] == 10
+    assert metrics["record_counts"]["rejected_records"] == 1
+    assert metrics["transformation_processing_issues"]["invalid_trips_count"] == 0
+    assert metrics["transformation_processing_issues"]["invalid_vehicle_ids_count"] == 0
+    assert metrics["post_transformation_validation_summary"]["records_failed"] == report["summary"]["items_failed"]
+
+
+def test_create_data_quality_report_emits_quality_report_metrics_event(monkeypatch):
+    emitted = []
+
+    class _FakeStructuredLogger:
+        def info(self, **kwargs):
+            emitted.append(kwargs)
+
+    monkeypatch.setattr(
+        "transformlivedata.services.create_data_quality_report.structured_logger",
+        _FakeStructuredLogger(),
+    )
+
+    create_data_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        transform_result=make_transform_result(),
+        expectations_result=make_expectations_result(),
+        write_fn=lambda *a, **kw: None,
+    )
+
+    assert len(emitted) >= 1
+    event = emitted[-1]
+    assert event["event"] == "quality_report_metrics"
+    assert event["message"] == "Quality report metrics"
+    assert event["execution_id"] == "exec-1"
+    assert event["correlation_id"] == "2026-02-15T10:00:00+00:00"
+    assert "metadata" in event
+    assert "record_counts" in event["metadata"]
+
+
 # --- create_failure_quality_report ---
 
 
@@ -528,6 +584,75 @@ def test_create_failure_quality_report_calls_write_fn():
         write_fn=lambda *a, **kw: calls.append(True),
     )
     assert len(calls) == 1
+
+
+def test_create_failure_quality_report_emits_metrics_event_without_results(monkeypatch):
+    emitted = []
+
+    class _FakeStructuredLogger:
+        def info(self, **kwargs):
+            emitted.append(kwargs)
+
+    monkeypatch.setattr(
+        "transformlivedata.services.create_data_quality_report.structured_logger",
+        _FakeStructuredLogger(),
+    )
+
+    create_failure_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        failure_phase="load",
+        failure_message="err",
+        write_fn=lambda *a, **kw: None,
+    )
+
+    assert len(emitted) >= 1
+    event = emitted[-1]
+    assert event["event"] == "quality_report_metrics"
+    assert event["status"] == "FAILED"
+    assert event["metadata"]["record_counts"] == {}
+    assert event["metadata"]["transformation_processing_metrics"] == {}
+    assert event["metadata"]["transformation_processing_issues"] == {}
+    assert event["metadata"]["post_transformation_validation_summary"] == {
+        "records_failed": 0
+    }
+    assert event["metadata"]["failure_phase"] == "load"
+    assert event["metadata"]["failure_message"] == "err"
+
+
+def test_create_failure_quality_report_emits_metrics_event_with_results(monkeypatch):
+    emitted = []
+
+    class _FakeStructuredLogger:
+        def info(self, **kwargs):
+            emitted.append(kwargs)
+
+    monkeypatch.setattr(
+        "transformlivedata.services.create_data_quality_report.structured_logger",
+        _FakeStructuredLogger(),
+    )
+
+    create_failure_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        failure_phase="expectations_validation",
+        failure_message="expectation failed",
+        transform_result=make_transform_result(invalid_count=1, total=10),
+        expectations_result=make_expectations_result(gx_invalid_count=2, rows_failed=3),
+        write_fn=lambda *a, **kw: None,
+    )
+
+    assert len(emitted) >= 1
+    event = emitted[-1]
+    assert event["event"] == "quality_report_metrics"
+    assert event["status"] == "FAILED"
+    assert event["metadata"]["record_counts"]["raw_input_records"] == 10
+    assert event["metadata"]["failure_phase"] == "expectations_validation"
+    assert event["metadata"]["failure_message"] == "expectation failed"
 
 
 # --- build_quarantine_path ---

@@ -4,10 +4,16 @@ import logging
 from datetime import datetime
 import pandas as pd
 from infra.object_storage import write_generic_bytes_to_object_storage
+from observability.structured_event_logger import get_structured_logger
 from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
 # This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="transformlivedata",
+    component="create_data_quality_report",
+    logger_name=__name__,
+)
 
 
 def _build_quality_details(
@@ -238,8 +244,21 @@ def create_data_quality_report(
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
-    validation_report = format_data_quality_report(data_quality_report)
-    logger.info(validation_report)
+    _ = format_data_quality_report(data_quality_report)
+    report_metrics = create_data_quality_metrics(data_quality_report)
+    summary = data_quality_report["summary"]
+    structured_logger.info(
+        event="quality_report_metrics",
+        message="Quality report metrics",
+        execution_id=execution_id,
+        correlation_id=logical_date_utc,
+        status="SUCCEEDED",
+        metadata={
+            **report_metrics,
+            "summary_status": summary["status"],
+            "quality_report_path": summary["quality_report_path"],
+        },
+    )
     connection_data = {
         **config["connections"]["object_storage"],
         "secure": False,
@@ -292,7 +311,11 @@ def create_failure_quality_report(
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
-    if transform_result is not None and expectations_result is not None:
+    has_full_results = transform_result is not None and expectations_result is not None
+
+    if has_full_results:
+        assert transform_result is not None
+        assert expectations_result is not None
         data_quality_report = build_data_quality_report(
             config=config,
             execution_id=execution_id,
@@ -336,6 +359,32 @@ def create_failure_quality_report(
         path=data_quality_report["summary"]["quality_report_path"],
         connection_data=connection_data,
         write_fn=write_fn,
+    )
+    if has_full_results:
+        report_metrics = create_data_quality_metrics(data_quality_report)
+    else:
+        report_metrics = {
+            "record_counts": {},
+            "transformation_processing_metrics": {},
+            "transformation_processing_issues": {},
+            "post_transformation_validation_summary": {
+                "records_failed": summary["items_failed"],
+            },
+        }
+    summary = data_quality_report["summary"]
+    structured_logger.info(
+        event="quality_report_metrics",
+        message="Quality report metrics",
+        execution_id=execution_id,
+        correlation_id=logical_date_utc,
+        status="FAILED",
+        metadata={
+            **report_metrics,
+            "summary_status": summary["status"],
+            "quality_report_path": summary["quality_report_path"],
+            "failure_phase": failure_phase,
+            "failure_message": failure_message,
+        },
     )
     return data_quality_report
 
@@ -435,6 +484,48 @@ def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
     except Exception as e:
         logger.error("Error parsing data_quality_report: %s", e)
         raise ValueError(f"Error parsing data_quality_report: {e}")
+
+
+def create_data_quality_metrics(data_quality_report: Dict[str, Any]) -> Dict[str, Any]:
+    summary = data_quality_report["summary"]
+    details = data_quality_report["details"]
+    row_counts = details["transformation_row_counts"]
+    transform_metrics = details["transformation_metrics"]
+    transform_issues = details["transformation_issues"]
+    expectations_summary = details["expectations_summary"]
+    return {
+        "record_counts": {
+            "raw_input_records": row_counts["raw_records"],
+            "transformed_records": row_counts["transformed_records"],
+            "accepted_records": row_counts["accepted_records"],
+            "rejected_records": row_counts["rejected_records"],
+        },
+        "transformation_processing_metrics": {
+            "total_vehicles_processed": transform_metrics["total_vehicles_processed"],
+            "valid_vehicles": transform_metrics["valid_vehicles"],
+            "invalid_vehicles": transform_metrics["invalid_vehicles"],
+            "expected_vehicles": transform_metrics["expected_vehicles"],
+            "lines_processed": transform_metrics["total_lines_processed"],
+        },
+        "transformation_processing_issues": {
+            "invalid_trips_count": len(transform_issues["invalid_trips"]),
+            "invalid_vehicle_ids_count": len(transform_issues["invalid_vehicle_ids"]),
+            "distance_calculation_errors_count": transform_issues[
+                "number_of_distance_calculation_errors"
+            ],
+            "lines_with_invalid_vehicles": transform_issues[
+                "lines_with_invalid_vehicles"
+            ],
+        },
+        "post_transformation_validation_summary": {
+            "total_checks": expectations_summary["total_checks"],
+            "expectations_successful": expectations_summary["expectations_successful"],
+            "expectations_with_violations": expectations_summary[
+                "expectations_with_violations"
+            ],
+            "records_failed": summary["items_failed"],
+        },
+    }
 
 
 def data_quality_report_to_json(data_quality_report: Dict[str, Any]) -> str:

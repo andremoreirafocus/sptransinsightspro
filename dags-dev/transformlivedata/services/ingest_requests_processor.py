@@ -1,8 +1,12 @@
-import logging
 from typing import Any, Callable, Dict, List, Tuple
 from infra.sql_db_v2 import execute_select_query, execute_update_query
+from observability.structured_event_logger import get_structured_logger
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="transformlivedata",
+    component="ingest_requests_processor",
+    logger_name=__name__,
+)
 
 
 def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
@@ -54,16 +58,38 @@ def get_unprocessed_requests(
     """
     connection, schema, table = _extract_database_config(config)
     query = f'SELECT * FROM "{schema}"."{table}" WHERE processed = false ORDER BY created_at ASC'
-    logger.info(f"Fetching unprocessed requests from {schema}.{table}")
+    structured_logger.info(
+        event="get_unprocessed_requests_started",
+        message="Fetching unprocessed requests",
+        status="STARTED",
+        metadata={"schema": schema, "table": table},
+    )
     try:
         results = select_fn(connection, query)
         if results:
-            logger.info(f"Found {len(results)} unprocessed request(s)")
+            structured_logger.info(
+                event="get_unprocessed_requests_succeeded",
+                message="Unprocessed requests fetched",
+                status="SUCCEEDED",
+                metadata={"count": int(len(results)), "schema": schema, "table": table},
+            )
         else:
-            logger.info("No unprocessed requests found")
+            structured_logger.info(
+                event="get_unprocessed_requests_succeeded",
+                message="No unprocessed requests found",
+                status="SUCCEEDED",
+                metadata={"count": 0, "schema": schema, "table": table},
+            )
         return results
     except Exception as e:
-        logger.error(f"Error fetching unprocessed requests from {schema}.{table}: {e}")
+        structured_logger.error(
+            event="get_unprocessed_requests_failed",
+            message="Error fetching unprocessed requests",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            metadata={"schema": schema, "table": table},
+        )
         raise ValueError(
             f"Error fetching unprocessed requests from {schema}.{table}: {e}"
         ) from e
@@ -91,21 +117,34 @@ def mark_request_as_processed(
         SET processed = true, updated_at = NOW()
         WHERE logical_date = :logical_date
     """
-    logger.info(
-        f"Marking request as processed for logical_date: {logical_date} in {schema}.{table}"
+    structured_logger.info(
+        event="mark_request_as_processed_started",
+        message="Marking request as processed by logical_date",
+        status="STARTED",
+        metadata={"logical_date": logical_date, "schema": schema, "table": table},
     )
     try:
         success = update_fn(connection, query, {"logical_date": logical_date})
         if success:
-            logger.info(f"Request with logical_date={logical_date} marked as processed")
+            structured_logger.info(
+                event="mark_request_as_processed_succeeded",
+                message="Request marked as processed by logical_date",
+                status="SUCCEEDED",
+                metadata={"logical_date": logical_date, "schema": schema, "table": table},
+            )
         else:
             raise ValueError(
                 f"Failed to mark request as processed for logical_date={logical_date}"
             )
         return success
     except Exception as e:
-        logger.error(
-            f"Error marking request as processed for logical_date={logical_date}: {str(e)}"
+        structured_logger.error(
+            event="mark_request_as_processed_failed",
+            message="Error marking request as processed by logical_date",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            metadata={"logical_date": logical_date, "schema": schema, "table": table},
         )
         raise ValueError(
             f"Error marking request as processed for logical_date={logical_date}: {str(e)}"
@@ -133,16 +172,31 @@ def mark_request_as_processed_by_filename(
         SET processed = true, updated_at = NOW()
         WHERE filename = :filename
     """
-    logger.info(
-        f"Marking request as processed for filename: {filename} in {schema}.{table}"
+    structured_logger.info(
+        event="mark_request_by_filename_started",
+        message="Marking request as processed by filename",
+        status="STARTED",
+        metadata={"filename": filename, "schema": schema, "table": table},
     )
     try:
         success = update_fn(connection, query, {"filename": filename})
         if success:
-            logger.info(f"Request with filename={filename} marked as processed")
+            structured_logger.info(
+                event="mark_request_by_filename_succeeded",
+                message="Request marked as processed by filename",
+                status="SUCCEEDED",
+                metadata={"filename": filename, "schema": schema, "table": table},
+            )
         else:
             raise ValueError(f"Failed to mark request as processed for filename={filename}")
         return success
     except Exception as e:
-        logger.error(f"Error marking request as processed for filename={filename}: {str(e)}")
+        structured_logger.error(
+            event="mark_request_by_filename_failed",
+            message="Error marking request as processed by filename",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+            metadata={"filename": filename, "schema": schema, "table": table},
+        )
         raise ValueError(f"Error marking request as processed for filename={filename}: {str(e)}") from e
