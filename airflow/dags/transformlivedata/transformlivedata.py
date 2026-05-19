@@ -5,6 +5,7 @@ from transformlivedata.orchestration_dependencies import (
 from quality.execution_phase_metrics import (
     ExecutionPhaseMetricsTracker,
 )
+from observability.structured_event_logger import StructuredEventLogger, get_structured_logger
 import pandas as pd
 import logging
 import uuid
@@ -37,6 +38,13 @@ def load_transform_save_positions(
     logical_date_string: str,
     deps: TransformLiveDataOrchestrationDependencies,
 ) -> None:
+    correlation_id = logical_date_string
+    structured_logger: StructuredEventLogger = get_structured_logger(
+        service=pipeline_name,
+        component="orchestrator",
+        logger_name=__name__,
+    )
+
     def write_failure_report(phase: str, message: str) -> None:
         if pipeline_config is None:
             logger.error(
@@ -107,7 +115,13 @@ def load_transform_save_positions(
         tracker.emit(logger, "failed")
         logger.error("Pipeline configuration validation failed")
         raise ValueError("Pipeline configuration validation failed") from e
-    logger.info(f"Starting execution {execution_id}")
+    structured_logger.info(
+        event="execution_started",
+        message="Starting execution",
+        execution_id=execution_id,
+        correlation_id=correlation_id,
+        status="STARTED",
+    )
     logger.info(f"Loading positions for {logical_date_string}...")
     tracker.begin("load_positions")
     try:

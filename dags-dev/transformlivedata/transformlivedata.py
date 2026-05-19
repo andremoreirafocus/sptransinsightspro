@@ -6,11 +6,10 @@ from quality.execution_phase_metrics import (
     ExecutionPhaseMetricsTracker,
 )
 from observability.structured_event_logger import StructuredEventLogger, get_structured_logger
-from transformlivedata.domain.events import EventType
 import pandas as pd
 import logging
 import uuid
-from typing import Callable, Dict, Optional
+from typing import Callable
 
 
 logger = logging.getLogger(__name__)
@@ -44,54 +43,7 @@ def load_transform_save_positions(
         service=pipeline_name,
         component="orchestrator",
         logger_name=__name__,
-        base_metadata={"pipeline": pipeline_name},
     )
-
-    def emit_structured_event(
-        *,
-        level: str,
-        event: EventType,
-        message: str,
-        execution_id: Optional[str] = None,
-        phase: Optional[str] = None,
-        status: Optional[str] = None,
-        error_type: Optional[str] = None,
-        error_message: Optional[str] = None,
-        metadata: Optional[Dict[str, object]] = None,
-    ) -> None:
-        payload_metadata: Dict[str, object] = {
-            "pipeline": pipeline_name,
-            "logical_date_utc": logical_date_string,
-        }
-        if phase is not None:
-            payload_metadata["phase"] = phase
-        if metadata:
-            payload_metadata.update(metadata)
-
-        emit_kwargs = {
-            "event": event,
-            "message": message,
-            "execution_id": execution_id,
-            "correlation_id": correlation_id,
-            "metadata": payload_metadata,
-        }
-        if status is not None:
-            emit_kwargs["status"] = status
-        if error_type is not None:
-            emit_kwargs["error_type"] = error_type
-        if error_message is not None:
-            emit_kwargs["error_message"] = error_message
-
-        if level == "INFO":
-            structured_logger.info(**emit_kwargs)
-        elif level == "ERROR":
-            structured_logger.error(**emit_kwargs)
-        elif level == "WARNING":
-            structured_logger.warning(**emit_kwargs)
-        elif level == "DEBUG":
-            structured_logger.debug(**emit_kwargs)
-        else:
-            structured_logger.critical(**emit_kwargs)
 
     def write_failure_report(phase: str, message: str) -> None:
         if pipeline_config is None:
@@ -163,12 +115,11 @@ def load_transform_save_positions(
         tracker.emit(logger, "failed")
         logger.error("Pipeline configuration validation failed")
         raise ValueError("Pipeline configuration validation failed") from e
-    emit_structured_event(
-        level="INFO",
+    structured_logger.info(
         event="execution_started",
         message=f"Starting execution {execution_id}",
         execution_id=execution_id,
-        phase="config_load",
+        correlation_id=correlation_id,
         status="STARTED",
     )
     logger.info(f"Loading positions for {logical_date_string}...")
