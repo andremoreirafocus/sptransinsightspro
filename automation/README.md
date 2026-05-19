@@ -4,7 +4,7 @@ Automatizar as operações de implantação e promoção de código, garantindo 
 ## O que este subprojeto faz
 - valida a qualidade do código (lint via `ruff`, SAST via `bandit` e testes unitários via `pytest`) antes de qualquer operação
 - valida tipagem estática com `mypy` antes de qualquer operação
-- promove uma pipeline do ambiente de desenvolvimento (`dags-dev`) para o ambiente de produção (`airflow/dags`), sincronizando também os módulos compartilhados `infra`, `quality` e `pipeline_configurator`
+- promove uma pipeline do ambiente de desenvolvimento (`dags-dev`) para o ambiente de produção (`airflow/dags`), sincronizando também os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 - realiza o build e o redeploy de um microserviço via `docker compose`
 
 ## Pré-requisitos
@@ -97,7 +97,7 @@ Promove uma pipeline do ambiente de desenvolvimento para produção.
 4. Executa type checking com `mypy` na pasta da pipeline
 5. Executa os testes unitários (se a pasta `tests/` existir)
 6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>` excluindo `__pycache__`, `.pytest_cache` e `tests/`
-7. Sincroniza os módulos compartilhados `infra`, `quality` e `pipeline_configurator`
+7. Sincroniza os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 
 **Uso:**
 ```bash
@@ -143,7 +143,7 @@ python3 deploy_service.py alertservice alertservice
 ### `deploy_helpers.py`
 Módulo auxiliar interno. Não é executado diretamente.
 
-Expõe a função `run_code_validations(folder, label, step_offset)` que executa lint, SAST e testes em sequência, retornando o número de steps consumidos. Utilizado por `promote_pipeline.py` e `deploy_service.py`.
+Expõe a função `run_code_validations(folder, label, step_offset, total_steps)` que executa lint, SAST e testes em sequência, retornando o número de steps consumidos. Utilizado por `promote_pipeline.py` e `deploy_service.py`.
 
 Observação: quando existir `<folder>/.venv/bin/python`, este interpretador é utilizado automaticamente para `ruff`, `bandit`, `mypy` e `pytest`.
 

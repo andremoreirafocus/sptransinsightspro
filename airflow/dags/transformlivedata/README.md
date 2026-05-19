@@ -73,12 +73,15 @@ Isso permite identificar exatamente em qual fase o processamento parou e quais m
 }
 ```
 
-### Notificação e observabilidade (alertservice)
-O resumo (`summary`) do relatório é enviado via webhook para o microserviço `alertservice` quando este está habilitado.
-O resumo contém informações de status, fases de falha e métricas de transformação para disparar alertas imediatos (FAIL) ou cumulativos (WARN) configurados no alertservice.
-O alertservice envia notificações por e-mail com base em limiares configuráveis por pipeline:
-- **FAIL (imediato)**: qualquer status FAIL gera e-mail imediato
-- **WARN (cumulativo)**: alertas de warning são aggregados dentro de uma janela de tempo configurável (ex.: 24 horas) e enviados quando limiares são atingidos
+### Observabilidade (stack Loki + Alertmanager)
+A observabilidade deste pipeline é baseada em logging estruturado, com eventos emitidos em JSON e coletados pela stack de observabilidade.
+
+- Eventos operacionais e de execução são emitidos com `service`, `component`, `event`, `status`, `execution_id` e `correlation_id`.
+- Métricas de qualidade são emitidas no evento `quality_report_metrics`.
+- Métricas de duração por fase são emitidas no evento `execution_phase_metrics`.
+- Logs de bibliotecas de terceiros podem ser roteados para eventos estruturados via bridge de observabilidade.
+
+No ambiente com Airflow, os logs são coletados pelo Promtail e enviados ao Loki; a camada de alertas é feita via regras no Grafana/Loki e Alertmanager.
 
 ## Pré-requisitos
 - Disponibilidade de quatro buckets: para a camada raw, para a camada trusted, para os registros em quarentena e para os relatórios de qualidade, previamente criados no serviço de object storage
@@ -133,9 +136,6 @@ Chaves esperadas em `general`
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
-  "notifications": {
-    "webhook_url": "http://localhost:8000/notify"  // URL do microserviço alertservice
-  },
   "data_validations": {
     "json_validation": {
       "schemas": ["raw_data_json_schema"]
@@ -147,8 +147,7 @@ Chaves esperadas em `general`
 }
 ```
 
-Observação: `webhook_url` é a URL do microserviço `alertservice` e é obrigatório.  
-Para desativar notificações para o alertservice, use o valor `"disabled"`.
+Observação: a notificação de alertas não depende mais de webhook de aplicação neste pipeline; os alertas operacionais devem ser configurados na stack de observabilidade (Loki/Grafana/Alertmanager).
 
 ## Testes unitários
 Os testes unitários deste subprojeto estão restritos ao módulo `transform_positions.py` e cobrem o núcleo da lógica de transformação, incluindo:

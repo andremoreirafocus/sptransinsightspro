@@ -4,7 +4,7 @@ Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de t
 
 Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
 
-Resumos de qualidade dos pipelines principais e do microserviço de ingest são enviados via webhook para um microserviço de geração de alertas, responsável por emitir notificações e alertas por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings.
+Os pipelines e microserviços adotam observabilidade estruturada com logs em JSON, coleta centralizada e regras de alerta na stack Loki/Grafana/Alertmanager. Em componentes legados, integrações via webhook podem coexistir durante a transição.
 
 A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
@@ -19,7 +19,7 @@ A plataforma adota observabilidade estruturada, gerando ganhos diretos de rastre
 Para implementar a solução foram adotados os componentes:
 - Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, alertservice, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
 - [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTrans a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
-- [alertservice](./alertservice/README.md): microserviço que recebe resumos de qualidade via webhook do microserviço de ingest e dos pipelines, e envia notificações por e-mail com alertas imediatos para falhas e alertas cumulativos para warnings baseados em limiares configuráveis por pipeline.
+- [alertservice](./alertservice/README.md): microserviço legado para notificações via webhook, mantido para compatibilidade durante a migração para alertas pela stack de observabilidade.
 - Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados transformados e com qualidade checada.
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
@@ -160,7 +160,7 @@ Este script realiza os seguintes passos:
 3. Type checking: executa o `mypy` no subdiretório da pipeline.
 4. Testes de unidade: executa o `pytest` na pasta `tests/` da pipeline (se existir).
 5. Sincronização do código: sincroniza o subdiretório da pipeline para produção.
-6. Sincronização de infraestrutura compartilhada: sincroniza as pastas `infra`, `quality` e `pipeline_configurator` para produção.
+6. Sincronização de infraestrutura compartilhada: sincroniza as pastas `infra`, `quality`, `observability` e `pipeline_configurator` para produção.
 
 O número total de passos exibido é ajustado automaticamente com base na presença de testes.
 
@@ -188,6 +188,6 @@ Os scripts de deployment compartilham dois módulos auxiliares em `automation/`:
 | Módulo | Responsabilidade |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executa subprocessos com `shell=False` e reporta o exit code em caso de falha |
-| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — executa linting, SAST, type checking e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset, total_steps)` — executa linting, SAST e testes, retornando o número de passos consumidos para alinhamento do contador de steps |
 
 [Mais informações sobre os scripts](./automation/README.md)

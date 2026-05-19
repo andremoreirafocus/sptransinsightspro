@@ -6,7 +6,7 @@ Automate deployment and code-promotion operations, ensuring that lint, SAST, typ
 
 - validates code quality (lint with `ruff`, SAST with `bandit`, and unit tests with `pytest`) before any operation
 - validates static typing with `mypy` before any operation
-- promotes a pipeline from the development environment (`dags-dev`) to the production environment (`airflow/dags`), also synchronizing the shared modules `infra`, `quality`, and `pipeline_configurator`
+- promotes a pipeline from the development environment (`dags-dev`) to the production environment (`airflow/dags`), also synchronizing the shared modules `infra`, `quality`, `observability`, and `pipeline_configurator`
 - builds and redeploys a microservice through `docker compose`
 
 ## Prerequisites
@@ -105,7 +105,7 @@ Promotes a pipeline from the development environment to production.
 4. Runs type checking with `mypy` on the pipeline folder
 5. Runs unit tests if the `tests/` folder exists
 6. Synchronizes the pipeline folder to `airflow/dags/<pipeline>`, excluding `__pycache__`, `.pytest_cache`, and `tests/`
-7. Synchronizes the shared modules `infra`, `quality`, and `pipeline_configurator`
+7. Synchronizes the shared modules `infra`, `quality`, `observability`, and `pipeline_configurator`
 
 **Usage:**
 ```bash
@@ -153,7 +153,7 @@ python3 deploy_service.py alertservice alertservice
 
 Internal helper module. Not executed directly.
 
-Exposes the function `run_code_validations(folder, label, step_offset)`, which runs lint, SAST, type checking, and tests in sequence and returns the number of steps consumed. It is used by `promote_pipeline.py` and `deploy_service.py`.
+Exposes the function `run_code_validations(folder, label, step_offset, total_steps)`, which runs lint, SAST, and tests in sequence and returns the number of steps consumed. It is used by `promote_pipeline.py` and `deploy_service.py`.
 
 Note: when `<folder>/.venv/bin/python` exists, that interpreter is automatically used for `ruff`, `bandit`, `mypy`, and `pytest`.
 

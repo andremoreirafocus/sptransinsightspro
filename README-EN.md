@@ -4,7 +4,7 @@ To achieve this, Sptransinsights extracts the positions of all buses in circulat
 
 A complete data quality framework, with configuration-driven validations using JSON Schema and Great Expectations, quarantine of invalid records, and generation of quality reports with both summary and processing details for observability, is applied to the most critical pipelines.
 
-Quality summaries from the main pipelines and from the ingestion microservice are sent via webhook to an alert-generation microservice, which is responsible for sending email notifications with immediate alerts for failures and cumulative alerts for warnings.
+Pipelines and microservices adopt structured observability with JSON logs, centralized collection, and alert rules in the Loki/Grafana/Alertmanager stack. In legacy components, webhook-based integrations may coexist during migration.
 
 The solution adopts a monorepo structure and is composed of several subprojects. Each one has its own README with information about its role and operational requirements.
 
@@ -20,7 +20,7 @@ The platform adopts structured observability, generating direct gains in end-to-
 The following components were adopted to implement the solution:
 - Docker and Docker Compose: used to package and run the solution components in containers, and to orchestrate local environment startup with services such as Airflow, PostgreSQL, MinIO, Jupyter, `extractloadlivedata`, `alertservice`, Loki, Promtail, and Grafana, reducing manual setup effort and increasing environment reproducibility.
 - [extractloadlivedata](./extractloadlivedata/README-EN.md): microservice that extracts data from the SPTrans API at regular intervals, initially every 2 minutes, while allowing this interval to be reduced, which would not be feasible with an Airflow job because execution delays would compromise interval precision. It saves data first to a local volume and then to the raw layer implemented with MinIO.
-- [alertservice](./alertservice/README-EN.md): microservice that receives quality summaries via webhook from the ingest microservice and the pipelines, and sends email notifications with immediate failure alerts and cumulative warning alerts based on per-pipeline thresholds.
+- [alertservice](./alertservice/README-EN.md): legacy webhook notification microservice, kept for compatibility while migrating alerts to the observability stack.
 - MinIO: used to implement the raw layer for storing raw data extracted from the SPTrans API and GTFS data, and also the trusted layer for transformed data with quality checks applied.
 - DuckDB: used in transformation processes to run SQL queries directly on Parquet tables stored in the trusted layer implemented through MinIO, with excellent performance and without requiring SQL engines such as Presto, therefore reducing infrastructure complexity. It is also used for exploratory analysis through Jupyter.
 - [Jupyter](./jupyter/README-EN.md): used to create notebooks for exploratory data analysis over the trusted layer stored in object storage.
@@ -184,7 +184,7 @@ This script performs the following steps:
 3. Type checking: runs `mypy` on the pipeline subdirectory.
 4. Unit tests: runs `pytest` in the pipeline `tests/` folder if it exists.
 5. Code synchronization: synchronizes the pipeline subdirectory to production.
-6. Shared infrastructure synchronization: synchronizes `infra`, `quality`, and `pipeline_configurator` to production.
+6. Shared infrastructure synchronization: synchronizes `infra`, `quality`, `observability`, and `pipeline_configurator` to production.
 
 The total number of displayed steps is automatically adjusted based on the presence of tests.
 
@@ -214,6 +214,6 @@ Deployment scripts share two helper modules in `automation/`:
 | Module | Responsibility |
 |---|---|
 | `os_command_helper.py` | `run_command(command, error_msg)` — executes subprocesses with `shell=False` and reports the exit code in case of failure |
-| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset)` — runs linting, SAST, type checking, and tests, returning the number of consumed steps so the step counter stays aligned |
+| `deploy_helpers.py` | `run_code_validations(folder, label, step_offset, total_steps)` — runs linting, SAST, and tests, returning the number of consumed steps so the step counter stays aligned |
 
 [More information about the scripts](./automation/README-EN.md)
