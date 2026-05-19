@@ -40,3 +40,55 @@ scrape_configs:
             status: status
             execution_id: execution_id
             correlation_id: correlation_id
+  - job_name: airflow
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/airflow_(webserver|scheduler)"
+        action: keep
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/airflow_(.*)"
+        target_label: service
+        replacement: airflow_$1
+      - source_labels: ["__meta_docker_container_name"]
+        regex: "/(.*)"
+        target_label: container
+    pipeline_stages:
+      - docker: {}
+      - static_labels:
+          source: docker
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            service: service
+            component: component
+            event: event
+            status: status
+            execution_id: execution_id
+            correlation_id: correlation_id
+  - job_name: airflow_task_logs
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          service: airflow_tasks
+          source: airflow_task_logs
+          __path__: /opt/airflow/logs/**/*.log
+    pipeline_stages:
+      - regex:
+          expression: ".* - (?P<json_payload>\\{.*\\})$"
+      - output:
+          source: json_payload
+      - json:
+          expressions:
+            timestamp: timestamp
+            level: level
+            service: service
+            component: component
+            event: event
+            status: status
+            execution_id: execution_id
+            correlation_id: correlation_id

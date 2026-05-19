@@ -32,6 +32,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
       - ./airflow/variables_and_connections:/opt/airflow/variables_and_connections
+      - airflow_logs:/opt/airflow/logs
     ports:
       - "8080:8080"
     depends_on:
@@ -54,6 +55,7 @@ services:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
       - ./airflow/variables_and_connections:/opt/airflow/variables_and_connections
+      - airflow_logs:/opt/airflow/logs
     depends_on:
       - airflow_postgres
     networks:
@@ -184,6 +186,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - promtail_positions:/tmp
+      - airflow_logs:/opt/airflow/logs:ro
     networks:
       - rede_fia
     restart: always
@@ -235,6 +238,7 @@ volumes:
   minio_storage: {}
   postgres_data: {}
   airflow_db_data: {}
+  airflow_logs: {}
   ingest_buffer: {}
   diskcache_pending_invocations: {}
   diskcache_pending_processing_requests: {}
