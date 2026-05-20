@@ -1,48 +1,11 @@
 from typing import Any, Callable, Dict, Optional, Tuple
-import json
 import logging
 from datetime import datetime
 import pandas as pd
 from infra.object_storage import write_generic_bytes_to_object_storage
-from observability.structured_event_logger import get_structured_logger
 from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
-# This logger inherits the configuration from the root logger in main.py
 logger = logging.getLogger(__name__)
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="create_data_quality_report",
-    logger_name=__name__,
-)
-
-
-def _emit_quality_report_metrics_event(
-    *,
-    execution_id: str,
-    logical_date_utc: str,
-    status: str,
-    summary: Dict[str, Any],
-    report_metrics: Dict[str, Any],
-    failure_phase: Optional[str] = None,
-    failure_message: Optional[str] = None,
-) -> None:
-    metadata = {
-        **report_metrics,
-        "summary_status": summary["status"],
-        "quality_report_path": summary["quality_report_path"],
-    }
-    if failure_phase is not None:
-        metadata["failure_phase"] = failure_phase
-    if failure_message is not None:
-        metadata["failure_message"] = failure_message
-    structured_logger.info(
-        event="quality_report_metrics",
-        message="Quality report metrics",
-        execution_id=execution_id,
-        correlation_id=logical_date_utc,
-        status=status,
-        metadata=metadata,
-    )
 
 
 def _save_quality_report_to_storage(
@@ -63,68 +26,60 @@ def _save_quality_report_to_storage(
     )
 
 
-def initialize_collected_quality_metrics() -> Dict[str, Dict[str, Any]]:
+def _compute_partial_metrics(
+    transform_result: Optional[Dict[str, Any]],
+    expectations_result: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    record_counts: Dict[str, Any] = {}
+    transformation_processing_metrics: Dict[str, Any] = {}
+    transformation_processing_issues: Dict[str, Any] = {}
+    post_transformation_validation_summary: Dict[str, Any] = {}
+
+    if transform_result is not None:
+        positions_df = transform_result.get("positions")
+        if positions_df is not None:
+            record_counts["transformed_records"] = positions_df.shape[0]
+        invalid_positions = transform_result.get("invalid_positions")
+        if invalid_positions is not None:
+            record_counts["rejected_records"] = invalid_positions.shape[0]
+        metrics = transform_result.get("metrics")
+        if metrics is not None:
+            record_counts["raw_input_records"] = metrics["total_vehicles_processed"]
+            transformation_processing_metrics = {
+                "total_vehicles_processed": metrics["total_vehicles_processed"],
+                "valid_vehicles": metrics["valid_vehicles"],
+                "invalid_vehicles": metrics["invalid_vehicles"],
+                "expected_vehicles": metrics["expected_vehicles"],
+                "lines_processed": metrics["total_lines_processed"],
+            }
+        issues = transform_result.get("issues")
+        if issues is not None:
+            transformation_processing_issues = {
+                "invalid_trips_count": len(issues["invalid_trips"]),
+                "invalid_vehicle_ids_count": len(issues["invalid_vehicle_ids"]),
+                "distance_calculation_errors_count": len(issues["distance_calculation_errors"]),
+                "lines_with_invalid_vehicles": issues["lines_with_invalid_vehicles"],
+            }
+
+    if expectations_result is not None:
+        valid_df = expectations_result.get("valid_df")
+        if valid_df is not None:
+            record_counts["accepted_records"] = valid_df.shape[0]
+        expectations_summary = expectations_result.get("expectations_summary")
+        if expectations_summary is not None:
+            post_transformation_validation_summary = {
+                "total_checks": expectations_summary["total_checks"],
+                "expectations_successful": expectations_summary["expectations_successful"],
+                "expectations_with_violations": expectations_summary["expectations_with_violations"],
+                "records_failed": expectations_summary["rows_failed"],
+            }
+
     return {
-        "record_counts": {},
-        "transformation_processing_metrics": {},
-        "transformation_processing_issues": {},
-        "post_transformation_validation_summary": {},
+        "record_counts": record_counts,
+        "transformation_processing_metrics": transformation_processing_metrics,
+        "transformation_processing_issues": transformation_processing_issues,
+        "post_transformation_validation_summary": post_transformation_validation_summary,
     }
-
-
-def update_collected_metrics_from_transform_result(
-    collected_metrics: Dict[str, Dict[str, Any]],
-    transform_result: Dict[str, Any],
-) -> None:
-    positions_df = transform_result["positions"]
-    collected_metrics["record_counts"]["transformed_records"] = positions_df.shape[0]
-    invalid_positions = transform_result.get("invalid_positions")
-    if invalid_positions is not None:
-        collected_metrics["record_counts"]["rejected_records"] = invalid_positions.shape[0]
-    transform_metrics = transform_result.get("metrics")
-    if transform_metrics is not None:
-        collected_metrics["record_counts"]["raw_input_records"] = transform_metrics[
-            "total_vehicles_processed"
-        ]
-        collected_metrics["transformation_processing_metrics"] = {
-            "total_vehicles_processed": transform_metrics["total_vehicles_processed"],
-            "valid_vehicles": transform_metrics["valid_vehicles"],
-            "invalid_vehicles": transform_metrics["invalid_vehicles"],
-            "expected_vehicles": transform_metrics["expected_vehicles"],
-            "lines_processed": transform_metrics["total_lines_processed"],
-        }
-    transform_issues = transform_result.get("issues")
-    if transform_issues is not None:
-        collected_metrics["transformation_processing_issues"] = {
-            "invalid_trips_count": len(transform_issues["invalid_trips"]),
-            "invalid_vehicle_ids_count": len(transform_issues["invalid_vehicle_ids"]),
-            "distance_calculation_errors_count": len(
-                transform_issues["distance_calculation_errors"]
-            ),
-            "lines_with_invalid_vehicles": transform_issues[
-                "lines_with_invalid_vehicles"
-            ],
-        }
-
-
-def update_collected_metrics_from_expectations_result(
-    collected_metrics: Dict[str, Dict[str, Any]],
-    expectations_result: Dict[str, Any],
-) -> None:
-    valid_positions_df = expectations_result["valid_df"]
-    collected_metrics["record_counts"]["accepted_records"] = valid_positions_df.shape[0]
-    expectations_summary = expectations_result.get("expectations_summary")
-    if expectations_summary is not None:
-        collected_metrics["post_transformation_validation_summary"] = {
-            "total_checks": expectations_summary["total_checks"],
-            "expectations_successful": expectations_summary[
-                "expectations_successful"
-            ],
-            "expectations_with_violations": expectations_summary[
-                "expectations_with_violations"
-            ],
-            "records_failed": expectations_summary["rows_failed"],
-        }
 
 
 def _build_quality_details(
@@ -355,22 +310,18 @@ def create_data_quality_report(
         quarantine_save_status=quarantine_save_status,
         quarantine_save_error=quarantine_save_error,
     )
-    _ = format_data_quality_report(data_quality_report)
     report_metrics = create_data_quality_metrics(data_quality_report)
     summary = data_quality_report["summary"]
-    _emit_quality_report_metrics_event(
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        status="SUCCEEDED",
-        summary=summary,
-        report_metrics=report_metrics,
-    )
     _save_quality_report_to_storage(
         config=config,
         report=data_quality_report,
         write_fn=write_fn,
     )
-    return data_quality_report
+    return {
+        **report_metrics,
+        "summary_status": summary["status"],
+        "quality_report_path": summary["quality_report_path"],
+    }
 
 
 def create_failure_quality_report(
@@ -387,8 +338,6 @@ def create_failure_quality_report(
     expectations_result: Optional[Dict[str, Any]] = None,
     quarantine_save_status: Optional[str] = None,
     quarantine_save_error: Optional[str] = None,
-    collected_metrics: Optional[Dict[str, Any]] = None,
-    execution_phase_metrics: Optional[Dict[str, Any]] = None,
     write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
 ) -> Dict[str, Any]:
     batch_ts_value = batch_ts or logical_date_utc
@@ -433,6 +382,7 @@ def create_failure_quality_report(
             quarantine_save_error=quarantine_save_error,
         )
         data_quality_report["summary"] = summary
+        report_metrics = create_data_quality_metrics(data_quality_report)
     else:
         details = {
             "execution_id": execution_id,
@@ -453,40 +403,20 @@ def create_failure_quality_report(
             "summary": summary,
             "details": details,
         }
+        report_metrics = _compute_partial_metrics(transform_result, expectations_result)
+
     _save_quality_report_to_storage(
         config=config,
         report=data_quality_report,
         write_fn=write_fn,
     )
-    report_metrics: Dict[str, Any]
-    if has_full_results:
-        report_metrics = create_data_quality_metrics(data_quality_report)
-    elif collected_metrics is not None:
-        report_metrics = collected_metrics
-    else:
-        report_metrics = {
-            "record_counts": {},
-            "transformation_processing_metrics": {},
-            "transformation_processing_issues": {},
-            "post_transformation_validation_summary": {},
-        }
-
-    if execution_phase_metrics is not None:
-        report_metrics = {
-            **report_metrics,
-            "execution_phase_metrics": execution_phase_metrics,
-        }
-    summary = data_quality_report["summary"]
-    _emit_quality_report_metrics_event(
-        execution_id=execution_id,
-        logical_date_utc=logical_date_utc,
-        status="FAILED",
-        summary=summary,
-        report_metrics=report_metrics,
-        failure_phase=failure_phase,
-        failure_message=failure_message,
-    )
-    return data_quality_report
+    return {
+        **report_metrics,
+        "summary_status": "FAIL",
+        "quality_report_path": quality_report_path,
+        "failure_phase": failure_phase,
+        "failure_message": failure_message,
+    }
 
 
 def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
@@ -508,82 +438,6 @@ def build_quarantine_path(config: Dict[str, Any], batch_ts: Any) -> str:
     hhmm = batch_ts.strftime("%H%M")
     prefix = f"{app_folder}/{positions_table_name}/year={year}/month={month}/day={day}/hour={hour}/"
     return f"{bucket_name}/{prefix}positions_{hhmm}_*.parquet"
-
-
-def format_data_quality_report(data_quality_report: Dict[str, Any]) -> str:
-    try:
-        summary = data_quality_report.get("summary", {})
-        details = data_quality_report.get("details", data_quality_report)
-        row_counts = details.get("transformation_row_counts", {})
-        transform_metrics = details.get("transformation_metrics", {})
-        transform_issues = details.get("transformation_issues", {})
-        expectations_summary = details.get("expectations_summary", {})
-        outcome = details.get("outcome", {})
-        execution_id = details.get("execution_id", summary.get("execution_id"))
-        logical_date_utc = details.get(
-            "logical_date_utc", summary.get("logical_date_utc")
-        )
-        source_file = details.get("source_file", summary.get("source_file"))
-        artifacts = details.get("artifacts", {})
-        column_lineage = artifacts.get("column_lineage", {})
-        lines = [
-            "data_quality_report SUMMARY",
-            "-" * 80,
-            f"Execution ID: {execution_id}",
-            f"Logical Date (UTC): {logical_date_utc}",
-            f"Source File: {source_file}",
-            "",
-            "Record Counts",
-            f"- Raw input records: {row_counts.get('raw_records', 0)}",
-            f"- Transformed records: {row_counts.get('transformed_records', 0)}",
-            f"- Accepted records: {row_counts.get('accepted_records', 0)}",
-            f"- Rejected records: {row_counts.get('rejected_records', 0)}",
-            "",
-            "Transformation Processing Metrics",
-            f"- Total vehicles processed: {transform_metrics.get('total_vehicles_processed', 0)}",
-            f"- Valid vehicles: {transform_metrics.get('valid_vehicles', 0)}",
-            f"- Invalid vehicles: {transform_metrics.get('invalid_vehicles', 0)}",
-            f"- Expected vehicles: {transform_metrics.get('expected_vehicles', 0)}",
-            f"- Lines processed: {transform_metrics.get('total_lines_processed', 0)}",
-            "",
-            "Transformation Processing Issues",
-            f"- Invalid trips: {len(transform_issues.get('invalid_trips', []))} - {transform_issues.get('invalid_trips', [])}",
-            f"- Invalid vehicle IDs: {len(transform_issues.get('invalid_vehicle_ids', []))} - {transform_issues.get('invalid_vehicle_ids', [])}",
-            f"- Distance calculation errors: {transform_issues.get('number_of_distance_calculation_errors', 0)}",
-            f"- Lines with invalid vehicles: {transform_issues.get('lines_with_invalid_vehicles', 0)}",
-            "",
-            "Post Transformation Validation Summary",
-            f"- Total checks: {expectations_summary.get('total_checks', 0)}",
-            f"- Expectations successful: {expectations_summary.get('expectations_successful', 0)}",
-            f"- Expectations with violations: {expectations_summary.get('expectations_with_violations', 0)}",
-        ]
-        if expectations_summary.get("expectations_failed_due_to_exceptions", 0) > 0:
-            lines.append(
-                f"- Expectations failed due to exceptions: {expectations_summary.get('expectations_failed_due_to_exceptions', 0)}"
-            )
-        lines.append(f"- Records failed: {summary.get('items_failed', 0)}")
-        if expectations_summary.get("violation_reasons"):
-            lines.append(
-                f"- Expectation violation reasons: {expectations_summary.get('violation_reasons')}"
-            )
-        if expectations_summary.get("exception_reasons"):
-            lines.append(
-                f"- Expectation exception reasons: {expectations_summary.get('exception_reasons')}"
-            )
-        lines.extend(
-            [
-                f"- Column lineage: {column_lineage}",
-                "",
-                "Outcome",
-                f"- Status: {outcome.get('status', summary.get('status'))}",
-                f"- Acceptance rate: {outcome.get('acceptance_rate', summary.get('acceptance_rate', 0.0)) * 100:.2f}%",
-                f"- Policy version: {outcome.get('policy_version', 'v1')}",
-            ]
-        )
-        return "\n".join(lines)
-    except Exception as e:
-        logger.error("Error parsing data_quality_report: %s", e)
-        raise ValueError(f"Error parsing data_quality_report: {e}")
 
 
 def create_data_quality_metrics(data_quality_report: Dict[str, Any]) -> Dict[str, Any]:
@@ -628,12 +482,3 @@ def create_data_quality_metrics(data_quality_report: Dict[str, Any]) -> Dict[str
     }
 
 
-def data_quality_report_to_json(data_quality_report: Dict[str, Any]) -> str:
-    return json.dumps(data_quality_report, ensure_ascii=False, indent=2, default=str)
-
-
-def write_data_quality_report_json(
-    data_quality_report: Dict[str, Any], output_path: str
-) -> None:
-    with open(output_path, "w") as f:
-        f.write(data_quality_report_to_json(data_quality_report))

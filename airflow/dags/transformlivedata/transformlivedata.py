@@ -2,11 +2,6 @@ from transformlivedata.config.transformlivedata_config_schema import GeneralConf
 from transformlivedata.orchestration_dependencies import (
     TransformLiveDataOrchestrationDependencies,
 )
-from transformlivedata.services.create_data_quality_report import (
-    initialize_collected_quality_metrics,
-    update_collected_metrics_from_expectations_result,
-    update_collected_metrics_from_transform_result,
-)
 from observability.third_party_log_bridge import configure_third_party_log_bridge
 from quality.execution_phase_metrics import (
     ExecutionPhaseMetricsTracker,
@@ -40,7 +35,7 @@ def load_transform_save_positions(
             )
             return
         try:
-            deps.create_failure_quality_report(
+            report_log_metadata = deps.create_failure_quality_report(
                 config=pipeline_config,
                 execution_id=execution_id,
                 logical_date_utc=logical_date_string,
@@ -56,11 +51,28 @@ def load_transform_save_positions(
                 expectations_result=expectations_result,
                 quarantine_save_status=quarantine_save_status,
                 quarantine_save_error=quarantine_save_error,
-                collected_metrics=collected_metrics,
-                execution_phase_metrics=tracker.to_log_payload("failed"),
+            )
+            structured_logger.info(
+                event="quality_report_metrics",
+                message="Quality report metrics",
+                execution_id=execution_id,
+                correlation_id=correlation_id,
+                status="FAILED",
+                metadata=report_log_metadata,
             )
         except Exception as e:
             logger.error("Failed to write quality report on failure: %s", e)
+
+    def emit_phase_metrics(overall_status: str) -> None:
+        emit = structured_logger.info if overall_status == "success" else structured_logger.error
+        emit(
+            event="execution_phase_metrics",
+            message="Execution phase metrics",
+            execution_id=execution_id,
+            correlation_id=correlation_id,
+            status="SUCCEEDED" if overall_status == "success" else "FAILED",
+            metadata=tracker.to_log_payload(overall_status),
+        )
 
     execution_id = str(uuid.uuid4())
     correlation_id = logical_date_string
@@ -75,8 +87,6 @@ def load_transform_save_positions(
         correlation_id=correlation_id,
         namespaces=THIRD_PARTY_LOGGER_NAMESPACES,
     )
-    collected_metrics = initialize_collected_quality_metrics()
-
     phase_order = [
         "config_load",
         "load_positions",
@@ -128,7 +138,6 @@ def load_transform_save_positions(
         )
     except Exception as e:
         tracker.finish("config_load", "failed")
-        tracker.emit(logger, "failed")
         structured_logger.error(
             event="config_load_failed",
             message="Configuration load and validation failed",
@@ -138,6 +147,7 @@ def load_transform_save_positions(
             error_type=type(e).__name__,
             error_message=str(e),
         )
+        emit_phase_metrics("failed")
         raise ValueError("Pipeline configuration validation failed") from e
     structured_logger.info(
         event="execution_started",
@@ -180,7 +190,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         write_failure_report("load_positions", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
     if not raw_positions:
         tracker.finish("load_positions", "failed")
@@ -193,7 +203,7 @@ def load_transform_save_positions(
             status="FAILED",
         )
         write_failure_report("load_positions", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise ValueError(error_msg)
     tracker.finish("load_positions", "success")
     structured_logger.info(
@@ -219,7 +229,7 @@ def load_transform_save_positions(
             error_message=error_msg,
         )
         write_failure_report("raw_schema_validation", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise ValueError(error_msg)
     tracker.finish("raw_schema_validation", "success")
     structured_logger.info(
@@ -259,7 +269,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         write_failure_report("transform", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
     if (
         not transform_result
@@ -276,11 +286,10 @@ def load_transform_save_positions(
             status="FAILED",
         )
         write_failure_report("transform", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise ValueError(error_msg)
     tracker.finish("transform", "success")
     positions_df = transform_result["positions"]
-    update_collected_metrics_from_transform_result(collected_metrics, transform_result)
     structured_logger.info(
         event="expectations_validation_started",
         message="Starting expectations validation",
@@ -315,13 +324,10 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         write_failure_report("expectations", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
     valid_positions_df = expectations_result["valid_df"]
     invalid_positions_df = expectations_result["invalid_df"]
-    update_collected_metrics_from_expectations_result(
-        collected_metrics, expectations_result
-    )
     structured_logger.info(
         event="save_trusted_started",
         message="Starting trusted positions save",
@@ -354,7 +360,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         write_failure_report("save_trusted", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
     transform_invalid_df = transform_result["invalid_positions"]
     invalid_frames = [
@@ -405,7 +411,7 @@ def load_transform_save_positions(
                 error_message=str(e),
             )
             write_failure_report("save_quarantine", error_msg)
-            tracker.emit(logger, "failed")
+            emit_phase_metrics("failed")
             raise
     else:
         tracker.finish("save_quarantine", "skipped")
@@ -448,7 +454,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         write_failure_report("mark_processed", error_msg)
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
     structured_logger.info(
         event="quality_report_started",
@@ -459,7 +465,7 @@ def load_transform_save_positions(
     )
     tracker.begin("quality_report")
     try:
-        deps.create_data_quality_report(
+        report_log_metadata = deps.create_data_quality_report(
             config=pipeline_config,
             execution_id=execution_id,
             logical_date_utc=logical_date_string,
@@ -472,6 +478,14 @@ def load_transform_save_positions(
             quarantine_save_error=quarantine_save_error,
         )
         tracker.finish("quality_report", "success")
+        structured_logger.info(
+            event="quality_report_metrics",
+            message="Quality report metrics",
+            execution_id=execution_id,
+            correlation_id=correlation_id,
+            status="SUCCEEDED",
+            metadata=report_log_metadata,
+        )
         structured_logger.info(
             event="quality_report_succeeded",
             message="Quality report generation succeeded",
@@ -490,9 +504,9 @@ def load_transform_save_positions(
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        tracker.emit(logger, "failed")
+        emit_phase_metrics("failed")
         raise
-    tracker.emit(logger, "success")
+    emit_phase_metrics("success")
     structured_logger.info(
         event="execution_finished",
         message="Execution finished successfully",

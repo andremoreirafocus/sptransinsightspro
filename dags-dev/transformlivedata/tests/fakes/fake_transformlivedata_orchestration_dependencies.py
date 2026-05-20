@@ -129,12 +129,28 @@ class FakeTransformLiveDataOrchestrationDependencies:
             recorder.quality_report_calls += 1
             if quality_report_raises is not None:
                 raise quality_report_raises
-            return {"summary": {}}
+            return {
+                "summary_status": "PASS",
+                "quality_report_path": "metadata/quality/report.json",
+                "record_counts": {},
+                "transformation_processing_metrics": {},
+                "transformation_processing_issues": {},
+                "post_transformation_validation_summary": {},
+            }
 
         def create_failure_quality_report(*args, **kwargs):
             recorder.calls.append("create_failure_quality_report")
             recorder.failure_quality_report_calls += 1
-            return {"summary": {}}
+            return {
+                "summary_status": "FAIL",
+                "quality_report_path": "metadata/quality/report.json",
+                "failure_phase": kwargs.get("failure_phase", ""),
+                "failure_message": kwargs.get("failure_message", ""),
+                "record_counts": {},
+                "transformation_processing_metrics": {},
+                "transformation_processing_issues": {},
+                "post_transformation_validation_summary": {},
+            }
 
         deps = TransformLiveDataOrchestrationDependencies(
             build_logical_date_context=build_logical_date_context,

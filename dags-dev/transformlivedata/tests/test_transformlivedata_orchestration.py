@@ -21,6 +21,20 @@ PHASES = [
     "quality_report",
 ]
 
+
+def _extract_quality_report_metrics_events(caplog):
+    payloads = []
+    for record in caplog.records:
+        message = record.getMessage()
+        try:
+            parsed = json.loads(message)
+        except Exception:
+            continue
+        if parsed.get("event") == "quality_report_metrics":
+            payloads.append(parsed)
+    return payloads
+
+
 def _extract_execution_phase_metrics_log(caplog):
     payloads = []
     for record in caplog.records:
@@ -44,17 +58,17 @@ def test_orchestration_emits_success_execution_phase_metrics(caplog):
 
     payload = _extract_execution_phase_metrics_log(caplog)
 
-    assert payload["overall_status"] == "success"
-    assert payload["pipeline"] == "transformlivedata"
-    assert payload["logical_date_utc"] == "2026-05-17T10:00:00+00:00"
-    assert set(payload["phase_metrics"].keys()) == set(PHASES)
-    assert "notify_webhook" not in payload["phase_metrics"]
+    assert payload["metadata"]["overall_status"] == "success"
+    assert payload["metadata"]["pipeline"] == "transformlivedata"
+    assert payload["metadata"]["logical_date_utc"] == "2026-05-17T10:00:00+00:00"
+    assert set(payload["metadata"]["phase_metrics"].keys()) == set(PHASES)
+    assert "notify_webhook" not in payload["metadata"]["phase_metrics"]
 
     for phase in PHASES:
-        phase_data = payload["phase_metrics"][phase]
+        phase_data = payload["metadata"]["phase_metrics"][phase]
         assert set(phase_data.keys()) == {"duration_seconds", "status"}
 
-    assert payload["phase_metrics"]["save_quarantine"]["status"] == "skipped"
+    assert payload["metadata"]["phase_metrics"]["save_quarantine"]["status"] == "skipped"
     assert recorder.mark_processed_calls == 1
     assert recorder.quality_report_calls == 1
     assert "save_positions_to_storage:trusted" in recorder.calls
@@ -76,14 +90,14 @@ def test_orchestration_emits_failed_execution_phase_metrics_when_load_fails(capl
 
     payload = _extract_execution_phase_metrics_log(caplog)
 
-    assert payload["overall_status"] == "failed"
-    assert payload["phase_metrics"]["config_load"]["status"] == "success"
-    assert payload["phase_metrics"]["load_positions"]["status"] == "failed"
-    assert payload["phase_metrics"]["transform"]["status"] == "skipped"
-    assert payload["phase_metrics"]["quality_report"]["status"] == "skipped"
+    assert payload["metadata"]["overall_status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["config_load"]["status"] == "success"
+    assert payload["metadata"]["phase_metrics"]["load_positions"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["transform"]["status"] == "skipped"
+    assert payload["metadata"]["phase_metrics"]["quality_report"]["status"] == "skipped"
 
     for phase in PHASES:
-        phase_data = payload["phase_metrics"][phase]
+        phase_data = payload["metadata"]["phase_metrics"][phase]
         assert set(phase_data.keys()) == {"duration_seconds", "status"}
     assert recorder.failure_quality_report_calls == 1
 
@@ -98,9 +112,9 @@ def test_raw_schema_validation_failure_raises_and_emits_metrics(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["overall_status"] == "failed"
-    assert payload["phase_metrics"]["raw_schema_validation"]["status"] == "failed"
-    assert payload["phase_metrics"]["transform"]["status"] == "skipped"
+    assert payload["metadata"]["overall_status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["raw_schema_validation"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["transform"]["status"] == "skipped"
     assert recorder.failure_quality_report_calls == 1
 
 
@@ -114,8 +128,8 @@ def test_transform_empty_positions_fails_fast(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["phase_metrics"]["transform"]["status"] == "failed"
-    assert payload["phase_metrics"]["expectations_validation"]["status"] == "skipped"
+    assert payload["metadata"]["phase_metrics"]["transform"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["expectations_validation"]["status"] == "skipped"
 
 
 def test_expectations_validation_exception_skips_trusted_save(caplog):
@@ -128,8 +142,8 @@ def test_expectations_validation_exception_skips_trusted_save(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["phase_metrics"]["expectations_validation"]["status"] == "failed"
-    assert payload["phase_metrics"]["save_trusted"]["status"] == "skipped"
+    assert payload["metadata"]["phase_metrics"]["expectations_validation"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["save_trusted"]["status"] == "skipped"
     assert "save_positions_to_storage:trusted" not in recorder.calls
 
 
@@ -143,7 +157,7 @@ def test_save_trusted_failure_should_not_mark_processed(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["phase_metrics"]["save_trusted"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["save_trusted"]["status"] == "failed"
     assert recorder.failure_quality_report_calls == 1
     assert recorder.mark_processed_calls == 0
 
@@ -159,7 +173,7 @@ def test_save_quarantine_success_when_invalid_rows_exist(caplog):
     load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["phase_metrics"]["save_quarantine"]["status"] == "success"
+    assert payload["metadata"]["phase_metrics"]["save_quarantine"]["status"] == "success"
     assert "quarantined" in recorder.save_calls
 
 
@@ -173,7 +187,7 @@ def test_mark_processed_failure_should_not_build_success_quality_report(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["phase_metrics"]["mark_processed"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["mark_processed"]["status"] == "failed"
     assert recorder.quality_report_calls == 0
 
 
@@ -187,6 +201,39 @@ def test_quality_report_failure_emits_failed_terminal_metrics(caplog):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
     payload = _extract_execution_phase_metrics_log(caplog)
-    assert payload["overall_status"] == "failed"
-    assert payload["phase_metrics"]["quality_report"]["status"] == "failed"
+    assert payload["metadata"]["overall_status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["quality_report"]["status"] == "failed"
     assert recorder.quality_report_calls == 1
+
+
+def test_orchestration_emits_quality_report_metrics_on_success(caplog):
+    deps, _ = FakeTransformLiveDataOrchestrationDependencies.create_scenario()
+    caplog.clear()
+    caplog.set_level("INFO")
+
+    load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
+
+    events = _extract_quality_report_metrics_events(caplog)
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "SUCCEEDED"
+    assert "execution_phase_metrics" not in event.get("metadata", {})
+
+
+def test_orchestration_emits_quality_report_metrics_on_failure(caplog):
+    deps, recorder = FakeTransformLiveDataOrchestrationDependencies.create_scenario(
+        load_raises=RuntimeError("storage unavailable")
+    )
+    caplog.clear()
+    caplog.set_level("INFO")
+
+    with pytest.raises(RuntimeError):
+        load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
+
+    events = _extract_quality_report_metrics_events(caplog)
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "FAILED"
+    assert event["metadata"]["failure_phase"] == "load_positions"
+    assert "execution_phase_metrics" not in event.get("metadata", {})
+    assert recorder.failure_quality_report_calls == 1
