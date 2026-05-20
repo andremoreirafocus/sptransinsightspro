@@ -28,7 +28,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 0 },
       "id": 1,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -69,7 +69,7 @@
           ]
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 4, "w": 2, "x": 10, "y": 0 },
       "id": 2,
       "options": {
         "colorMode": "background",
@@ -108,7 +108,7 @@
           ]
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "gridPos": { "h": 4, "w": 2, "x": 10, "y": 4 },
       "id": 3,
       "options": {
         "colorMode": "background",
@@ -121,7 +121,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | level=\"ERROR\" [1h])",
+          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\" [1h])",
           "instant": true,
           "queryType": "instant",
           "refId": "A"
@@ -170,7 +170,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "id": 4,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" },
@@ -227,6 +227,44 @@
       "datasource": { "type": "loki", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "orange", "value": null },
+              { "color": "green", "value": 0.98 }
+            ]
+          },
+          "unit": "percentunit",
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.accepted_records\" | unwrap v [5m])) / avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.raw_input_records\" | unwrap v [5m]))",
+          "legendFormat": "acceptance rate",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Acceptance rate",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
             "drawStyle": "line",
@@ -238,14 +276,10 @@
           {
             "matcher": { "id": "byName", "options": "raw" },
             "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
-          },
-          {
-            "matcher": { "id": "byName", "options": "accepted" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "id": 5,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -258,44 +292,38 @@
           "legendFormat": "raw",
           "queryType": "range",
           "refId": "A"
-        },
-        {
-          "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.accepted_records\" | unwrap v [5m]))",
-          "legendFormat": "accepted",
-          "queryType": "range",
-          "refId": "B"
         }
       ],
-      "title": "Records: raw vs accepted",
+      "title": "Raw records",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "thresholds" },
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              { "color": "green", "value": null },
-              { "color": "orange", "value": 1 }
-            ]
-          },
+          "color": { "mode": "palette-classic" },
           "custom": {
-            "drawStyle": "bars",
-            "lineWidth": 1,
-            "fillOpacity": 80
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
           }
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "rejected" },
+            "matcher": { "id": "byName", "options": "invalid_vehicle_ids" },
             "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "distance_errors" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "gx_records_failures" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "id": 6,
       "options": {
         "legend": { "calcs": ["max", "last"], "displayMode": "list", "placement": "bottom" },
@@ -304,13 +332,27 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.rejected_records\" | unwrap v [1m]))",
-          "legendFormat": "rejected",
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.transformation_processing_issues.invalid_vehicle_ids_count\" | unwrap v [5m]))",
+          "legendFormat": "invalid_vehicle_ids",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.transformation_processing_issues.distance_calculation_errors_count\" | unwrap v [5m]))",
+          "legendFormat": "distance_errors",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.post_transformation_validation_summary.gx_records_failures\" | unwrap v [5m]))",
+          "legendFormat": "gx_records_failures",
+          "queryType": "range",
+          "refId": "C"
         }
       ],
-      "title": "Rejected records",
+      "title": "Rejected records by reason",
       "type": "timeseries"
     },
     {
@@ -330,7 +372,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | level=\"ERROR\"",
+          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\"",
           "queryType": "range",
           "refId": "A"
         }
@@ -388,5 +430,5 @@
   "timezone": "browser",
   "title": "transformlivedata",
   "uid": "transformlivedata",
-  "version": 8
+  "version": 13
 }

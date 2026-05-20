@@ -478,6 +478,7 @@ def create_data_quality_metrics(data_quality_report: Dict[str, Any]) -> Dict[str
                 "expectations_with_violations"
             ],
             "records_failed": summary["items_failed"],
+            "gx_records_failures": expectations_summary["rows_failed"],
         },
     }
 

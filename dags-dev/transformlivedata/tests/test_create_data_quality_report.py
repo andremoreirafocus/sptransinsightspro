@@ -473,6 +473,7 @@ def test_create_data_quality_metrics_returns_expected_compact_counts():
     assert metrics["transformation_processing_issues"]["invalid_trips_count"] == 0
     assert metrics["transformation_processing_issues"]["invalid_vehicle_ids_count"] == 0
     assert metrics["post_transformation_validation_summary"]["records_failed"] == report["summary"]["items_failed"]
+    assert metrics["post_transformation_validation_summary"]["gx_records_failures"] == 3
 
 
 # --- _compute_partial_metrics ---
