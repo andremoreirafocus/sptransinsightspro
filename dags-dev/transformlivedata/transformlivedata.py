@@ -21,6 +21,15 @@ def load_transform_save_positions(
     logical_date_string: str,
     deps: TransformLiveDataOrchestrationDependencies,
 ) -> None:
+    def create_execution_failed_log_record(message: str) -> None:
+        structured_logger.error(
+            event="execution_failed",
+            message=message,
+            execution_id=state.execution_id,
+            correlation_id=state.correlation_id,
+            status="FAILED",
+        )
+
     state = PipelineTaskRunState(
         execution_id=str(uuid.uuid4()),
         correlation_id=logical_date_string,
@@ -84,9 +93,10 @@ def load_transform_save_positions(
         )
     except Exception as e:
         tracker.finish("config_load", "failed")
+        error_msg = "Configuration load and validation failed"
         structured_logger.error(
             event="config_load_failed",
-            message="Configuration load and validation failed",
+            message=error_msg,
             execution_id=state.execution_id,
             correlation_id=state.correlation_id,
             status="FAILED",
@@ -94,6 +104,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise ValueError("Pipeline configuration validation failed") from e
     structured_logger.info(
         event="execution_started",
@@ -137,6 +148,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "load_positions", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     if not raw_positions:
         tracker.finish("load_positions", "failed")
@@ -150,6 +162,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "load_positions", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise ValueError(error_msg)
     tracker.finish("load_positions", "success")
     structured_logger.info(
@@ -176,6 +189,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "raw_schema_validation", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise ValueError(error_msg)
     tracker.finish("raw_schema_validation", "success")
     structured_logger.info(
@@ -216,6 +230,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "transform", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     if (
         not state.transform_result
@@ -233,6 +248,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "transform", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise ValueError(error_msg)
     tracker.finish("transform", "success")
     positions_df = state.transform_result["positions"]
@@ -271,6 +287,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "expectations", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     valid_positions_df = state.expectations_result["valid_df"]
     invalid_positions_df = state.expectations_result["invalid_df"]
@@ -307,6 +324,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "save_trusted", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     transform_invalid_df = state.transform_result["invalid_positions"]
     invalid_frames = [
@@ -358,6 +376,7 @@ def load_transform_save_positions(
             )
             handle_failure_event(state, deps, structured_logger, "save_quarantine", error_msg)
             handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+            create_execution_failed_log_record(error_msg)
             raise
     else:
         tracker.finish("save_quarantine", "skipped")
@@ -400,6 +419,7 @@ def load_transform_save_positions(
         )
         handle_failure_event(state, deps, structured_logger, "mark_processed", error_msg)
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     structured_logger.info(
         event="quality_report_started",
@@ -440,9 +460,10 @@ def load_transform_save_positions(
         )
     except Exception as e:
         tracker.finish("quality_report", "failed")
+        error_msg = "Quality report generation failed"
         structured_logger.error(
             event="quality_report_failed",
-            message="Quality report generation failed",
+            message=error_msg,
             execution_id=state.execution_id,
             correlation_id=state.correlation_id,
             status="FAILED",
@@ -450,6 +471,7 @@ def load_transform_save_positions(
             error_message=str(e),
         )
         handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_failed_log_record(error_msg)
         raise
     handle_phase_metrics_event(state, tracker, structured_logger, "success")
     structured_logger.info(

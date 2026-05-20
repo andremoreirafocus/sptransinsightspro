@@ -7,28 +7,51 @@
   "panels": [
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "succeeded" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
       "gridPos": { "h": 8, "w": 16, "x": 0, "y": 0 },
       "id": 1,
       "options": {
-        "dedupStrategy": "none",
-        "enableLogDetails": true,
-        "prettifyLogMessage": true,
-        "showCommonLabels": false,
-        "showLabels": false,
-        "showTime": true,
-        "sortOrder": "Descending",
-        "wrapLogMessage": false
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
       },
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_phase_metrics\"",
+          "expr": "sum(count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_finished\" [2m]))",
+          "legendFormat": "succeeded",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\" [2m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "B"
         }
       ],
       "title": "Executions",
-      "type": "logs"
+      "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
@@ -365,5 +388,5 @@
   "timezone": "browser",
   "title": "transformlivedata",
   "uid": "transformlivedata",
-  "version": 7
+  "version": 8
 }
