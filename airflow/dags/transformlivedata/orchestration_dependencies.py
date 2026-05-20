@@ -3,7 +3,6 @@ from typing import Any, Callable
 
 import pandas as pd
 
-from infra.notifications import send_webhook
 from pipeline_configurator.config import get_config
 from quality.validate_expectations import validate_expectations
 from quality.validate_json_data_schema import validate_json_data_schema
@@ -36,7 +35,6 @@ class TransformLiveDataOrchestrationDependencies:
     mark_request_as_processed: Callable[[dict, str], Any]
     create_data_quality_report: Callable[..., dict]
     create_failure_quality_report: Callable[..., dict]
-    send_webhook: Callable[..., Any]
 
 
 def get_transformlivedata_orchestration_dependencies() -> (
@@ -53,5 +51,4 @@ def get_transformlivedata_orchestration_dependencies() -> (
         mark_request_as_processed=mark_request_as_processed,
         create_data_quality_report=create_data_quality_report,
         create_failure_quality_report=create_failure_quality_report,
-        send_webhook=send_webhook,
     )

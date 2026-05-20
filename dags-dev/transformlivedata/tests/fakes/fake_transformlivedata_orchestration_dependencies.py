@@ -14,7 +14,6 @@ class OrchestrationCallRecorder:
     mark_processed_calls: int = 0
     quality_report_calls: int = 0
     failure_quality_report_calls: int = 0
-    webhook_calls: int = 0
 
 
 class FakeTransformLiveDataOrchestrationDependencies:
@@ -137,10 +136,6 @@ class FakeTransformLiveDataOrchestrationDependencies:
             recorder.failure_quality_report_calls += 1
             return {"summary": {}}
 
-        def send_webhook(summary, webhook_url):
-            recorder.calls.append("send_webhook")
-            recorder.webhook_calls += 1
-
         deps = TransformLiveDataOrchestrationDependencies(
             build_logical_date_context=build_logical_date_context,
             get_config=get_config,
@@ -152,6 +147,5 @@ class FakeTransformLiveDataOrchestrationDependencies:
             mark_request_as_processed=mark_request_as_processed,
             create_data_quality_report=create_data_quality_report,
             create_failure_quality_report=create_failure_quality_report,
-            send_webhook=send_webhook,
         )
         return deps, recorder

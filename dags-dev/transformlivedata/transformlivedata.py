@@ -15,7 +15,6 @@ from observability.structured_event_logger import StructuredEventLogger, get_str
 import pandas as pd
 import logging
 import uuid
-from typing import Callable
 
 
 logger = logging.getLogger(__name__)
@@ -27,24 +26,6 @@ THIRD_PARTY_LOGGER_NAMESPACES = (
     "great_expectations.data_context.data_context.context_factory",
     "great_expectations.datasource.fluent.config",
 )
-
-
-def _send_quality_summary_webhook(
-    summary: dict,
-    pipeline_config: dict,
-    send_webhook_fn: Callable[[dict, str], None],
-) -> None:
-    """Send quality summary via webhook if enabled."""
-    webhook_url = pipeline_config["general"]["notifications"]["webhook_url"]
-    if webhook_url.strip().lower() in {"disabled", "none", "null"}:
-        # logger.info("Webhook notification disabled")
-        return
-
-    try:
-        send_webhook_fn(summary, webhook_url)
-        # logger.info("Webhook notification sent")
-    except Exception:
-        pass # logger.error("Webhook notification failed: %s", e)
 
 
 def load_transform_save_positions(
@@ -59,7 +40,7 @@ def load_transform_save_positions(
             )
             return
         try:
-            failure_report = deps.create_failure_quality_report(
+            deps.create_failure_quality_report(
                 config=pipeline_config,
                 execution_id=execution_id,
                 logical_date_utc=logical_date_string,
@@ -78,8 +59,6 @@ def load_transform_save_positions(
                 collected_metrics=collected_metrics,
                 execution_phase_metrics=tracker.to_log_payload("failed"),
             )
-            summary = failure_report.get("summary", {})
-            _send_quality_summary_webhook(summary, pipeline_config, deps.send_webhook)
         except Exception as e:
             logger.error("Failed to write quality report on failure: %s", e)
 
@@ -480,7 +459,7 @@ def load_transform_save_positions(
     )
     tracker.begin("quality_report")
     try:
-        report = deps.create_data_quality_report(
+        deps.create_data_quality_report(
             config=pipeline_config,
             execution_id=execution_id,
             logical_date_utc=logical_date_string,
@@ -513,8 +492,6 @@ def load_transform_save_positions(
         )
         tracker.emit(logger, "failed")
         raise
-    summary = report.get("summary", {})
-    _send_quality_summary_webhook(summary, pipeline_config, deps.send_webhook)
     tracker.emit(logger, "success")
     structured_logger.info(
         event="execution_finished",

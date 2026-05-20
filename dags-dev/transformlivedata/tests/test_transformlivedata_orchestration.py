@@ -57,7 +57,6 @@ def test_orchestration_emits_success_execution_phase_metrics(caplog):
     assert payload["phase_metrics"]["save_quarantine"]["status"] == "skipped"
     assert recorder.mark_processed_calls == 1
     assert recorder.quality_report_calls == 1
-    assert recorder.webhook_calls == 0
     assert "save_positions_to_storage:trusted" in recorder.calls
 
 
