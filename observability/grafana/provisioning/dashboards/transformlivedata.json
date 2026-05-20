@@ -1,0 +1,329 @@
+{
+  "description": "Operational observability for the transformlivedata pipeline",
+  "editable": true,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "success" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum by (overall_status) (count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_phase_metrics\" | json overall_status=\"metadata.overall_status\" [5m]))",
+          "legendFormat": "{{overall_status}}",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Executions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          },
+          "mappings": [
+            { "options": { "match": "null", "result": { "text": "0" } }, "type": "special" }
+          ]
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_finished\" [1h])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Completed (last 1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "options": { "match": "null", "result": { "text": "0" } }, "type": "special" }
+          ]
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "id": 3,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | level=\"ERROR\" [1h])",
+          "instant": true,
+          "queryType": "instant",
+          "refId": "A"
+        }
+      ],
+      "title": "Errors (last 1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          },
+          "unit": "s"
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "duration" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(avg_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_phase_metrics\" | json total_duration=\"metadata.total_duration_seconds\" | unwrap total_duration [5m]))",
+          "legendFormat": "duration",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Execution duration (s)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "raw" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "accepted" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.raw_input_records\" | unwrap v [5m]))",
+          "legendFormat": "raw",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.accepted_records\" | unwrap v [5m]))",
+          "legendFormat": "accepted",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Records: raw vs accepted",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "custom": {
+            "drawStyle": "bars",
+            "lineWidth": 1,
+            "fillOpacity": 80
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "rejected" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"quality_report_metrics\" | json v=\"metadata.record_counts.rejected_records\" | unwrap v [5m]))",
+          "legendFormat": "rejected",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Rejected records",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
+      "id": 7,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | level=\"ERROR\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Recent failures",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 32 },
+      "id": 8,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": true,
+        "showCommonLabels": false,
+        "showLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Log stream",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["transformlivedata", "observability"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "loki",
+        "refresh": 1,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "transformlivedata",
+  "uid": "transformlivedata",
+  "version": 2
+}

@@ -79,7 +79,7 @@ scrape_configs:
           __path__: /opt/airflow/logs/**/*.log
     pipeline_stages:
       - regex:
-          expression: ".*\\{(?P<emitter>structured_event_logger\\.py|execution_phase_metrics\\.py):\\d+\\} INFO - (?P<json_payload>\\{.*\\})$"
+          expression: ".*\\{(?P<emitter>structured_event_logger\\.py|execution_phase_metrics\\.py):\\d+\\} (?:DEBUG|INFO|WARNING|ERROR|CRITICAL) - (?P<json_payload>\\{.*\\})$"
       - output:
           source: json_payload
       - json:
