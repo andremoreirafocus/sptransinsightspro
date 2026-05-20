@@ -150,11 +150,7 @@ Chaves esperadas em `general`
 Observação: a notificação de alertas não depende mais de webhook de aplicação neste pipeline; os alertas operacionais devem ser configurados na stack de observabilidade (Loki/Grafana/Alertmanager).
 
 ## Testes unitários
-Os testes unitários deste subprojeto estão restritos ao módulo `transform_positions.py` e cobrem o núcleo da lógica de transformação, incluindo:
-- validação de payloads e estrutura mínima dos dados
-- mapeamento e enriquecimento dos campos transformados
-- cálculos e agregações aplicadas às posições dos veículos
-- cenários de erro para dados ausentes ou inválidos
+Os testes deste subprojeto cobrem a lógica de transformação, o serviço de relatório de qualidade e a orquestração completa do pipeline.
 
 
 ## Instruções para instalação

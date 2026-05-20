@@ -81,13 +81,16 @@ The [samples](./samples) folder contains a manually curated example of the conso
 }
 ```
 
-### Notification and observability (`alertservice`)
+### Observability (Loki + Alertmanager stack)
 
-The report `summary` is sent via webhook to the `alertservice` microservice when enabled.
-The summary contains status information, failure phases, and transformation metrics to trigger immediate alerts (`FAIL`) or cumulative alerts (`WARN`) configured in `alertservice`.
-`alertservice` sends email notifications based on thresholds configured per pipeline:
-- **FAIL (immediate)**: any `FAIL` status sends an immediate email
-- **WARN (cumulative)**: warning alerts are aggregated within a configured time window, for example 24 hours, and sent when thresholds are reached
+The pipeline's observability is based on structured logging, with events emitted as JSON and collected by the observability stack.
+
+- Operational and execution events are emitted with `service`, `component`, `event`, `status`, `execution_id`, and `correlation_id`.
+- Data quality metrics are emitted in the `quality_report_metrics` event.
+- Per-phase duration metrics are emitted in the `execution_phase_metrics` event.
+- Third-party library logs can be routed to structured events via the observability bridge.
+
+In the Airflow environment, logs are collected by Promtail and sent to Loki; alerting is handled by rules in Grafana/Loki and Alertmanager.
 
 ## Prerequisites
 
@@ -147,9 +150,6 @@ Expected keys in `general`:
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
-  "notifications": {
-    "webhook_url": "http://localhost:8000/notify"
-  },
   "data_validations": {
     "json_validation": {
       "schemas": ["raw_data_json_schema"]
@@ -161,16 +161,11 @@ Expected keys in `general`:
 }
 ```
 
-Note: `webhook_url` is the URL of the `alertservice` microservice and is required.
-To disable notifications to `alertservice`, use the value `"disabled"`.
+Note: alert notifications are no longer handled by an application webhook in this pipeline; operational alerts must be configured in the observability stack (Loki/Grafana/Alertmanager).
 
 ## Unit tests
 
-Unit tests in this subproject are currently limited to the `transform_positions.py` module and cover the core transformation logic, including:
-- payload validation and minimum data structure checks
-- transformed-field mapping and enrichment
-- calculations and aggregations applied to vehicle positions
-- error scenarios for missing or invalid data
+Tests in this subproject cover the transformation logic, the quality report service, and the full pipeline orchestration.
 
 ## Installation instructions
 
