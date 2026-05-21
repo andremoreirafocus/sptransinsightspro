@@ -11,25 +11,11 @@ from refinedfinishedtrips.lineage import (
     get_finished_trips_output_columns,
     validate_finished_trips_lineage,
 )
-from refinedfinishedtrips.services.create_quality_report import (
-    create_failure_quality_report,
-    create_final_quality_report,
-    create_quality_report,
+from refinedfinishedtrips.orchestration_dependencies import (
+    RefinedFinishedTripsOrchestrationDependencies,
+    get_refinedfinishedtrips_orchestration_dependencies,
 )
-from refinedfinishedtrips.services.get_all_finished_trips import (
-    get_all_finished_trips,
-)
-from refinedfinishedtrips.services.get_recent_positions import get_recent_positions
-from refinedfinishedtrips.services.save_finished_trips_to_db import (
-    save_finished_trips_to_db,
-)
-from refinedfinishedtrips.services.validate_positions_quality import (
-    validate_positions_quality,
-)
-from refinedfinishedtrips.services.validate_persistence_quality import validate_persistence_quality
-from refinedfinishedtrips.services.validate_trips_quality import validate_trips_quality
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
-from infra.notifications import send_webhook
 import logging
 
 logger = logging.getLogger(__name__)
@@ -65,50 +51,6 @@ def _parse_trip_extraction_output(trip_extraction_output: Any) -> tuple[Any, Dic
     return trip_extraction_output, {}
 
 
-def _send_webhook_from_report(
-    report: Dict[str, Any],
-    config: Dict[str, Any],
-    send_webhook_fn: Callable[..., Any],
-    path: str,
-) -> None:
-    def get_config(config):
-        return config.get("general", {}).get("notifications", {}).get("webhook_url")
-
-    summary = report.get("summary", {})
-    execution_id = summary.get("execution_id")
-    status = summary.get("status")
-    failure_phase = summary.get("failure_phase")
-    webhook_url = get_config(config)
-    normalized_webhook_url = str(webhook_url or "").strip()
-    if normalized_webhook_url.lower() in {"", "disabled", "none", "null"}:
-        logger.info(
-            "Webhook notification disabled (%s): execution_id=%s status=%s failure_phase=%s",
-            path,
-            execution_id,
-            status,
-            failure_phase,
-        )
-        return
-    try:
-        send_webhook_fn(summary, normalized_webhook_url)
-        logger.info(
-            "Webhook notification sent (%s): execution_id=%s status=%s failure_phase=%s",
-            path,
-            execution_id,
-            status,
-            failure_phase,
-        )
-    except Exception as exc:
-        logger.error(
-            "Webhook notification failed (%s): execution_id=%s status=%s failure_phase=%s error=%s",
-            path,
-            execution_id,
-            status,
-            failure_phase,
-            exc,
-        )
-
-
 def _build_column_lineage() -> Dict[str, Any]:
     column_lineage = get_finished_trips_lineage()
     actual_output_columns = get_finished_trips_output_columns()
@@ -122,7 +64,6 @@ def _handle_positions_result(
     run_ts: datetime,
     create_report_fn: Callable[..., Any],
     create_failure_report_fn: Callable[..., Any],
-    send_webhook_fn: Callable[..., Any],
 ) -> None:
     def checks_message(status):
         return "; ".join(
@@ -133,7 +74,7 @@ def _handle_positions_result(
     if positions_result["status"] == "FAIL":
         failure_message = checks_message("FAIL")
         logger.error(f"Positions quality FAIL: {failure_message}")
-        report = create_failure_report_fn(
+        create_failure_report_fn(
             config,
             execution_id,
             run_ts,
@@ -141,16 +82,10 @@ def _handle_positions_result(
             failure_message,
             positions_result,
         )
-        _send_webhook_from_report(
-            report, config, send_webhook_fn, "positions fail"
-        )
         raise ValueError(f"Positions quality check FAILED: {failure_message}")
     if positions_result["status"] == "WARN":
         logger.warning(f"Positions quality WARN: {checks_message('WARN')}")
-        report = create_report_fn(config, execution_id, run_ts, positions_result)
-        _send_webhook_from_report(
-            report, config, send_webhook_fn, "positions warn"
-        )
+        create_report_fn(config, execution_id, run_ts, positions_result)
 
 
 def _handle_trips_result(trips_result: Dict[str, Any]) -> None:
@@ -170,17 +105,10 @@ def _handle_persistence_result(persistence_result: Dict[str, Any]) -> None:
 
 def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name_or_config: str | Dict[str, Any],
-    get_recent_positions_fn: Callable[..., Any] = get_recent_positions,
-    save_trips_fn: Callable[..., Any] = save_finished_trips_to_db,
-    extract_trips_fn: Callable[..., Any] = get_all_finished_trips,
-    validate_positions_fn: Callable[..., Any] = validate_positions_quality,
-    validate_trips_fn: Callable[..., Any] = validate_trips_quality,
-    validate_persistence_fn: Callable[..., Any] = validate_persistence_quality,
-    create_report_fn: Callable[..., Any] = create_quality_report,
-    create_failure_report_fn: Callable[..., Any] = create_failure_quality_report,
-    create_final_report_fn: Callable[..., Any] = create_final_quality_report,
-    send_webhook_fn: Callable[..., Any] = send_webhook,
+    deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
 ) -> None:
+    if deps is None:
+        deps = get_refinedfinishedtrips_orchestration_dependencies()
     phase_order = [
         "config_load",
         "positions_load",
@@ -221,7 +149,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     tracker.begin("positions_load")
     try:
-        df_recent_positions = get_recent_positions_fn(config)
+        df_recent_positions = deps.get_recent_positions(config)
         tracker.finish("positions_load", "success")
     except Exception:
         tracker.finish("positions_load", "failed")
@@ -231,15 +159,14 @@ def extract_trips_for_all_Lines_and_vehicles(
     logger.info(f"Validating quality of {len(df_recent_positions)} position records.")
     tracker.begin("positions_quality")
     try:
-        positions_result = validate_positions_fn(config, df_recent_positions)
+        positions_result = deps.validate_positions_quality(config, df_recent_positions)
         _handle_positions_result(
             positions_result,
             config,
             execution_id,
             run_ts,
-            create_report_fn,
-            create_failure_report_fn,
-            send_webhook_fn,
+            deps.create_quality_report,
+            deps.create_failure_quality_report,
         )
         tracker.finish("positions_quality", "success")
     except Exception:
@@ -249,12 +176,12 @@ def extract_trips_for_all_Lines_and_vehicles(
 
     tracker.begin("trip_extraction")
     try:
-        trip_extraction_output = extract_trips_fn(config, df_recent_positions)
+        trip_extraction_output = deps.get_all_finished_trips(config, df_recent_positions)
         all_finished_trips, extraction_metrics = _parse_trip_extraction_output(
             trip_extraction_output
         )
         column_lineage = _build_column_lineage()
-        trips_result = validate_trips_fn(
+        trips_result = deps.validate_trips_quality(
             config, df_recent_positions, all_finished_trips, extraction_metrics
         )
         _handle_trips_result(trips_result)
@@ -263,7 +190,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         tracker.finish("trip_extraction", "failed")
         failure_message = str(exc)
         logger.error(f"Trip extraction failed: {failure_message}")
-        report = create_failure_report_fn(
+        deps.create_failure_quality_report(
             config,
             execution_id,
             run_ts,
@@ -273,22 +200,19 @@ def extract_trips_for_all_Lines_and_vehicles(
             trips_result=trips_result,
             column_lineage=column_lineage,
         )
-        _send_webhook_from_report(
-            report, config, send_webhook_fn, "trip extraction fail"
-        )
         tracker.emit(logger, "failed")
         raise
     tracker.begin("persistence")
     try:
-        save_result = save_trips_fn(config, all_finished_trips)
-        persistence_result = validate_persistence_fn(save_result)
+        save_result = deps.save_finished_trips_to_db(config, all_finished_trips)
+        persistence_result = deps.validate_persistence_quality(save_result)
         _handle_persistence_result(persistence_result)
         tracker.finish("persistence", "success")
     except Exception as exc:
         tracker.finish("persistence", "failed")
         failure_message = str(exc)
         logger.error(f"Persistence failed: {failure_message}")
-        report = create_failure_report_fn(
+        deps.create_failure_quality_report(
             config,
             execution_id,
             run_ts,
@@ -299,14 +223,11 @@ def extract_trips_for_all_Lines_and_vehicles(
             persistence_result=persistence_result,
             column_lineage=column_lineage,
         )
-        _send_webhook_from_report(
-            report, config, send_webhook_fn, "persistence fail"
-        )
         tracker.emit(logger, "failed")
         raise
     tracker.begin("quality_report")
     try:
-        report = create_final_report_fn(
+        report = deps.create_final_quality_report(
             config,
             execution_id,
             run_ts,
@@ -314,9 +235,6 @@ def extract_trips_for_all_Lines_and_vehicles(
             trips_result,
             persistence_result,
             column_lineage=column_lineage,
-        )
-        _send_webhook_from_report(
-            report, config, send_webhook_fn, "final report"
         )
         tracker.finish("quality_report", "success")
         tracker.emit(logger, "success")
