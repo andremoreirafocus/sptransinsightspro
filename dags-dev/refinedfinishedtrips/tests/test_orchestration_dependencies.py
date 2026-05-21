@@ -8,6 +8,7 @@ from refinedfinishedtrips.orchestration_dependencies import (
 _NOOP = lambda *a, **k: None  # noqa: E731
 
 _ALL_FIELDS = [
+    "get_config",
     "get_recent_positions",
     "get_all_finished_trips",
     "validate_positions_quality",

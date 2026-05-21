@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from types import SimpleNamespace
 from typing import Any, Callable, Dict
 import uuid
 
@@ -15,40 +16,14 @@ from refinedfinishedtrips.orchestration_dependencies import (
     RefinedFinishedTripsOrchestrationDependencies,
     get_refinedfinishedtrips_orchestration_dependencies,
 )
+from refinedfinishedtrips.orchestration_event_handlers import handle_phase_metrics_event
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
+from observability.structured_event_logger import get_structured_logger
+from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
 import logging
 
 logger = logging.getLogger(__name__)
 
-
-def _load_pipeline_config(pipeline_name: str) -> Dict[str, Any]:
-    try:
-        pipeline_config = get_config(
-            pipeline_name,
-            None,
-            GeneralConfig,
-            None,
-            "minio_conn",
-            "postgres_conn",
-        )
-    except Exception as e:
-        error_message = (
-            "Pipeline configuration validation failed for refinedfinishedtrips: "
-            f"pipeline_name='{pipeline_name}'"
-        )
-        logger.error(error_message)
-        raise ValueError(error_message) from e
-    return pipeline_config
-
-
-def _parse_trip_extraction_output(trip_extraction_output: Any) -> tuple[Any, Dict[str, Any]]:
-    if (
-        isinstance(trip_extraction_output, tuple)
-        and len(trip_extraction_output) == 2
-        and isinstance(trip_extraction_output[1], dict)
-    ):
-        return trip_extraction_output
-    return trip_extraction_output, {}
 
 
 def _build_column_lineage() -> Dict[str, Any]:
@@ -59,7 +34,7 @@ def _build_column_lineage() -> Dict[str, Any]:
 
 def _handle_positions_result(
     positions_result: Dict[str, Any],
-    config: Dict[str, Any],
+    pipeline_config: Dict[str, Any],
     execution_id: str,
     run_ts: datetime,
     create_report_fn: Callable[..., Any],
@@ -75,7 +50,7 @@ def _handle_positions_result(
         failure_message = checks_message("FAIL")
         logger.error(f"Positions quality FAIL: {failure_message}")
         create_failure_report_fn(
-            config,
+            pipeline_config,
             execution_id,
             run_ts,
             "positions",
@@ -85,7 +60,7 @@ def _handle_positions_result(
         raise ValueError(f"Positions quality check FAILED: {failure_message}")
     if positions_result["status"] == "WARN":
         logger.warning(f"Positions quality WARN: {checks_message('WARN')}")
-        create_report_fn(config, execution_id, run_ts, positions_result)
+        create_report_fn(pipeline_config, execution_id, run_ts, positions_result)
 
 
 def _handle_trips_result(trips_result: Dict[str, Any]) -> None:
@@ -104,7 +79,7 @@ def _handle_persistence_result(persistence_result: Dict[str, Any]) -> None:
 
 
 def extract_trips_for_all_Lines_and_vehicles(
-    pipeline_name_or_config: str | Dict[str, Any],
+    pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
 ) -> None:
     if deps is None:
@@ -117,11 +92,6 @@ def extract_trips_for_all_Lines_and_vehicles(
         "persistence",
         "quality_report",
     ]
-    pipeline_name = (
-        pipeline_name_or_config
-        if isinstance(pipeline_name_or_config, str)
-        else "refinedfinishedtrips"
-    )
     execution_id = str(uuid.uuid4())
     run_ts = datetime.now(timezone.utc)
     tracker = ExecutionPhaseMetricsTracker(
@@ -130,17 +100,27 @@ def extract_trips_for_all_Lines_and_vehicles(
         logical_date_utc=run_ts.isoformat(),
         phase_order=phase_order,
     )
+    logger.info("Starting execution")
+    structured_logger = RefinedFinishedTripsLogger(
+        get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
+    )  # upgraded in Step 5
+    state = SimpleNamespace(execution_id=execution_id, correlation_id=execution_id)  # replaced in Step 5
     tracker.begin("config_load")
     try:
-        if isinstance(pipeline_name_or_config, dict):
-            config = pipeline_name_or_config
-        else:
-            config = _load_pipeline_config(pipeline_name_or_config)
+        pipeline_config = deps.get_config(
+            pipeline_name,
+            None,
+            GeneralConfig,
+            None,
+            "minio_conn",
+            "postgres_conn",
+        )
         tracker.finish("config_load", "success")
-    except Exception:
-        tracker.finish("config_load", "failed")
-        tracker.emit(logger, "failed")
-        raise
+        logger.info("Configuration load succeeded")
+    except Exception as e:
+        error_msg = "Configuration load and validation failed"
+        logger.error(error_msg)
+        raise ValueError(error_msg) from e
     positions_result = None
     trips_result = None
     persistence_result = None
@@ -149,20 +129,20 @@ def extract_trips_for_all_Lines_and_vehicles(
     logger.info(f"Starting pipeline run. execution_id={execution_id}")
     tracker.begin("positions_load")
     try:
-        df_recent_positions = deps.get_recent_positions(config)
+        df_recent_positions = deps.get_recent_positions(pipeline_config)
         tracker.finish("positions_load", "success")
     except Exception:
         tracker.finish("positions_load", "failed")
-        tracker.emit(logger, "failed")
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise
 
     logger.info(f"Validating quality of {len(df_recent_positions)} position records.")
     tracker.begin("positions_quality")
     try:
-        positions_result = deps.validate_positions_quality(config, df_recent_positions)
+        positions_result = deps.validate_positions_quality(pipeline_config, df_recent_positions)
         _handle_positions_result(
             positions_result,
-            config,
+            pipeline_config,
             execution_id,
             run_ts,
             deps.create_quality_report,
@@ -171,18 +151,15 @@ def extract_trips_for_all_Lines_and_vehicles(
         tracker.finish("positions_quality", "success")
     except Exception:
         tracker.finish("positions_quality", "failed")
-        tracker.emit(logger, "failed")
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise
 
     tracker.begin("trip_extraction")
     try:
-        trip_extraction_output = deps.get_all_finished_trips(config, df_recent_positions)
-        all_finished_trips, extraction_metrics = _parse_trip_extraction_output(
-            trip_extraction_output
-        )
+        all_finished_trips, extraction_metrics = deps.get_all_finished_trips(pipeline_config, df_recent_positions)
         column_lineage = _build_column_lineage()
         trips_result = deps.validate_trips_quality(
-            config, df_recent_positions, all_finished_trips, extraction_metrics
+            pipeline_config, df_recent_positions, all_finished_trips, extraction_metrics
         )
         _handle_trips_result(trips_result)
         tracker.finish("trip_extraction", "success")
@@ -191,7 +168,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         failure_message = str(exc)
         logger.error(f"Trip extraction failed: {failure_message}")
         deps.create_failure_quality_report(
-            config,
+            pipeline_config,
             execution_id,
             run_ts,
             "trip_extraction",
@@ -200,11 +177,11 @@ def extract_trips_for_all_Lines_and_vehicles(
             trips_result=trips_result,
             column_lineage=column_lineage,
         )
-        tracker.emit(logger, "failed")
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise
     tracker.begin("persistence")
     try:
-        save_result = deps.save_finished_trips_to_db(config, all_finished_trips)
+        save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips)
         persistence_result = deps.validate_persistence_quality(save_result)
         _handle_persistence_result(persistence_result)
         tracker.finish("persistence", "success")
@@ -213,7 +190,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         failure_message = str(exc)
         logger.error(f"Persistence failed: {failure_message}")
         deps.create_failure_quality_report(
-            config,
+            pipeline_config,
             execution_id,
             run_ts,
             "persistence",
@@ -223,12 +200,12 @@ def extract_trips_for_all_Lines_and_vehicles(
             persistence_result=persistence_result,
             column_lineage=column_lineage,
         )
-        tracker.emit(logger, "failed")
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise
     tracker.begin("quality_report")
     try:
         report = deps.create_final_quality_report(
-            config,
+            pipeline_config,
             execution_id,
             run_ts,
             positions_result,
@@ -237,9 +214,9 @@ def extract_trips_for_all_Lines_and_vehicles(
             column_lineage=column_lineage,
         )
         tracker.finish("quality_report", "success")
-        tracker.emit(logger, "success")
+        handle_phase_metrics_event(state, tracker, structured_logger, "success")
     except Exception:
         tracker.finish("quality_report", "failed")
-        tracker.emit(logger, "failed")
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise
     logger.info(f"Pipeline run complete. execution_id={execution_id}, status={report['summary']['status']}")

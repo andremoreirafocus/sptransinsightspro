@@ -168,7 +168,7 @@ def test_trip_extraction_metrics_reach_final_report():
 
 def test_no_trips_extracted_save_called_with_empty_list():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
-        extract_trips_output=[]
+        extract_trips_output=([], {})
     )
     extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
     assert len(recorder.save_calls) == 1
@@ -178,7 +178,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
 def test_two_vehicles_save_called_once_with_combined_result():
     trips = [{"trip_id": "1234-10"}, {"trip_id": "5678-20"}]
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
-        extract_trips_output=trips
+        extract_trips_output=(trips, {})
     )
     extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
     assert len(recorder.save_calls) == 1

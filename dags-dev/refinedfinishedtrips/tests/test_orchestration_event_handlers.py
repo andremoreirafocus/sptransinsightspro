@@ -52,6 +52,7 @@ def _make_state(**overrides) -> PipelineTaskRunState:
 def _make_failure_deps(create_failure_quality_report=None) -> RefinedFinishedTripsOrchestrationDependencies:
     _noop = lambda *a, **k: None  # noqa: E731
     return RefinedFinishedTripsOrchestrationDependencies(
+        get_config=_noop,
         get_recent_positions=_noop,
         get_all_finished_trips=_noop,
         validate_positions_quality=_noop,

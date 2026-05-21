@@ -46,6 +46,11 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
     ) -> tuple[RefinedFinishedTripsOrchestrationDependencies, OrchestrationCallRecorder]:
         recorder = OrchestrationCallRecorder()
 
+        def get_config(pipeline_name_or_config, *args, **kwargs):
+            if isinstance(pipeline_name_or_config, dict):
+                return pipeline_name_or_config
+            return {}
+
         def get_recent_positions(config):
             return cls._default_positions_df()
 
@@ -79,7 +84,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
         def get_all_finished_trips(config, df):
             if extract_trips_raises is not None:
                 raise extract_trips_raises
-            return extract_trips_output if extract_trips_output is not None else []
+            return extract_trips_output if extract_trips_output is not None else ([], {})
 
         def validate_trips_quality(config, df, trips, extraction_metrics=None):
             metrics = extraction_metrics or {}
@@ -158,6 +163,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
             return {"summary": {"status": "PASS", "execution_id": execution_id}, "details": {}}
 
         deps = RefinedFinishedTripsOrchestrationDependencies(
+            get_config=get_config,
             get_recent_positions=get_recent_positions,
             get_all_finished_trips=get_all_finished_trips,
             validate_positions_quality=validate_positions_quality,
