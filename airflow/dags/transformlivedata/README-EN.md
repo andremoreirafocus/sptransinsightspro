@@ -81,16 +81,70 @@ The [samples](./samples) folder contains a manually curated example of the conso
 }
 ```
 
-### Observability (Loki + Alertmanager stack)
+### Observability (Loki + Grafana + Alertmanager stack)
 
-The pipeline's observability is based on structured logging, with events emitted as JSON and collected by the observability stack.
+The pipeline's observability is based on structured logging: all events are emitted as JSON with the fields `service`, `event`, `status`, `execution_id`, and `correlation_id`. In the Airflow environment, logs are collected by Promtail and sent to Loki. Third-party library logs are routed to the same format via the observability bridge.
 
-- Operational and execution events are emitted with `service`, `component`, `event`, `status`, `execution_id`, and `correlation_id`.
-- Data quality metrics are emitted in the `quality_report_metrics` event.
-- Per-phase duration metrics are emitted in the `execution_phase_metrics` event.
-- Third-party library logs can be routed to structured events via the observability bridge.
+#### Event taxonomy
 
-In the Airflow environment, logs are collected by Promtail and sent to Loki; alerting is handled by rules in Grafana/Loki and Alertmanager.
+Each pipeline phase emits lifecycle events (`_started`, `_succeeded`, `_failed`). Two consolidated events are emitted at the end of every execution:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `execution_finished` | Execution completed successfully | `execution_id`, `correlation_id`, `status` |
+| `execution_failed` | Any phase fails and interrupts the pipeline | `execution_id`, `correlation_id`, `status`, `message` |
+| `execution_phase_metrics` | At the end of every execution (success or failure) | Duration and status of each phase in `metadata.phase_metrics` |
+| `quality_report_metrics` | After the quality report is generated | Record counts, transformation metrics, issues, and GX summary in `metadata` |
+
+#### Grafana dashboard
+
+The dashboard is located at [`observability/grafana/provisioning/dashboards/transformlivedata.json`](../../../../observability/grafana/provisioning/dashboards/transformlivedata.json) and is provisioned automatically by Grafana. It uses Loki as its datasource. All queries follow the pattern:
+
+```
+{service="airflow_tasks"} | json | service_extracted="transformlivedata" | event="<event>"
+```
+
+The dashboard is organized into three rows:
+
+**Row 1 — Operational health**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Executions | Timeseries (dots) | Completed executions (green) and failed executions (red) over time | `execution_finished` and `execution_failed` — `count_over_time [2m]` |
+| Completed (last 1h) | Stat | Total successful executions in the last hour | `execution_finished` — `count_over_time [1h]` |
+| Errors (last 1h) | Stat (red when ≥ 1) | Total failed executions in the last hour | `execution_failed` — `count_over_time [1h]` |
+| Execution duration (s) | Timeseries | Average duration per phase: `total`, `load_positions`, `raw_schema_validation`, `transform`, `expectations_validation`, `save_trusted` | `execution_phase_metrics` — `metadata.phase_metrics.<phase>.duration_seconds` via `avg_over_time [5m]` |
+
+**Row 2 — Data quality**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Acceptance rate | Timeseries | Acceptance rate (`accepted / raw`); visual threshold at 0.98 (orange below, green above) | `quality_report_metrics` — `metadata.record_counts.accepted_records` / `raw_input_records` |
+| Raw records | Timeseries | Volume of raw records received per execution | `quality_report_metrics` — `metadata.record_counts.raw_input_records` |
+| Rejected records by reason | Timeseries | Breakdown of rejected records by cause: invalid vehicle IDs, distance-calculation errors, and GX failures | `quality_report_metrics` — `metadata.transformation_processing_issues.invalid_vehicle_ids_count`, `distance_calculation_errors_count`; `metadata.post_transformation_validation_summary.gx_records_failures` |
+
+The `gx_records_failures` field captures exclusively the rows rejected by Great Expectations after the transformation phase — distinct from the total rejected count, which also includes records filtered during transformation.
+
+**Row 3 — Logs**
+
+| Panel | What it shows |
+|---|---|
+| Recent failures | Filtered stream of `execution_failed` events with failure details |
+| Log stream | All pipeline events in descending order |
+
+#### Alert rules
+
+Rules are defined in `observability/loki/rules/fake/transformlivedata-alerts.yaml` and evaluated every minute by the Loki Ruler:
+
+| Alert | Severity | Condition | Window |
+|---|---|---|---|
+| `PipelinePhaseFailed` | critical | Any `execution_failed` event detected | 5m |
+| `AcceptanceRateBelowThreshold` | warning | Acceptance rate (`accepted / raw`) below 0.98 | 10m |
+| `NoPipelineExecutionCompleted` | critical | No `execution_finished` detected (`absent_over_time`) | 30m |
+
+Alertmanager (`observability/alertmanager/alertmanager.yml`) routes:
+- `critical` → immediate delivery, no grouping, repeat every 30 min
+- `warning` → 2-minute grouping, repeat every 12h
 
 ## Prerequisites
 
@@ -245,27 +299,3 @@ CREATE TABLE trusted.positions (
     distance_to_last_stop DOUBLE PRECISION
 );
 ```
-
-## Structure of the table before enrichment with `trip_details`
-
-```sql
-CREATE TABLE trusted.positions (
-    id BIGSERIAL PRIMARY KEY,
-    extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at
-    veiculo_id INTEGER,            -- p: vehicle id
-    linha_lt TEXT,                 -- c: full route sign
-    linha_code INTEGER,            -- cl: route code
-    linha_sentido INTEGER,         -- sl: direction
-    lt_destino TEXT,               -- lt0: destination
-    lt_origem TEXT,                -- lt1: origin
-    veiculo_acessivel BOOLEAN,     -- a: accessible
-    veiculo_ts TIMESTAMPTZ,        -- ta: UTC timestamp
-    veiculo_lat DOUBLE PRECISION,  -- py: latitude
-    veiculo_long DOUBLE PRECISION  -- px: longitude
-);
-```
-
-## Exploration queries
-
-The original README also includes a large set of ad hoc SQL exploration queries used during development and validation of the trusted `positions` table, terminals, route geometry, and vehicle trajectories.
-Those queries were kept in the Portuguese source document and can still be used directly as reference when needed.

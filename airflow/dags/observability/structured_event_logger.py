@@ -1,5 +1,6 @@
 import json
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Literal, Optional, TypeAlias
@@ -21,6 +22,19 @@ LEVEL_TO_LOGGING = {
     "ERROR": logging.ERROR,
     "CRITICAL": logging.CRITICAL,
 }
+
+
+_execution_context: ContextVar[Optional[Dict[str, str]]] = ContextVar(
+    "_execution_context", default=None
+)
+
+
+def set_execution_context(execution_id: str, correlation_id: str) -> None:
+    _execution_context.set({"execution_id": execution_id, "correlation_id": correlation_id})
+
+
+def clear_execution_context() -> None:
+    _execution_context.set(None)
 
 
 def _utc_timestamp() -> str:
@@ -91,10 +105,13 @@ class StructuredEventLogger:
             "message": _normalize_non_empty_string(message, "message"),
         }
 
-        if execution_id is not None:
-            payload["execution_id"] = execution_id
-        if correlation_id is not None:
-            payload["correlation_id"] = correlation_id
+        context = _execution_context.get()
+        resolved_execution_id = execution_id if execution_id is not None else (context.get("execution_id") if context else None)
+        resolved_correlation_id = correlation_id if correlation_id is not None else (context.get("correlation_id") if context else None)
+        if resolved_execution_id is not None:
+            payload["execution_id"] = resolved_execution_id
+        if resolved_correlation_id is not None:
+            payload["correlation_id"] = resolved_correlation_id
         if status is not None:
             normalized_status = _normalize_status_value(status, "status").upper()
             payload["status"] = normalized_status
