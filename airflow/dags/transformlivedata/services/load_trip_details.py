@@ -3,11 +3,7 @@ from observability.structured_event_logger import get_structured_logger
 from typing import Any, Callable, Dict, Tuple
 import pandas as pd
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="load_trip_details",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def load_trip_details(

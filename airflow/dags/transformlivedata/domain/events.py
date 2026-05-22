@@ -42,6 +42,7 @@ _OrchestratorEvent: TypeAlias = Literal[
 
 _ServiceEvent: TypeAlias = Literal[
     "build_logical_date_context_failed",
+    "quality_report_build_failed",
     "distance_calculation_failed",
     "get_unprocessed_requests_failed",
     "get_unprocessed_requests_started",

@@ -2,11 +2,7 @@ from typing import Any, Callable, Dict, List, Tuple
 from infra.sql_db_v2 import execute_select_query, execute_update_query
 from observability.structured_event_logger import get_structured_logger
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="ingest_requests_processor",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:
@@ -117,22 +113,9 @@ def mark_request_as_processed(
         SET processed = true, updated_at = NOW()
         WHERE logical_date = :logical_date
     """
-    structured_logger.info(
-        event="mark_request_as_processed_started",
-        message="Marking request as processed by logical_date",
-        status="STARTED",
-        metadata={"logical_date": logical_date, "schema": schema, "table": table},
-    )
     try:
         success = update_fn(connection, query, {"logical_date": logical_date})
-        if success:
-            structured_logger.info(
-                event="mark_request_as_processed_succeeded",
-                message="Request marked as processed by logical_date",
-                status="SUCCEEDED",
-                metadata={"logical_date": logical_date, "schema": schema, "table": table},
-            )
-        else:
+        if not success:
             raise ValueError(
                 f"Failed to mark request as processed for logical_date={logical_date}"
             )

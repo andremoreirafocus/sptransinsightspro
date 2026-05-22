@@ -121,3 +121,44 @@ def test_payload_structure_unchanged_with_context():
     assert payload["status"] == "SUCCEEDED"
     assert payload["metadata"] == {"k": "v"}
     assert "timestamp" in payload
+
+
+# --- get_structured_logger auto-derivation ---
+
+
+def test_service_and_component_derived_from_logger_name():
+    logger = get_structured_logger(logger_name="mypipeline.services.myservice")
+    payload = logger.info(event="e", message="m")
+    assert payload["service"] == "mypipeline"
+    assert payload["component"] == "myservice"
+
+
+def test_single_segment_logger_name_uses_it_for_both():
+    logger = get_structured_logger(logger_name="mypipeline")
+    payload = logger.info(event="e", message="m")
+    assert payload["service"] == "mypipeline"
+    assert payload["component"] == "mypipeline"
+
+
+def test_explicit_service_overrides_derived():
+    logger = get_structured_logger(service="override_svc", logger_name="mypipeline.services.myservice")
+    payload = logger.info(event="e", message="m")
+    assert payload["service"] == "override_svc"
+    assert payload["component"] == "myservice"
+
+
+def test_explicit_component_overrides_derived():
+    logger = get_structured_logger(component="orchestrator", logger_name="mypipeline.mypipeline")
+    payload = logger.info(event="e", message="m")
+    assert payload["service"] == "mypipeline"
+    assert payload["component"] == "orchestrator"
+
+
+def test_raises_when_no_logger_name_and_no_service():
+    with pytest.raises(ValueError, match="service"):
+        get_structured_logger(component="myservice")
+
+
+def test_raises_when_no_logger_name_and_no_component():
+    with pytest.raises(ValueError, match="component"):
+        get_structured_logger(service="mypipeline")

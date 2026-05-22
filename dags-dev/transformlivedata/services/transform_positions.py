@@ -15,11 +15,7 @@ import pandas as pd
 from observability.structured_event_logger import get_structured_logger
 
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="transform_positions",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 @dataclass(frozen=True)
@@ -328,11 +324,6 @@ def transform_positions(
         return raw_schema
 
     deps = deps or get_transform_positions_dependencies()
-    structured_logger.info(
-        event="transform_positions_started",
-        message="Converting raw positions to positions table",
-        status="STARTED",
-    )
     metadata: Dict[str, Any] = raw_positions.get("metadata") or {}
     df_flat = deps.flatten_raw_positions(raw_positions)
     if df_flat.empty:
@@ -366,11 +357,6 @@ def transform_positions(
             status="FAILED",
         )
         raise ValueError("No position data resulted from normalization.")
-    structured_logger.info(
-        event="transform_positions_load_trip_details_started",
-        message="Preloading trip details from storage",
-        status="STARTED",
-    )
     trip_details_df = deps.load_trip_details(config)
     if trip_details_df is None or trip_details_df.empty:
         structured_logger.error(
@@ -379,12 +365,6 @@ def transform_positions(
             status="FAILED",
         )
         raise ValueError("trip_details_df is empty. Aborting transformation.")
-    structured_logger.info(
-        event="transform_positions_load_trip_details_succeeded",
-        message="Trip details cache built",
-        status="SUCCEEDED",
-        metadata={"rows": int(trip_details_df.shape[0])},
-    )
     df_with_trip_id = add_trip_id(df_normalized)
     df_enriched, lineage_join = deps.enrich_with_trip_details(
         df_with_trip_id, trip_details_df
@@ -470,7 +450,7 @@ def transform_positions(
         lineage,
     )
     structured_logger.info(
-        event="transform_positions_succeeded",
+        event="transform_positions_metrics",
         message="Transformation finished",
         status="SUCCEEDED",
         metadata={

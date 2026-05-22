@@ -1,11 +1,11 @@
 from typing import Any, Callable, Dict, Optional, Tuple
-import logging
 from datetime import datetime
 import pandas as pd
 from infra.object_storage import write_generic_bytes_to_object_storage
+from observability.structured_event_logger import get_structured_logger
 from quality.reporting import build_quality_summary, build_quality_report_path, save_quality_report
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _save_quality_report_to_storage(
@@ -236,7 +236,13 @@ def build_data_quality_report(
         valid_df = expectations_result["valid_df"]
         expectations_summary = expectations_result["expectations_summary"]
     except Exception as e:
-        logger.error("Error parsing expectations_result: %s", e)
+        structured_logger.error(
+            event="quality_report_build_failed",
+            message="Error parsing expectations_result",
+            status="FAILED",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
         raise ValueError(f"Error parsing expectations_result: {e}")
     computed_metrics = _compute_quality_metrics(
         transform_result=transform_result,

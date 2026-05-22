@@ -5,11 +5,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from infra.duck_db_v3 import get_duckdb_connection
 from observability.structured_event_logger import get_structured_logger
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="save_positions_to_storage",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def save_positions_to_storage(

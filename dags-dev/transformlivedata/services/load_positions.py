@@ -7,11 +7,7 @@ from observability.structured_event_logger import get_structured_logger
 import json
 from typing import Any, Callable, Dict, Tuple
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="load_positions",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def load_positions(

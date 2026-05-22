@@ -15,11 +15,7 @@ import pandas as pd
 from observability.structured_event_logger import get_structured_logger
 
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="transform_positions",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 @dataclass(frozen=True)

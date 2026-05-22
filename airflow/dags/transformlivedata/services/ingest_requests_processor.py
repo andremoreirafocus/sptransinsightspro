@@ -2,11 +2,7 @@ from typing import Any, Callable, Dict, List, Tuple
 from infra.sql_db_v2 import execute_select_query, execute_update_query
 from observability.structured_event_logger import get_structured_logger
 
-structured_logger = get_structured_logger(
-    service="transformlivedata",
-    component="ingest_requests_processor",
-    logger_name=__name__,
-)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _extract_database_config(config: Dict[str, Any]) -> Tuple[Dict[str, Any], str, str]:

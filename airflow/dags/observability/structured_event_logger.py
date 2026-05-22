@@ -149,15 +149,22 @@ class StructuredEventLogger:
 
 def get_structured_logger(
     *,
-    service: str,
-    component: str,
+    service: Optional[str] = None,
+    component: Optional[str] = None,
     logger_name: Optional[str] = None,
     base_metadata: Optional[Dict[str, Any]] = None,
 ) -> StructuredEventLogger:
-    target_name = logger_name.strip() if logger_name and logger_name.strip() else service
+    stripped_name = logger_name.strip() if logger_name and logger_name.strip() else None
+    parts = stripped_name.split(".") if stripped_name else []
+    resolved_service = service or (parts[0] if parts else None)
+    resolved_component = component or (parts[-1] if parts else None)
+    if not resolved_service:
+        raise ValueError("'service' must be provided or derivable from 'logger_name'.")
+    if not resolved_component:
+        raise ValueError("'component' must be provided or derivable from 'logger_name'.")
     return StructuredEventLogger(
-        service=service,
-        component=component,
-        logger=logging.getLogger(target_name),
+        service=resolved_service,
+        component=resolved_component,
+        logger=logging.getLogger(stripped_name or resolved_service),
         base_metadata=base_metadata or {},
     )
