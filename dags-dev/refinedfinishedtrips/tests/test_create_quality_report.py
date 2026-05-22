@@ -5,7 +5,6 @@ from refinedfinishedtrips.services.create_quality_report import (
     build_quality_report,
     create_failure_quality_report,
     create_final_quality_report,
-    create_quality_report,
 )
 
 RUN_TS = datetime(2026, 4, 27, 14, 0, 0, tzinfo=timezone.utc)
@@ -301,63 +300,6 @@ def test_create_failure_quality_report_includes_column_lineage_when_provided():
     )
     artifacts = report["details"]["artifacts"]
     assert artifacts["column_lineage"]["table_name"] == "finished_trips"
-
-
-# ---------------------------------------------------------------------------
-# create_quality_report (WARN / PASS path)
-# ---------------------------------------------------------------------------
-
-
-def test_create_quality_report_saves_warn_report_to_minio():
-    write = WriteCapture()
-    checks = [{"check": "freshness", "status": "WARN"}]
-    positions_result = make_positions_result(status="WARN", checks=checks)
-
-    report = create_quality_report(
-        config=make_config(),
-        execution_id=EXEC_ID,
-        run_ts=RUN_TS,
-        positions_result=positions_result,
-        write_fn=write,
-    )
-
-    assert len(write.calls) == 1
-    assert write.calls[0]["bucket_name"] == "metadata"
-    assert report["summary"]["status"] == "WARN"
-
-
-def test_create_quality_report_status_derived_from_positions_result():
-    write = WriteCapture()
-
-    report_pass = create_quality_report(
-        config=make_config(),
-        execution_id=EXEC_ID,
-        run_ts=RUN_TS,
-        positions_result=make_positions_result(status="PASS"),
-        write_fn=write,
-    )
-    report_warn = create_quality_report(
-        config=make_config(),
-        execution_id=EXEC_ID,
-        run_ts=RUN_TS,
-        positions_result=make_positions_result(status="WARN"),
-        write_fn=write,
-    )
-
-    assert report_pass["summary"]["status"] == "PASS"
-    assert report_warn["summary"]["status"] == "WARN"
-
-
-def test_create_quality_report_path_contains_execution_id_prefix():
-    write = WriteCapture()
-    create_quality_report(
-        config=make_config(),
-        execution_id=EXEC_ID,
-        run_ts=RUN_TS,
-        positions_result=make_positions_result(status="WARN"),
-        write_fn=write,
-    )
-    assert "aaaabbbb" in write.calls[0]["object_name"]
 
 
 # ---------------------------------------------------------------------------

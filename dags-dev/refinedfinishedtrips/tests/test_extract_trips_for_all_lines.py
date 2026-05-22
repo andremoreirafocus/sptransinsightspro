@@ -47,14 +47,14 @@ def test_positions_fail_raises_and_save_not_called():
     assert recorder.save_calls == []
 
 
-def test_positions_fail_calls_create_failure_report():
+def test_positions_fail_failure_report_called():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         positions_status="FAIL"
     )
     with pytest.raises(ValueError):
         extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
     assert len(recorder.failure_report_calls) == 1
-    assert recorder.failure_report_calls[0]["failure_phase"] == "positions"
+    assert recorder.failure_report_calls[0]["failure_phase"] == "positions_quality"
 
 
 def test_positions_fail_final_report_not_called():
@@ -102,12 +102,12 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
 # ---------------------------------------------------------------------------
 
 
-def test_positions_warn_calls_create_report():
+def test_positions_warn_no_early_report_called():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         positions_status="WARN"
     )
     extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
-    assert len(recorder.early_report_calls) == 1
+    assert recorder.early_report_calls == []
 
 
 def test_positions_warn_pipeline_continues_and_save_called():

@@ -57,7 +57,6 @@ def _make_failure_deps(create_failure_quality_report=None) -> RefinedFinishedTri
         validate_trips_quality=_noop,
         validate_persistence_quality=_noop,
         save_finished_trips_to_db=_noop,
-        create_quality_report=_noop,
         create_failure_quality_report=create_failure_quality_report or _noop,
         create_final_quality_report=_noop,
     )

@@ -112,10 +112,6 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 "previously_saved_rows": save_result.get("previously_saved_rows", 0),
             }
 
-        def create_quality_report(config, execution_id, run_ts, positions_result, write_fn=None):
-            recorder.early_report_calls.append(positions_result)
-            return {"summary": {"status": positions_result["status"]}, "details": {}}
-
         def create_failure_quality_report(
             config,
             execution_id,
@@ -170,7 +166,6 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
             validate_trips_quality=validate_trips_quality,
             validate_persistence_quality=validate_persistence_quality,
             save_finished_trips_to_db=save_finished_trips_to_db,
-            create_quality_report=create_quality_report,
             create_failure_quality_report=create_failure_quality_report,
             create_final_quality_report=create_final_quality_report,
         )

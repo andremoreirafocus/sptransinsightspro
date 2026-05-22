@@ -15,7 +15,6 @@ _ALL_FIELDS = [
     "validate_trips_quality",
     "validate_persistence_quality",
     "save_finished_trips_to_db",
-    "create_quality_report",
     "create_failure_quality_report",
     "create_final_quality_report",
 ]

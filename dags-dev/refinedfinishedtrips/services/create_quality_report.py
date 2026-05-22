@@ -19,7 +19,7 @@ def _count_failed_checks(result: Dict[str, Any]) -> int:
 
 def build_quality_report(
     execution_id: str,
-    positions_result: Dict[str, Any],
+    positions_result: Optional[Dict[str, Any]],
     quality_report_path: str,
     status: Literal["PASS", "WARN", "FAIL"],
     failure_phase: Optional[str] = None,
@@ -29,18 +29,20 @@ def build_quality_report(
     column_lineage: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     def _build_phase_details(
-        positions_result: Dict[str, Any],
+        positions_result: Optional[Dict[str, Any]],
         trips_result: Optional[Dict[str, Any]] = None,
         persistence_result: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        phase_details = {"positions": positions_result}
+        phase_details: Dict[str, Any] = {}
+        if positions_result is not None:
+            phase_details["positions"] = positions_result
         if trips_result is not None:
             phase_details["trip_extraction"] = trips_result
         if persistence_result is not None:
             phase_details["persistence"] = persistence_result
         return phase_details
-    
-    items_failed = _count_failed_checks(positions_result)
+
+    items_failed = _count_failed_checks(positions_result) if positions_result is not None else 0
     summary = build_quality_summary(
         pipeline=PIPELINE_NAME,
         execution_id=execution_id,
@@ -51,7 +53,7 @@ def build_quality_report(
         failure_message=failure_message,
         positions_in_time_window_count=positions_result.get(
             "positions_in_time_window_count"
-        ),
+        ) if positions_result is not None else None,
     )
     details = {
         "execution_id": execution_id,
@@ -67,44 +69,6 @@ def build_quality_report(
     return {"summary": summary, "details": details}
 
 
-def create_quality_report(
-    config: Dict[str, Any],
-    execution_id: str,
-    run_ts: Any,
-    positions_result: Dict[str, Any],
-    write_fn: Callable[..., Any] = write_generic_bytes_to_object_storage,
-) -> Dict[str, Any]:
-    def get_config(config):
-        storage = config["general"]["storage"]
-        return (
-            storage["metadata_bucket"],
-            storage["quality_report_folder"],
-            {**config["connections"]["object_storage"], "secure": False},
-        )
-
-    metadata_bucket, quality_report_folder, connection_data = get_config(config)
-    report_path = build_quality_report_path(
-        metadata_bucket=metadata_bucket,
-        quality_report_folder=quality_report_folder,
-        pipeline_name=PIPELINE_NAME,
-        batch_ts=run_ts,
-        filename_suffix=f"_{execution_id.replace('-', '')[:8]}",
-    )
-    report = build_quality_report(
-        execution_id=execution_id,
-        positions_result=positions_result,
-        quality_report_path=report_path,
-        status=positions_result["status"],
-    )
-    save_quality_report(
-        report=report,
-        path=report_path,
-        connection_data=connection_data,
-        write_fn=write_fn,
-    )
-    logger.info(f"Quality report ({positions_result['status']}) saved to {report_path}.")
-    return report
-
 
 def create_failure_quality_report(
     config: Dict[str, Any],
@@ -112,7 +76,7 @@ def create_failure_quality_report(
     run_ts: Any,
     failure_phase: str,
     failure_message: str,
-    positions_result: Dict[str, Any],
+    positions_result: Optional[Dict[str, Any]] = None,
     trips_result: Optional[Dict[str, Any]] = None,
     persistence_result: Optional[Dict[str, Any]] = None,
     column_lineage: Optional[Dict[str, Any]] = None,
