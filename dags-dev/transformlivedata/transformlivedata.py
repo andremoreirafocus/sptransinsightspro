@@ -9,8 +9,8 @@ from transformlivedata.orchestration_event_handlers import (
     handle_phase_metrics_event,
 )
 from observability.third_party_log_bridge import configure_third_party_log_bridge
+from observability.structured_event_logger import get_structured_logger, set_execution_context
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
-from observability.structured_event_logger import get_structured_logger
 from transformlivedata.domain.logger import TransformLivedataLogger
 import pandas as pd
 import uuid
@@ -25,8 +25,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="execution_failed",
             message=message,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
         )
 
@@ -35,6 +33,7 @@ def load_transform_save_positions(
         correlation_id=logical_date_string,
         logical_date_utc=logical_date_string,
     )
+    set_execution_context(state.execution_id, state.correlation_id)
     _inner_logger = get_structured_logger(
         service=pipeline_name,
         component="orchestrator",
@@ -67,8 +66,6 @@ def load_transform_save_positions(
     structured_logger.info(
         event="config_load_started",
         message="Starting configuration load",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("config_load")
@@ -87,8 +84,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="config_load_succeeded",
             message="Configuration load succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -97,8 +92,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="config_load_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -109,15 +102,11 @@ def load_transform_save_positions(
     structured_logger.info(
         event="execution_started",
         message="Starting execution",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     structured_logger.info(
         event="load_positions_started",
         message="Starting positions load",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("load_positions")
@@ -130,8 +119,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="load_positions_succeeded",
             message="Positions load succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -140,8 +127,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="load_positions_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -156,8 +141,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="load_positions_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
         )
         handle_failure_event(state, deps, structured_logger, "load_positions", error_msg)
@@ -168,8 +151,6 @@ def load_transform_save_positions(
     structured_logger.info(
         event="raw_schema_validation_started",
         message="Starting raw schema validation",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("raw_schema_validation")
@@ -182,8 +163,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="raw_schema_validation_failed",
             message="Raw schema validation failed",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_message=error_msg,
         )
@@ -195,15 +174,11 @@ def load_transform_save_positions(
     structured_logger.info(
         event="raw_schema_validation_succeeded",
         message="Raw schema validation succeeded",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="SUCCEEDED",
     )
     structured_logger.info(
         event="transform_started",
         message="Starting transformation",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("transform")
@@ -212,8 +187,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="transform_succeeded",
             message="Transformation succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -222,8 +195,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="transform_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -242,8 +213,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="transform_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
         )
         handle_failure_event(state, deps, structured_logger, "transform", error_msg)
@@ -255,8 +224,6 @@ def load_transform_save_positions(
     structured_logger.info(
         event="expectations_validation_started",
         message="Starting expectations validation",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("expectations_validation")
@@ -269,8 +236,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="expectations_validation_succeeded",
             message="Expectations validation succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -279,8 +244,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="expectations_validation_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -294,8 +257,6 @@ def load_transform_save_positions(
     structured_logger.info(
         event="save_trusted_started",
         message="Starting trusted positions save",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("save_trusted")
@@ -305,8 +266,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="save_trusted_succeeded",
             message="Trusted positions save succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
             metadata={"records_saved": int(valid_positions_df.shape[0])},
         )
@@ -316,8 +275,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="save_trusted_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -339,8 +296,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="save_quarantine_started",
             message="Starting quarantined positions save",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="STARTED",
         )
         tracker.begin("save_quarantine")
@@ -355,8 +310,6 @@ def load_transform_save_positions(
             structured_logger.info(
                 event="save_quarantine_succeeded",
                 message="Quarantined positions save succeeded",
-                execution_id=state.execution_id,
-                correlation_id=state.correlation_id,
                 status="SUCCEEDED",
                 metadata={"records_saved": int(combined_invalid_df.shape[0])},
             )
@@ -368,8 +321,6 @@ def load_transform_save_positions(
             structured_logger.error(
                 event="save_quarantine_failed",
                 message=error_msg,
-                execution_id=state.execution_id,
-                correlation_id=state.correlation_id,
                 status="FAILED",
                 error_type=type(e).__name__,
                 error_message=str(e),
@@ -383,15 +334,11 @@ def load_transform_save_positions(
         structured_logger.info(
             event="save_quarantine_skipped",
             message="No invalid positions to save in quarantine",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SKIPPED",
         )
     structured_logger.info(
         event="mark_processed_started",
         message="Starting request mark as processed",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("mark_processed")
@@ -401,8 +348,6 @@ def load_transform_save_positions(
         structured_logger.info(
             event="mark_processed_succeeded",
             message="Request marked as processed",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -411,8 +356,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="mark_processed_failed",
             message="Failed to mark request as processed",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -424,8 +367,6 @@ def load_transform_save_positions(
     structured_logger.info(
         event="quality_report_started",
         message="Starting quality report generation",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="STARTED",
     )
     tracker.begin("quality_report")
@@ -446,16 +387,12 @@ def load_transform_save_positions(
         structured_logger.info(
             event="quality_report_metrics",
             message="Quality report metrics",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
             metadata=report_log_metadata,
         )
         structured_logger.info(
             event="quality_report_succeeded",
             message="Quality report generation succeeded",
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="SUCCEEDED",
         )
     except Exception as e:
@@ -464,8 +401,6 @@ def load_transform_save_positions(
         structured_logger.error(
             event="quality_report_failed",
             message=error_msg,
-            execution_id=state.execution_id,
-            correlation_id=state.correlation_id,
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
@@ -477,7 +412,5 @@ def load_transform_save_positions(
     structured_logger.info(
         event="execution_finished",
         message="Execution finished successfully",
-        execution_id=state.execution_id,
-        correlation_id=state.correlation_id,
         status="SUCCEEDED",
     )

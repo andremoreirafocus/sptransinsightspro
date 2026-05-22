@@ -1,8 +1,13 @@
 import json
 
 import pandas as pd
+import pytest
 
-from observability.structured_event_logger import get_structured_logger
+from observability.structured_event_logger import (
+    clear_execution_context,
+    get_structured_logger,
+    set_execution_context,
+)
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
 from transformlivedata.domain.logger import TransformLivedataLogger
 from transformlivedata.orchestration_dependencies import (
@@ -62,6 +67,13 @@ def _make_failure_deps(
     )
 
 
+@pytest.fixture(autouse=True)
+def reset_execution_context():
+    clear_execution_context()
+    yield
+    clear_execution_context()
+
+
 def _parse_log_events(caplog, event_name: str) -> list[dict]:
     results = []
     for record in caplog.records:
@@ -97,6 +109,7 @@ def test_pipeline_task_run_state_has_correct_defaults():
 def test_handle_phase_metrics_event_success_emits_info_with_succeeded_status(caplog):
     caplog.set_level("INFO")
     state = _make_state()
+    set_execution_context(state.execution_id, state.correlation_id)
     tracker = _make_tracker()
     logger = _make_logger("test_pm_success")
 
@@ -131,6 +144,7 @@ def test_handle_phase_metrics_event_failure_emits_error_with_failed_status(caplo
 def test_handle_phase_metrics_event_includes_correlation_id(caplog):
     caplog.set_level("INFO")
     state = _make_state(correlation_id="corr-123")
+    set_execution_context(state.execution_id, state.correlation_id)
     tracker = _make_tracker()
     logger = _make_logger("test_pm_corr_id")
 
