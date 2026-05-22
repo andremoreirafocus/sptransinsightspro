@@ -4,8 +4,8 @@ from zoneinfo import ZoneInfo
 import pandas as pd
 
 from refinedfinishedtrips.services.validate_trips_quality import (
-    check_low_trip_count,
-    check_zero_trips,
+    evaluate_low_trip_count,
+    evaluate_zero_trips,
     validate_trips_quality,
 )
 
@@ -38,84 +38,64 @@ def make_df_tz_naive(window_minutes=180):
 
 
 # ---------------------------------------------------------------------------
-# check_zero_trips
+# evaluate_zero_trips
 # ---------------------------------------------------------------------------
 
 
-def test_check_zero_trips_warns_when_sufficient_window_and_no_trips():
-    result = check_zero_trips(
-        effective_window_minutes=180.0, trips_count=0, config=make_config(window_threshold=60)
+def test_evaluate_zero_trips_returns_raw_metrics():
+    result = evaluate_zero_trips(
+        config=make_config(window_threshold=60), effective_window_minutes=180.0, trips_count=0
     )
-    assert result["status"] == "WARN"
-    assert "note" in result
-
-
-def test_check_zero_trips_passes_when_window_below_threshold():
-    result = check_zero_trips(
-        effective_window_minutes=30.0, trips_count=0, config=make_config(window_threshold=60)
-    )
-    assert result["status"] == "PASS"
-    assert "note" not in result
-
-
-def test_check_zero_trips_passes_when_trips_present():
-    result = check_zero_trips(
-        effective_window_minutes=180.0, trips_count=10, config=make_config(window_threshold=60)
-    )
-    assert result["status"] == "PASS"
-
-
-def test_check_zero_trips_result_structure():
-    result = check_zero_trips(
-        effective_window_minutes=180.0, trips_count=0, config=make_config(window_threshold=60)
-    )
-    assert result["check"] == "zero_trips"
     assert result["effective_window_minutes"] == 180.0
     assert result["window_threshold_minutes"] == 60
+    assert result["trips_count"] == 0
+
+
+def test_evaluate_zero_trips_returns_threshold_from_config():
+    result = evaluate_zero_trips(
+        config=make_config(window_threshold=90), effective_window_minutes=30.0, trips_count=5
+    )
+    assert result["window_threshold_minutes"] == 90
+    assert result["trips_count"] == 5
+
+
+def test_evaluate_zero_trips_no_status_in_result():
+    result = evaluate_zero_trips(
+        config=make_config(window_threshold=60), effective_window_minutes=180.0, trips_count=0
+    )
+    assert "status" not in result
+    assert "reason" not in result
 
 
 # ---------------------------------------------------------------------------
-# check_low_trip_count
+# evaluate_low_trip_count
 # ---------------------------------------------------------------------------
 
 
-def test_check_low_trip_count_warns_when_sufficient_window_and_low_count():
-    result = check_low_trip_count(
-        effective_window_minutes=180.0, trips_count=2, config=make_config(window_threshold=60, min_trips=5)
+def test_evaluate_low_trip_count_returns_raw_metrics():
+    result = evaluate_low_trip_count(
+        config=make_config(window_threshold=60, min_trips=5), effective_window_minutes=180.0, trips_count=2
     )
-    assert result["status"] == "WARN"
-    assert "note" in result
-
-
-def test_check_low_trip_count_passes_when_window_below_threshold():
-    result = check_low_trip_count(
-        effective_window_minutes=30.0, trips_count=2, config=make_config(window_threshold=60, min_trips=5)
-    )
-    assert result["status"] == "PASS"
-    assert "note" not in result
-
-
-def test_check_low_trip_count_passes_when_adequate_count():
-    result = check_low_trip_count(
-        effective_window_minutes=180.0, trips_count=10, config=make_config(window_threshold=60, min_trips=5)
-    )
-    assert result["status"] == "PASS"
-
-
-def test_check_low_trip_count_passes_at_exact_threshold():
-    result = check_low_trip_count(
-        effective_window_minutes=180.0, trips_count=5, config=make_config(window_threshold=60, min_trips=5)
-    )
-    assert result["status"] == "PASS"
-
-
-def test_check_low_trip_count_result_structure():
-    result = check_low_trip_count(
-        effective_window_minutes=180.0, trips_count=2, config=make_config(window_threshold=60, min_trips=5)
-    )
-    assert result["check"] == "low_trip_count"
-    assert result["trips_extracted"] == 2
+    assert result["effective_window_minutes"] == 180.0
+    assert result["window_threshold_minutes"] == 60
     assert result["min_trips_threshold"] == 5
+    assert result["trips_count"] == 2
+
+
+def test_evaluate_low_trip_count_returns_thresholds_from_config():
+    result = evaluate_low_trip_count(
+        config=make_config(window_threshold=90, min_trips=10), effective_window_minutes=180.0, trips_count=5
+    )
+    assert result["window_threshold_minutes"] == 90
+    assert result["min_trips_threshold"] == 10
+
+
+def test_evaluate_low_trip_count_no_status_in_result():
+    result = evaluate_low_trip_count(
+        config=make_config(window_threshold=60, min_trips=5), effective_window_minutes=180.0, trips_count=2
+    )
+    assert "status" not in result
+    assert "reason" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -178,6 +158,27 @@ def test_validate_trips_quality_result_contains_two_checks():
     assert len(result["checks"]) == 2
     check_names = {c["check"] for c in result["checks"]}
     assert check_names == {"zero_trips", "low_trip_count"}
+
+
+def test_validate_trips_quality_warn_check_contains_reason():
+    df = make_df(window_minutes=180)
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
+    warn_check = next(c for c in result["checks"] if c["status"] == "WARN")
+    assert "reason" in warn_check
+
+
+def test_validate_trips_quality_pass_when_trips_at_exact_min_threshold():
+    df = make_df(window_minutes=180)
+    trips = [f"trip_{i}" for i in range(5)]
+    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, trips, {})
+    assert result["status"] == "PASS"
+
+
+def test_validate_trips_quality_pass_check_has_no_reason():
+    df = make_df(window_minutes=30)
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
+    for check in result["checks"]:
+        assert "reason" not in check
 
 
 # ---------------------------------------------------------------------------

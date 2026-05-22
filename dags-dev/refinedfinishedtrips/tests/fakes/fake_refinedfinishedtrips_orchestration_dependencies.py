@@ -63,7 +63,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                         {
                             "check": "freshness",
                             "status": "FAIL",
-                            "note": "no positions available for the analysis time window",
+                            "reason": "no positions available for the analysis time window",
                         }
                     ],
                 }
@@ -75,7 +75,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                         {
                             "check": "freshness",
                             "status": "WARN",
-                            "note": "freshness lag above warning threshold",
+                            "reason": "freshness lag above warning threshold",
                         }
                     ],
                 }
@@ -104,13 +104,6 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
             if save_trips_raises is not None:
                 raise save_trips_raises
             return {"added_rows": len(trips), "previously_saved_rows": 0}
-
-        def validate_persistence_quality(save_result):
-            return {
-                "status": "PASS",
-                "added_rows": save_result.get("added_rows", 0),
-                "previously_saved_rows": save_result.get("previously_saved_rows", 0),
-            }
 
         def create_failure_quality_report(
             config,
@@ -164,7 +157,6 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
             get_all_finished_trips=get_all_finished_trips,
             validate_positions_quality=validate_positions_quality,
             validate_trips_quality=validate_trips_quality,
-            validate_persistence_quality=validate_persistence_quality,
             save_finished_trips_to_db=save_finished_trips_to_db,
             create_failure_quality_report=create_failure_quality_report,
             create_final_quality_report=create_final_quality_report,

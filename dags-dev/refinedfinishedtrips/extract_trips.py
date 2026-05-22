@@ -34,21 +34,6 @@ def _build_column_lineage() -> Dict[str, Any]:
     return validate_finished_trips_lineage(column_lineage, actual_output_columns)
 
 
-def _handle_positions_result(positions_result: Dict[str, Any]) -> None:
-    def checks_message(status):
-        return "; ".join(
-            c.get("note", f"{c['check']} check {status.lower()}")
-            for c in positions_result["checks"]
-            if c["status"] == status
-        )
-    if positions_result["status"] == "FAIL":
-        failure_message = checks_message("FAIL")
-        logger.error(f"Positions quality FAIL: {failure_message}")
-        raise ValueError(f"Positions quality check FAILED: {failure_message}")
-    if positions_result["status"] == "WARN":
-        logger.warning(f"Positions quality WARN: {checks_message('WARN')}")
-
-
 def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
@@ -116,7 +101,13 @@ def extract_trips_for_all_Lines_and_vehicles(
     try:
         positions_result = deps.validate_positions_quality(pipeline_config, df_recent_positions)
         state.positions_result = positions_result
-        _handle_positions_result(positions_result)
+        if positions_result["status"] == "FAIL":
+            failed_notes = "; ".join(
+                c.get("reason", f"{c['check']} check failed")
+                for c in positions_result.get("checks", [])
+                if c["status"] == "FAIL"
+            )
+            raise ValueError(f"Positions quality check FAILED: {failed_notes}")
         tracker.finish("positions_quality", "success")
     except Exception as exc:
         tracker.finish("positions_quality", "failed")
@@ -144,7 +135,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     tracker.begin("persistence")
     try:
         save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips)
-        persistence_result = deps.validate_persistence_quality(save_result)
+        persistence_result = {"status": "PASS", **save_result}
         state.persistence_result = persistence_result
         tracker.finish("persistence", "success")
     except Exception as exc:

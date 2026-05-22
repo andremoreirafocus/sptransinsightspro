@@ -13,7 +13,6 @@ _ALL_FIELDS = [
     "get_all_finished_trips",
     "validate_positions_quality",
     "validate_trips_quality",
-    "validate_persistence_quality",
     "save_finished_trips_to_db",
     "create_failure_quality_report",
     "create_final_quality_report",

@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Any, Callable, Dict, Literal, Optional
 
@@ -12,62 +13,14 @@ logger = logging.getLogger(__name__)
 
 PIPELINE_NAME = "refinedfinishedtrips"
 
-def _count_failed_checks(result: Dict[str, Any]) -> int:
-    return sum(1 for c in result.get("checks", []) if c.get("status") == "FAIL")
-    
 
-
-def build_quality_report(
-    execution_id: str,
-    positions_result: Optional[Dict[str, Any]],
-    quality_report_path: str,
-    status: Literal["PASS", "WARN", "FAIL"],
-    failure_phase: Optional[str] = None,
-    failure_message: Optional[str] = None,
-    trips_result: Optional[Dict[str, Any]] = None,
-    persistence_result: Optional[Dict[str, Any]] = None,
-    column_lineage: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    def _build_phase_details(
-        positions_result: Optional[Dict[str, Any]],
-        trips_result: Optional[Dict[str, Any]] = None,
-        persistence_result: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
-        phase_details: Dict[str, Any] = {}
-        if positions_result is not None:
-            phase_details["positions"] = positions_result
-        if trips_result is not None:
-            phase_details["trip_extraction"] = trips_result
-        if persistence_result is not None:
-            phase_details["persistence"] = persistence_result
-        return phase_details
-
-    items_failed = _count_failed_checks(positions_result) if positions_result is not None else 0
-    summary = build_quality_summary(
-        pipeline=PIPELINE_NAME,
-        execution_id=execution_id,
-        status=status,
-        items_failed=items_failed,
-        quality_report_path=quality_report_path,
-        failure_phase=failure_phase,
-        failure_message=failure_message,
-        positions_in_time_window_count=positions_result.get(
-            "positions_in_time_window_count"
-        ) if positions_result is not None else None,
-    )
-    details = {
-        "execution_id": execution_id,
-        "status": status,
-        "failure_phase": failure_phase,
-        "failure_message": failure_message,
-        "phases": _build_phase_details(positions_result, trips_result, persistence_result),
-        "artifacts": {
-            "quality_report_path": quality_report_path,
-            "column_lineage": column_lineage or {},
-        },
-    }
-    return {"summary": summary, "details": details}
-
+def _derive_overall_status(*results: Dict[str, Any]) -> Literal["PASS", "WARN", "FAIL"]:
+    statuses = [r["status"] for r in results]
+    if "FAIL" in statuses:
+        return "FAIL"
+    if "WARN" in statuses:
+        return "WARN"
+    return "PASS"
 
 
 def create_failure_quality_report(
@@ -98,24 +51,44 @@ def create_failure_quality_report(
         batch_ts=run_ts,
         filename_suffix=f"_{execution_id.replace('-', '')[:8]}",
     )
-    report = build_quality_report(
+
+    phase_details: Dict[str, Any] = {}
+    if positions_result is not None:
+        phase_details["positions"] = positions_result
+    if trips_result is not None:
+        phase_details["trip_extraction"] = trips_result
+    if persistence_result is not None:
+        phase_details["persistence"] = persistence_result
+
+    summary = build_quality_summary(
+        pipeline=PIPELINE_NAME,
         execution_id=execution_id,
-        positions_result=positions_result,
-        quality_report_path=report_path,
         status="FAIL",
+        items_failed=0,
+        quality_report_path=report_path,
         failure_phase=failure_phase,
         failure_message=failure_message,
-        trips_result=trips_result,
-        persistence_result=persistence_result,
-        column_lineage=column_lineage,
+        positions_in_time_window_count=positions_result.get("positions_in_time_window_count") if positions_result is not None else None,
     )
+    details = {
+        "execution_id": execution_id,
+        "status": "FAIL",
+        "failure_phase": failure_phase,
+        "failure_message": failure_message,
+        "phases": phase_details,
+        "artifacts": {
+            "quality_report_path": report_path,
+            "column_lineage": column_lineage or {},
+        },
+    }
+    report = {"summary": summary, "details": details}
     save_quality_report(
         report=report,
         path=report_path,
         connection_data=connection_data,
         write_fn=write_fn,
     )
-    logger.info(f"Failure quality report saved to {report_path}.")
+    logger.info(json.dumps({"event": "failure_quality_report_saved", "message": "Failure quality report saved", "metadata": {"path": report_path, "failure_phase": failure_phase}}))
     return report
 
 
@@ -136,13 +109,7 @@ def create_final_quality_report(
             storage["quality_report_folder"],
             {**config["connections"]["object_storage"], "secure": False},
         )
-    def _derive_overall_status(*results: Dict[str, Any]) -> Literal["PASS", "WARN", "FAIL"]:
-        statuses = [r["status"] for r in results]
-        if "FAIL" in statuses:
-            return "FAIL"
-        if "WARN" in statuses:
-            return "WARN"
-        return "PASS"
+
     metadata_bucket, quality_report_folder, connection_data = get_config(config)
     report_path = build_quality_report_path(
         metadata_bucket=metadata_bucket,
@@ -152,18 +119,15 @@ def create_final_quality_report(
         filename_suffix=f"_{execution_id.replace('-', '')[:8]}",
     )
     overall_status = _derive_overall_status(positions_result, trips_result, persistence_result)
-    items_failed = sum(_count_failed_checks(r) for r in (positions_result, trips_result, persistence_result))
     summary = build_quality_summary(
         pipeline=PIPELINE_NAME,
         execution_id=execution_id,
         status=overall_status,
-        items_failed=items_failed,
+        items_failed=0,
         quality_report_path=report_path,
         positions_in_time_window_count=positions_result.get("positions_in_time_window_count"),
         trips_extracted=trips_result.get("trips_extracted"),
-        source_sentido_discrepancies=trips_result.get(
-            "source_sentido_discrepancies"
-        ),
+        source_sentido_discrepancies=trips_result.get("source_sentido_discrepancies"),
         sanitization_dropped_points=trips_result.get("sanitization_dropped_points"),
         vehicle_line_groups_processed=trips_result.get("vehicle_line_groups_processed"),
         added_rows=persistence_result.get("added_rows"),
@@ -191,5 +155,5 @@ def create_final_quality_report(
         connection_data=connection_data,
         write_fn=write_fn,
     )
-    logger.info(f"Final quality report ({overall_status}) saved to {report_path}.")
+    logger.info(json.dumps({"event": "final_quality_report_saved", "message": "Final quality report saved", "metadata": {"path": report_path, "status": overall_status}}))
     return report

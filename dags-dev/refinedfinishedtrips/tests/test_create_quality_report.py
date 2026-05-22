@@ -2,7 +2,6 @@ import json
 from datetime import datetime, timezone
 
 from refinedfinishedtrips.services.create_quality_report import (
-    build_quality_report,
     create_failure_quality_report,
     create_final_quality_report,
 )
@@ -54,133 +53,13 @@ class WriteCapture:
 
 
 # ---------------------------------------------------------------------------
-# build_quality_report
-# ---------------------------------------------------------------------------
-
-
-def test_build_quality_report_structure():
-    path = "metadata/quality-reports/refinedfinishedtrips/year=2026/month=04/day=27/hour=14/quality-report-refinedfinishedtrips_1400_aaaabbbb.json"
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=make_positions_result(),
-        quality_report_path=path,
-        status="PASS",
-    )
-    assert "summary" in result
-    assert "details" in result
-    summary = result["summary"]
-    assert summary["pipeline"] == "refinedfinishedtrips"
-    assert summary["execution_id"] == EXEC_ID
-    assert summary["status"] == "PASS"
-    assert summary["items_failed"] == 0
-    assert summary["quality_report_path"] == path
-    assert summary["positions_in_time_window_count"] == 100
-    assert summary["failure_phase"] is None
-    assert summary["failure_message"] is None
-
-
-def test_build_quality_report_details_structure():
-    path = "metadata/some-path.json"
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=make_positions_result(),
-        quality_report_path=path,
-        status="PASS",
-    )
-    details = result["details"]
-    assert details["execution_id"] == EXEC_ID
-    assert details["status"] == "PASS"
-    assert "positions" in details["phases"]
-    assert details["artifacts"]["quality_report_path"] == path
-
-
-def test_build_quality_report_items_failed_counts_only_fail_checks():
-    checks = [
-        {"check": "freshness", "status": "FAIL"},
-        {"check": "recent_gaps", "status": "WARN"},
-    ]
-    positions_result = make_positions_result(status="FAIL", checks=checks)
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=positions_result,
-        quality_report_path="metadata/p.json",
-        status="FAIL",
-    )
-    assert result["summary"]["items_failed"] == 1
-
-
-def test_build_quality_report_items_failed_zero_when_only_warn():
-    checks = [
-        {"check": "freshness", "status": "WARN"},
-        {"check": "recent_gaps", "status": "PASS"},
-    ]
-    positions_result = make_positions_result(status="WARN", checks=checks)
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=positions_result,
-        quality_report_path="metadata/p.json",
-        status="WARN",
-    )
-    assert result["summary"]["items_failed"] == 0
-
-
-def test_build_quality_report_failure_fields_propagated():
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=make_positions_result(status="FAIL"),
-        quality_report_path="metadata/p.json",
-        status="FAIL",
-        failure_phase="positions",
-        failure_message="freshness check failed",
-    )
-    assert result["summary"]["failure_phase"] == "positions"
-    assert result["summary"]["failure_message"] == "freshness check failed"
-    assert result["details"]["failure_phase"] == "positions"
-
-
-def test_build_quality_report_includes_partial_phase_results_when_provided():
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=make_positions_result(status="PASS"),
-        quality_report_path="metadata/p.json",
-        status="FAIL",
-        failure_phase="persistence",
-        failure_message="save failed",
-        trips_result={"status": "PASS", "checks": []},
-        persistence_result={
-            "status": "FAIL",
-            "added_rows": 0,
-            "previously_saved_rows": 0,
-        },
-    )
-    phases = result["details"]["phases"]
-    assert phases["positions"]["status"] == "PASS"
-    assert phases["trip_extraction"]["status"] == "PASS"
-    assert phases["persistence"]["status"] == "FAIL"
-
-
-def test_build_quality_report_includes_column_lineage_when_provided():
-    result = build_quality_report(
-        execution_id=EXEC_ID,
-        positions_result=make_positions_result(status="PASS"),
-        quality_report_path="metadata/p.json",
-        status="FAIL",
-        failure_phase="persistence",
-        failure_message="save failed",
-        column_lineage={"table_name": "finished_trips", "columns": {"trip_id": {}}},
-    )
-    artifacts = result["details"]["artifacts"]
-    assert artifacts["column_lineage"]["table_name"] == "finished_trips"
-
-
-# ---------------------------------------------------------------------------
 # create_failure_quality_report
 # ---------------------------------------------------------------------------
 
 
 def test_create_failure_quality_report_saves_to_minio():
     write = WriteCapture()
-    checks = [{"check": "freshness", "status": "FAIL", "note": "no positions"}]
+    checks = [{"check": "freshness", "status": "FAIL", "reason": "no positions"}]
     positions_result = make_positions_result(status="FAIL", checks=checks, count=0)
 
     create_failure_quality_report(
