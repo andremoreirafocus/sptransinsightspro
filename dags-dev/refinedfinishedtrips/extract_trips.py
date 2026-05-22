@@ -1,9 +1,7 @@
 from datetime import datetime, timezone
-from types import SimpleNamespace
 from typing import Any, Callable, Dict
 import uuid
 
-from pipeline_configurator.config import get_config
 from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
     GeneralConfig,
 )
@@ -16,7 +14,10 @@ from refinedfinishedtrips.orchestration_dependencies import (
     RefinedFinishedTripsOrchestrationDependencies,
     get_refinedfinishedtrips_orchestration_dependencies,
 )
-from refinedfinishedtrips.orchestration_event_handlers import handle_phase_metrics_event
+from refinedfinishedtrips.orchestration_event_handlers import (
+    PipelineTaskRunState,
+    handle_phase_metrics_event,
+)
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
 from observability.structured_event_logger import get_structured_logger
 from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
@@ -104,7 +105,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     structured_logger = RefinedFinishedTripsLogger(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )  # upgraded in Step 5
-    state = SimpleNamespace(execution_id=execution_id, correlation_id=execution_id)  # replaced in Step 5
+    state = PipelineTaskRunState(execution_id=execution_id, correlation_id=execution_id, run_ts=run_ts)
     tracker.begin("config_load")
     try:
         pipeline_config = deps.get_config(
@@ -118,8 +119,10 @@ def extract_trips_for_all_Lines_and_vehicles(
         tracker.finish("config_load", "success")
         logger.info("Configuration load succeeded")
     except Exception as e:
+        tracker.finish("config_load", "failed")
         error_msg = "Configuration load and validation failed"
         logger.error(error_msg)
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
         raise ValueError(error_msg) from e
     positions_result = None
     trips_result = None

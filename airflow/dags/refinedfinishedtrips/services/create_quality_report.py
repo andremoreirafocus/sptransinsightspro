@@ -12,31 +12,9 @@ logger = logging.getLogger(__name__)
 
 PIPELINE_NAME = "refinedfinishedtrips"
 
-
 def _count_failed_checks(result: Dict[str, Any]) -> int:
     return sum(1 for c in result.get("checks", []) if c.get("status") == "FAIL")
-
-
-def _derive_overall_status(*results: Dict[str, Any]) -> Literal["PASS", "WARN", "FAIL"]:
-    statuses = [r["status"] for r in results]
-    if "FAIL" in statuses:
-        return "FAIL"
-    if "WARN" in statuses:
-        return "WARN"
-    return "PASS"
-
-
-def _build_phase_details(
-    positions_result: Dict[str, Any],
-    trips_result: Optional[Dict[str, Any]] = None,
-    persistence_result: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
-    phase_details = {"positions": positions_result}
-    if trips_result is not None:
-        phase_details["trip_extraction"] = trips_result
-    if persistence_result is not None:
-        phase_details["persistence"] = persistence_result
-    return phase_details
+    
 
 
 def build_quality_report(
@@ -50,6 +28,18 @@ def build_quality_report(
     persistence_result: Optional[Dict[str, Any]] = None,
     column_lineage: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
+    def _build_phase_details(
+        positions_result: Dict[str, Any],
+        trips_result: Optional[Dict[str, Any]] = None,
+        persistence_result: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        phase_details = {"positions": positions_result}
+        if trips_result is not None:
+            phase_details["trip_extraction"] = trips_result
+        if persistence_result is not None:
+            phase_details["persistence"] = persistence_result
+        return phase_details
+    
     items_failed = _count_failed_checks(positions_result)
     summary = build_quality_summary(
         pipeline=PIPELINE_NAME,
@@ -182,7 +172,13 @@ def create_final_quality_report(
             storage["quality_report_folder"],
             {**config["connections"]["object_storage"], "secure": False},
         )
-
+    def _derive_overall_status(*results: Dict[str, Any]) -> Literal["PASS", "WARN", "FAIL"]:
+        statuses = [r["status"] for r in results]
+        if "FAIL" in statuses:
+            return "FAIL"
+        if "WARN" in statuses:
+            return "WARN"
+        return "PASS"
     metadata_bucket, quality_report_folder, connection_data = get_config(config)
     report_path = build_quality_report_path(
         metadata_bucket=metadata_bucket,

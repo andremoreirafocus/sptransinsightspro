@@ -125,33 +125,33 @@ def test_check_low_trip_count_result_structure():
 
 def test_validate_trips_quality_overall_warn_when_zero_trips():
     df = make_df(window_minutes=180)
-    result = validate_trips_quality(make_config(window_threshold=60), df, [])
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
     assert result["status"] == "WARN"
 
 
 def test_validate_trips_quality_overall_warn_when_low_count():
     df = make_df(window_minutes=180)
-    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, ["t1", "t2"])
+    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, ["t1", "t2"], {})
     assert result["status"] == "WARN"
 
 
 def test_validate_trips_quality_overall_pass_when_adequate():
     df = make_df(window_minutes=180)
     trips = [f"trip_{i}" for i in range(10)]
-    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, trips)
+    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, trips, {})
     assert result["status"] == "PASS"
 
 
 def test_validate_trips_quality_overall_pass_when_window_insufficient():
     df = make_df(window_minutes=30)
-    result = validate_trips_quality(make_config(window_threshold=60), df, [])
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
     assert result["status"] == "PASS"
 
 
 def test_validate_trips_quality_returns_effective_window_and_trip_count():
     df = make_df(window_minutes=180)
     trips = [f"trip_{i}" for i in range(10)]
-    result = validate_trips_quality(make_config(), df, trips)
+    result = validate_trips_quality(make_config(), df, trips, {})
     assert result["effective_window_minutes"] == 180.0
     assert result["trips_extracted"] == 10
 
@@ -174,7 +174,7 @@ def test_validate_trips_quality_includes_extraction_metrics_when_provided():
 
 def test_validate_trips_quality_result_contains_two_checks():
     df = make_df(window_minutes=180)
-    result = validate_trips_quality(make_config(), df, [])
+    result = validate_trips_quality(make_config(), df, [], {})
     assert len(result["checks"]) == 2
     check_names = {c["check"] for c in result["checks"]}
     assert check_names == {"zero_trips", "low_trip_count"}
@@ -188,21 +188,21 @@ def test_validate_trips_quality_result_contains_two_checks():
 def test_validate_trips_quality_handles_tz_naive_extracao_ts():
     df = make_df_tz_naive(window_minutes=180)
     trips = [f"trip_{i}" for i in range(10)]
-    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, trips)
+    result = validate_trips_quality(make_config(window_threshold=60, min_trips=5), df, trips, {})
     assert result["status"] == "PASS"
     assert result["effective_window_minutes"] == 180.0
 
 
 def test_validate_trips_quality_tz_naive_warns_on_zero_trips():
     df = make_df_tz_naive(window_minutes=180)
-    result = validate_trips_quality(make_config(window_threshold=60), df, [])
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
     assert result["status"] == "WARN"
 
 
 def test_validate_trips_quality_tz_naive_passes_when_window_insufficient():
     """Simulates cold-start: only 11 min of extraction data → no warning."""
     df = make_df_tz_naive(window_minutes=11)
-    result = validate_trips_quality(make_config(window_threshold=60), df, [])
+    result = validate_trips_quality(make_config(window_threshold=60), df, [], {})
     assert result["status"] == "PASS"
 
 
@@ -210,7 +210,7 @@ def test_validate_trips_quality_tz_aware_and_tz_naive_equivalent():
     df_aware = make_df(window_minutes=120)
     df_naive = make_df_tz_naive(window_minutes=120)
     trips = [f"trip_{i}" for i in range(10)]
-    result_aware = validate_trips_quality(make_config(), df_aware, trips)
-    result_naive = validate_trips_quality(make_config(), df_naive, trips)
+    result_aware = validate_trips_quality(make_config(), df_aware, trips, {})
+    result_naive = validate_trips_quality(make_config(), df_naive, trips, {})
     assert result_aware["effective_window_minutes"] == result_naive["effective_window_minutes"]
     assert result_aware["status"] == result_naive["status"]

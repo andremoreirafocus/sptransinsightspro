@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pandas as pd
 
@@ -74,11 +74,10 @@ def validate_trips_quality(
     config: Dict[str, Any],
     df: pd.DataFrame,
     trips_extracted: List,
-    extraction_metrics: Optional[Dict[str, int]] = None,
+    extraction_metrics: Dict[str, int],
 ) -> Dict[str, Any]:
     trips_count = len(trips_extracted)
     effective_window = _effective_window_minutes(df)
-    extraction_metrics = extraction_metrics or {}
     logger.info(
         f"Running trip extraction quality checks: {trips_count} trips, effective window {effective_window} min."
     )

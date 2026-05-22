@@ -1,8 +1,6 @@
 import json
 from datetime import datetime, timezone
 
-import pytest
-
 from observability.structured_event_logger import get_structured_logger
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
 from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger

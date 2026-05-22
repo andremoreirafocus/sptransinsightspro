@@ -86,7 +86,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 raise extract_trips_raises
             return extract_trips_output if extract_trips_output is not None else ([], {})
 
-        def validate_trips_quality(config, df, trips, extraction_metrics=None):
+        def validate_trips_quality(config, df, trips, extraction_metrics):
             metrics = extraction_metrics or {}
             return {
                 "status": "PASS",
