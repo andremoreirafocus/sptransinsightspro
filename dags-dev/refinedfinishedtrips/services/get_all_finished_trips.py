@@ -1,13 +1,13 @@
-import logging
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
+from observability.structured_event_logger import get_structured_logger
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
     extract_trips_per_line_per_vehicle,
 )
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _build_extraction_metrics(
@@ -59,8 +59,10 @@ def get_all_finished_trips(
             total_input_position_sanitization_drops += dropped_points
             num_processed += 1
             if num_processed % 500 == 0:
-                logger.info(
-                    f"Progress: {num_processed} vehicle/line combinations processed."
+                structured_logger.info(
+                    event="trip_extraction_progress",
+                    message="Trip extraction in progress",
+                    metadata={"vehicle_line_groups_processed": num_processed},
                 )
             start_idx = i
         current_vehicle_key = vehicle_key
@@ -81,20 +83,9 @@ def get_all_finished_trips(
         total_input_position_records=total_input_position_records,
         vehicle_line_groups_processed=num_processed,
     )
-    logger.info(f"Progress: {num_processed} vehicle/line combinations processed.")
-    logger.info(
-        "Total finished trips: %s, source sentido discrepancies: %s/%s",
-        total_trips,
-        total_source_sentido_discrepancies,
-        total_trips,
-    )
-    logger.info(
-        "Total invalid position records dropped by sanitization: %s out of %s",
-        total_input_position_sanitization_drops,
-        total_input_position_records,
-    )
-    logger.info(
-        "Trip extraction metrics: %s",
-        extraction_metrics,
+    structured_logger.info(
+        event="trip_extraction_completed",
+        message="Trip extraction completed",
+        metadata=extraction_metrics,
     )
     return all_finished_trips, extraction_metrics

@@ -1,12 +1,12 @@
-import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional
 from zoneinfo import ZoneInfo
-import logging
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _now_utc() -> datetime:
@@ -29,7 +29,7 @@ def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optiona
             "warn_threshold_minutes": warn_threshold,
             "fail_threshold_minutes": fail_threshold,
         }
-        logger.warning(json.dumps({"event": "freshness_evaluation", "message": "Freshness evaluation", "metadata": result}))
+        structured_logger.warning(event="freshness_evaluation", message="Freshness evaluation", metadata=result)
         return result
 
     now_utc = (now_fn or _now_utc)()
@@ -45,7 +45,7 @@ def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optiona
         "warn_threshold_minutes": warn_threshold,
         "fail_threshold_minutes": fail_threshold,
     }
-    logger.info(json.dumps({"event": "freshness_evaluation", "message": "Freshness evaluation", "metadata": result}))
+    structured_logger.info(event="freshness_evaluation", message="Freshness evaluation", metadata=result)
     return result
 
 
@@ -68,7 +68,7 @@ def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optio
             "fail_threshold_minutes": fail_threshold,
             "recent_window_minutes": recent_window,
         }
-        logger.warning(json.dumps({"event": "recent_gaps_evaluation", "message": "Recent gaps evaluation", "metadata": result}))
+        structured_logger.warning(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
         return result
 
     now_utc = (now_fn or _now_utc)()
@@ -96,7 +96,7 @@ def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optio
             "fail_threshold_minutes": fail_threshold,
             "recent_window_minutes": recent_window,
         }
-        logger.warning(json.dumps({"event": "recent_gaps_evaluation", "message": "Recent gaps evaluation", "metadata": result}))
+        structured_logger.warning(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
         return result
 
     diffs = recent_ts.diff().dropna().dt.total_seconds() / 60
@@ -109,7 +109,7 @@ def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optio
         "fail_threshold_minutes": fail_threshold,
         "recent_window_minutes": recent_window,
     }
-    logger.info(json.dumps({"event": "recent_gaps_evaluation", "message": "Recent gaps evaluation", "metadata": result}))
+    structured_logger.info(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
     return result
 
 
@@ -158,5 +158,5 @@ def validate_positions_quality(config: Dict[str, Any], df: pd.DataFrame, now_fn:
         "positions_in_time_window_count": len(df),
         "checks": checks,
     }
-    logger.info(json.dumps({"event": "positions_quality_validated", "message": "Positions quality validation", "metadata": result}))
+    structured_logger.info(event="positions_quality_validated", message="Positions quality validation", metadata=result)
     return result

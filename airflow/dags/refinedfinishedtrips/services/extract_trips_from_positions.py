@@ -25,7 +25,7 @@ def extract_raw_trips_metadata(
         trips_metadata = extract_circular_trips_metadata(
             position_records, stop_proximity_threshold_meters
         )
-        if trips_metadata:
+        if trips_metadata and logger.isEnabledFor(logging.DEBUG):
             logger.debug(
                 "Using circular trip extraction for line %s vehicle %s; detected %s trip(s)",
                 position_records[0]["linha_lt"],
@@ -36,7 +36,7 @@ def extract_raw_trips_metadata(
     trips_metadata = extract_non_circular_trips_metadata(
         position_records, stop_proximity_threshold_meters
     )
-    if trips_metadata:
+    if trips_metadata and logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             "Using non-circular trip extraction for line %s vehicle %s; detected %s trip(s)",
             position_records[0]["linha_lt"],
@@ -257,7 +257,7 @@ def _emit_trip(
     source_sentido_discrepancy = (
         representative_sentido is not None and derived_sentido != representative_sentido
     )
-    if source_sentido_discrepancy:
+    if source_sentido_discrepancy and logger.isEnabledFor(logging.DEBUG):
         logger.debug(
             f"Source sentido discrepancy for vehicle {position_records[0]['veiculo_id']} "
             f"on line {position_records[0]['linha_lt']}: "

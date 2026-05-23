@@ -1,10 +1,10 @@
-import json
-import logging
 from typing import Any, Dict, List
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _effective_window_minutes(df: pd.DataFrame) -> float:
@@ -23,7 +23,7 @@ def evaluate_zero_trips(config: Dict[str, Any], effective_window_minutes: float,
         "window_threshold_minutes": window_threshold,
         "trips_count": trips_count,
     }
-    logger.info(json.dumps({"event": "zero_trips_evaluation", "message": "Zero trips evaluation", "metadata": result}))
+    structured_logger.info(event="zero_trips_evaluation", message="Zero trips evaluation", metadata=result)
     return result
 
 
@@ -42,7 +42,7 @@ def evaluate_low_trip_count(config: Dict[str, Any], effective_window_minutes: fl
         "min_trips_threshold": min_trips_threshold,
         "trips_count": trips_count,
     }
-    logger.info(json.dumps({"event": "low_trip_count_evaluation", "message": "Low trip count evaluation", "metadata": result}))
+    structured_logger.info(event="low_trip_count_evaluation", message="Low trip count evaluation", metadata=result)
     return result
 
 
@@ -91,5 +91,5 @@ def validate_trips_quality(
         "vehicle_line_groups_processed": extraction_metrics.get("vehicle_line_groups_processed", 0),
         "checks": checks,
     }
-    logger.info(json.dumps({"event": "trips_quality_validated", "message": "Trips quality validation", "metadata": result}))
+    structured_logger.info(event="trips_quality_validated", message="Trips quality validation", metadata=result)
     return result

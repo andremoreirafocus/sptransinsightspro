@@ -1,7 +1,13 @@
 import json
 from datetime import datetime, timezone
 
-from observability.structured_event_logger import get_structured_logger
+import pytest
+
+from observability.structured_event_logger import (
+    clear_execution_context,
+    get_structured_logger,
+    set_execution_context,
+)
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
 from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
 from refinedfinishedtrips.orchestration_dependencies import (
@@ -14,6 +20,13 @@ from refinedfinishedtrips.orchestration_event_handlers import (
 )
 
 _RUN_TS = datetime(2026, 5, 17, 10, 0, 0, tzinfo=timezone.utc)
+
+
+@pytest.fixture(autouse=True)
+def _clear_execution_context():
+    clear_execution_context()
+    yield
+    clear_execution_context()
 
 PHASE_ORDER = ["config_load", "positions_load", "positions_quality", "trip_extraction", "persistence", "quality_report"]
 
@@ -110,6 +123,7 @@ def test_handle_phase_metrics_event_success_emits_info_with_succeeded_status(cap
     state = _make_state()
     tracker = _make_tracker()
     logger = _make_logger("test_pm_success")
+    set_execution_context(state.execution_id, state.correlation_id)
 
     handle_phase_metrics_event(state, tracker, logger, "success")
 
@@ -144,6 +158,7 @@ def test_handle_phase_metrics_event_includes_correlation_id(caplog):
     state = _make_state(correlation_id="corr-abc")
     tracker = _make_tracker()
     logger = _make_logger("test_pm_corr")
+    set_execution_context(state.execution_id, state.correlation_id)
 
     handle_phase_metrics_event(state, tracker, logger, "success")
 
@@ -196,6 +211,7 @@ def test_handle_failure_event_calls_create_failure_quality_report_with_state(cap
 
     def capture(**kwargs):
         received.update(kwargs)
+        return {"summary": {"status": "FAIL"}}
 
     deps = _make_failure_deps(create_failure_quality_report=capture)
     logger = _make_logger("test_fe_call")
@@ -212,9 +228,30 @@ def test_handle_failure_event_calls_create_failure_quality_report_with_state(cap
     assert received["run_ts"] == _RUN_TS
 
 
+def test_handle_failure_event_emits_quality_report_metrics_on_success(caplog):
+    caplog.set_level("INFO")
+    state = _make_state(pipeline_config={"general": {}})
+    set_execution_context(state.execution_id, state.correlation_id)
+
+    def succeed(**kwargs):
+        return {"summary": {"status": "FAIL"}}
+
+    deps = _make_failure_deps(create_failure_quality_report=succeed)
+    logger = _make_logger("test_fe_quality_metrics")
+
+    handle_failure_event(state, deps, logger, "trip_extraction", "exploded")
+
+    events = _parse_log_events(caplog, "quality_report_metrics")
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "FAILED"
+    assert event["execution_id"] == "test-exec-id"
+
+
 def test_handle_failure_event_emits_failure_report_error_when_deps_raises(caplog):
     caplog.set_level("ERROR")
     state = _make_state(pipeline_config={"general": {}})
+    set_execution_context(state.execution_id, state.correlation_id)
 
     def failing_report(**kwargs):
         raise RuntimeError("storage unavailable")

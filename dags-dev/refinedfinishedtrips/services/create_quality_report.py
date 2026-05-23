@@ -1,15 +1,14 @@
-import json
-import logging
 from typing import Any, Callable, Dict, Literal, Optional
 
 from infra.object_storage import write_generic_bytes_to_object_storage
+from observability.structured_event_logger import get_structured_logger
 from quality.reporting import (
     build_quality_report_path,
     build_quality_summary,
     save_quality_report,
 )
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 PIPELINE_NAME = "refinedfinishedtrips"
 
@@ -88,7 +87,11 @@ def create_failure_quality_report(
         connection_data=connection_data,
         write_fn=write_fn,
     )
-    logger.info(json.dumps({"event": "failure_quality_report_saved", "message": "Failure quality report saved", "metadata": {"path": report_path, "failure_phase": failure_phase}}))
+    structured_logger.info(
+        event="failure_quality_report_saved",
+        message="Failure quality report saved",
+        metadata={"path": report_path, "failure_phase": failure_phase},
+    )
     return report
 
 
@@ -155,5 +158,9 @@ def create_final_quality_report(
         connection_data=connection_data,
         write_fn=write_fn,
     )
-    logger.info(json.dumps({"event": "final_quality_report_saved", "message": "Final quality report saved", "metadata": {"path": report_path, "status": overall_status}}))
+    structured_logger.info(
+        event="final_quality_report_saved",
+        message="Final quality report saved",
+        metadata={"path": report_path, "status": overall_status},
+    )
     return report

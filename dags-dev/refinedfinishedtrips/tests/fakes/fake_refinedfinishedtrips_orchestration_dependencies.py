@@ -13,7 +13,6 @@ _BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
 @dataclass
 class OrchestrationCallRecorder:
     save_calls: list = field(default_factory=list)
-    early_report_calls: list = field(default_factory=list)
     failure_report_calls: list = field(default_factory=list)
     final_report_calls: list = field(default_factory=list)
 

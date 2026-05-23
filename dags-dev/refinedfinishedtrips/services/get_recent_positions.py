@@ -1,13 +1,13 @@
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
-import logging
 
 import pandas as pd
 
 from infra.duck_db_v3 import get_duckdb_connection
+from observability.structured_event_logger import get_structured_logger
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
@@ -39,26 +39,22 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
         positions_table_name,
         connection,
     ) = get_config(config)
-    logger.info(
-        f"Bulk loading last {hours_interval} hours of positions for all vehicles..."
-    )
     now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")
     current_hour = int(now.strftime("%H"))
-    logger.info(f"Current hour: {current_hour}")
     min_hour = current_hour - hours_interval
-    logger.info(f"Minimum hour: {min_hour}")
     if min_hour < 0:
         min_hour = 0
     s3_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}/year={year}/month={month}/day={day}/**"
+    structured_logger.info(
+        event="positions_query_started",
+        message="Starting positions query",
+        metadata={"hours_interval": hours_interval, "current_hour": current_hour, "min_hour": min_hour, "s3_path": s3_path},
+    )
     try:
-        logger.info("Connecting to DuckDB...")
         con = duckdb_client or get_duckdb_connection(connection)
-        logger.info(
-            f"Retrieveing position records for the last {hours_interval} hours in {s3_path}..."
-        )
         # Optimized: Select only needed columns for trip detection
         # Sorted by linha_lt, veiculo_id first for index-based grouping, then veiculo_ts for chronological order
         sql = f"""
@@ -70,19 +66,18 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
             ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;
         """
-        logger.info("Executing SQL query...")
-        logger.info(f"SQL query: {sql}")
         df_recent_positions = con.execute(sql).df()
         total_records = df_recent_positions.shape[0]
-        logger.info(f"Retrieved {total_records} position records.")
-        if con:
-            con.close()
-            logger.info("DuckDB connection closed.")
+        structured_logger.info(
+            event="positions_query_completed",
+            message="Positions query completed",
+            metadata={"record_count": total_records},
+        )
     except Exception as e:
         error_message = (
             "Data retrieval failed for recent positions query in object storage/duckdb"
         )
-        logger.error(error_message)
+        structured_logger.error(event="positions_query_failed", message=error_message)
         raise ValueError(error_message) from e
     finally:
         if "con" in locals():

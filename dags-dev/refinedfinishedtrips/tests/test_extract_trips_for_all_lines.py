@@ -1,9 +1,23 @@
+import json
+
 import pytest
 
 from refinedfinishedtrips.extract_trips import (
     extract_trips_for_all_Lines_and_vehicles,
 )
 from refinedfinishedtrips.tests.fakes import FakeRefinedFinishedTripsOrchestrationDependencies
+
+
+def _parse_events(caplog, event_name: str) -> list[dict]:
+    results = []
+    for record in caplog.records:
+        try:
+            parsed = json.loads(record.getMessage())
+        except Exception:
+            continue
+        if parsed.get("event") == event_name:
+            results.append(parsed)
+    return results
 
 
 def make_config():
@@ -102,14 +116,6 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
 # ---------------------------------------------------------------------------
 
 
-def test_positions_warn_no_early_report_called():
-    deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
-        positions_status="WARN"
-    )
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
-    assert recorder.early_report_calls == []
-
-
 def test_positions_warn_pipeline_continues_and_save_called():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         positions_status="WARN"
@@ -182,3 +188,59 @@ def test_two_vehicles_save_called_once_with_combined_result():
     )
     extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
     assert len(recorder.save_calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# execution_aborted (Step 2)
+# ---------------------------------------------------------------------------
+
+
+def test_execution_aborted_event_emitted_on_pipeline_failure(caplog):
+    deps, _ = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
+        positions_status="FAIL"
+    )
+    caplog.set_level("ERROR")
+
+    with pytest.raises(ValueError):
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+
+    events = _parse_events(caplog, "execution_aborted")
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "FAILED"
+    assert "phase" in event["metadata"]
+    assert event["metadata"]["phase"] == "positions_quality"
+    assert "execution_id" in event
+    assert "correlation_id" in event
+
+
+# ---------------------------------------------------------------------------
+# quality_report_metrics (Step 3)
+# ---------------------------------------------------------------------------
+
+
+def test_quality_report_metrics_emitted_on_success(caplog):
+    deps, _ = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
+    caplog.set_level("INFO")
+
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+
+    events = _parse_events(caplog, "quality_report_metrics")
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "SUCCEEDED"
+
+
+def test_quality_report_metrics_emitted_on_failure(caplog):
+    deps, _ = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
+        positions_status="FAIL"
+    )
+    caplog.set_level("INFO")
+
+    with pytest.raises(ValueError):
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+
+    events = _parse_events(caplog, "quality_report_metrics")
+    assert len(events) == 1
+    event = events[0]
+    assert event["status"] == "FAILED"
