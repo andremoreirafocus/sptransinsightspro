@@ -79,12 +79,12 @@ A observabilidade deste pipeline é baseada em logging estruturado: todos os eve
 
 #### Taxonomia de eventos
 
-Cada fase do pipeline emite eventos de ciclo de vida (`_started`, `_succeeded`, `_failed`). Dois eventos consolidados são emitidos ao final de cada execução:
+Cada fase do pipeline emite eventos de ciclo de vida (`_started`, `_succeeded`, `_failed`). Quatro eventos consolidados são emitidos ao final de cada execução:
 
 | Evento | Quando | Conteúdo relevante |
 |---|---|---|
 | `execution_finished` | Execução concluída com sucesso | `execution_id`, `correlation_id`, `status` |
-| `execution_failed` | Qualquer fase falha e interrompe o pipeline | `execution_id`, `correlation_id`, `status`, `message` |
+| `execution_aborted` | Qualquer fase falha e interrompe o pipeline | `execution_id`, `correlation_id`, `status`, `message`, `metadata.phase` |
 | `execution_phase_metrics` | Ao final de toda execução (sucesso ou falha) | Duração e status de cada fase em `metadata.phase_metrics` |
 | `quality_report_metrics` | Após geração do relatório de qualidade | Contagens, métricas de transformação, issues e resumo GX em `metadata` |
 
@@ -102,9 +102,9 @@ O dashboard está organizado em três linhas:
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Executions | Timeseries (pontos) | Execuções concluídas (verde) e com falha (vermelho) ao longo do tempo | `execution_finished` e `execution_failed` — `count_over_time [2m]` |
+| Executions | Timeseries (pontos) | Execuções concluídas (verde) e com falha (vermelho) ao longo do tempo | `execution_finished` e `execution_aborted` — `count_over_time [2m]` |
 | Completed (last 1h) | Stat | Total de execuções bem-sucedidas na última hora | `execution_finished` — `count_over_time [1h]` |
-| Errors (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções com falha na última hora | `execution_failed` — `count_over_time [1h]` |
+| Errors (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções com falha na última hora | `execution_aborted` — `count_over_time [1h]` |
 | Execution duration (s) | Timeseries | Duração média por fase: `total`, `load_positions`, `raw_schema_validation`, `transform`, `expectations_validation`, `save_trusted` | `execution_phase_metrics` — `metadata.phase_metrics.<fase>.duration_seconds` via `avg_over_time [5m]` |
 
 **Linha 2 — Qualidade dos dados**
@@ -121,7 +121,7 @@ O campo `gx_records_failures` captura exclusivamente as linhas rejeitadas pelo G
 
 | Painel | O que mostra |
 |---|---|
-| Recent failures | Stream filtrado dos eventos `execution_failed` com detalhes da falha |
+| Recent failures | Stream filtrado dos eventos `execution_aborted` com detalhes da falha |
 | Log stream | Todos os eventos do pipeline em ordem decrescente |
 
 #### Regras de alerta
@@ -130,7 +130,7 @@ As regras estão em `observability/loki/rules/fake/transformlivedata-alerts.yaml
 
 | Alerta | Severidade | Condição | Janela |
 |---|---|---|---|
-| `PipelinePhaseFailed` | critical | Qualquer evento `execution_failed` detectado | 5m |
+| `PipelinePhaseFailed` | critical | Qualquer evento `execution_aborted` detectado | 5m |
 | `AcceptanceRateBelowThreshold` | warning | Taxa de aceitação (`accepted / raw`) abaixo de 0,98 | 10m |
 | `NoPipelineExecutionCompleted` | critical | Nenhum `execution_finished` detectado (`absent_over_time`) | 30m |
 
@@ -211,7 +211,7 @@ Os testes deste subprojeto cobrem a lógica de transformação, o serviço de re
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
-- python3 -m venv .env
+- python3 -m venv .venv
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
@@ -242,12 +242,7 @@ Crie `dags-dev/transformlivedata/.env` com base em `.env.example` preenchendo to
 Com a tabela já criada conforme instruções acima, execute:
 
 ```shell
-python ./transformlivedata-v<version number>.py
-```
-
-Exemplo: 
-```shell
-python ./transformlivedata-v2.py
+python transformlivedata/transformlivedata.py
 ```
 
 Para reprocessamento pontual do pipeline, utilize o script [transformlivedata-backfill-v9.py](../transformlivedata-backfill-v9.py). 

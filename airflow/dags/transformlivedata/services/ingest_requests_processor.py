@@ -113,22 +113,9 @@ def mark_request_as_processed(
         SET processed = true, updated_at = NOW()
         WHERE logical_date = :logical_date
     """
-    structured_logger.info(
-        event="mark_request_as_processed_started",
-        message="Marking request as processed by logical_date",
-        status="STARTED",
-        metadata={"logical_date": logical_date, "schema": schema, "table": table},
-    )
     try:
         success = update_fn(connection, query, {"logical_date": logical_date})
-        if success:
-            structured_logger.info(
-                event="mark_request_as_processed_succeeded",
-                message="Request marked as processed by logical_date",
-                status="SUCCEEDED",
-                metadata={"logical_date": logical_date, "schema": schema, "table": table},
-            )
-        else:
+        if not success:
             raise ValueError(
                 f"Failed to mark request as processed for logical_date={logical_date}"
             )

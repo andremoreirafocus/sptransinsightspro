@@ -92,7 +92,7 @@ Each pipeline phase emits lifecycle events (`_started`, `_succeeded`, `_failed`)
 | Event | When | Relevant content |
 |---|---|---|
 | `execution_finished` | Execution completed successfully | `execution_id`, `correlation_id`, `status` |
-| `execution_failed` | Any phase fails and interrupts the pipeline | `execution_id`, `correlation_id`, `status`, `message` |
+| `execution_aborted` | Any phase fails and interrupts the pipeline | `execution_id`, `correlation_id`, `status`, `message` |
 | `execution_phase_metrics` | At the end of every execution (success or failure) | Duration and status of each phase in `metadata.phase_metrics` |
 | `quality_report_metrics` | After the quality report is generated | Record counts, transformation metrics, issues, and GX summary in `metadata` |
 
@@ -110,9 +110,9 @@ The dashboard is organized into three rows:
 
 | Panel | Type | What it shows | Loki event / field |
 |---|---|---|---|
-| Executions | Timeseries (dots) | Completed executions (green) and failed executions (red) over time | `execution_finished` and `execution_failed` — `count_over_time [2m]` |
+| Executions | Timeseries (dots) | Completed executions (green) and failed executions (red) over time | `execution_finished` and `execution_aborted` — `count_over_time [2m]` |
 | Completed (last 1h) | Stat | Total successful executions in the last hour | `execution_finished` — `count_over_time [1h]` |
-| Errors (last 1h) | Stat (red when ≥ 1) | Total failed executions in the last hour | `execution_failed` — `count_over_time [1h]` |
+| Errors (last 1h) | Stat (red when ≥ 1) | Total failed executions in the last hour | `execution_aborted` — `count_over_time [1h]` |
 | Execution duration (s) | Timeseries | Average duration per phase: `total`, `load_positions`, `raw_schema_validation`, `transform`, `expectations_validation`, `save_trusted` | `execution_phase_metrics` — `metadata.phase_metrics.<phase>.duration_seconds` via `avg_over_time [5m]` |
 
 **Row 2 — Data quality**
@@ -129,7 +129,7 @@ The `gx_records_failures` field captures exclusively the rows rejected by Great 
 
 | Panel | What it shows |
 |---|---|
-| Recent failures | Filtered stream of `execution_failed` events with failure details |
+| Recent failures | Filtered stream of `execution_aborted` events with failure details |
 | Log stream | All pipeline events in descending order |
 
 #### Alert rules
@@ -138,7 +138,7 @@ Rules are defined in `observability/loki/rules/fake/transformlivedata-alerts.yam
 
 | Alert | Severity | Condition | Window |
 |---|---|---|---|
-| `PipelinePhaseFailed` | critical | Any `execution_failed` event detected | 5m |
+| `PipelinePhaseFailed` | critical | Any `execution_aborted` event detected | 5m |
 | `AcceptanceRateBelowThreshold` | warning | Acceptance rate (`accepted / raw`) below 0.98 | 10m |
 | `NoPipelineExecutionCompleted` | critical | No `execution_finished` detected (`absent_over_time`) | 30m |
 

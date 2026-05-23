@@ -59,16 +59,10 @@ def save_positions_to_storage(
             event="save_positions_skipped_empty",
             message="No positions to save. DataFrame is empty.",
             status="SKIPPED",
-            metadata={"target_bucket": target_bucket},
+            metadata={"bucket": bucket_name},
         )
         return
     try:
-        structured_logger.info(
-            event="save_positions_started",
-            message="Starting positions save",
-            status="STARTED",
-            metadata={"target_bucket": target_bucket, "rows": int(len(positions_df))},
-        )
         positions_df["extracao_ts"] = pd.to_datetime(positions_df["extracao_ts"], utc=True).dt.tz_convert(ZoneInfo("America/Sao_Paulo"))
         batch_ts = positions_df["extracao_ts"].iloc[0] 
         file_name = batch_ts.strftime("positions_%H%M.parquet")
@@ -76,18 +70,18 @@ def save_positions_to_storage(
         positions_df["month"] = positions_df["extracao_ts"].dt.strftime("%m")
         positions_df["day"] = positions_df["extracao_ts"].dt.strftime("%d")
         positions_df["hour"] = positions_df["extracao_ts"].dt.strftime("%H")
-        con = get_duckdb_connection_fn(connection_data)
         output_base_path = f"s3://{bucket_name}/{app_folder}/{positions_table_name}"
         structured_logger.info(
             event="save_positions_export_started",
             message="Exporting positions to storage",
             status="STARTED",
             metadata={
-                "target_bucket": target_bucket,
+                "bucket": bucket_name,
                 "rows": int(len(positions_df)),
                 "output_base_path": output_base_path,
             },
         )
+        con = get_duckdb_connection_fn(connection_data)
         con.execute(f"""
             COPY (SELECT * FROM positions_df) 
             TO '{output_base_path}' 
@@ -98,22 +92,16 @@ def save_positions_to_storage(
                 OVERWRITE_OR_IGNORE 1
             );
         """)
-        structured_logger.info(
-            event="save_positions_succeeded",
-            message="Positions saved successfully",
-            status="SUCCEEDED",
-            metadata={"target_bucket": target_bucket, "file_name": file_name},
-        )
     except Exception as e:
         structured_logger.error(
             event="save_positions_failed",
-            message=f"Failed to save positions to {target_bucket} layer.",
+            message="Failed to save positions to storage",
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
-            metadata={"target_bucket": target_bucket},
+            metadata={"bucket": bucket_name},
         )
-        raise ValueError(f"Failed to save positions to {target_bucket} layer: {e}") from e
+        raise ValueError(f"Failed to save positions to {bucket_name} layer: {e}") from e
     finally:
         if "con" in locals():
             con.close()

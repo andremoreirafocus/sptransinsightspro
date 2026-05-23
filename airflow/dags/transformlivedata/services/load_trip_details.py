@@ -51,7 +51,7 @@ def load_trip_details(
             error_message=str(e),
             metadata={"s3_path": s3_path},
         )
-        raise ValueError(f"Error fetching trip_details from storage: {e}") from e
+        raise ValueError(f"Error fetching trip_details from storage '{s3_path}': {e}") from e
     finally:
         if "con" in locals():
             con.close()

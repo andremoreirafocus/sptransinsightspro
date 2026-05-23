@@ -5,7 +5,7 @@ from typing import Literal, TypeAlias, Union
 _OrchestratorEvent: TypeAlias = Literal[
     "config_load_started",
     "config_load_succeeded",
-    "execution_failed",
+    "execution_aborted",
     "execution_finished",
     "execution_phase_metrics",
     "execution_started",

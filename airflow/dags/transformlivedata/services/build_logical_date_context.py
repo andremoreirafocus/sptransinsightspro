@@ -31,4 +31,4 @@ def build_logical_date_context(logical_date_string: str) -> Dict[str, str]:
             error_message=str(e),
             metadata={"logical_date_string": logical_date_string},
         )
-        raise ValueError("Failed to build logical date context") from e
+        raise ValueError(f"Failed to build logical date context '{logical_date_string}': {e}") from e

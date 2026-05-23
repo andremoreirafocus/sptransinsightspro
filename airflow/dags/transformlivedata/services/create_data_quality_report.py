@@ -243,7 +243,7 @@ def build_data_quality_report(
             error_type=type(e).__name__,
             error_message=str(e),
         )
-        raise ValueError(f"Error parsing expectations_result: {e}")
+        raise ValueError(f"Error parsing expectations_result: {e}") from e
     computed_metrics = _compute_quality_metrics(
         transform_result=transform_result,
         expectations_result=expectations_result,

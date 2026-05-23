@@ -35,7 +35,7 @@ def _extract_quality_report_metrics_events(caplog):
     return payloads
 
 
-def _extract_execution_failed_events(caplog):
+def _extract_execution_aborted_events(caplog):
     payloads = []
     for record in caplog.records:
         message = record.getMessage()
@@ -43,7 +43,7 @@ def _extract_execution_failed_events(caplog):
             parsed = json.loads(message)
         except Exception:
             continue
-        if parsed.get("event") == "execution_failed":
+        if parsed.get("event") == "execution_aborted":
             payloads.append(parsed)
     return payloads
 
@@ -233,7 +233,7 @@ def test_orchestration_emits_quality_report_metrics_on_success(caplog):
     assert "execution_phase_metrics" not in event.get("metadata", {})
 
 
-def test_execution_failed_event_is_emitted_on_pipeline_failure(caplog):
+def test_execution_aborted_event_is_emitted_on_pipeline_failure(caplog):
     deps, _ = FakeTransformLiveDataOrchestrationDependencies.create_scenario(
         load_raises=RuntimeError("storage unavailable")
     )
@@ -242,12 +242,12 @@ def test_execution_failed_event_is_emitted_on_pipeline_failure(caplog):
     with pytest.raises(RuntimeError):
         load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
 
-    events = _extract_execution_failed_events(caplog)
+    events = _extract_execution_aborted_events(caplog)
     assert len(events) == 1
     event = events[0]
-    assert event["event"] == "execution_failed"
+    assert event["event"] == "execution_aborted"
     assert event["status"] == "FAILED"
-    assert event["message"] == "Load positions failed."
+    assert event["message"] == "Pipeline aborted: Load positions failed."
     assert "execution_id" in event
     assert "correlation_id" in event
 

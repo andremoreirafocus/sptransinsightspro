@@ -95,7 +95,7 @@ def save_positions_to_storage(
     except Exception as e:
         structured_logger.error(
             event="save_positions_failed",
-            message=f"Failed to save positions to storage",
+            message="Failed to save positions to storage",
             status="FAILED",
             error_type=type(e).__name__,
             error_message=str(e),
