@@ -109,10 +109,20 @@ Dashboards are provisioned automatically from `grafana/provisioning/dashboards/`
 | Dashboard | File | Description |
 |---|---|---|
 | extractloadlivedata | `extractloadlivedata.json` | Executions, errors, warnings, execution time per phase, log stream |
+| transformlivedata | `transformlivedata.json` | Executions, duration per phase, acceptance rate, raw record volume, rejected records by reason, log stream |
+| refinedfinishedtrips | `refinedfinishedtrips.json` | Executions, duration per phase, trips added, trips detected, positions loaded, extraction quality, position data freshness, log stream |
 
 The screenshot below shows the extractloadlivedata dashboard in operation delivering the amount of errors and warnings for each execution and the execution times for each phase of the extraction workflow implemented by the service.
 
 ![extractloadlivedata dashboard](grafana_dashboard_for_extractloadlivedata.png)
+
+The screenshot below shows the transformlivedata dashboard in operation. It displays successful and failed executions over time, average duration per phase, acceptance rate of transformed records, raw record volume, and rejected records by reason.
+
+![transformlivedata dashboard](transformlivedata_dashboard.png)
+
+The screenshot below shows the refinedfinishedtrips dashboard in operation. It displays completed and aborted executions, duration per phase, trips added and detected per execution, extraction quality metrics (groups processed, sentido discrepancies, sanitized points), and position data freshness with warn and fail thresholds.
+
+![refinedfinishedtrips dashboard](refinedfinishedtrips_dashboard.png)
 
 After editing a dashboard JSON, bump its `version` field and reload without restarting Grafana:
 
@@ -135,8 +145,10 @@ observability/
       datasources/
         loki.yml             # Auto-provisioned Loki datasource
       dashboards/
-        dashboards.yml       # Dashboard provider config
-        extractloadlivedata.json  # extractloadlivedata dashboard
+        dashboards.yml               # Dashboard provider config
+        extractloadlivedata.json     # extractloadlivedata dashboard
+        transformlivedata.json       # transformlivedata dashboard
+        refinedfinishedtrips.json    # refinedfinishedtrips dashboard
 ```
 
 ## Local URLs
