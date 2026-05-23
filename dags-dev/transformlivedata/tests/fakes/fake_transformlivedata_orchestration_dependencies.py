@@ -48,6 +48,7 @@ class FakeTransformLiveDataOrchestrationDependencies:
         *,
         load_raises: Exception | None = None,
         schema_valid: bool = True,
+        schema_raises: Exception | None = None,
         transform_positions_df: pd.DataFrame | None = None,
         transform_invalid_df: pd.DataFrame | None = None,
         expectations_raises: Exception | None = None,
@@ -91,6 +92,8 @@ class FakeTransformLiveDataOrchestrationDependencies:
 
         def validate_json_data_schema(raw, schema):
             recorder.calls.append("validate_json_data_schema")
+            if schema_raises is not None:
+                raise schema_raises
             if schema_valid:
                 return True, []
             return False, ["schema error"]

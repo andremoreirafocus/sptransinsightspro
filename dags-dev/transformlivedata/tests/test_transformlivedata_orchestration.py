@@ -131,6 +131,26 @@ def test_raw_schema_validation_failure_raises_and_emits_metrics(caplog):
     assert recorder.failure_quality_report_calls == 1
 
 
+def test_raw_schema_validation_exception_propagates(caplog):
+    deps, recorder = FakeTransformLiveDataOrchestrationDependencies.create_scenario(
+        schema_raises=RuntimeError("schema load error")
+    )
+    caplog.set_level("ERROR")
+
+    with pytest.raises(RuntimeError, match="schema load error"):
+        load_transform_save_positions("transformlivedata", "2026-05-17T10:00:00+00:00", deps)
+
+    payload = _extract_execution_phase_metrics_log(caplog)
+    assert payload["metadata"]["overall_status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["raw_schema_validation"]["status"] == "failed"
+    assert payload["metadata"]["phase_metrics"]["transform"]["status"] == "skipped"
+
+    aborted = _extract_execution_aborted_events(caplog)
+    assert len(aborted) == 1
+    assert aborted[0]["metadata"]["phase"] == "raw_schema_validation"
+    assert recorder.failure_quality_report_calls == 1
+
+
 def test_transform_empty_positions_fails_fast(caplog):
     deps, _ = FakeTransformLiveDataOrchestrationDependencies.create_scenario(
         transform_positions_df=pd.DataFrame()

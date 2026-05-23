@@ -141,9 +141,17 @@ def load_transform_save_positions(
         status="STARTED",
     )
     tracker.begin("raw_schema_validation")
-    is_valid, validation_errors = deps.validate_json_data_schema(
-        raw_positions, state.pipeline_config["raw_data_json_schema"]
-    )
+    try:
+        is_valid, validation_errors = deps.validate_json_data_schema(
+            raw_positions, state.pipeline_config["raw_data_json_schema"]
+        )
+    except Exception:
+        tracker.finish("raw_schema_validation", "failed")
+        error_msg = "Raw schema validation failed."
+        handle_failure_event(state, deps, structured_logger, "raw_schema_validation", error_msg)
+        handle_phase_metrics_event(state, tracker, structured_logger, "failed")
+        create_execution_aborted_log_record(error_msg, phase="raw_schema_validation")
+        raise
     if not is_valid:
         tracker.finish("raw_schema_validation", "failed")
         error_msg = f"Raw data validation failed: {validation_errors}"
