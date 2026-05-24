@@ -3,17 +3,18 @@ import os
 
 from gtfs.gtfs import (
     build_run_context,
-    build_quality_report_and_send_webhook,
+    build_quality_report,
     create_trip_details,
     extract_load_files,
     transform,
 )
+from gtfs.orchestration_dependencies import get_gtfs_orchestration_dependencies
 
 PIPELINE_NAME = "gtfs"
 _IN_AIRFLOW = bool(os.getenv("AIRFLOW_HOME"))
 
 if _IN_AIRFLOW:
-    VERSION = 6
+    VERSION = 7
     DAG_NAME = f"{PIPELINE_NAME}-v{VERSION}"
 else:
     from logging.handlers import RotatingFileHandler
@@ -30,34 +31,36 @@ else:
         ],
     )
 
-logger = logging.getLogger(__name__)
-
 
 def extract_load_files_wrapper():
+    deps = get_gtfs_orchestration_dependencies()
     run_context = build_run_context()
     stage_results = {}
-    stage_results = extract_load_files(run_context, stage_results)
+    stage_results = extract_load_files(run_context, stage_results, deps=deps)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
 def transform_wrapper(input):
+    deps = get_gtfs_orchestration_dependencies()
     run_context = input["run_context"]
     stage_results = input["stage_results"]
-    stage_results = transform(run_context, stage_results)
+    stage_results = transform(run_context, stage_results, deps=deps)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
 def create_trip_details_wrapper(input):
+    deps = get_gtfs_orchestration_dependencies()
     run_context = input["run_context"]
     stage_results = input["stage_results"]
-    stage_results = create_trip_details(run_context, stage_results)
+    stage_results = create_trip_details(run_context, stage_results, deps=deps)
     return {"run_context": run_context, "stage_results": stage_results}
 
 
 def build_quality_report_wrapper(input):
+    deps = get_gtfs_orchestration_dependencies()
     run_context = input["run_context"]
     stage_results = input["stage_results"]
-    build_quality_report_and_send_webhook(run_context, stage_results)
+    build_quality_report(run_context, stage_results, deps=deps)
 
 
 if _IN_AIRFLOW:
@@ -79,16 +82,13 @@ if _IN_AIRFLOW:
         input = ti.xcom_pull(task_ids="extract_load_files")
         return transform_wrapper(input)
 
-
     def create_trip_details_airflow_wrapper(ti):
         input = ti.xcom_pull(task_ids="transform")
         return create_trip_details_wrapper(input)
 
-
     def build_quality_report_airflow_wrapper(ti):
         input = ti.xcom_pull(task_ids="create_trip_details")
         build_quality_report_wrapper(input)
-
 
     with DAG(
         DAG_NAME,
@@ -129,7 +129,6 @@ else:
         output = transform_wrapper(output)
         output = create_trip_details_wrapper(output)
         build_quality_report_wrapper(output)
-
 
     if __name__ == "__main__":
         main()

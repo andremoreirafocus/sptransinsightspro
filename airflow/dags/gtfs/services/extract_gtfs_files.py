@@ -1,13 +1,13 @@
 import io
-import logging
 import zipfile
 from pathlib import Path
 from typing import Any, Callable, Dict, List
 
 import requests
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _is_safe_zip_member(base_dir: Path, member_name: str) -> bool:
@@ -37,7 +37,11 @@ def extract_gtfs_files(config: Dict[str, Any], http_get_fn: Callable[..., Any] =
     response = http_get_fn(url, auth=(login, password))
     if response.status_code == 404:
         error_msg = "GTFS endpoint returned 404: check credentials or portal access."
-        logger.error(error_msg)
+        structured_logger.error(
+            event="gtfs_extraction_failed",
+            message=error_msg,
+            metadata={"status_code": 404},
+        )
         raise ValueError(error_msg)
     response.raise_for_status()
     files_list = []
@@ -45,10 +49,23 @@ def extract_gtfs_files(config: Dict[str, Any], http_get_fn: Callable[..., Any] =
     base_dir.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(io.BytesIO(response.content)) as z:
         files_list = z.namelist()
-        logger.info(files_list)  # List files: agency.txt, stops.txt, etc.
+        structured_logger.info(
+            event="gtfs_extraction_started",
+            message="GTFS zip downloaded",
+            metadata={"files": files_list, "url": url},
+        )
         for member in z.infolist():
             if not _is_safe_zip_member(base_dir, member.filename):
+                structured_logger.error(
+                    event="gtfs_extraction_failed",
+                    message=f"Unsafe zip entry detected: {member.filename}",
+                    metadata={"entry": member.filename},
+                )
                 raise ValueError(f"Unsafe zip entry detected: {member.filename}")
             z.extract(member, path=base_dir)
-    logger.info(f"GTFS files extracted to {downloads_folder}")
+    structured_logger.info(
+        event="gtfs_extraction_succeeded",
+        message="GTFS files extracted",
+        metadata={"downloads_folder": downloads_folder, "file_count": len(files_list)},
+    )
     return files_list
