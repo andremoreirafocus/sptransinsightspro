@@ -1,14 +1,25 @@
 import pandas as pd
-import logging
+from observability.structured_event_logger import get_structured_logger
 
 INTERMEDIATE_STOP_NAME = "Parada intermediaria"
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def transform_trip_details_for_refined(trip_details_dataframe: pd.DataFrame) -> pd.DataFrame:
     try:
         if trip_details_dataframe.empty:
+            structured_logger.warning(
+                event="trip_details_transform_skipped",
+                message="Empty dataframe received — transformation skipped",
+                metadata={"record_count": 0},
+            )
             return trip_details_dataframe.copy()
+
+        structured_logger.info(
+            event="trip_details_transform_started",
+            message="Starting trip details transformation",
+            metadata={"record_count": len(trip_details_dataframe)},
+        )
 
         transformed_trip_details_dataframe = trip_details_dataframe.copy()
 
@@ -47,7 +58,17 @@ def transform_trip_details_for_refined(trip_details_dataframe: pd.DataFrame) -> 
             circular_direction_1_mask, "first_stop_lon"
         ] = None
 
+        structured_logger.info(
+            event="trip_details_transform_succeeded",
+            message="Trip details transformation completed",
+            metadata={"record_count": len(transformed_trip_details_dataframe)},
+        )
         return transformed_trip_details_dataframe
     except Exception as e:
-        logger.error("Failed to transform trip details for refined layer: %s", e)
+        structured_logger.error(
+            event="trip_details_transform_failed",
+            message=f"Failed to transform trip details for refined layer: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
         raise ValueError(f"Failed to transform trip details for refined layer: {e}") from e
