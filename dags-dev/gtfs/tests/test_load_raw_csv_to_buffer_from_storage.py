@@ -1,4 +1,6 @@
 import io
+
+import pytest
 from gtfs.services.load_raw_csv_to_buffer_from_storage import (
     load_raw_csv_to_buffer_from_storage,
 )
@@ -45,3 +47,11 @@ def test_object_name_uses_correct_path():
     bucket, object_name = calls[0]
     assert bucket == "raw"
     assert object_name == "gtfs/stops.txt"
+
+
+def test_read_error_raises_value_error():
+    def fake_read(connection, bucket, object_name):
+        raise RuntimeError("storage unavailable")
+
+    with pytest.raises(ValueError, match="Failed to load raw csv buffer from object storage"):
+        load_raw_csv_to_buffer_from_storage(make_config(), "stops", read_fn=fake_read)

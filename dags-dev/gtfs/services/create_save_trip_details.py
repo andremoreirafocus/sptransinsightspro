@@ -1,9 +1,9 @@
-import logging
 from typing import Any, Dict, Optional
 
 from infra.duck_db_v3 import get_duckdb_connection
+from observability.structured_event_logger import get_structured_logger
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> Dict[str, Any]:
@@ -103,10 +103,13 @@ def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duck
         UNION ALL
         SELECT * FROM inferred_sentido_2_trips;
         """
-        logger.info("Generating trip_details...")
+        structured_logger.info(
+            event="trip_details_creation_started",
+            message="Generating trip details table",
+            metadata={"table": trip_details},
+        )
         con.execute(sql_command)
         count = con.execute(f"SELECT COUNT(*) FROM {trip_details}").fetchone()[0]
-        logger.info(f"Table created successfully with {count} records!")
         storage = config["general"]["storage"]
         staging_subfolder = storage.get("staging_subfolder")
         if staging_subfolder:
@@ -119,10 +122,11 @@ def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duck
             TO 's3://{bucket_name}/{destination_object_name}' (FORMAT PARQUET);
         """
         con.execute(export_query)
-        logger.info(
-            "Table successfully exported to s3://%s/%s",
-            bucket_name,
-            destination_object_name,
+        structured_logger.info(
+            event="trip_details_creation_succeeded",
+            message="Trip details table created and exported",
+            status="SUCCEEDED",
+            metadata={"row_count": count, "path": destination_object_name},
         )
         return {
             "table_name": trip_details,
@@ -131,9 +135,13 @@ def create_trip_details_table_and_fill_missing_data(config: Dict[str, Any], duck
             "staged_written": bool(staging_subfolder),
         }
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
-        raise ValueError(f"An unexpected error occurred: {e}")
+        structured_logger.error(
+            event="trip_details_creation_failed",
+            message=f"Trip details creation failed: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise ValueError(f"Trip details creation failed: {e}") from e
     finally:
         if con:
             con.close()
-            logger.info("DuckDB connection closed.")

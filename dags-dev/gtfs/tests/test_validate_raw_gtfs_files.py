@@ -1,5 +1,21 @@
-from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
 import csv
+import json
+
+import pytest
+
+from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
+
+
+def _parse_log_events(caplog, event_name: str) -> list[dict]:
+    results = []
+    for record in caplog.records:
+        try:
+            parsed = json.loads(record.getMessage())
+        except Exception:
+            continue
+        if parsed.get("event") == event_name:
+            results.append(parsed)
+    return results
 
 
 def make_config(folder):
@@ -89,3 +105,31 @@ def test_flags_unexpected_validation_error(tmp_path):
     assert result["errors_by_file"]["stops.txt"][0].startswith(
         "unexpected_validation_error:"
     )
+
+
+def test_insufficient_lines_emits_raw_file_validation_error(caplog, tmp_path):
+    caplog.set_level("ERROR")
+    (tmp_path / "stops.txt").write_text("stop_id,stop_name\n", encoding="utf-8")
+
+    validate_raw_gtfs_files(make_config(tmp_path), ["stops.txt"], min_lines=2)
+
+    events = _parse_log_events(caplog, "raw_file_validation_error")
+    assert len(events) == 1
+    assert events[0]["metadata"]["error_type"] == "insufficient_lines"
+    assert events[0]["metadata"]["file_name"] == "stops.txt"
+    assert events[0]["metadata"]["line_count"] == 1
+    assert events[0]["metadata"]["min_lines"] == 2
+
+
+def test_raw_validation_completed_includes_validated_files_count(caplog, tmp_path):
+    caplog.set_level("INFO")
+    (tmp_path / "stops.txt").write_text("stop_id,stop_name\n1,Central\n", encoding="utf-8")
+    (tmp_path / "routes.txt").write_text("route_id,route_name\n1,Line1\n", encoding="utf-8")
+
+    validate_raw_gtfs_files(
+        make_config(tmp_path), ["stops.txt", "routes.txt"], min_lines=2
+    )
+
+    events = _parse_log_events(caplog, "raw_validation_completed")
+    assert len(events) == 1
+    assert events[0]["metadata"]["validated_files_count"] == 2

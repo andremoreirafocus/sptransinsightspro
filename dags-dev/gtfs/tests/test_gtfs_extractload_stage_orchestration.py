@@ -1,41 +1,16 @@
 import pytest
-import gtfs.gtfs
 from gtfs.gtfs import extract_load_files, StageExecutionError
-from gtfs.tests.fakes.fake_orchestration_dependencies import (
-    FakeExtractLoadDependencies,
+from gtfs.tests.fakes.fake_gtfs_orchestration_dependencies import (
+    FakeGtfsOrchestrationDependencies,
 )
-
-
-def make_pipeline_config():
-    return {
-        "general": {
-            "notifications": {"webhook_url": "disabled"},
-            "storage": {
-                "metadata_bucket": "meta-bucket",
-                "quality_report_folder": "quality",
-            },
-        },
-        "connections": {
-            "object_storage": {
-                "endpoint": "localhost",
-                "access_key": "key",
-                "secret_key": "secret",
-            }
-        },
-    }
 
 
 def make_run_context():
     return {"execution_id": "exec-test", "batch_ts": "2026-04-19T10:00:00+00:00"}
 
 
-def fake_write_fn(connection_data, buffer, bucket_name, object_name):
-    pass
-
-
 def test_extract_load_files_quarantines_and_raises_on_validation_failure():
-    deps = FakeExtractLoadDependencies(
-        pipeline_config=make_pipeline_config(),
+    deps, recorder = FakeGtfsOrchestrationDependencies.create_scenario(
         extracted_files=["stops.txt", "routes.txt"],
         validation_result={
             "is_valid": False,
@@ -44,35 +19,15 @@ def test_extract_load_files_quarantines_and_raises_on_validation_failure():
         },
     )
 
-    orig_load_config = gtfs.gtfs.load_pipeline_config
-    orig_extract = gtfs.gtfs.extract_gtfs_files
-    orig_validate = gtfs.gtfs.validate_raw_gtfs_files
-    orig_save = gtfs.gtfs.save_files_to_raw_storage
-    orig_handle_error = gtfs.gtfs.handle_unexpected_error
+    with pytest.raises(StageExecutionError, match="Raw GTFS validation failed"):
+        extract_load_files(make_run_context(), {}, deps)
 
-    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
-    gtfs.gtfs.extract_gtfs_files = deps.extract_gtfs_files
-    gtfs.gtfs.validate_raw_gtfs_files = deps.validate_raw_gtfs_files
-    gtfs.gtfs.save_files_to_raw_storage = deps.save_files_to_raw_storage
-    gtfs.gtfs.handle_unexpected_error = lambda e, run_context, stage_results, write_fn=None: None
-
-    try:
-        with pytest.raises(StageExecutionError, match="Raw GTFS validation failed"):
-            extract_load_files(make_run_context(), {}, write_fn=fake_write_fn)
-    finally:
-        gtfs.gtfs.load_pipeline_config = orig_load_config
-        gtfs.gtfs.extract_gtfs_files = orig_extract
-        gtfs.gtfs.validate_raw_gtfs_files = orig_validate
-        gtfs.gtfs.save_files_to_raw_storage = orig_save
-        gtfs.gtfs.handle_unexpected_error = orig_handle_error
-
-    assert len(deps.raw_save_calls) == 1
-    assert deps.raw_save_calls[0]["failed"] is True
+    assert len(recorder.save_raw_calls) == 1
+    assert recorder.save_raw_calls[0]["failed"] is True
 
 
 def test_extract_load_files_saves_raw_on_success():
-    deps = FakeExtractLoadDependencies(
-        pipeline_config=make_pipeline_config(),
+    deps, recorder = FakeGtfsOrchestrationDependencies.create_scenario(
         extracted_files=["stops.txt"],
         validation_result={
             "is_valid": True,
@@ -81,25 +36,27 @@ def test_extract_load_files_saves_raw_on_success():
         },
     )
 
-    orig_load_config = gtfs.gtfs.load_pipeline_config
-    orig_extract = gtfs.gtfs.extract_gtfs_files
-    orig_validate = gtfs.gtfs.validate_raw_gtfs_files
-    orig_save = gtfs.gtfs.save_files_to_raw_storage
+    result = extract_load_files(make_run_context(), {}, deps)
 
-    gtfs.gtfs.load_pipeline_config = deps.load_pipeline_config
-    gtfs.gtfs.extract_gtfs_files = deps.extract_gtfs_files
-    gtfs.gtfs.validate_raw_gtfs_files = deps.validate_raw_gtfs_files
-    gtfs.gtfs.save_files_to_raw_storage = deps.save_files_to_raw_storage
-
-    try:
-        result = extract_load_files(make_run_context(), {}, write_fn=fake_write_fn)
-    finally:
-        gtfs.gtfs.load_pipeline_config = orig_load_config
-        gtfs.gtfs.extract_gtfs_files = orig_extract
-        gtfs.gtfs.validate_raw_gtfs_files = orig_validate
-        gtfs.gtfs.save_files_to_raw_storage = orig_save
-
-    assert len(deps.raw_save_calls) == 1
-    assert deps.raw_save_calls[0]["failed"] is False
+    assert len(recorder.save_raw_calls) == 1
+    assert recorder.save_raw_calls[0]["failed"] is False
     assert result["extract_load_files"]["status"] == "PASS"
     assert result["extract_load_files"]["validated_items_count"] == 1
+
+
+def test_extract_load_files_raises_stage_execution_error_when_no_files_extracted():
+    deps, _ = FakeGtfsOrchestrationDependencies.create_scenario(
+        extracted_files=[],
+    )
+
+    with pytest.raises(StageExecutionError, match="No GTFS files extracted"):
+        extract_load_files(make_run_context(), {}, deps)
+
+
+def test_extract_load_files_raises_stage_execution_error_on_extract_failure():
+    deps, _ = FakeGtfsOrchestrationDependencies.create_scenario(
+        extract_raises=RuntimeError("download failed"),
+    )
+
+    with pytest.raises(StageExecutionError, match="download failed"):
+        extract_load_files(make_run_context(), {}, deps)

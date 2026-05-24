@@ -1,10 +1,11 @@
 import io
-import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from minio import Minio
 
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _move_object_with_minio(
@@ -62,6 +63,11 @@ def relocate_staged_trusted_files(
     moved = []
     errors = []
 
+    structured_logger.info(
+        event="file_relocation_started",
+        message=f"Relocating staged files to '{target}'",
+        metadata={"target": target, "item_count": len(staged_results or [])},
+    )
     for item in staged_results or []:
         table_name = item["table_name"]
         source_object_name = item["staging_object_name"]
@@ -86,10 +92,17 @@ def relocate_staged_trusted_files(
                 }
             )
         except Exception as e:
-            logger.error(
-                "Failed to relocate staged artifact for table '%s': %s",
-                table_name,
-                e,
+            structured_logger.error(
+                event="file_relocation_item_failed",
+                message=f"Failed to relocate '{table_name}'",
+                error_type=type(e).__name__,
+                error_message=str(e),
+                metadata={
+                    "table_name": table_name,
+                    "source": source_object_name,
+                    "destination": destination_object_name,
+                    "target": target,
+                },
             )
             errors.append(
                 {
@@ -100,6 +113,11 @@ def relocate_staged_trusted_files(
                 }
             )
 
+    structured_logger.info(
+        event="file_relocation_completed",
+        message="File relocation completed",
+        metadata={"target": target, "moved_count": len(moved), "error_count": len(errors)},
+    )
     return {
         "status": "FAILED" if errors else "SUCCESS",
         "moved": moved,

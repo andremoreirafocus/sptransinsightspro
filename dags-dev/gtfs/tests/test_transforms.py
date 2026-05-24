@@ -1,7 +1,20 @@
 import io
+import json
 
 import gtfs.services.transforms as transforms_module
 from gtfs.services.transforms import transform_and_validate_table
+
+
+def _parse_log_events(caplog, event_name: str) -> list[dict]:
+    results = []
+    for record in caplog.records:
+        try:
+            parsed = json.loads(record.getMessage())
+        except Exception:
+            continue
+        if parsed.get("event") == event_name:
+            results.append(parsed)
+    return results
 
 
 def make_config():
@@ -195,6 +208,27 @@ def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
     assert result["is_valid"] is False
     assert result["staged_written"] is False
     assert result["errors"] == ["staging_save_failed:save boom"]
+
+
+def test_table_transform_succeeded_logs_row_count(caplog):
+    caplog.set_level("INFO")
+
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A\n2,B\n3,C")
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        pass
+
+    transform_and_validate_table(
+        make_config(),
+        "stops",
+        load_fn=fake_load,
+        save_fn=fake_save,
+    )
+
+    events = _parse_log_events(caplog, "table_transform_succeeded")
+    assert len(events) == 1
+    assert events[0]["metadata"]["row_count"] == 3
 
 
 def test_transform_table_wrappers_delegate_to_transform_and_validate_table():
