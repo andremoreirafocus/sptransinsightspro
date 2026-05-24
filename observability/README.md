@@ -55,6 +55,17 @@ Regras atualmente configuradas para `extractloadlivedata`:
 - `ServiceFailed` (`severity=critical`): dispara quando há `execution_failed_non_recoverable`.
 - `ServiceWarningThreshold` (`severity=warning`): dispara quando a execução finaliza com `retries_seen > 0`.
 
+Regras atualmente configuradas para `transformlivedata`:
+- `PipelinePhaseFailed` (`severity=critical`): dispara quando qualquer fase do pipeline emite um evento de falha.
+- `AcceptanceRateBelowThreshold` (`severity=warning`): dispara quando a taxa de aceitação dos registros cai abaixo de 98%.
+- `NoPipelineExecutionCompleted` (`severity=critical`): dispara quando nenhum `execution_finished` é detectado em 30 minutos.
+
+Regras atualmente configuradas para `refinedfinishedtrips`:
+- `ExecutionAborted` (`severity=critical`): dispara quando há `execution_aborted` — a execução foi interrompida (cobre falhas de freshness e gaps que atingem o limiar de falha).
+- `NoPipelineExecutionCompleted` (`severity=critical`): dispara quando nenhum `execution_finished` é detectado em 1 hora.
+- `PositionFreshnessHigh` (`severity=warning`): dispara quando `observed_lag_minutes` excede o limiar de aviso de 10 minutos — o pipeline continua, mas a qualidade dos dados pode estar degradada.
+- `ExtractionGapHigh` (`severity=warning`): dispara quando `max_gap_minutes` excede o limiar de aviso de 5 minutos — sinal antecipado antes que o pipeline comece a ser interrompido.
+
 Configuração de e-mail usada pelo Alertmanager:
 - `ALERTSERVICE_SMTP_HOST`
 - `ALERTSERVICE_SMTP_PORT`

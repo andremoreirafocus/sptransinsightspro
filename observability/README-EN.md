@@ -55,6 +55,17 @@ Rules currently configured for `extractloadlivedata`:
 - `ServiceFailed` (`severity=critical`): fires on `execution_failed_non_recoverable`.
 - `ServiceWarningThreshold` (`severity=warning`): fires when execution completes with `retries_seen > 0`.
 
+Rules currently configured for `transformlivedata`:
+- `PipelinePhaseFailed` (`severity=critical`): fires when any pipeline phase emits a failure event.
+- `AcceptanceRateBelowThreshold` (`severity=warning`): fires when the record acceptance rate drops below 98%.
+- `NoPipelineExecutionCompleted` (`severity=critical`): fires when no `execution_finished` is detected in 30 minutes.
+
+Rules currently configured for `refinedfinishedtrips`:
+- `ExecutionAborted` (`severity=critical`): fires on `execution_aborted` — the execution was stopped mid-run (covers freshness and gap failures that reach the fail threshold).
+- `NoPipelineExecutionCompleted` (`severity=critical`): fires when no `execution_finished` is detected in 1 hour.
+- `PositionFreshnessHigh` (`severity=warning`): fires when `observed_lag_minutes` exceeds the warn threshold of 10 minutes — pipeline continues but data quality may be degraded.
+- `ExtractionGapHigh` (`severity=warning`): fires when `max_gap_minutes` exceeds the warn threshold of 5 minutes — early signal before the pipeline starts aborting.
+
 Email configuration used by Alertmanager:
 - `ALERTSERVICE_SMTP_HOST`
 - `ALERTSERVICE_SMTP_PORT`
