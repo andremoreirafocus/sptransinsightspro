@@ -3,7 +3,7 @@ import os
 
 from gtfs.gtfs import (
     build_run_context,
-    build_quality_report_and_send_webhook,
+    build_quality_report,
     create_trip_details,
     extract_load_files,
     transform,
@@ -60,7 +60,7 @@ def build_quality_report_wrapper(input):
     deps = get_gtfs_orchestration_dependencies()
     run_context = input["run_context"]
     stage_results = input["stage_results"]
-    build_quality_report_and_send_webhook(run_context, stage_results, deps=deps)
+    build_quality_report(run_context, stage_results, deps=deps)
 
 
 if _IN_AIRFLOW:

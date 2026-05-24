@@ -1,8 +1,6 @@
 import csv
 import json
 
-import pytest
-
 from gtfs.services.validate_raw_gtfs_files import validate_raw_gtfs_files
 
 

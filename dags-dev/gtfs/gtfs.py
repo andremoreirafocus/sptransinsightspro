@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Dict, Optional
 import uuid
 
 from gtfs.config.gtfs_config_schema import GeneralConfig
@@ -14,7 +14,6 @@ from gtfs.orchestration_dependencies import (
     GtfsOrchestrationDependencies,
     get_gtfs_orchestration_dependencies,
 )
-from infra.notifications import send_webhook
 from observability.structured_event_logger import get_structured_logger, set_execution_context
 from observability.third_party_log_bridge import configure_third_party_log_bridge
 from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
@@ -66,56 +65,6 @@ def _build_consolidated_metrics(
     full.update(stage_results.get("phase_metrics", {}))
     full[current_phase] = tracker.to_log_payload(overall_status)["phase_metrics"][current_phase]
     return full
-
-
-def send_webhook_from_report(report: dict, pipeline_config: dict, path: str, send_fn: Optional[Callable[..., Any]] = None) -> None:
-    if send_fn is None:
-        send_fn = send_webhook
-    summary = report.get("summary", {})
-    execution_id = summary.get("execution_id")
-    status = summary.get("status")
-    failure_phase = summary.get("failure_phase")
-    webhook_url = (
-        pipeline_config.get("general", {}).get("notifications", {}).get("webhook_url")
-    )
-    normalized_webhook_url = str(webhook_url or "").strip()
-    if normalized_webhook_url.lower() in {"", "disabled", "none", "null"}:
-        _structured_logger.info(
-            event="webhook_notification_disabled",
-            message=f"Webhook notification disabled ({path})",
-            metadata={
-                "path": path,
-                "execution_id": execution_id,
-                "status": status,
-                "failure_phase": failure_phase,
-            },
-        )
-        return
-    try:
-        send_fn(summary, normalized_webhook_url)
-        _structured_logger.info(
-            event="webhook_notification_sent",
-            message=f"Webhook notification sent ({path})",
-            metadata={
-                "path": path,
-                "execution_id": execution_id,
-                "status": status,
-                "failure_phase": failure_phase,
-            },
-        )
-    except Exception as e:
-        _structured_logger.error(
-            event="webhook_notification_failed",
-            message=f"Webhook notification failed ({path})",
-            error_type=type(e).__name__,
-            error_message=str(e),
-            metadata={
-                "path": path,
-                "execution_id": execution_id,
-                "status": status,
-                "failure_phase": failure_phase,
-            },
-        )
 
 
 def apply_relocation_result(stage_result: dict, relocation: dict) -> None:
@@ -512,7 +461,7 @@ def build_run_context() -> Dict[str, Any]:
     return {"execution_id": execution_id, "batch_ts": batch_ts}
 
 
-def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_results: Dict[str, Any], deps: Optional[GtfsOrchestrationDependencies] = None) -> None:
+def build_quality_report(run_context: Dict[str, Any], stage_results: Dict[str, Any], deps: Optional[GtfsOrchestrationDependencies] = None) -> None:
     if deps is None:
         deps = get_gtfs_orchestration_dependencies()
     set_execution_context(run_context["execution_id"], correlation_id=run_context["batch_ts"])
@@ -531,13 +480,12 @@ def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_res
     tracker.begin("quality_report")
     pipeline_config = deps.get_config(PIPELINE_NAME, None, GeneralConfig, "gtfs_conn", "minio_conn", None)
     try:
-        report = deps.create_data_quality_report(
+        deps.create_data_quality_report(
             config=pipeline_config,
             execution_id=run_context["execution_id"],
             stage_results=stage_results,
             batch_ts=run_context["batch_ts"],
         )
-        send_webhook_from_report(report, pipeline_config, "success path")
         tracker.finish("quality_report", "success")
         stage_results.setdefault("phase_metrics", {})["quality_report"] = (
             tracker.to_log_payload("success")["phase_metrics"]["quality_report"]
@@ -555,7 +503,7 @@ def build_quality_report_and_send_webhook(run_context: Dict[str, Any], stage_res
             },
         )
         _structured_logger.info(event="execution_finished", message="Pipeline run complete", status="SUCCEEDED")
-    except Exception as e:
+    except Exception:
         tracker.finish("quality_report", "failed")
         stage_results.setdefault("phase_metrics", {})["quality_report"] = (
             tracker.to_log_payload("failed")["phase_metrics"]["quality_report"]
@@ -590,7 +538,7 @@ def handle_unexpected_error(e: StageExecutionError, run_context: Dict[str, Any],
         status="FAILED",
         metadata={"phase": e.stage},
     )
-    report = deps.create_failure_quality_report(
+    deps.create_failure_quality_report(
         config=pipeline_config,
         execution_id=run_context["execution_id"],
         failure_phase=e.stage,
@@ -599,4 +547,3 @@ def handle_unexpected_error(e: StageExecutionError, run_context: Dict[str, Any],
         batch_ts=run_context["batch_ts"],
         write_fn=deps.write_fn,
     )
-    send_webhook_from_report(report, pipeline_config, "failure path")

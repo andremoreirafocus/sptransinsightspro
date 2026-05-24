@@ -1,7 +1,7 @@
 import pytest
 from gtfs.gtfs import (
     build_run_context,
-    build_quality_report_and_send_webhook,
+    build_quality_report,
     extract_load_files,
     transform,
     create_trip_details,
@@ -21,7 +21,7 @@ def test_main_calls_build_quality_report_on_success():
     stage_results = extract_load_files(run_context, stage_results, deps)
     stage_results = transform(run_context, stage_results, deps)
     stage_results = create_trip_details(run_context, stage_results, deps)
-    build_quality_report_and_send_webhook(run_context, stage_results, deps)
+    build_quality_report(run_context, stage_results, deps)
 
     assert len(recorder.create_report_calls) == 1
 

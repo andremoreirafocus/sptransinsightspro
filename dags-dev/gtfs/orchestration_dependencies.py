@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from typing import Callable
 
-from gtfs.config.gtfs_config_schema import GeneralConfig
 from gtfs.services.create_data_quality_report import (
     create_data_quality_report,
     create_failure_quality_report,

@@ -7,9 +7,6 @@ _OrchestratorEvent: TypeAlias = Literal[
     "execution_finished",
     "execution_phase_metrics",
     "execution_started",
-    "webhook_notification_disabled",
-    "webhook_notification_failed",
-    "webhook_notification_sent",
 ]
 _ServiceEvent: TypeAlias = Literal[
     "buffer_save_failed",

@@ -4,7 +4,7 @@ import pytest
 
 from observability.structured_event_logger import clear_execution_context
 from gtfs.gtfs import (
-    build_quality_report_and_send_webhook,
+    build_quality_report,
     build_run_context,
     create_trip_details,
     extract_load_files,
@@ -41,7 +41,7 @@ def _run_full_pipeline(deps):
     stage_results = extract_load_files(run_context, stage_results, deps)
     stage_results = transform(run_context, stage_results, deps)
     stage_results = create_trip_details(run_context, stage_results, deps)
-    build_quality_report_and_send_webhook(run_context, stage_results, deps)
+    build_quality_report(run_context, stage_results, deps)
     return run_context, stage_results
 
 
@@ -152,7 +152,7 @@ def test_quality_report_failure_emits_execution_aborted(caplog):
         stage_results = extract_load_files(run_context, stage_results, deps)
         stage_results = transform(run_context, stage_results, deps)
         stage_results = create_trip_details(run_context, stage_results, deps)
-        build_quality_report_and_send_webhook(run_context, stage_results, deps)
+        build_quality_report(run_context, stage_results, deps)
 
     events = _parse_log_events(caplog, "execution_aborted")
     assert len(events) >= 1
