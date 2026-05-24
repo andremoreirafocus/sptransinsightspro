@@ -1,17 +1,19 @@
 import importlib.util
+import json
+import logging
 import pathlib
 
 import pytest
+
+from updatelatestpositions.tests.fakes.fake_updatelatestpositions_orchestration_dependencies import (
+    FakeUpdateLatestPositionsOrchestrationDependencies,
+)
 
 _mod_path = pathlib.Path(__file__).parents[2] / "updatelatestpositions-v4.py"
 _spec = importlib.util.spec_from_file_location("updatelatestpositions_v4", _mod_path)
 _mod = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(_mod)
 update_latest_positions_table = _mod.update_latest_positions_table
-
-from updatelatestpositions.tests.fakes.fake_updatelatestpositions_orchestration_dependencies import (
-    FakeUpdateLatestPositionsOrchestrationDependencies,
-)
 
 
 def test_create_latest_positions_called_on_success():
@@ -46,7 +48,6 @@ def test_update_failure_create_was_attempted():
 
 
 def _log_records(caplog):
-    import json
     records = []
     for r in caplog.records:
         try:
@@ -57,7 +58,6 @@ def _log_records(caplog):
 
 
 def test_success_emits_execution_finished(caplog):
-    import logging
     deps, _ = FakeUpdateLatestPositionsOrchestrationDependencies.create_scenario()
     with caplog.at_level(logging.INFO):
         update_latest_positions_table(deps=deps)
@@ -65,7 +65,6 @@ def test_success_emits_execution_finished(caplog):
 
 
 def test_success_emits_execution_phase_metrics(caplog):
-    import logging
     deps, _ = FakeUpdateLatestPositionsOrchestrationDependencies.create_scenario()
     with caplog.at_level(logging.INFO):
         update_latest_positions_table(deps=deps)
@@ -77,7 +76,6 @@ def test_success_emits_execution_phase_metrics(caplog):
 
 
 def test_config_failure_emits_execution_aborted(caplog):
-    import logging
     deps, _ = FakeUpdateLatestPositionsOrchestrationDependencies.create_scenario(
         config_raises=RuntimeError("config boom")
     )
@@ -93,7 +91,6 @@ def test_config_failure_emits_execution_aborted(caplog):
 
 
 def test_update_failure_emits_execution_aborted(caplog):
-    import logging
     deps, _ = FakeUpdateLatestPositionsOrchestrationDependencies.create_scenario(
         create_raises=RuntimeError("update boom")
     )
