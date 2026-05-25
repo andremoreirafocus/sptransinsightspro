@@ -104,6 +104,8 @@ The dashboard is located at [`observability/grafana/provisioning/dashboards/tran
 {service="airflow_tasks"} | json | service_extracted="transformlivedata" | event="<event>"
 ```
 
+![Dashboard transformlivedata](transformlivedata_dashboard.png)
+
 The dashboard is organized into three rows:
 
 **Row 1 — Operational health**

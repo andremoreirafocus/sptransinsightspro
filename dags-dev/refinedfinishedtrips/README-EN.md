@@ -198,6 +198,8 @@ The dashboard is at [`observability/grafana/provisioning/dashboards/refinedfinis
 {service="airflow_tasks"} | json | service_extracted="refinedfinishedtrips" | event="<event>"
 ```
 
+![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
+
 The dashboard is organized in five rows:
 
 **Row 1 — Operational health**

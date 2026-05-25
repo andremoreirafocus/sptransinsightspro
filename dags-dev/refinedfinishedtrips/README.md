@@ -189,6 +189,8 @@ O dashboard está em [`observability/grafana/provisioning/dashboards/refinedfini
 {service="airflow_tasks"} | json | service_extracted="refinedfinishedtrips" | event="<evento>"
 ```
 
+![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
+
 O dashboard está organizado em cinco linhas:
 
 **Linha 1 — Saúde operacional**

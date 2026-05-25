@@ -123,17 +123,12 @@ Os dashboards são provisionados automaticamente a partir de `grafana/provisioni
 | transformlivedata | `transformlivedata.json` | Execuções, duração por fase, taxa de aceitação, volume de registros brutos, registros rejeitados por motivo, stream de logs |
 | refinedfinishedtrips | `refinedfinishedtrips.json` | Execuções, duração por fase, viagens adicionadas, viagens detectadas, posições carregadas, qualidade da extração, freshness dos dados de posição, stream de logs |
 
-O screenshot abaixo mostra o dashboard do extractloadlivedata em operação. Exibe a quantidade de erros e warnings por execução e os tempos de execução de cada fase do workflow de extração implementado pelo serviço.
+Os screenshots dos dashboards estão nos READMEs de cada pipeline, junto com o inventário completo de painéis e queries Loki:
 
-![extractloadlivedata dashboard](grafana_dashboard_for_extractloadlivedata.png)
-
-O screenshot abaixo mostra o dashboard do transformlivedata em operação. Exibe execuções bem-sucedidas e com falha ao longo do tempo, duração média por fase, taxa de aceitação dos registros transformados, volume de registros brutos e registros rejeitados por motivo.
-
-![transformlivedata dashboard](transformlivedata_dashboard.png)
-
-O screenshot abaixo mostra o dashboard do refinedfinishedtrips em operação. Exibe execuções concluídas e abortadas, duração por fase, volume de viagens adicionadas e detectadas por execução, métricas de qualidade da extração (grupos processados, discrepâncias de sentido, pontos sanitizados) e freshness dos dados de posição com limiares de warn e fail.
-
-![refinedfinishedtrips dashboard](refinedfinishedtrips_dashboard.png)
+- [extractloadlivedata](../extractloadlivedata/README.md#dashboard-grafana) — erros e warnings por execução, tempo de execução por fase
+- [transformlivedata](../dags-dev/transformlivedata/README.md#dashboard-grafana) — execuções, duração por fase, taxa de aceitação, volume de registros
+- [refinedfinishedtrips](../dags-dev/refinedfinishedtrips/README.md#dashboard-grafana) — execuções, volume de viagens, qualidade da extração, freshness dos dados de posição
+- [gtfs](../dags-dev/gtfs/README.md#dashboard-grafana) — execuções, duração por fase, linhas do trip_details, arquivos extraídos
 
 Após editar um JSON de dashboard, incremente o campo `version` e recarregue sem reiniciar o Grafana:
 

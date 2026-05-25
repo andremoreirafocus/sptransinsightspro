@@ -90,6 +90,107 @@ Every operation is tagged with `correlation_id = logical_datetime` (data timesta
 - Enables Loki queries: `{correlation_id="2026-05-13T15:30:45.123456Z"}` to see all operations on this data
 - Propagates from extractloadlivedata → transformlivedata → refinedfinishedtrips for full lineage
 
+### Event Taxonomy
+
+All events are emitted via `{service="extractloadlivedata"}` (direct Docker container stream).
+
+**Scheduler** events (main.py):
+
+| Event | When |
+|---|---|
+| `scheduler_config_loaded` | Configuration loaded successfully |
+| `scheduler_started` | Scheduler started |
+| `scheduler_tick_started` / `scheduler_tick_completed` | Start and end of each APScheduler tick |
+| `scheduler_stopped` | Scheduler stopped (SIGTERM/SIGINT) |
+| `scheduler_shutdown_completed` | Scheduler shutdown completed |
+| `cli_dev_mode_requested` | Execution started in `dev` mode (single run) |
+| `cli_invalid_parameter` | Invalid CLI parameter |
+
+**Orchestrator** events (extractloadlivedata.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `config_validation_succeeded` / `config_validation_failed` | Configuration validation | `error_message` on failure |
+| `notification_engine_selected` | Notification engine determined | `metadata.engine` |
+| `execution_started` | Start of an execution | `execution_id` |
+| `extract_positions_started` / `extract_positions_succeeded` | Extract phase | — |
+| `pending_storage_scan_succeeded` / `pending_storage_scan_failed` | Local buffer scan | `metadata.pending_count` |
+| `pending_storage_detected` / `pending_storage_multiple_files_detected` | Pending files detected | `metadata.pending_count` |
+| `pending_storage_file_started` / `pending_storage_file_succeeded` / `pending_storage_file_failed` | Each pending file processed | `metadata.filename` |
+| `notification_dispatch_started` / `notification_dispatch_succeeded` / `notification_dispatch_failed` | Notification dispatch | `metadata.filename` |
+| `notification_metrics_invalid` | Notification metrics inconsistent | — |
+| `execution_metrics_final` | At the end of every execution | `metadata.phase_metrics`, `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`, `metadata.execution_seconds` |
+| `execution_summary_emitted` | Summary sent to alertservice | — |
+| `execution_completed` | Execution closed without fatal failures | `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen` |
+| `execution_failed_non_recoverable` | Execution closed with non-recoverable failure | `metadata.items_failed`, `metadata.failure_phase` |
+
+Service events — **Extraction** (extract_buses_positions.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `api_authentication_successful` / `api_authentication_failed` | SPTrans API authentication | `error_message` on failure |
+| `api_get_started` / `api_get_successful` / `api_get_failed` | API GET call | `metadata.attempt` |
+| `extract_positions_succeeded_after_retries` | Extraction succeeded after retries | `metadata.retries` |
+| `extract_positions_failed` | Extraction failed on all attempts | `error_type`, `error_message` |
+| `summarize_extracted_positions_succeeded` | Extracted positions summary produced | `metadata.total_vehicles` |
+| `metadata_validation_failed` | Invalid payload structure | `metadata.payload_sample` |
+
+Service events — **Local storage** (save_load_bus_positions.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `local_storage_persist_started` | Start of save to local volume | `metadata.filename` |
+| `local_storage_compression_succeeded` | Zstandard compression completed | `metadata.filename` |
+| `local_storage_persist_succeeded` | File saved to local volume | `metadata.filename` |
+| `local_storage_persist_failed` | Failed to save to local volume | `metadata.filename`, `error_type` |
+
+Service events — **Object storage** (save_load_bus_positions.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `object_storage_compression_started` / `object_storage_compression_succeeded` | Compression before upload | `metadata.filename` |
+| `object_storage_persist_started` / `object_storage_persist_succeeded` / `object_storage_persist_failed` | MinIO persistence | `metadata.bucket`, `metadata.object_name` |
+| `object_storage_list_failed` | Failed to list pending MinIO objects | `error_type`, `error_message` |
+| `remove_pending_storage_file_succeeded` / `remove_pending_storage_file_failed` | Local file removal after upload | `metadata.filename` |
+
+Service events — **Database** (save_processing_requests.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `db_storage_persist_started` / `db_storage_persist_succeeded` / `db_storage_persist_failed` | Processing request creation in PostgreSQL | `metadata.filename`, `metadata.table` |
+
+Service events — **Airflow API trigger** (trigger_airflow.py):
+
+| Event | When | Relevant content |
+|---|---|---|
+| `get_utc_logical_date_succeeded` / `get_utc_logical_date_failed` | UTC logical date calculation | `metadata.logical_date` |
+
+### Grafana Dashboard
+
+The dashboard is at [`observability/grafana/provisioning/dashboards/extractloadlivedata.json`](./observability/grafana/provisioning/dashboards/extractloadlivedata.json) and is provisioned automatically by Grafana. It uses Loki as the datasource. All queries use the stream `{service="extractloadlivedata"}`.
+
+Default window: `now-1h`. Refresh: `30s`.
+
+![Dashboard extractloadlivedata](extractloadlivedata_dashboard.png)
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Executions | Timeseries (dots) | `execution_completed` (green), `execution_failed_non_recoverable` (red), errors and warnings over time | `execution_completed`, `execution_failed_non_recoverable`, level `ERROR`, level `WARNING` — `count_over_time [5m]` |
+| Errors (last 1h) | Stat (red if ≥ 1) | Total logs with `level="ERROR"` in the last hour | `count_over_time [1h]` |
+| Warnings (last 1h) | Stat (orange if ≥ 1) | Total logs with `level="WARNING"` in the last hour | `count_over_time [1h]` |
+| Execution time (s) | Timeseries | Average duration per phase: `total`, `extract`, `save`, `notify` | `execution_metrics_final` — `metadata.execution_seconds` and `metadata.phase_durations.<phase>` via `avg_over_time [5m]` |
+| Recent failures | Logs | Stream filtered by `level="ERROR"` in descending order | — |
+| Log stream | Logs | All service events in descending order | — |
+
+### Alert Rules
+
+Rules are defined in `observability/loki/rules/fake/extractloadlivedata-alerts.yaml` and evaluated every minute:
+
+| Alert | Severity | Condition | Window |
+|---|---|---|---|
+| `ServiceFailed` | critical | `execution_failed_non_recoverable` event detected | 5m |
+| `ServiceWarningThreshold` | warning | `execution_completed` with `metadata.retries_seen > 0` | 5m |
+
 ## Execution reporting (`alertservice`)
 
 - Scope: the service publishes **only an execution summary** to `alertservice`; no JSON report artifact is persisted
