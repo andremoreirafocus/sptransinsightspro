@@ -58,6 +58,7 @@ import_variables() {
   docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_data_expectations_stop_times.json
   docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_data_expectations_trip_details.json
   docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/refinedfinishedtrips_general.json
+  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/updatelatestpositions_general.json
 }
 
 trap 'rm -f "${GENERATED_CONNECTIONS_FILE}"' EXIT

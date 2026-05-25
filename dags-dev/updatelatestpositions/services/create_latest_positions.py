@@ -22,7 +22,7 @@ def _evaluate_freshness(
     config: dict,
     df: pd.DataFrame,
     now_fn: Optional[Callable[[], datetime]] = None,
-) -> None:
+) -> dict:
     quality = config["general"]["quality"]
     warn_threshold = quality["freshness_warn_staleness_minutes"]
     fail_threshold = quality["freshness_fail_staleness_minutes"]

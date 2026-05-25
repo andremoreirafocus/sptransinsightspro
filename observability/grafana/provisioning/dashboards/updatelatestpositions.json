@@ -213,7 +213,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 8 },
       "id": 5,
       "options": {
         "legend": { "calcs": ["mean", "max", "last"], "displayMode": "list", "placement": "bottom" },
@@ -237,10 +237,9 @@
         "defaults": {
           "color": { "mode": "palette-classic" },
           "custom": {
-            "drawStyle": "points",
-            "pointSize": 6,
-            "lineWidth": 0,
-            "fillOpacity": 0
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
           }
         },
         "overrides": [
@@ -250,7 +249,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
       "id": 6,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -272,38 +271,40 @@
       "datasource": { "type": "loki", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
-          "color": { "mode": "palette-classic" },
-          "custom": {
-            "drawStyle": "points",
-            "pointSize": 6,
-            "lineWidth": 0,
-            "fillOpacity": 0
-          }
-        },
-        "overrides": [
-          {
-            "matcher": { "id": "byName", "options": "skipped" },
-            "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
-          }
-        ]
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 1 }
+            ]
+          },
+          "mappings": [
+            { "options": { "match": "null", "result": { "text": "0" } }, "type": "special" }
+          ]
+        }
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "gridPos": { "h": 8, "w": 2, "x": 10, "y": 8 },
       "id": 7,
       "options": {
-        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
-        "tooltip": { "mode": "multi" }
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": { "calcs": ["sum"], "fields": "", "values": false },
+        "textMode": "auto"
       },
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"updatelatestpositions\" | event=\"positions_update_skipped\" [5m]))",
-          "legendFormat": "skipped",
-          "queryType": "range",
+          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"updatelatestpositions\" | event=\"positions_update_skipped\" [1h])",
+          "instant": true,
+          "queryType": "instant",
           "refId": "A"
         }
       ],
-      "title": "Skipped runs (no data in last 2h)",
-      "type": "timeseries"
+      "title": "Skipped runs (last 1h)",
+      "type": "stat"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
@@ -380,5 +381,5 @@
   "timezone": "browser",
   "title": "updatelatestpositions",
   "uid": "updatelatestpositions",
-  "version": 1
+  "version": 3
 }

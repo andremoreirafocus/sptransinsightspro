@@ -3,7 +3,6 @@ from zoneinfo import ZoneInfo
 
 import logging
 import pandas as pd
-import pytest
 
 from updatelatestpositions.services.create_latest_positions import _evaluate_freshness
 

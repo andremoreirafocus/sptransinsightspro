@@ -1,3 +1,9 @@
+from datetime import datetime, timezone
+from typing import Callable, Optional
+from zoneinfo import ZoneInfo
+
+import pandas as pd
+
 from infra.duck_db_v3 import get_duckdb_connection
 from infra.sql_db_v2 import update_db_table_with_dataframe
 from updatelatestpositions.services.get_latest_path_for_query import (
@@ -8,11 +14,58 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _evaluate_freshness(
+    config: dict,
+    df: pd.DataFrame,
+    now_fn: Optional[Callable[[], datetime]] = None,
+) -> dict:
+    quality = config["general"]["quality"]
+    warn_threshold = quality["freshness_warn_staleness_minutes"]
+    fail_threshold = quality["freshness_fail_staleness_minutes"]
+
+    if df.empty:
+        result = {
+            "observed_lag_minutes": None,
+            "warn_threshold_minutes": warn_threshold,
+            "fail_threshold_minutes": fail_threshold,
+        }
+        structured_logger.warning(
+            event="freshness_evaluation",
+            message="Freshness evaluation: no records to evaluate",
+            metadata=result,
+        )
+        return result
+
+    now_utc = (now_fn or _now_utc)()
+    now_sp_naive = now_utc.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+    latest_ts = df["veiculo_ts"].max()
+    if hasattr(latest_ts, "tzinfo") and latest_ts.tzinfo is not None:
+        latest_ts = latest_ts.tz_convert(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+    lag_minutes = round((now_sp_naive - latest_ts).total_seconds() / 60, 2)
+
+    result = {
+        "observed_lag_minutes": lag_minutes,
+        "warn_threshold_minutes": warn_threshold,
+        "fail_threshold_minutes": fail_threshold,
+    }
+    structured_logger.info(
+        event="freshness_evaluation",
+        message="Freshness evaluation",
+        metadata=result,
+    )
+    return result
+
+
 def create_latest_positions_table(
     config,
     get_path_fn=get_latest_path_for_query,
     duckdb_client=None,
     save_fn=update_db_table_with_dataframe,
+    evaluate_freshness_fn=_evaluate_freshness,
 ):
     def get_config(config):
         general = config["general"]
@@ -62,6 +115,7 @@ def create_latest_positions_table(
             message="Positions query completed",
             metadata={"total_records": total_records},
         )
+        evaluate_freshness_fn(config, refined_df)
         structured_logger.info(
             event="positions_save_started",
             message=f"Saving {total_records} records to table '{latest_positions_table_name}'",

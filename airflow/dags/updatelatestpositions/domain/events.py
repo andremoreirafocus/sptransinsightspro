@@ -12,6 +12,7 @@ _OrchestratorEvent: TypeAlias = Literal[
 ]
 
 _ServiceEvent: TypeAlias = Literal[
+    "freshness_evaluation",
     "path_discovery_empty",
     "path_discovery_failed",
     "path_discovery_started",

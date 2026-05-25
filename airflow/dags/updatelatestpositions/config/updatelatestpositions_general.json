@@ -7,6 +7,10 @@
     "tables": {
       "positions_table_name": "positions",
       "latest_positions_table_name": "refined.latest_positions"
+    },
+    "quality": {
+      "freshness_warn_staleness_minutes": 10,
+      "freshness_fail_staleness_minutes": 30
     }
   }
 }
