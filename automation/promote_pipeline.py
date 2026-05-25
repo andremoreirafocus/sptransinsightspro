@@ -1,5 +1,7 @@
 import sys
 import os
+import glob
+import shutil
 import argparse
 
 from os_command_helper import run_command
@@ -65,6 +67,13 @@ def promote_pipeline(pipeline_name):
         ],
         "Folder sync failed!",
     )
+    dag_entry_points = glob.glob(
+        os.path.join(dev_dir, f"{pipeline_name}-v*.py")
+    )
+    for dag_file in dag_entry_points:
+        dest = os.path.join(prod_dir, os.path.basename(dag_file))
+        shutil.copy2(dag_file, dest)
+        print(f"  Copied DAG entry point: {os.path.basename(dag_file)}")
     print(
         f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality, observability and pipeline_configurator files..."
     )
