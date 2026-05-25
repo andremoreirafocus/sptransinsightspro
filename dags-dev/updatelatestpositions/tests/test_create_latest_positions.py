@@ -78,6 +78,7 @@ def test_save_called_with_correct_table_name():
         get_path_fn=fake_get_path,
         duckdb_client=fake_con,
         save_fn=fake_save,
+        evaluate_freshness_fn=lambda config, df: None,
     )
     assert save_calls == ["refined.latest_positions"]
 
