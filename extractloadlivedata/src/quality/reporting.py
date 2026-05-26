@@ -34,6 +34,8 @@ def build_execution_report_metadata(
     phase_metrics: Optional[Dict[str, Dict[str, int]]] = None,
     phase_durations: Optional[Dict[str, float]] = None,
     logical_datetime: Optional[str] = None,
+    pending_object_storage_save_files_count: int = 0,
+    pending_ingest_notifications_count: int = 0,
 ) -> Dict[str, Any]:
     correlation_payload = _prepare_correlation_ids_payload(worked_correlation_ids)
     metadata: Dict[str, Any] = {
@@ -44,6 +46,8 @@ def build_execution_report_metadata(
         "correlation_ids": correlation_payload["correlation_ids"],
         "correlation_ids_count": correlation_payload["correlation_ids_count"],
         "correlation_ids_truncated": correlation_payload["correlation_ids_truncated"],
+        "pending_object_storage_save_files_count": pending_object_storage_save_files_count,
+        "pending_ingest_notifications_count": pending_ingest_notifications_count,
     }
     if phase_metrics is not None:
         metadata["phase_metrics"] = phase_metrics

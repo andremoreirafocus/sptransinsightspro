@@ -137,9 +137,12 @@ def extractloadlivedata(
     items_total = 0
     items_failed = 0
     retries_seen = 0
+    pending_object_storage_save_files_count = 0
+    pending_ingest_notifications_count = 0
     phase_metrics: Dict[str, Dict[str, int]] = {
         "extract": {"attempted": 0, "succeeded": 0, "failed": 0},
-        "save": {"attempted": 0, "succeeded": 0, "failed": 0},
+        "local_save": {"attempted": 0, "succeeded": 0, "failed": 0},
+        "object_storage_save": {"attempted": 0, "succeeded": 0, "failed": 0},
         "notify": {"attempted": 0, "succeeded": 0, "failed": 0},
     }
     phase_durations: Dict[str, float] = {}
@@ -230,25 +233,6 @@ def extractloadlivedata(
             if logical_datetime:
                 worked_correlation_ids.append(logical_datetime)
             phase_metrics["extract"]["succeeded"] = 1
-            structured_logger.debug(
-                event="local_storage_persist_started",
-                status=EVENT_STATUS_STARTED,
-                execution_id=execution_id,
-                correlation_id=logical_datetime,
-                message="Starting storage persistence for current extraction payload.",
-            )
-            services.save_bus_positions_to_local_volume(config, buses_positions)
-            structured_logger.info(
-                event="local_storage_persist_succeeded",
-                status=EVENT_STATUS_SUCCEEDED,
-                execution_id=execution_id,
-                correlation_id=logical_datetime,
-                message="Storage persistence completed for current extraction payload.",
-            )
-        except LocalIngestBufferSaveError:
-            items_failed += 1
-            failed_phases.append("local_ingest_buffer_save_positions")
-            _emit_failure_alert("local_ingest_buffer_save_positions")
         except Exception as e:
             structured_logger.error(
                 event="local_ingest_buffer_phase_failed",
@@ -262,8 +246,50 @@ def extractloadlivedata(
             items_failed += 1
             failed_phases.append("unknown")
             _emit_failure_alert("unknown")
+        if phase_metrics["extract"]["succeeded"] == 1:
+            local_save_start = time.time()
+            try:
+                phase_metrics["local_save"]["attempted"] = 1
+                structured_logger.debug(
+                    event="local_storage_persist_started",
+                    status=EVENT_STATUS_STARTED,
+                    execution_id=execution_id,
+                    correlation_id=logical_datetime,
+                    message="Starting storage persistence for current extraction payload.",
+                )
+                services.save_bus_positions_to_local_volume(config, buses_positions)
+                phase_metrics["local_save"]["succeeded"] = 1
+                structured_logger.info(
+                    event="local_storage_persist_succeeded",
+                    status=EVENT_STATUS_SUCCEEDED,
+                    execution_id=execution_id,
+                    correlation_id=logical_datetime,
+                    message="Storage persistence completed for current extraction payload.",
+                )
+            except LocalIngestBufferSaveError:
+                items_failed += 1
+                phase_metrics["local_save"]["failed"] = 1
+                failed_phases.append("local_ingest_buffer_save_positions")
+                _emit_failure_alert("local_ingest_buffer_save_positions")
+            except Exception as e:
+                structured_logger.error(
+                    event="local_ingest_buffer_phase_failed",
+                    status=EVENT_STATUS_FAILED,
+                    execution_id=execution_id,
+                    correlation_id=logical_datetime,
+                    message="Unexpected local buffer persistence failure.",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                )
+                items_failed += 1
+                phase_metrics["local_save"]["failed"] = 1
+                failed_phases.append("unknown")
+                _emit_failure_alert("unknown")
+            finally:
+                phase_durations["local_save"] = time.time() - local_save_start
     try:
         pending_storage_save_list = services.get_pending_storage_save_list(config)
+        pending_object_storage_save_files_count = len(pending_storage_save_list)
         structured_logger.debug(
             event="pending_storage_scan_succeeded",
             status=EVENT_STATUS_SUCCEEDED,
@@ -308,7 +334,7 @@ def extractloadlivedata(
         try:
             for pending_storage_save_file in pending_storage_save_list:
                 items_total += 1
-                phase_metrics["save"]["attempted"] += 1
+                phase_metrics["object_storage_save"]["attempted"] += 1
                 file_logical_datetime = get_utc_logical_date_from_file(
                     pending_storage_save_file
                 )
@@ -359,7 +385,7 @@ def extractloadlivedata(
                             "retries_seen": retries_seen,
                         },
                     )
-                    phase_metrics["save"]["succeeded"] += 1
+                    phase_metrics["object_storage_save"]["succeeded"] += 1
                     services.remove_local_file(
                         config, pending_storage_save_file_content
                     )
@@ -374,7 +400,7 @@ def extractloadlivedata(
                 except SavePositionsToRawError as e:
                     retries_seen += int(getattr(e, "retries", 0))
                     items_failed += 1
-                    phase_metrics["save"]["failed"] += 1
+                    phase_metrics["object_storage_save"]["failed"] += 1
                     failed_phases.append("save_positions_to_raw")
                     _emit_failure_alert("save_positions_to_raw")
                     break
@@ -390,11 +416,11 @@ def extractloadlivedata(
                         metadata={"pending_file": pending_storage_save_file},
                     )
                     items_failed += 1
-                    phase_metrics["save"]["failed"] += 1
+                    phase_metrics["object_storage_save"]["failed"] += 1
                     failed_phases.append("unknown")
                     _emit_failure_alert("unknown")
         finally:
-            phase_durations["save"] = time.time() - save_start
+            phase_durations["object_storage_save"] = time.time() - save_start
         notify_start = time.time()
         try:
             structured_logger.info(
@@ -416,6 +442,7 @@ def extractloadlivedata(
             success_count, failed_count, retries_count = _parse_notification_metrics(
                 notification_result["metrics"]
             )
+            pending_ingest_notifications_count = success_count + failed_count
             items_total += success_count + failed_count
             items_failed += failed_count
             retries_seen += retries_count
@@ -449,6 +476,7 @@ def extractloadlivedata(
                 success_count, failed_count, retries_count = (
                     _parse_notification_metrics(metrics)
                 )
+                pending_ingest_notifications_count = success_count + failed_count
                 items_total += success_count + failed_count
                 items_failed += failed_count
                 retries_seen += retries_count
@@ -494,6 +522,8 @@ def extractloadlivedata(
         phase_metrics=phase_metrics,
         phase_durations=phase_durations,
         logical_datetime=logical_datetime,
+        pending_object_storage_save_files_count=pending_object_storage_save_files_count,
+        pending_ingest_notifications_count=pending_ingest_notifications_count,
     )
     structured_logger.info(
         event="execution_metrics_final",

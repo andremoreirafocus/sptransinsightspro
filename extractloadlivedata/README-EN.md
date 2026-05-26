@@ -44,42 +44,56 @@ Each execution receives an `execution_id` in **ISO 8601 format** (UTC start time
 - Correlates all logs from one execution in Loki
 
 ### Per-Phase Metrics (Phase Instrumentation)
-The service tracks **attempts, successes and failures** across three phases:
+The service tracks **attempts, successes and failures** across four phases:
 
-1. **Extract phase**
-   - Attempts to extract positions from the API
+1. **Extract phase (extract)**
+   - Attempts to extract positions from the API with retries and exponential backoff
    - Captures `logical_datetime` from `buses_positions["metadata"]["extracted_at"]` (data timestamp)
-   - Saves locally and proceeds to the next phase
 
-2. **Save phase**
-   - Persists pending local files to MinIO
-   - Each saved file is registered in the database as a processing request
-   - Tracks total save duration
+2. **Local save phase (local_save)**
+   - Persists the extracted payload to the local ingest buffer volume
+   - Only runs if the extract phase succeeded
 
-3. **Notify phase**
-   - Triggers the transformation DAG (via Airflow or database)
-   - Tracks success/failure per invocation
-   - Final metrics aggregation
+3. **Object storage save phase (object_storage_save)**
+   - Iterates over all pending files in the local volume and persists each one to MinIO
+   - Each successfully saved file is removed from the local volume
+   - Tracks the number of pending files at phase start via `pending_object_storage_save_files_count`
+
+4. **Notify ingest phase (notify)**
+   - Dispatches a processing request for each saved file (via database or Airflow API)
+   - Tracks success/failure per notification
+   - Tracks the number of pending notifications at phase start via `pending_ingest_notifications_count`
 
 ### Execution Metrics Final Event (execution_metrics_final)
-Emitted at the end of each execution with Prometheus-compatible structure:
+Emitted at the end of each execution with full observability structure:
 
 ```json
 {
   "event": "execution_metrics_final",
   "status": "SUCCEEDED",
   "execution_id": "2026-05-13T15:30:15.987654+00:00",
-  "correlation_id": "2026-05-13T15:30:45.123456+00:00",
   "metadata": {
     "phase_metrics": {
-      "extract": {"attempted": 1, "succeeded": 1, "failed": 0, "duration": 3.21},
-      "save": {"attempted": 3, "succeeded": 2, "failed": 1, "duration": 7.89},
-      "notify": {"attempted": 3, "succeeded": 3, "failed": 0, "duration": 1.35}
+      "extract":             {"attempted": 1, "succeeded": 1, "failed": 0},
+      "local_save":          {"attempted": 1, "succeeded": 1, "failed": 0},
+      "object_storage_save": {"attempted": 1, "succeeded": 1, "failed": 0},
+      "notify":              {"attempted": 1, "succeeded": 1, "failed": 0}
     },
-    "items_total": 7,
-    "items_failed": 1,
-    "retries_seen": 4,
-    "execution_seconds": 12.45
+    "phase_durations": {
+      "extract":             3.21,
+      "local_save":          0.05,
+      "object_storage_save": 1.87,
+      "notify":              0.44
+    },
+    "items_total": 4,
+    "items_failed": 0,
+    "retries_seen": 0,
+    "execution_seconds": 5.57,
+    "pending_object_storage_save_files_count": 0,
+    "pending_ingest_notifications_count": 0,
+    "correlation_ids": ["2026-05-13T18:30:00Z"],
+    "correlation_ids_count": 1,
+    "correlation_ids_truncated": false
   }
 }
 ```
@@ -114,12 +128,14 @@ All events are emitted via `{service="extractloadlivedata"}` (direct Docker cont
 | `notification_engine_selected` | Notification engine determined | `metadata.engine` |
 | `execution_started` | Start of an execution | `execution_id` |
 | `extract_positions_started` / `extract_positions_succeeded` | Extract phase | — |
-| `pending_storage_scan_succeeded` / `pending_storage_scan_failed` | Local buffer scan | `metadata.pending_count` |
-| `pending_storage_detected` / `pending_storage_multiple_files_detected` | Pending files detected | `metadata.pending_count` |
-| `pending_storage_file_started` / `pending_storage_file_succeeded` / `pending_storage_file_failed` | Each pending file processed | `metadata.filename` |
+| `local_storage_persist_started` / `local_storage_persist_succeeded` | Local save phase | `correlation_id` |
+| `pending_storage_scan_succeeded` / `pending_storage_scan_failed` | Local buffer scan | `metadata.pending_files_count` |
+| `pending_storage_detected` / `pending_storage_multiple_files_detected` | Pending files detected | `metadata.pending_files_count` |
+| `pending_storage_file_started` / `pending_storage_file_succeeded` / `pending_storage_file_failed` | Each pending file processed in object storage | `metadata.filename` |
+| `object_storage_persist_started` / `object_storage_persist_succeeded` | Pending file persisted to MinIO | `correlation_id`, `metadata.pending_file` |
 | `notification_dispatch_started` / `notification_dispatch_succeeded` / `notification_dispatch_failed` | Notification dispatch | `metadata.filename` |
 | `notification_metrics_invalid` | Notification metrics inconsistent | — |
-| `execution_metrics_final` | At the end of every execution | `metadata.phase_metrics`, `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`, `metadata.execution_seconds` |
+| `execution_metrics_final` | At the end of every execution | `metadata.phase_metrics`, `metadata.phase_durations`, `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`, `metadata.execution_seconds`, `metadata.pending_object_storage_save_files_count`, `metadata.pending_ingest_notifications_count` |
 | `execution_summary_emitted` | Summary sent to alertservice | — |
 | `execution_completed` | Execution closed without fatal failures | `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen` |
 | `execution_failed_non_recoverable` | Execution closed with non-recoverable failure | `metadata.items_failed`, `metadata.failure_phase` |
@@ -173,14 +189,32 @@ Default window: `now-1h`. Refresh: `30s`.
 
 ![Dashboard extractloadlivedata](extractloadlivedata_dashboard.png)
 
+**Row 1 — Execution overview**
+
 | Panel | Type | What it shows | Loki event / field |
 |---|---|---|---|
-| Executions | Timeseries (dots) | `execution_completed` (green), `execution_failed_non_recoverable` (red), errors and warnings over time | `execution_completed`, `execution_failed_non_recoverable`, level `ERROR`, level `WARNING` — `count_over_time [5m]` |
+| Executions | Timeseries (dots) | `execution_completed` (green), `execution_failed_non_recoverable` (red), errors and warnings over time | `count_over_time [2m]` |
 | Errors (last 1h) | Stat (red if ≥ 1) | Total logs with `level="ERROR"` in the last hour | `count_over_time [1h]` |
 | Warnings (last 1h) | Stat (orange if ≥ 1) | Total logs with `level="WARNING"` in the last hour | `count_over_time [1h]` |
-| Execution time (s) | Timeseries | Average duration per phase: `total`, `extract`, `save`, `notify` | `execution_metrics_final` — `metadata.execution_seconds` and `metadata.phase_durations.<phase>` via `avg_over_time [5m]` |
-| Recent failures | Logs | Stream filtered by `level="ERROR"` in descending order | — |
-| Log stream | Logs | All service events in descending order | — |
+| Execution time (s) | Timeseries | Average duration per phase: `total`, `extract`, `local_save`, `object_storage_save`, `notify` | `execution_metrics_final` — `metadata.execution_seconds` and `metadata.phase_durations.<phase>` via `avg_over_time [5m]` |
+
+**Row 2 — Per-phase metrics** (6 panels side by side, each showing `succeeded` and `failed` via `sum_over_time [2m]`)
+
+| Panel | Phase | Colour |
+|---|---|---|
+| Extract | `phase_metrics.extract` | green / red |
+| Local Save | `phase_metrics.local_save` | green / red |
+| Object Storage Save | `phase_metrics.object_storage_save` | green / red |
+| Pending Object Storage Save Files | `pending_object_storage_save_files_count` | orange |
+| Notify Ingest | `phase_metrics.notify` | green / red |
+| Pending Ingest Notifications | `pending_ingest_notifications_count` | purple |
+
+**Row 3 — Logs**
+
+| Panel | Type | What it shows |
+|---|---|---|
+| Recent failures | Logs | Stream filtered by `level="ERROR"` in descending order |
+| Log stream | Logs | All service events in descending order |
 
 ### Alert Rules
 
@@ -218,7 +252,7 @@ Rules are defined in `observability/loki/rules/fake/extractloadlivedata-alerts.y
   - `unknown`: `ingest execution failed`
 - Severity rule: only `positions_download` and `local_ingest_buffer_save_positions` receive the `[SEVERE] non recoverable ` prefix
 - Webhook rule:
-  - missing webhook or `disabled` / `none` / `null` -> send is skipped with an info log
+  - missing webhook or `disabled` / `none` / `null` → send is skipped with an info log
   - send failure does not interrupt the service and is logged as an error
 
 ## Prerequisites
@@ -298,7 +332,7 @@ Tests focus on relevant behavior and business invariants, using dependency injec
 - `tests/test_save_load_bus_positions.py`: structure validation, compression, file reading, persistence with retries, local file removal, and pending-file filtering
 - `tests/test_save_processing_requests.py`: creation and triggering of processing requests with cache and database persistence
 - `tests/test_trigger_airflow.py`: creation and triggering of Airflow invocations through HTTP and cache
-- `tests/test_extractloadlivedata_orchestrator.py`: orchestrator routing between `processing_requests` and `airflow`, configuration validation, and orchestration tests with integrated `alertservice`
+- `tests/test_extractloadlivedata_orchestrator.py`: orchestrator routing between `processing_requests` and `airflow`, configuration validation, per-phase metrics (`extract`, `local_save`, `object_storage_save`, `notify`), pending counts (`pending_object_storage_save_files_count`, `pending_ingest_notifications_count`), and orchestration tests with integrated `alertservice`
 - `tests/test_alertservice.py`: payload construction, alert sending with webhook enabled/disabled, and non-blocking behavior on failures
 - `tests/test_reporting.py`: execution-summary construction with validated contract for both success and failure paths
 - `tests/test_sql_db_v2.py`: persistence, select, and update contracts with injected engine

@@ -407,3 +407,136 @@ def test_alert_rule_scenario_non_recoverable_failure_triggers_failure_context(ca
     assert failed["metadata"]["items_failed"] > 0
     # Alert rule expectation:
     # - service_failed should trigger (failure event exists)
+
+
+# ── Phase metrics: local_save and object_storage_save ────────────────────────
+
+
+def test_phase_metrics_local_save_succeeds_in_happy_path(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["local_save"]["attempted"] == 1
+    assert phase_metrics["local_save"]["succeeded"] == 1
+    assert phase_metrics["local_save"]["failed"] == 0
+
+
+def test_phase_metrics_local_save_fails_on_local_ingest_buffer_save_error(caplog):
+    call_log = []
+
+    def save_local_raises(_config, _buses_positions):
+        call_log.append("save_bus_positions_to_local_volume")
+        raise LocalIngestBufferSaveError("local save failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, save_bus_positions_to_local_volume=save_local_raises)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["local_save"]["attempted"] == 1
+    assert phase_metrics["local_save"]["failed"] == 1
+    assert phase_metrics["local_save"]["succeeded"] == 0
+
+
+def test_phase_metrics_object_storage_save_succeeds_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log,
+        pending_list=["posicoes_onibus-202605131530.json"],
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["object_storage_save"]["attempted"] == 1
+    assert phase_metrics["object_storage_save"]["succeeded"] == 1
+    assert phase_metrics["object_storage_save"]["failed"] == 0
+
+
+def test_phase_durations_local_save_present_in_happy_path(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert "local_save" in payload["metadata"]["phase_durations"]
+
+
+# ── Pending counts observability ─────────────────────────────────────────────
+
+
+def test_pending_storage_files_count_zero_with_no_pending_files(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_object_storage_save_files_count"] == 0
+
+
+def test_pending_storage_files_count_one_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_object_storage_save_files_count"] == 1
+
+
+def test_pending_notifications_count_one_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_ingest_notifications_count"] == 1

@@ -169,7 +169,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 4, "x": 0, "y": 8 },
       "id": 7,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -217,8 +217,8 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
-      "id": 8,
+      "gridPos": { "h": 8, "w": 4, "x": 4, "y": 8 },
+      "id": 10,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
         "tooltip": { "mode": "multi" }
@@ -226,20 +226,20 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.save.succeeded\" | unwrap val [2m]))",
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.local_save.succeeded\" | unwrap val [2m]))",
           "legendFormat": "succeeded",
           "queryType": "range",
           "refId": "A"
         },
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.save.failed\" | unwrap val [2m]))",
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.local_save.failed\" | unwrap val [2m]))",
           "legendFormat": "failed",
           "queryType": "range",
           "refId": "B"
         }
       ],
-      "title": "Save",
+      "title": "Local Save",
       "type": "timeseries"
     },
     {
@@ -265,7 +265,86 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "gridPos": { "h": 8, "w": 4, "x": 8, "y": 8 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.object_storage_save.succeeded\" | unwrap val [2m]))",
+          "legendFormat": "succeeded",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.object_storage_save.failed\" | unwrap val [2m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Object Storage Save",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "orange" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 8 },
+      "id": 11,
+      "options": {
+        "legend": { "calcs": ["max", "mean"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.pending_object_storage_save_files_count\" | unwrap val [2m]))",
+          "legendFormat": "pending files",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Pending Object Storage Save Files",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "succeeded" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 8 },
       "id": 9,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -287,7 +366,38 @@
           "refId": "B"
         }
       ],
-      "title": "Notify",
+      "title": "Notify Ingest",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "fixed", "fixedColor": "purple" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 8 },
+      "id": 12,
+      "options": {
+        "legend": { "calcs": ["max", "mean"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.pending_ingest_notifications_count\" | unwrap val [2m]))",
+          "legendFormat": "pending notifications",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Pending Ingest Notifications",
       "type": "timeseries"
     },
     {
@@ -363,11 +473,15 @@
             "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "save" },
+            "matcher": { "id": "byName", "options": "local_save" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "object_storage_save" },
             "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "notify" },
+            "matcher": { "id": "byName", "options": "notify_ingest" },
             "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
           }
         ]
@@ -395,17 +509,24 @@
         },
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json save_duration=\"metadata.phase_durations.save\" | unwrap save_duration [5m]))",
-          "legendFormat": "save",
+          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json local_save_duration=\"metadata.phase_durations.local_save\" | unwrap local_save_duration [5m]))",
+          "legendFormat": "local_save",
           "queryType": "range",
           "refId": "C"
         },
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json notify_duration=\"metadata.phase_durations.notify\" | unwrap notify_duration [5m]))",
-          "legendFormat": "notify",
+          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json object_storage_save_duration=\"metadata.phase_durations.object_storage_save\" | unwrap object_storage_save_duration [5m]))",
+          "legendFormat": "object_storage_save",
           "queryType": "range",
           "refId": "D"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(avg_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json notify_duration=\"metadata.phase_durations.notify\" | unwrap notify_duration [5m]))",
+          "legendFormat": "notify_ingest",
+          "queryType": "range",
+          "refId": "E"
         }
       ],
       "title": "Execution time (s)",
@@ -436,5 +557,5 @@
   "timezone": "browser",
   "title": "extractloadlivedata",
   "uid": "extractloadlivedata",
-  "version": 103
+  "version": 108
 }
