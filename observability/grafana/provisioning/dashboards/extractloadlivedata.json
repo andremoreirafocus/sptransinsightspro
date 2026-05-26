@@ -36,7 +36,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 16, "x": 0, "y": 0 },
+      "gridPos": { "h": 8, "w": 10, "x": 0, "y": 0 },
       "id": 1,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -85,7 +85,7 @@
           ]
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "gridPos": { "h": 4, "w": 2, "x": 10, "y": 0 },
       "id": 2,
       "options": {
         "colorMode": "background",
@@ -124,7 +124,7 @@
           ]
         }
       },
-      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 4 },
+      "gridPos": { "h": 4, "w": 2, "x": 10, "y": 4 },
       "id": 3,
       "options": {
         "colorMode": "background",
@@ -145,6 +145,150 @@
       ],
       "title": "Warnings (last 1h)",
       "type": "stat"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "succeeded" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.extract.succeeded\" | unwrap val [2m]))",
+          "legendFormat": "succeeded",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.extract.failed\" | unwrap val [2m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Extract",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "succeeded" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+      "id": 8,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.save.succeeded\" | unwrap val [2m]))",
+          "legendFormat": "succeeded",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.save.failed\" | unwrap val [2m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Save",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "points",
+            "pointSize": 6,
+            "lineWidth": 0,
+            "fillOpacity": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "succeeded" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
+          },
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+      "id": 9,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.notify.succeeded\" | unwrap val [2m]))",
+          "legendFormat": "succeeded",
+          "queryType": "range",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(sum_over_time({service=\"extractloadlivedata\"} | json | event=\"execution_metrics_final\" | json val=\"metadata.phase_metrics.notify.failed\" | unwrap val [2m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "B"
+        }
+      ],
+      "title": "Notify",
+      "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
@@ -228,7 +372,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
       "id": 6,
       "options": {
         "legend": { "calcs": ["mean", "max"], "displayMode": "list", "placement": "bottom" },
@@ -292,5 +436,5 @@
   "timezone": "browser",
   "title": "extractloadlivedata",
   "uid": "extractloadlivedata",
-  "version": 101
+  "version": 103
 }

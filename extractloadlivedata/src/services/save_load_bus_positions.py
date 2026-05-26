@@ -4,7 +4,7 @@ from src.infra.object_storage import (
 )
 from src.infra.compression import compress_data, decompress_data
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 import json
 import os
@@ -51,8 +51,11 @@ def get_file_name_from_data(data: PayloadDict) -> Tuple[str, str]:
         )
         raise ValueError("Missing or invalid metadata.extracted_at.")
 
-    # Parse the timestamp
-    dt = datetime.fromisoformat(iso_timestamp_str)
+    # Parse the timestamp — handle both Z suffix (Python < 3.11) and +00:00 offset
+    if iso_timestamp_str.endswith("Z"):
+        dt = datetime.strptime(iso_timestamp_str, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    else:
+        dt = datetime.fromisoformat(iso_timestamp_str)
 
     # If naive (no timezone), assume UTC and make it aware
     if dt.tzinfo is None:

@@ -56,6 +56,25 @@ def test_get_file_name_from_data_formats():
     assert partition == "year=2026/month=04/day=09/"
 
 
+def test_get_file_name_from_data_z_suffix_utc_timestamp():
+    # Z-suffix format produced by strftime("%Y-%m-%dT%H:%M:%SZ")
+    # 2026-05-26T16:14:00Z = UTC 16:14 = São Paulo 13:14 (UTC-3)
+    data = build_sample_data()
+    data["metadata"]["extracted_at"] = "2026-05-26T16:14:00Z"
+    filename, partition = get_file_name_from_data(data)
+    assert filename == "posicoes_onibus-202605261314.json"
+    assert partition == "year=2026/month=05/day=26/"
+
+
+def test_get_file_name_from_data_utc_plus00_offset_timestamp():
+    # +00:00 format — backwards compatibility
+    data = build_sample_data()
+    data["metadata"]["extracted_at"] = "2026-05-26T16:14:00+00:00"
+    filename, partition = get_file_name_from_data(data)
+    assert filename == "posicoes_onibus-202605261314.json"
+    assert partition == "year=2026/month=05/day=26/"
+
+
 def test_get_payload_summary_counts():
     data = build_sample_data()
     hour_minute, total_qv, total_lines = get_payload_summary(data)
