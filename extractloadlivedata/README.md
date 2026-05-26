@@ -240,9 +240,11 @@ As regras estão em `observability/loki/rules/fake/extractloadlivedata-alerts.ya
 | `ServiceFailed` | critical | Evento `execution_failed_non_recoverable` detectado | 5m |
 | `ServiceWarningThreshold` | warning | `execution_completed` com `metadata.retries_seen > 0` | 5m |
 
-## Execution Reporting (Alertservice)
-- Escopo: o serviço publica **resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
-- Contrato de resumo enviado:
+## Execution Summary
+
+Ao final de cada execução, o serviço constrói um resumo de execução e o emite como evento estruturado `execution_summary_emitted` no log.
+
+- Contrato do resumo:
   - `contract_version`, `pipeline`, `execution_id`, `status`
   - `items_total`, `items_failed`, `retries`, `acceptance_rate`
   - `generated_at_utc` (timestamp UTC da geração do resumo)
@@ -265,9 +267,6 @@ As regras estão em `observability/loki/rules/fake/extractloadlivedata-alerts.ya
   - `ingest_notification`: `ingest notification failed`
   - `unknown`: `ingest execution failed`
 - Regra de severidade: apenas `positions_download` e `local_ingest_buffer_save_positions` recebem prefixo `[SEVERE] non recoverable `.
-- Regra de envio webhook:
-  - webhook ausente/`disabled`/`none`/`null` -> envio é pulado com log informativo.
-  - erro de envio não interrompe o serviço (com log de erro).
 
 
 ## Pré-requisitos

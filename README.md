@@ -4,12 +4,12 @@ Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de t
 
 Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
 
-Os pipelines e microserviços adotam observabilidade estruturada com logs em JSON, coleta centralizada e regras de alerta na stack Loki/Grafana/Alertmanager. Em componentes legados, integrações via webhook podem coexistir durante a transição.
+Os pipelines e microserviços adotam observabilidade estruturada com logs em JSON, coleta centralizada e regras de alerta na stack Loki/Grafana/Alertmanager.
 
 A solução adota o conceito de monorepo e é composta por alguns subprojetos. Cada um deles possui um README com informações sobre o seu papel e os requisitos para o seu funcionamento.
 
 ## Arquitetura
-As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada, o design do alertservice e o workflow de promoção de pipelines.
+As principais decisões de design do projeto — tecnologias escolhidas, alternativas descartadas e tradeoffs aceitos — estão documentadas como Architecture Decision Records em `docs/adr/`. Os ADRs cobrem desde a escolha da arquitetura Medallion e do DuckDB como motor de transformação até o design da fila durável com PostgreSQL, o framework de qualidade de dados multi-camada e o workflow de promoção de pipelines.
 
 A plataforma adota observabilidade estruturada, gerando ganhos diretos de rastreabilidade ponta a ponta entre componentes e pipelines, redução do tempo de diagnóstico de falhas e maior confiabilidade operacional no acompanhamento contínuo da saúde dos serviços. Essa abordagem entrega rastreamento de execuções ao longo dos múltiplos pipelines por meio de instrumentação de métricas, com correlação por `correlation_id` baseado na data/hora do ingest (dado processado) e `execution_id` (execução). O resultado é auditoria ponta a ponta e monitoramento operacional consistente com visão da linhagem de dados.
 
@@ -17,9 +17,8 @@ A plataforma adota observabilidade estruturada, gerando ganhos diretos de rastre
 ![Diagrama da solução](./diagrama_solucao.png)
 
 Para implementar a solução foram adotados os componentes:
-- Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, alertservice, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
+- Docker e Docker Compose: utilizados para empacotar e executar os componentes da solução em containers, além de orquestrar a subida do ambiente local com serviços como Airflow, PostgreSQL, MinIO, Jupyter, extractloadlivedata, Loki, Promtail e Grafana, reduzindo o esforço de configuração manual e aumentando a reprodutibilidade do ambiente.
 - [extractloadlivedata](./extractloadlivedata/README.md): microserviço que extrai os dados da API da SPTrans a intervalos regulares, inicialmente a cada 2 minutos, mas possibilitando que este intervalo seja reduzido, o que não seria viável usando um job no Airflow, uma vez que atrasos na execução impactariam a precisão dos intervalos entre execuções da extração de dados, e salvando em um volume local e em seguida na camada raw, implementada usando o Minio.
-- [alertservice](./alertservice/README.md): microserviço legado para notificações via webhook, mantido para compatibilidade durante a migração para alertas pela stack de observabilidade.
 - Minio: utilizado para implementar a camada raw, para armazenamento de dados brutos extraídos da API SPTrans e dados GTFS da SPTrans, e para a camada trusted, com dados transformados e com qualidade checada.
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
@@ -40,7 +39,7 @@ Detalhes sobre as DAGs:
         - JSON Schema para validação estrutural do dado bruto
         - suite Great Expectations para validação pós-transformação
     - [DAG orchestratetransform](./dags-dev/orchestratetransform/README.md): processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.
-    - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md): processo de transformação para criação das viagens finalizadas na camada refined a partir dos dados enriquecidos da camada trusted, com checagens de qualidade sobre posições, extração e persistência, além de geração de relatório consolidado e notificação via webhook.
+    - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md): processo de transformação para criação das viagens finalizadas na camada refined a partir dos dados enriquecidos da camada trusted, com checagens de qualidade sobre posições, extração e persistência, além de geração de relatório consolidado.
         - A partir da versão 6 desta pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness das viagens finalizadas calculadas na camada refined, que passam a ser atualizadas logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
     - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README.md): processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow.
     - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README.md): processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
@@ -56,7 +55,7 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
 
 ## Configuração
-O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, alertservice, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
+O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
 Para detalhes específicos de observabilidade e alertas, consulte [observability/README.md](./observability/README.md).
 
 ## Para executar o Sptransinsights
@@ -87,7 +86,6 @@ docker compose up -d minio
 docker compose up -d postgres
 docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
-docker compose up -d alertservice
 docker compose up -d jupyter
 docker compose up -d loki promtail grafana alertmanager
 ```
@@ -99,7 +97,6 @@ Porém será necessário seguir as instruções abaixo, executando alguns comand
 - [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
 - [extractloadlivedata](./extractloadlivedata/README.md)
-- [alertservice](./alertservice/README.md)
 
 ## Para monitorar os serviços ou efetuar configurações
 

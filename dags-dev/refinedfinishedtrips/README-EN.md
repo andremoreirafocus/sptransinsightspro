@@ -303,8 +303,6 @@ Expected keys in `general`:
 }
 ```
 
-Operational alert notifications are managed by the observability stack (Loki/Grafana); there is no application-level webhook in this pipeline.
-
 ## Installation instructions
 
 To install the requirements:

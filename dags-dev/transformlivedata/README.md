@@ -204,8 +204,6 @@ Chaves esperadas em `general`
 }
 ```
 
-Observação: a notificação de alertas não depende mais de webhook de aplicação neste pipeline; os alertas operacionais devem ser configurados na stack de observabilidade (Loki/Grafana/Alertmanager).
-
 ## Testes unitários
 Os testes deste subprojeto cobrem a lógica de transformação, o serviço de relatório de qualidade e a orquestração completa do pipeline.
 

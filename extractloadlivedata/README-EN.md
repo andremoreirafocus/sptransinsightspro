@@ -246,10 +246,11 @@ Rules are defined in `observability/loki/rules/fake/extractloadlivedata-alerts.y
 | `ServiceFailed` | critical | `execution_failed_non_recoverable` event detected | 5m |
 | `ServiceWarningThreshold` | warning | `execution_completed` with `metadata.retries_seen > 0` | 5m |
 
-## Execution reporting (`alertservice`)
+## Execution Summary
 
-- Scope: the service publishes **only an execution summary** to `alertservice`; no JSON report artifact is persisted
-- Summary contract sent:
+At the end of each execution, the service builds an execution summary and emits it as the `execution_summary_emitted` structured log event.
+
+- Summary contract:
   - `contract_version`, `pipeline`, `execution_id`, `status`
   - `items_total`, `items_failed`, `retries`, `acceptance_rate`
   - `generated_at_utc` (UTC timestamp when the summary is generated)
@@ -272,9 +273,6 @@ Rules are defined in `observability/loki/rules/fake/extractloadlivedata-alerts.y
   - `ingest_notification`: `ingest notification failed`
   - `unknown`: `ingest execution failed`
 - Severity rule: only `positions_download` and `local_ingest_buffer_save_positions` receive the `[SEVERE] non recoverable ` prefix
-- Webhook rule:
-  - missing webhook or `disabled` / `none` / `null` → send is skipped with an info log
-  - send failure does not interrupt the service and is logged as an error
 
 ## Prerequisites
 
