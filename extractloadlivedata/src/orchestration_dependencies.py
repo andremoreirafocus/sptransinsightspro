@@ -14,10 +14,12 @@ from src.services.save_load_bus_positions import (
 )
 from src.services.trigger_airflow import (
     create_pending_invokation,
+    get_pending_invokations,
     trigger_pending_airflow_dag_invokations,
 )
 from src.services.save_processing_requests import (
     create_pending_processing_request,
+    get_pending_processing_requests,
     trigger_pending_processing_requests,
 )
 
@@ -35,8 +37,10 @@ class Services:
     remove_local_file: Callable[[ConfigDict, PayloadDict], None]
     get_pending_storage_save_list: Callable[[ConfigDict], List[str]]
     create_pending_invokation: Callable[[ConfigDict, str], None]
+    get_pending_invokations: Callable[[ConfigDict], List]
     trigger_pending_airflow_dag_invokations: Callable[..., Any]
     create_pending_processing_request: Callable[[ConfigDict, str], None]
+    get_pending_processing_requests: Callable[[ConfigDict], List]
     trigger_pending_processing_requests: Callable[..., Any]
 
 
@@ -50,7 +54,9 @@ def build_orchestrator_dependencies() -> Services:
         remove_local_file=remove_local_file,
         get_pending_storage_save_list=get_pending_storage_save_list,
         create_pending_invokation=create_pending_invokation,
+        get_pending_invokations=get_pending_invokations,
         trigger_pending_airflow_dag_invokations=trigger_pending_airflow_dag_invokations,
         create_pending_processing_request=create_pending_processing_request,
+        get_pending_processing_requests=get_pending_processing_requests,
         trigger_pending_processing_requests=trigger_pending_processing_requests,
     )

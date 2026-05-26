@@ -189,6 +189,22 @@ Default window: `now-1h`. Refresh: `30s`.
 
 ![Dashboard extractloadlivedata](extractloadlivedata_dashboard.png)
 
+#### Resilience test: deliberate MinIO failure
+
+The image above was captured during a resilience test in which MinIO was deliberately stopped while the service was running. The dashboard accurately reveals how the local buffer architecture behaves under failure and how the service recovers automatically — without data loss and without manual intervention.
+
+**What each panel shows during the incident:**
+
+- **Extract Events**: remains stable at 1 success per cycle throughout the entire period — the API extraction layer is completely isolated from MinIO availability. Data collection never stopped.
+- **Local Save Events**: unchanged throughout the entire incident — local saving never failed, confirming that the local buffer absorbed all extractions while MinIO was unavailable.
+- **Object Storage Save Events**: `failed` events increase during MinIO unavailability. When MinIO is restored, `succeeded` events resume and drain the accumulated backlog.
+- **Object Storage Save Files Queue Depth**: the ascending staircase pattern during the failure shows files accumulating in the local buffer each cycle. The gradual descent after restoration shows the ordered draining of the backlog — one file per cycle, in creation order.
+- **Notify Ingest Events** and **Notify Ingest Queue Depth**: follow the same pattern with a slight natural delay — notifications are only carried out after a successful save to object storage.
+
+This behavior is exactly what the architecture was designed to guarantee: **the service continues extracting, storing locally, and recovering the backlog automatically when the external dependency is restored**.
+
+---
+
 **Row 1 — Execution overview**
 
 | Panel | Type | What it shows | Loki event / field |
@@ -196,20 +212,25 @@ Default window: `now-1h`. Refresh: `30s`.
 | Executions | Timeseries (dots) | `execution_completed` (green), `execution_failed_non_recoverable` (red), errors and warnings over time | `count_over_time [2m]` |
 | Errors (last 1h) | Stat (red if ≥ 1) | Total logs with `level="ERROR"` in the last hour | `count_over_time [1h]` |
 | Warnings (last 1h) | Stat (orange if ≥ 1) | Total logs with `level="WARNING"` in the last hour | `count_over_time [1h]` |
-| Execution time (s) | Timeseries | Average duration per phase: `total`, `extract`, `local_save`, `object_storage_save`, `notify` | `execution_metrics_final` — `metadata.execution_seconds` and `metadata.phase_durations.<phase>` via `avg_over_time [5m]` |
+| Execution time (s) | Timeseries | Average duration per phase: `total`, `extract`, `local_save`, `object_storage_save`, `notify_ingest` | `execution_metrics_final` — `metadata.execution_seconds` and `metadata.phase_durations.<phase>` via `avg_over_time [5m]` |
 
-**Row 2 — Per-phase metrics** (6 panels side by side, each showing `succeeded` and `failed` via `sum_over_time [2m]`)
+**Row 2 — Phase Events** (`succeeded` and `failed` via `sum_over_time [2m]`)
 
 | Panel | Phase | Colour |
 |---|---|---|
-| Extract | `phase_metrics.extract` | green / red |
-| Local Save | `phase_metrics.local_save` | green / red |
-| Object Storage Save | `phase_metrics.object_storage_save` | green / red |
-| Pending Object Storage Save Files | `pending_object_storage_save_files_count` | orange |
-| Notify Ingest | `phase_metrics.notify` | green / red |
-| Pending Ingest Notifications | `pending_ingest_notifications_count` | purple |
+| Extract Events | `phase_metrics.extract` | green / red |
+| Object Storage Save Events | `phase_metrics.object_storage_save` | green / red |
+| Notify Ingest Events | `phase_metrics.notify` | green / red |
 
-**Row 3 — Logs**
+**Row 3 — Queue Depth** (queue depth at the start of each cycle)
+
+| Panel | Field | Colour |
+|---|---|---|
+| Local Save Events | `phase_metrics.local_save` | green / red |
+| Object Storage Save Files Queue Depth | `pending_object_storage_save_files_count` | orange |
+| Notify Ingest Queue Depth | `pending_ingest_notifications_count` | purple |
+
+**Row 4 — Logs**
 
 | Panel | Type | What it shows |
 |---|---|---|

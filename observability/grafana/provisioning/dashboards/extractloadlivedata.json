@@ -169,7 +169,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 4, "x": 0, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
       "id": 7,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -191,7 +191,7 @@
           "refId": "B"
         }
       ],
-      "title": "Extract",
+      "title": "Extract Events",
       "type": "timeseries"
     },
     {
@@ -217,7 +217,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 4, "x": 4, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
       "id": 10,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -239,7 +239,7 @@
           "refId": "B"
         }
       ],
-      "title": "Local Save",
+      "title": "Local Save Events",
       "type": "timeseries"
     },
     {
@@ -265,7 +265,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 4, "x": 8, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
       "id": 8,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -287,7 +287,7 @@
           "refId": "B"
         }
       ],
-      "title": "Object Storage Save",
+      "title": "Object Storage Save Events",
       "type": "timeseries"
     },
     {
@@ -303,7 +303,7 @@
           }
         }
       },
-      "gridPos": { "h": 8, "w": 4, "x": 12, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
       "id": 11,
       "options": {
         "legend": { "calcs": ["max", "mean"], "displayMode": "list", "placement": "bottom" },
@@ -318,7 +318,7 @@
           "refId": "A"
         }
       ],
-      "title": "Pending Object Storage Save Files",
+      "title": "Object Storage Save Files Queue Depth",
       "type": "timeseries"
     },
     {
@@ -344,7 +344,7 @@
           }
         ]
       },
-      "gridPos": { "h": 8, "w": 4, "x": 16, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
       "id": 9,
       "options": {
         "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
@@ -366,7 +366,7 @@
           "refId": "B"
         }
       ],
-      "title": "Notify Ingest",
+      "title": "Notify Ingest Events",
       "type": "timeseries"
     },
     {
@@ -382,7 +382,7 @@
           }
         }
       },
-      "gridPos": { "h": 8, "w": 4, "x": 20, "y": 8 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
       "id": 12,
       "options": {
         "legend": { "calcs": ["max", "mean"], "displayMode": "list", "placement": "bottom" },
@@ -397,12 +397,12 @@
           "refId": "A"
         }
       ],
-      "title": "Pending Ingest Notifications",
+      "title": "Notify Ingest Queue Depth",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 24 },
       "id": 4,
       "options": {
         "dedupStrategy": "none",
@@ -427,7 +427,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 24 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 40 },
       "id": 5,
       "options": {
         "dedupStrategy": "none",
@@ -557,5 +557,5 @@
   "timezone": "browser",
   "title": "extractloadlivedata",
   "uid": "extractloadlivedata",
-  "version": 108
+  "version": 112
 }

@@ -183,6 +183,22 @@ Janela padrão: `now-1h`. Atualização: `30s`.
 
 ![Dashboard extractloadlivedata](extractloadlivedata_dashboard.png)
 
+#### Teste de resiliência: falha deliberada do MinIO
+
+A imagem acima foi capturada durante um teste de resiliência em que o MinIO foi deliberadamente interrompido enquanto o serviço estava em operação. O dashboard revela com precisão como a arquitetura de buffer local se comporta sob falha e como o serviço se recupera automaticamente — sem perda de dados e sem intervenção manual.
+
+**O que cada painel mostra durante o incidente:**
+
+- **Extract Events**: permanece estável em 1 sucesso por ciclo durante todo o período — a camada de extração da API é completamente isolada da disponibilidade do MinIO. A coleta de dados nunca parou.
+- **Local Save Events**: inalterado durante todo o incidente — o salvamento local nunca falhou, confirmando que o buffer local absorveu todas as extrações enquanto o MinIO estava indisponível.
+- **Object Storage Save Events**: os eventos `failed` aumentam durante a indisponibilidade do MinIO. Quando o MinIO é restaurado, os eventos `succeeded` retomam e drenam o backlog acumulado.
+- **Object Storage Save Files Queue Depth**: o padrão em escada ascendente durante a falha evidencia os arquivos acumulando-se no buffer local a cada ciclo. A descida gradual após a restauração mostra a drenagem ordenada do backlog — um arquivo por ciclo, na ordem de criação.
+- **Notify Ingest Events** e **Notify Ingest Queue Depth**: seguem o mesmo padrão com um leve atraso natural porém com uma diferença, as notificações são efetuadas apenas após o salvamento bem-sucedido no object storage.
+
+Este comportamento é exatamente o que a arquitetura foi projetada para garantir: **o serviço continua extraindo, armazenando localmente e recuperando o backlog automaticamente quando a dependência externa é restaurada**.
+
+---
+
 **Linha 1 — Visão geral da execução**
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
@@ -190,20 +206,25 @@ Janela padrão: `now-1h`. Atualização: `30s`.
 | Executions | Timeseries (pontos) | `execution_completed` (verde), `execution_failed_non_recoverable` (vermelho), erros e avisos ao longo do tempo | `count_over_time [2m]` |
 | Errors (last 1h) | Stat (vermelho se ≥ 1) | Total de logs com `level="ERROR"` na última hora | `count_over_time [1h]` |
 | Warnings (last 1h) | Stat (laranja se ≥ 1) | Total de logs com `level="WARNING"` na última hora | `count_over_time [1h]` |
-| Execution time (s) | Timeseries | Duração média por fase: `total`, `extract`, `local_save`, `object_storage_save`, `notify` | `execution_metrics_final` — `metadata.execution_seconds` e `metadata.phase_durations.<fase>` via `avg_over_time [5m]` |
+| Execution time (s) | Timeseries | Duração média por fase: `total`, `extract`, `local_save`, `object_storage_save`, `notify_ingest` | `execution_metrics_final` — `metadata.execution_seconds` e `metadata.phase_durations.<fase>` via `avg_over_time [5m]` |
 
-**Linha 2 — Métricas por fase** (6 painéis lado a lado, cada um com `succeeded` e `failed` via `sum_over_time [2m]`)
+**Linha 2 — Eventos por fase** (`succeeded` e `failed` via `sum_over_time [2m]`)
 
 | Painel | Fase | Cor |
 |---|---|---|
-| Extract | `phase_metrics.extract` | verde / vermelho |
-| Local Save | `phase_metrics.local_save` | verde / vermelho |
-| Object Storage Save | `phase_metrics.object_storage_save` | verde / vermelho |
-| Pending Object Storage Save Files | `pending_object_storage_save_files_count` | laranja |
-| Notify Ingest | `phase_metrics.notify` | verde / vermelho |
-| Pending Ingest Notifications | `pending_ingest_notifications_count` | roxo |
+| Extract Events | `phase_metrics.extract` | verde / vermelho |
+| Object Storage Save Events | `phase_metrics.object_storage_save` | verde / vermelho |
+| Notify Ingest Events | `phase_metrics.notify` | verde / vermelho |
 
-**Linha 3 — Logs**
+**Linha 3 — Queue Depth** (profundidade de fila no início de cada ciclo)
+
+| Painel | Campo | Cor |
+|---|---|---|
+| Local Save Events | `phase_metrics.local_save` | verde / vermelho |
+| Object Storage Save Files Queue Depth | `pending_object_storage_save_files_count` | laranja |
+| Notify Ingest Queue Depth | `pending_ingest_notifications_count` | roxo |
+
+**Linha 4 — Logs**
 
 | Painel | Tipo | O que mostra |
 |---|---|---|

@@ -64,6 +64,10 @@ def _build_services(call_log, pending_list, storage_success=True):
     def create_pending_invokation(_config, _filename):
         call_log.append("create_pending_invokation")
 
+    def get_pending_invokations(_config):
+        call_log.append("get_pending_invokations")
+        return pending_list
+
     def trigger_pending_airflow_dag_invokations(_config, with_metrics=False):
         call_log.append("trigger_pending_airflow_dag_invokations")
         if with_metrics:
@@ -74,6 +78,10 @@ def _build_services(call_log, pending_list, storage_success=True):
 
     def create_pending_processing_request(_config, _filename):
         call_log.append("create_pending_processing_request")
+
+    def get_pending_processing_requests(_config):
+        call_log.append("get_pending_processing_requests")
+        return pending_list
 
     def trigger_pending_processing_requests(_config, with_metrics=False):
         call_log.append("trigger_pending_processing_requests")
@@ -92,8 +100,10 @@ def _build_services(call_log, pending_list, storage_success=True):
         remove_local_file=remove_local_file,
         get_pending_storage_save_list=get_pending_storage_save_list,
         create_pending_invokation=create_pending_invokation,
+        get_pending_invokations=get_pending_invokations,
         trigger_pending_airflow_dag_invokations=trigger_pending_airflow_dag_invokations,
         create_pending_processing_request=create_pending_processing_request,
+        get_pending_processing_requests=get_pending_processing_requests,
         trigger_pending_processing_requests=trigger_pending_processing_requests,
     )
 

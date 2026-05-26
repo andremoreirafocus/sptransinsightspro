@@ -421,6 +421,21 @@ def extractloadlivedata(
                     _emit_failure_alert("unknown")
         finally:
             phase_durations["object_storage_save"] = time.time() - save_start
+        try:
+            if notification_engine == "airflow":
+                pending_notifications_list = services.get_pending_invokations(config)
+            else:
+                pending_notifications_list = services.get_pending_processing_requests(config)
+            pending_ingest_notifications_count = len(pending_notifications_list)
+        except Exception as e:
+            structured_logger.error(
+                event="pending_notifications_scan_failed",
+                status=EVENT_STATUS_FAILED,
+                execution_id=execution_id,
+                message="Failed to scan pending notifications list.",
+                error_type=type(e).__name__,
+                error_message=str(e),
+            )
         notify_start = time.time()
         try:
             structured_logger.info(
@@ -442,7 +457,6 @@ def extractloadlivedata(
             success_count, failed_count, retries_count = _parse_notification_metrics(
                 notification_result["metrics"]
             )
-            pending_ingest_notifications_count = success_count + failed_count
             items_total += success_count + failed_count
             items_failed += failed_count
             retries_seen += retries_count
@@ -476,7 +490,6 @@ def extractloadlivedata(
                 success_count, failed_count, retries_count = (
                     _parse_notification_metrics(metrics)
                 )
-                pending_ingest_notifications_count = success_count + failed_count
                 items_total += success_count + failed_count
                 items_failed += failed_count
                 retries_seen += retries_count
