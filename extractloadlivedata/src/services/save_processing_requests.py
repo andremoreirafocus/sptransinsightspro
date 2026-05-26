@@ -10,13 +10,20 @@ from src.infra.cache import (
     remove_from_cache,
 )
 from src.observability.process_structured_logger import get_structured_logger
-from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_RETRY, EVENT_STATUS_SKIPPED, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
+from src.domain.events import (
+    EVENT_STATUS_FAILED,
+    EVENT_STATUS_RETRY,
+    EVENT_STATUS_SKIPPED,
+    EVENT_STATUS_STARTED,
+    EVENT_STATUS_SUCCEEDED,
+)
 from src.services.exceptions import IngestNotificationError
 
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="save_processing_requests",
-    logger_name=__name__,)
+    logger_name=__name__,
+)
 
 ConfigDict = Dict[str, Any]
 DbConnection = Dict[str, Any]
@@ -40,10 +47,22 @@ def create_pending_processing_request(
         status=EVENT_STATUS_STARTED,
         message=f"Creating pending processing request for '{pending_marker}'",
     )
-    # Use marker name without extension as key
-    marker_name = f"{pending_marker.split('.')[0]}.pending"
-    cache_dir = get_config(config)
-    add_to_cache(cache_dir, marker_name, pending_marker, cache_factory=cache_factory)
+    try:
+        # Use marker name without extension as key
+        marker_name = f"{pending_marker.split('.')[0]}.pending"
+        cache_dir = get_config(config)
+        add_to_cache(
+            cache_dir, marker_name, pending_marker, cache_factory=cache_factory
+        )
+    except Exception as e:
+        structured_logger.error(
+            event="pending_storage_file_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to create pending processing request for '{pending_marker}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
 
 
 def get_pending_processing_requests(
@@ -56,8 +75,18 @@ def get_pending_processing_requests(
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
-    cache_dir = get_config(config)
-    return get_from_cache(cache_dir, cache_factory=cache_factory)
+    try:
+        cache_dir = get_config(config)
+        return get_from_cache(cache_dir, cache_factory=cache_factory)
+    except Exception as e:
+        structured_logger.error(
+            event="pending_storage_scan_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to retrieve pending processing requests: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
 
 
 def remove_pending_processing_request(
@@ -71,8 +100,18 @@ def remove_pending_processing_request(
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
 
-    cache_dir = get_config(config)
-    remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
+    try:
+        cache_dir = get_config(config)
+        remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
+    except Exception as e:
+        structured_logger.error(
+            event="remove_pending_storage_file_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to remove pending processing request '{marker_name}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
 
 
 def get_utc_logical_date_from_file(pending_marker: str) -> datetime:
@@ -139,9 +178,7 @@ def save_processing_request(
                 status=EVENT_STATUS_FAILED,
                 message=f"RAW_EVENTS_TABLE_NAME must be in 'schema.table' format. Got: '{raw_events_table}'",
             )
-            raise ValueError(
-                "RAW_EVENTS_TABLE_NAME must be in 'schema.table' format."
-            )
+            raise ValueError("RAW_EVENTS_TABLE_NAME must be in 'schema.table' format.")
         schema, table = raw_events_table.split(".", 1)
         connection = {
             "host": config["DB_HOST"],
@@ -154,7 +191,7 @@ def save_processing_request(
 
     try:
         structured_logger.debug(
-            event="notification_dispatch_started",
+            event="db_processing_request_started",
             status=EVENT_STATUS_STARTED,
             message=f"Saving processing request for: '{pending_marker}'",
         )
@@ -191,7 +228,7 @@ def save_processing_request(
             )
             return True
         structured_logger.error(
-            event="notification_dispatch_failed",
+            event="db_processing_request_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Failed to save processing request for marker '{pending_marker}'",
         )
@@ -200,7 +237,7 @@ def save_processing_request(
         )
     except Exception as e:
         structured_logger.error(
-            event="notification_dispatch_failed",
+            event="db_processing_request_failed",
             status=EVENT_STATUS_FAILED,
             message=f"Unexpected error while saving processing request for marker '{pending_marker}': {e}",
             error_type=type(e).__name__,
@@ -223,6 +260,7 @@ def trigger_pending_processing_requests(
     Process all pending processing requests and save them to the database.
     Only remove from cache if the database save was successful.
     """
+
     def get_config(config: ConfigDict) -> str:
         cache_dir = config["PROCESSING_REQUESTS_CACHE_DIR"]
         return cache_dir
@@ -230,7 +268,19 @@ def trigger_pending_processing_requests(
     pending_markers = get_pending_processing_requests(
         config, cache_factory=cache_factory
     )
-    cache_dir = get_config(config)
+    try:
+        cache_dir = get_config(config)
+    except Exception as e:
+        structured_logger.error(
+            event="db_processing_request_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to read processing requests cache configuration: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise IngestNotificationError(
+            "failed to read processing requests cache configuration"
+        ) from e
     success_count = 0
     failure_count = 0
     if pending_markers:
@@ -256,7 +306,7 @@ def trigger_pending_processing_requests(
                     else:
                         failure_count += 1
                         structured_logger.warning(
-                            event="notification_dispatch_failed",
+                            event="db_processing_request_failed",
                             status=EVENT_STATUS_RETRY,
                             message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
@@ -277,7 +327,7 @@ def trigger_pending_processing_requests(
                     if not getattr(e, "metrics", None):
                         failure_count += 1
                         structured_logger.warning(
-                            event="notification_dispatch_failed",
+                            event="db_processing_request_failed",
                             status=EVENT_STATUS_RETRY,
                             message=f"Failed to save processing request for marker '{pending_marker_value}'. Will retry on next execution.",
                         )
@@ -300,6 +350,10 @@ def trigger_pending_processing_requests(
     if with_metrics:
         return {
             "result": None,
-            "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
+            "metrics": {
+                "success": success_count,
+                "failed": failure_count,
+                "retries": 0,
+            },
         }
     return None

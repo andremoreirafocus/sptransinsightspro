@@ -1,9 +1,14 @@
 from src.observability.process_structured_logger import get_structured_logger
-from src.domain.events import EVENT_STATUS_FAILED, EVENT_STATUS_RETRY, EVENT_STATUS_STARTED, EVENT_STATUS_SUCCEEDED
+from src.domain.events import (
+    EVENT_STATUS_FAILED,
+    EVENT_STATUS_RETRY,
+    EVENT_STATUS_STARTED,
+    EVENT_STATUS_SUCCEEDED,
+)
 from src.services.exceptions import PositionsDownloadError
 import requests  # type: ignore[import-untyped]
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional, Tuple
 import re
 from html import unescape
@@ -13,7 +18,8 @@ import json
 structured_logger = get_structured_logger(
     service="extractloadlivedata",
     component="extract_buses_positions",
-    logger_name=__name__,)
+    logger_name=__name__,
+)
 DEFAULT_API_TIMEOUT_SECONDS = 10
 ConfigDict = Dict[str, Any]
 PayloadDict = Dict[str, Any]
@@ -33,9 +39,21 @@ def extract_buses_positions_with_retries(
 
         return api_max_retries, token, api_base_url
 
-    api_max_retries, token, api_base_url = get_config(config)
+    try:
+        api_max_retries, token, api_base_url = get_config(config)
+        sleep_fn = sleep_fn or time.sleep
+    except Exception as e:
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to read API configuration: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        error = PositionsDownloadError("failed to read API configuration")
+        setattr(error, "retries", 0)
+        raise error from e
 
-    sleep_fn = sleep_fn or time.sleep
     back_off = 1
     for retries in range(api_max_retries + 1):
         buses_positions_payload = extract_buses_positions(
@@ -92,7 +110,7 @@ def get_buses_positions_with_metadata(
     )
     buses_positions = {
         "metadata": {
-            "extracted_at": datetime.now().isoformat(),
+            "extracted_at": datetime.now(timezone.utc).replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "sptrans_api_v2",
             "total_vehicles": total_vehicles,
         },
@@ -185,11 +203,7 @@ def buses_positions_response_is_valid(buses_positions: Any) -> bool:
             event="extract_positions_failed",
             status=EVENT_STATUS_FAILED,
             message="Payload does not have a valid structure.",
-        )
-        structured_logger.error(
-            event="extract_positions_failed",
-            status=EVENT_STATUS_FAILED,
-            message=f"Payload content: {buses_positions}",
+            metadata={"payload_sample": str(buses_positions)[:200]},
         )
         return False
     required_fields = ["hr", "l"]
@@ -224,5 +238,3 @@ def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
             message=f"Error processing positions summary: {e}",
         )
         return "NaN", "NaN"
-
-

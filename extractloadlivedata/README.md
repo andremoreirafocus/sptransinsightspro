@@ -279,7 +279,6 @@ AIRFLOW_PASSWORD = "ingest_password"  # senha para autenticação na API do Airf
 AIRFLOW_WEBSERVER = "localhost"  # hostname do webserver do Airflow
 AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
 INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
-NOTIFICATIONS_WEBHOOK_URL="http://localhost:8000/notify" # url para envio de alertas através do alertservice
 
 ## Testes unitários
 Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas. A cobertura atual inclui:

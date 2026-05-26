@@ -1,3 +1,5 @@
+import json
+import logging
 import pytest
 
 from src.services.extract_buses_positions import (
@@ -9,6 +11,19 @@ from src.services.extract_buses_positions import (
 from src.services.exceptions import PositionsDownloadError
 from tests.fakes.http_session import FakeHttpSession
 from tests.fakes.sleep import FakeSleep
+
+_LOGGER_NAME = "src.services.extract_buses_positions"
+
+
+def _find_event(caplog: pytest.LogCaptureFixture, event: str) -> bool:
+    for record in caplog.records:
+        try:
+            payload = json.loads(record.message)
+            if payload.get("event") == event:
+                return True
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return False
 
 
 def test_buses_positions_response_is_valid_ok():
@@ -90,6 +105,18 @@ def test_extract_buses_positions_with_retries_max():
         )
     assert fake_sleep.calls == [1, 2]
     assert getattr(exc_info.value, "retries", None) == 2
+
+
+# ── Step 0: new tests for previously-silent escape paths ─────────────────────
+
+
+def test_extract_buses_positions_with_retries_config_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(PositionsDownloadError):
+            extract_buses_positions_with_retries({})
+    assert _find_event(caplog, "extract_positions_failed")
 
 
 def test_extract_buses_positions_with_retries_max_on_connection_error():

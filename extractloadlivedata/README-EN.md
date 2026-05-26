@@ -289,8 +289,6 @@ AIRFLOW_PASSWORD="ingest_password"
 AIRFLOW_WEBSERVER="localhost"
 AIRFLOW_DAG_NAME="transformlivedata-v5"
 INVOKATIONS_CACHE_DIR="../.diskcache_pending_invocations"
-
-NOTIFICATIONS_WEBHOOK_URL="http://localhost:8000/notify"
 ```
 
 ## Unit tests

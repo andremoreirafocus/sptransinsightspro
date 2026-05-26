@@ -45,7 +45,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum by (event) (count_over_time({service=\"extractloadlivedata\"} | json | event=~\"execution_completed|execution_failed_non_recoverable\" [5m]))",
+          "expr": "sum by (event) (count_over_time({service=\"extractloadlivedata\"} | json | event=~\"execution_completed|execution_failed_non_recoverable\" [2m]))",
           "legendFormat": "{{event}}",
           "queryType": "range",
           "refId": "A"

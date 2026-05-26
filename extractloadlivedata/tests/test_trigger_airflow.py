@@ -1,3 +1,5 @@
+import json
+import logging
 import pytest
 
 from src.services.trigger_airflow import (
@@ -12,6 +14,19 @@ from src.services.exceptions import IngestNotificationError
 from tests.fakes.cache import fake_cache_factory
 from tests.fakes.http_post import FakeHttp
 
+_LOGGER_NAME = "src.services.trigger_airflow"
+
+
+def _find_event(caplog: pytest.LogCaptureFixture, event: str) -> bool:
+    for record in caplog.records:
+        try:
+            payload = json.loads(record.message)
+            if payload.get("event") == event:
+                return True
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return False
+
 
 def test_get_utc_logical_date_from_file_format():
     logical_date = get_utc_logical_date_from_file("posicoes_onibus-202604090910.json")
@@ -22,19 +37,11 @@ def test_get_utc_logical_date_from_file_format():
 def test_pending_invokations_cache_flow():
     config = {"INVOKATIONS_CACHE_DIR": "/tmp/cache"}
     marker = "posicoes_onibus-202604090910.json"
-    create_pending_invokation(
-        config, marker, cache_factory=fake_cache_factory
-    )
-    pending = get_pending_invokations(
-        config, cache_factory=fake_cache_factory
-    )
+    create_pending_invokation(config, marker, cache_factory=fake_cache_factory)
+    pending = get_pending_invokations(config, cache_factory=fake_cache_factory)
     assert len(pending) == 1
-    remove_pending_invokation(
-        config, pending[0], cache_factory=fake_cache_factory
-    )
-    pending_after = get_pending_invokations(
-        config, cache_factory=fake_cache_factory
-    )
+    remove_pending_invokation(config, pending[0], cache_factory=fake_cache_factory)
+    pending_after = get_pending_invokations(config, cache_factory=fake_cache_factory)
     assert pending_after == []
 
 
@@ -72,9 +79,7 @@ def test_trigger_pending_airflow_dag_invokations_removes_on_success():
         "AIRFLOW_DAG_NAME": "dag",
     }
     marker = "posicoes_onibus-202604090910.json"
-    create_pending_invokation(
-        config, marker, cache_factory=fake_cache_factory
-    )
+    create_pending_invokation(config, marker, cache_factory=fake_cache_factory)
 
     http_ok = FakeHttp(status_code=200, text="true")
     trigger_pending_airflow_dag_invokations(
@@ -82,10 +87,50 @@ def test_trigger_pending_airflow_dag_invokations_removes_on_success():
         post_fn=http_ok.post,
         cache_factory=fake_cache_factory,
     )
-    pending_after = get_pending_invokations(
-        config, cache_factory=fake_cache_factory
-    )
+    pending_after = get_pending_invokations(config, cache_factory=fake_cache_factory)
     assert pending_after == []
+
+
+# ── Step 0: new tests for previously-silent escape paths ─────────────────────
+
+
+def test_get_utc_logical_date_from_file_invalid_format_emits_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(Exception):
+            get_utc_logical_date_from_file("bad-format")
+    assert _find_event(caplog, "get_utc_logical_date_failed")
+
+
+# ── Step 4: new test for single detected event per invocation ─────────────────
+
+
+def test_trigger_pending_airflow_dag_invokations_emits_single_detected_event(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = {
+        "INVOKATIONS_CACHE_DIR": "/tmp/cache",
+        "AIRFLOW_USER": "user",
+        "AIRFLOW_PASSWORD": "pass",
+        "AIRFLOW_WEBSERVER": "localhost",
+        "AIRFLOW_DAG_NAME": "dag",
+    }
+    marker = "posicoes_onibus-202604090910.json"
+    create_pending_invokation(config, marker, cache_factory=fake_cache_factory)
+    http_ok = FakeHttp(status_code=200, text="true")
+    with caplog.at_level(logging.DEBUG, logger=_LOGGER_NAME):
+        trigger_pending_airflow_dag_invokations(
+            config,
+            post_fn=http_ok.post,
+            cache_factory=fake_cache_factory,
+        )
+    matching = [
+        r
+        for r in caplog.records
+        if json.loads(r.message).get("event") == "airflow_invocation_detected"
+    ]
+    assert len(matching) == 1, f"Expected exactly 1 event, got {len(matching)}"
 
 
 def test_trigger_pending_airflow_dag_invokations_returns_metrics():
@@ -100,7 +145,10 @@ def test_trigger_pending_airflow_dag_invokations_returns_metrics():
     create_pending_invokation(config, marker, cache_factory=fake_cache_factory)
     http_ok = FakeHttp(status_code=200, text="true")
     result = trigger_pending_airflow_dag_invokations(
-        config, post_fn=http_ok.post, cache_factory=fake_cache_factory, with_metrics=True
+        config,
+        post_fn=http_ok.post,
+        cache_factory=fake_cache_factory,
+        with_metrics=True,
     )
     assert result["metrics"]["success"] == 1
     assert result["metrics"]["failed"] == 0
