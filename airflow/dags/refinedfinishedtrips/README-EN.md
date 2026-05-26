@@ -12,19 +12,19 @@ For each route and vehicle:
 - checks the quality of position data before processing trips by running two validations:
   - **freshness**: validates whether the most recent vehicle timestamp is within the expected staleness threshold
   - **extraction gaps**: validates whether there are no significant gaps between extraction timestamps in the recent window
-- if quality checks fail: stops the pipeline, saves a quality report to the metadata bucket, and sends a webhook notification
-- if quality checks produce a warning: saves a quality report to the metadata bucket, sends a webhook notification, and continues processing
+- if quality checks fail: stops the pipeline and saves a quality report to the metadata bucket
+- if quality checks produce a warning: saves a quality report to the metadata bucket and continues processing
 - computes finished trips during the analysis time window
 - checks the quality of trip extraction by running two validations over the effective extraction window, measured by the interval between the first and last `extracao_ts` in the dataset:
   - **zero trips**: warning if the effective extraction window exceeds the configured threshold and no trip is identified
   - **low trip count**: warning if the effective extraction window exceeds the configured threshold and the number of identified trips is below the expected minimum
-- if a failure occurs during the trip-extraction phase: saves a failure report with the partial results already available, sends a webhook notification, and stops execution
+- if a failure occurs during the trip-extraction phase: saves a failure report with the partial results already available and stops execution
 - saves finished trips to the refined layer implemented in the low-latency analytical database for use by the visualization layer
 - checks the persistence result, recording how many trips:
   - were actually inserted in this execution
   - had already been saved previously
-- if a failure occurs during the persistence phase: saves a failure report with the partial results already available, sends a webhook notification, and stops execution
-- at the end of every successful execution, saves a complete quality report to the metadata bucket and sends a webhook notification with the consolidated status of the three phases: positions, trip extraction, and persistence
+- if a failure occurs during the persistence phase: saves a failure report with the partial results already available and stops execution
+- at the end of every successful execution, saves a complete quality report to the metadata bucket with the consolidated status of the three phases: positions, trip extraction, and persistence
 
 ## Trip extraction algorithm
 
@@ -129,7 +129,7 @@ Together, these decisions make the finished-trips table more reliable for:
 - cycle and regularity evaluation
 - analytical consumption in the visualization layer
 
-## Quality reporting and notification
+## Quality reporting and observability
 
 The pipeline produces structured reports for three phases:
 - `positions`
@@ -166,32 +166,80 @@ The `persistence` phase of the final report directly exposes the persistence res
 - `added_rows`
 - `previously_saved_rows`
 
-The `summary` follows the common contract consumed by `alertservice`.
-The pipeline sends a webhook for:
-- failures in `positions`
-- warnings in `positions`
-- failures in `trip_extraction`
-- failures in `persistence`
-- the final consolidated report
-
-Webhook delivery is explicitly logged, indicating whether:
-- the notification was sent
-- the notification was disabled
-- the attempt failed
-
 The [samples](./samples) folder contains a manually curated example of the consolidated quality report: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
 
-## Execution phase metrics
-- The pipeline emits a structured `execution_phase_metrics` event at the end of each run.
-- The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
-- Tracked phases:
-  - `config_load`
-  - `positions_load`
-  - `positions_quality`
-  - `trip_extraction`
-  - `persistence`
-  - `quality_report`
-- On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
+### Observability (Loki + Grafana stack)
+
+Observability for this pipeline is based on structured logging: all events are emitted as JSON with the fields `service`, `event`, `status`, `execution_id`, and `correlation_id`. In the Airflow environment, logs are collected by Promtail and forwarded to Loki.
+
+#### Event taxonomy
+
+Each pipeline phase emits lifecycle events (`_started`, `_succeeded`). Four consolidated events are emitted at the end of each execution:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `execution_finished` | Execution completed successfully | `execution_id`, `correlation_id`, `status` |
+| `execution_aborted` | Any phase fails and stops the pipeline | `execution_id`, `correlation_id`, `status`, `message`, `metadata.phase` |
+| `execution_phase_metrics` | At the end of every execution (success or failure) | Duration and status of each phase in `metadata.phase_metrics` |
+| `quality_report_metrics` | After quality report generation | Volume, extraction, and persistence metrics in `metadata` |
+
+Two service events are especially relevant for continuous monitoring of input data quality:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `freshness_evaluation` | Each execution, after reading positions | `metadata.observed_lag_minutes`, `warn_threshold_minutes`, `fail_threshold_minutes` |
+| `recent_gaps_evaluation` | Each execution, after reading positions | `metadata.max_gap_minutes`, `warn_threshold_minutes`, `fail_threshold_minutes` |
+
+#### Grafana dashboard
+
+The dashboard is at [`observability/grafana/provisioning/dashboards/refinedfinishedtrips.json`](../../../../observability/grafana/provisioning/dashboards/refinedfinishedtrips.json) and is provisioned automatically by Grafana. It uses Loki as the datasource. All queries follow the pattern:
+
+```
+{service="airflow_tasks"} | json | service_extracted="refinedfinishedtrips" | event="<event>"
+```
+
+![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
+
+The dashboard is organized in five rows:
+
+**Row 1 — Operational health**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Executions | Timeseries (dots) | Completed (green) and aborted (red) executions over time | `execution_finished` and `execution_aborted` — `count_over_time [2m]` |
+| Completed (last 1h) | Stat | Total successful executions in the last hour | `execution_finished` — `count_over_time [1h]` |
+| Aborted (last 1h) | Stat (red if ≥ 1) | Total aborted executions in the last hour | `execution_aborted` — `count_over_time [1h]` |
+| Execution duration (s) | Timeseries | Average duration per phase: `total`, `trip_extraction`, `positions_load`, `positions_quality`, `persistence`, `quality_report`, `config_load` | `execution_phase_metrics` — `metadata.phase_metrics.<phase>.duration_seconds` via `avg_over_time [5m]` |
+
+**Row 2 — Trip volume**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Trips added per run | Timeseries | New trips inserted per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
+| Trips extracted per run | Timeseries | Trips detected by the algorithm per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.trips_extracted` |
+| Positions loaded per run | Timeseries | Volume of positions read from object storage per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.positions_in_time_window_count` |
+
+**Row 3 — Extraction quality**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Vehicle-line groups processed | Timeseries | Route/vehicle groups processed per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
+| Sentido discrepancies per run | Timeseries | Discrepancies between derived and source direction per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
+| Position sanitization drops per run | Timeseries | Positions discarded by spatial sanitization per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
+
+**Row 4 — Position data freshness**
+
+| Panel | Type | What it shows | Thresholds |
+|---|---|---|---|
+| Positions freshness lag (s) | Timeseries | Lag in seconds between the most recent vehicle timestamp and the execution time; alert lines at 600 s (warn) and 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
+| Max extraction gap (s) | Timeseries | Largest gap in seconds between consecutive extraction cycles in the recent window; alert lines at 300 s (warn) and 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
+
+**Row 5 — Logs**
+
+| Panel | What it shows |
+|---|---|
+| Recent aborted executions | Filtered stream of `execution_aborted` events with phase and failure message |
+| Log stream | All pipeline events in descending order |
 
 ## Prerequisites
 
@@ -199,7 +247,6 @@ The [samples](./samples) folder contains a manually curated example of the conso
 - availability of the metadata bucket in the object storage service to store quality reports
 - creation of an object storage access key registered in the configuration file with read access to the trusted-layer bucket and write access to the metadata bucket
 - availability of the analytical database service, currently PostgreSQL, for storing data in the refined layer
-- `alertservice` available and configured to receive quality notifications (configurable through `webhook_url`; use `"disabled"` to disable it)
 - `.env` file with the required credentials
 - a template is available in `.env.example`
 - creation of the configuration file
@@ -253,14 +300,10 @@ Expected keys in `general`:
     "trips_effective_window_threshold_minutes": 60,
     "trips_min_trips_threshold": 5
   },
-  "notifications": {
-    "webhook_url": "http://localhost:8000/notify"
-  }
 }
 ```
 
-To disable `alertservice` notifications, configure:
-- `notifications.webhook_url = "disabled"`
+Operational alert notifications are managed by the observability stack (Loki/Grafana); there is no application-level webhook in this pipeline.
 
 ## Installation instructions
 
@@ -369,10 +412,5 @@ Create `dags-dev/refinedfinishedtrips/.env` based on `.env.example` and fill in 
 With the tables already created as described above, run:
 
 ```bash
-python ./refinedfinishedtrips-v<version number>.py
-```
-
-Example:
-```bash
-python ./refinedfinishedtrips-v6.py
+python refinedfinishedtrips/extract_trips.py
 ```

@@ -22,9 +22,6 @@
       "trips_effective_window_threshold_minutes": 60,
       "trips_min_trips_threshold": 5
     },
-    "notifications": {
-      "webhook_url": "http://alertservice:8000/notify"
-    },
     "trip_detection": {
       "stop_proximity_threshold_meters": 100
     }

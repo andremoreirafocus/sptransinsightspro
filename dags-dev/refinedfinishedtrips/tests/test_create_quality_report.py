@@ -17,7 +17,6 @@ def make_config():
                 "metadata_bucket": "metadata",
                 "quality_report_folder": "quality-reports",
             },
-            "notifications": {"webhook_url": "disabled"},
         },
         "connections": {
             "object_storage": {
