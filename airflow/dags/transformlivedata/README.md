@@ -96,6 +96,8 @@ O dashboard está em [`observability/grafana/provisioning/dashboards/transformli
 {service="airflow_tasks"} | json | service_extracted="transformlivedata" | event="<evento>"
 ```
 
+![Dashboard transformlivedata](transformlivedata_dashboard.png)
+
 O dashboard está organizado em três linhas:
 
 **Linha 1 — Saúde operacional**

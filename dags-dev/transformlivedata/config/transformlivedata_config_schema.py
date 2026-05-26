@@ -1,6 +1,6 @@
 from typing import Any, Dict, Type
 
-from pydantic import BaseModel, ValidationError, ConfigDict, Field
+from pydantic import BaseModel, ValidationError, ConfigDict
 
 
 class StorageConfig(BaseModel):
@@ -27,11 +27,6 @@ class CompressionConfig(BaseModel):
     raw_data_compression_extension: str
 
 
-class NotificationsConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    webhook_url: str = "disabled"
-
-
 class DataValidationsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     json_validation: Dict[str, Any]
@@ -43,7 +38,6 @@ class GeneralConfig(BaseModel):
     storage: StorageConfig
     tables: TablesConfig
     compression: CompressionConfig
-    notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
     data_validations: DataValidationsConfig
 
 

@@ -75,7 +75,6 @@ def test_orchestration_emits_success_execution_phase_metrics(caplog):
     assert payload["metadata"]["pipeline"] == "transformlivedata"
     assert payload["metadata"]["logical_date_utc"] == "2026-05-17T10:00:00+00:00"
     assert set(payload["metadata"]["phase_metrics"].keys()) == set(PHASES)
-    assert "notify_webhook" not in payload["metadata"]["phase_metrics"]
 
     for phase in PHASES:
         phase_data = payload["metadata"]["phase_metrics"][phase]

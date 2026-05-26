@@ -21,7 +21,6 @@ class FakeTransformLiveDataOrchestrationDependencies:
     def _base_config():
         return {
             "general": {
-                "notifications": {"webhook_url": "disabled"},
                 "storage": {
                     "trusted_bucket": "trusted",
                     "quarantined_bucket": "quarantined",
