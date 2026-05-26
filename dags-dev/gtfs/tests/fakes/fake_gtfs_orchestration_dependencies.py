@@ -14,7 +14,6 @@ _TABLE_NAMES = ["stops", "stop_times", "routes", "trips", "frequencies", "calend
 def _default_pipeline_config() -> Dict[str, Any]:
     return {
         "general": {
-            "notifications": {"webhook_url": "disabled"},
             "storage": {
                 "trusted_bucket": "trusted",
                 "gtfs_folder": "gtfs",
