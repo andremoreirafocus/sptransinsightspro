@@ -143,7 +143,9 @@ observability/
   loki/
     loki-config.yml          # Configuração do Loki (armazenamento em filesystem, nó único)
   alertmanager/
-    alertmanager.yml         # Configuração do Alertmanager (roteamento e receivers)
+    alertmanager.yml.tmpl    # Template de configuração do Alertmanager (roteamento e receivers) — credenciais injetadas na inicialização via variáveis de ambiente
+    Dockerfile               # Imagem customizada com entrypoint baseado em sed
+    entrypoint.sh            # Renderiza o template na inicialização do container
   promtail/
     promtail-config.yml      # Configuração do Promtail (Docker socket, filtro extractloadlivedata)
   grafana/

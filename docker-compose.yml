@@ -187,10 +187,10 @@ services:
     restart: always
 
   alertmanager:
-    image: prom/alertmanager:v0.28.1
+    build:
+      context: ./observability/alertmanager
+      dockerfile: Dockerfile
     container_name: alertmanager
-    command:
-      - "--config.file=/etc/alertmanager/alertmanager.yml"
     environment:
       ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST}
       ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT}
@@ -201,8 +201,6 @@ services:
       ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO}
     ports:
       - "9093:9093"
-    volumes:
-      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     networks:
       - rede_fia
     restart: always

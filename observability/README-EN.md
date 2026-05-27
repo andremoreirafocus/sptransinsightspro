@@ -143,7 +143,9 @@ observability/
   loki/
     loki-config.yml          # Loki server config (filesystem storage, single-node)
   alertmanager/
-    alertmanager.yml         # Alertmanager config (routing and receivers)
+    alertmanager.yml.tmpl    # Alertmanager config template (routing and receivers) — credentials injected at startup from env vars
+    Dockerfile               # Custom image with sed-based entrypoint
+    entrypoint.sh            # Renders the template at container startup
   promtail/
     promtail-config.yml      # Promtail scrape config (Docker socket, extractloadlivedata filter)
   grafana/

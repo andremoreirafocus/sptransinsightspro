@@ -1,9 +1,9 @@
 global:
-  smtp_smarthost: 'sandbox.smtp.mailtrap.io:587'
-  smtp_from: 'andre.moreira.engineer@gmail.com'
-  smtp_auth_username: '71268641df9275'
-  smtp_auth_password: '74604dfb719b9c'
-  smtp_require_tls: true
+  smtp_smarthost: '${ALERTMANAGER_SMTP_HOST}:${ALERTMANAGER_SMTP_PORT}'
+  smtp_from: '${ALERTMANAGER_EMAIL_FROM}'
+  smtp_auth_username: '${ALERTMANAGER_SMTP_USER}'
+  smtp_auth_password: '${ALERTMANAGER_SMTP_PASSWORD}'
+  smtp_require_tls: ${ALERTMANAGER_SMTP_USE_TLS}
 
 route:
   receiver: warning-grouped
@@ -29,14 +29,14 @@ route:
 receivers:
   - name: critical-immediate
     email_configs:
-      - to: 'andremoreira.focus@gmail.com'
+      - to: '${ALERTMANAGER_EMAIL_TO}'
         send_resolved: true
         headers:
           Subject: '[CRITICAL][{{ .CommonLabels.service }}] {{ .CommonLabels.alertname }}'
 
   - name: warning-grouped
     email_configs:
-      - to: 'andremoreira.focus@gmail.com'
+      - to: '${ALERTMANAGER_EMAIL_TO}'
         send_resolved: true
         headers:
           Subject: '[WARNING][{{ .CommonLabels.service }}] {{ .CommonLabels.alertname }}'
