@@ -26,3 +26,4 @@ The goal is not to justify choices after the fact, but to record the reasoning a
 | [ADR-0008](./0008-pipeline-promotion-workflow-EN.md) | Pipeline promotion workflow (`dags-dev` -> `airflow/dags`) | Accepted |
 | [ADR-0009](./0009-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Accepted |
 | [ADR-0010](./0010-airflow-datasets-for-event-driven-orchestration-EN.md) | Airflow Datasets for event-driven orchestration | Proposed |
+| [ADR-0011](./0011-structured-logging-with-canonical-contract-and-decoupled-transport-EN.md) | Structured logging with canonical contract and decoupled transport | Accepted |
