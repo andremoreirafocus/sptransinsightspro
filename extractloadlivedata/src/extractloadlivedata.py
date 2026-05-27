@@ -8,7 +8,7 @@ from src.services.exceptions import (
     SavePositionsToRawError,
 )
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Literal, Optional, Tuple
 import time
 
 from src.domain.events import (
@@ -30,8 +30,6 @@ structured_logger = get_structured_logger(
     logger_name=__name__,
 )
 SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX = "[SEVERE] non recoverable "
-
-AlertSender = Callable[[str, Dict[str, Any]], None]
 
 
 def _get_config_values(config: ConfigDict) -> Tuple[str, str]:
@@ -93,7 +91,7 @@ def extractloadlivedata(
             event="execution_summary_emitted",
             status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
-            message="Failure quality summary emitted to alertservice.",
+            message="Failure quality metrics summary saved.",
             metadata={
                 "failure_phase": failure_phase,
                 "summary_payload": summary,
@@ -117,7 +115,7 @@ def extractloadlivedata(
             event="execution_summary_emitted",
             status=EVENT_STATUS_SUCCEEDED,
             execution_id=execution_id,
-            message="Final quality summary emitted to alertservice.",
+            message="Final quality metrics summary saved.",
             metadata={
                 "summary_status": status,
                 "summary_payload": summary,

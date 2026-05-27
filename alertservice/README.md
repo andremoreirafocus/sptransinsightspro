@@ -1,3 +1,5 @@
+> **⚠️ DESCONTINUADO** — Este microserviço foi descontinuado. Os pipelines da plataforma não utilizam mais este serviço. A observabilidade e os alertas são gerenciados pela stack Loki/Grafana/Alertmanager.
+
 ## Objetivo deste subprojeto
 Receber resumos de qualidade de pipelines via webhook e enviar notificações por e-mail, incluindo alertas imediatos para falhas e alertas cumulativos para warnings.
 
