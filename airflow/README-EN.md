@@ -84,14 +84,16 @@ airflow variables import variables_and_connections/gtfs_data_expectations_trip_d
 
 # refinedfinishedtrips
 airflow variables import variables_and_connections/refinedfinishedtrips_general.json
+
+# updatelatestpositions
+airflow variables import variables_and_connections/updatelatestpositions_general.json
 ```
 
 The `variables.json` file already contains:
 - `orchestratetransform_general`
-- `updatelatestpositions_general`
 - `refinedsynctripdetails_general`
 
-That means these three configurations are already loaded in the consolidated import and do not require additional dedicated files at this stage.
+That means these two configurations are already loaded in the consolidated import and do not require additional dedicated files at this stage.
 
 ## Airflow integration with the ingest service
 

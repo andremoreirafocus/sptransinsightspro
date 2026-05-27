@@ -3,7 +3,7 @@ import os
 import pytest
 
 import pipeline_configurator.config as config_module
-from fakes.fake_airflow_connection import FakeAirflowConnection
+from .fakes.fake_airflow_connection import FakeAirflowConnection
 
 
 def test_get_config_uses_local_mode_by_default(

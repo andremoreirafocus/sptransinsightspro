@@ -38,18 +38,12 @@ class TripDetectionConfig(BaseModel):
     stop_proximity_threshold_meters: int
 
 
-class NotificationsConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    webhook_url: str
-
-
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     analysis: AnalysisConfig
     storage: StorageConfig
     tables: TablesConfig
     quality: QualityConfig
-    notifications: NotificationsConfig
     trip_detection: TripDetectionConfig
 
 

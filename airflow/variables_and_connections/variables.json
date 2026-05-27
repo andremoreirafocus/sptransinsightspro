@@ -8,16 +8,6 @@
             "raw_events_table_name": "to_be_processed.raw"
         }
     },
-    "updatelatestpositions_general": {
-        "storage": {
-            "trusted_bucket": "trusted",
-            "app_folder": "sptrans"
-        },
-        "tables": {
-            "positions_table_name": "positions",
-            "latest_positions_table_name": "refined.latest_positions"
-        }
-    },
     "refinedsynctripdetails_general": {
         "storage": {
             "trusted_bucket": "trusted",

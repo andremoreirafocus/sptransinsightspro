@@ -17,7 +17,6 @@ def make_general():
             "trusted_bucket": "trusted",
         },
         "tables": {"trip_details_table_name": "trip_details"},
-        "notifications": {"webhook_url": "disabled"},
         "data_validations": {
             "expectations_validation": {
                 "expectations_suites": [

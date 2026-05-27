@@ -1,4 +1,3 @@
-import pytest
 from gtfs.services.save_files_to_raw_storage import save_files_to_raw_storage
 
 
@@ -120,11 +119,6 @@ def test_file_content_passed_to_write():
     assert write_calls[0] == b"abc123"
 
 
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["general"]["storage"]["raw_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        save_files_to_raw_storage(config, ["stops.txt"])
 
 
 def test_empty_files_list_does_nothing():

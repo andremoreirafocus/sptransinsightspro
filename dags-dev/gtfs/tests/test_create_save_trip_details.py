@@ -28,16 +28,9 @@ def make_config():
     }
 
 
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["general"]["storage"]["trusted_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        create_trip_details_table_and_fill_missing_data(config)
-
-
 def test_duckdb_error_raises_value_error():
     fake_con = FakeDuckDBConnection(raises=RuntimeError("duckdb boom"))
-    with pytest.raises(ValueError, match="An unexpected error occurred"):
+    with pytest.raises(ValueError, match="Trip details creation failed"):
         create_trip_details_table_and_fill_missing_data(
             make_config(), duckdb_client=fake_con
         )

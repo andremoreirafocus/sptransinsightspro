@@ -29,11 +29,11 @@ def make_trip_tuple(trip_end_offset_seconds: int = 3600):
     return ("1234-10-0", 100, start, end, end - start, False, 0.0)
 
 
-def test_missing_config_key_raises_value_error():
+def test_missing_config_key_raises_key_error():
     config = make_config()
     del config["connections"]
     factory = make_fake_engine_factory()
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError, match="connections"):
         save_finished_trips_to_db(config, [], engine_factory=factory)
 
 

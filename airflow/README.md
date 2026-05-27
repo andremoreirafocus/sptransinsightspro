@@ -79,14 +79,16 @@ airflow variables import variables_and_connections/gtfs_data_expectations_trip_d
 
 # refinedfinishedtrips
 airflow variables import variables_and_connections/refinedfinishedtrips_general.json
+
+# updatelatestpositions
+airflow variables import variables_and_connections/updatelatestpositions_general.json
 ```
 
 O arquivo [variables.json](/home/andrem/projetos/sptransinsightspro/airflow/variables_and_connections/variables.json) já contém:
 - `orchestratetransform_general`
-- `updatelatestpositions_general`
 - `refinedsynctripdetails_general`
 
-Ou seja, essas três configurações já são carregadas no import consolidado e não exigem arquivos adicionais separados nesta etapa.
+Ou seja, essas duas configurações já são carregadas no import consolidado e não exigem arquivos adicionais separados nesta etapa.
 
 ## Integração do Airflow com o serviço de ingest 
 O ingest de dados da API é efetuado pelo serviço de ingest [extractloadlivedata](../extractloadlivedata/README.md)

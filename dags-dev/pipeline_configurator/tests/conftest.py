@@ -6,9 +6,9 @@ import types
 from pathlib import Path
 
 import pytest
-from fakes.fake_airflow_base_hook import FakeAirflowBaseHook
-from fakes.fake_airflow_connection import FakeAirflowConnection
-from fakes.fake_airflow_variable import FakeAirflowVariable
+from .fakes.fake_airflow_base_hook import FakeAirflowBaseHook
+from .fakes.fake_airflow_connection import FakeAirflowConnection
+from .fakes.fake_airflow_variable import FakeAirflowVariable
 
 
 def pytest_configure():

@@ -66,17 +66,11 @@ class TablesConfig(BaseModel):
     trip_details_table_name: str
 
 
-class NotificationsConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    webhook_url: str
-
-
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     extraction: ExtractionConfig
     storage: StorageConfig
     tables: TablesConfig
-    notifications: NotificationsConfig
     data_validations: DataValidationsConfig
 
 

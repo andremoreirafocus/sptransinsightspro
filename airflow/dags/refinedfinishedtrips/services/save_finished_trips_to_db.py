@@ -1,39 +1,34 @@
-import logging
 from typing import Any, Callable, Dict, List, Tuple
 
 from sqlalchemy import create_engine, text
 
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], engine_factory: Callable = create_engine) -> Dict[str, Any]:
-    """
-    Saves finished trips to Postgres using SQLAlchemy.
-    Input: trips_tuples (List of Tuples)
-    Tuple order: trip_id, vehicle_id, trip_start_time, trip_end_time, duration, is_circular, average_speed
-    """
-
     def get_config(config):
-        try:
-            general = config["general"]
-            tables = general["tables"]
-            database = config["connections"]["database"]
-            table_name = tables["finished_trips_table_name"]
-            host = database["host"]
-            port = database["port"]
-            dbname = database["database"]
-            dbuser = database["user"]
-            password = database["password"]
-            return (table_name, host, port, dbname, dbuser, password)
-        except KeyError as e:
-            logger.error(f"Missing required configuration key: {e}")
-            raise ValueError(f"Missing required configuration key: {e}")
+        general = config["general"]
+        tables = general["tables"]
+        database = config["connections"]["database"]
+        table_name = tables["finished_trips_table_name"]
+        host = database["host"]
+        port = database["port"]
+        dbname = database["database"]
+        dbuser = database["user"]
+        password = database["password"]
+        return (table_name, host, port, dbname, dbuser, password)
 
     (table_name, host, port, dbname, dbuser, password) = get_config(config)
     db_uri = f"postgresql://{dbuser}:{password}@{host}:{port}/{dbname}"
     engine = engine_factory(db_uri)
     staging_table = f"{table_name}_stg"
-    logger.info(f"Using staging table: {staging_table} for batch operations.")
+    structured_logger.info(
+        event="trips_save_started",
+        message="Starting trips save",
+        metadata={"staging_table": staging_table},
+    )
     try:
         with engine.begin() as conn:
             max_result = conn.execute(text(f"SELECT MAX(trip_end_time) FROM {table_name}"))
@@ -41,9 +36,13 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
 
         if latest_trip_end_time is not None:
             new_trips_tuples = [t for t in trips_tuples if t[3] > latest_trip_end_time]
-            logger.info(
-                f"Filtered {len(trips_tuples) - len(new_trips_tuples)} already-persisted trips. "
-                f"{len(new_trips_tuples)} new trips to save."
+            structured_logger.info(
+                event="trips_filtered",
+                message="Trips filtered",
+                metadata={
+                    "filtered_count": len(trips_tuples) - len(new_trips_tuples),
+                    "new_count": len(new_trips_tuples),
+                },
             )
         else:
             new_trips_tuples = trips_tuples
@@ -79,30 +78,35 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
         with engine.begin() as conn:
             upsert_query = text(f"""
                 INSERT INTO {table_name} (
-                    trip_id, vehicle_id, trip_start_time, trip_end_time, 
+                    trip_id, vehicle_id, trip_start_time, trip_end_time,
                     duration, is_circular, average_speed
                 )
-                SELECT 
-                    trip_id, vehicle_id, trip_start_time, trip_end_time, 
+                SELECT
+                    trip_id, vehicle_id, trip_start_time, trip_end_time,
                     duration, is_circular, average_speed
                 FROM {staging_table}
-                ON CONFLICT (trip_start_time, vehicle_id, trip_id) 
+                ON CONFLICT (trip_start_time, vehicle_id, trip_id)
                 DO NOTHING;
             """)
             execution_result = conn.execute(upsert_query)
             added_rows = execution_result.rowcount
             previously_saved_rows = len(trips_tuples) - added_rows
             conn.execute(text(f"ANALYZE {table_name};"))
-            logger.info(
-                f"Sync complete: {added_rows} trips added, {previously_saved_rows} had been previously saved."
+            structured_logger.info(
+                event="trips_saved",
+                message="Trips saved",
+                metadata={"added_rows": added_rows, "previously_saved_rows": previously_saved_rows},
             )
         return {
             "added_rows": added_rows,
             "previously_saved_rows": previously_saved_rows,
         }
     except Exception as e:
-        logger.error(f"Persistence failed: {e}")
-        raise ValueError(f"Persistence failed: {e}")
+        error_message = (
+            "Persistence failed while saving finished trips to database"
+        )
+        structured_logger.error(event="trips_save_failed", message=error_message)
+        raise ValueError(error_message) from e
     finally:
         try:
             with engine.begin() as conn:

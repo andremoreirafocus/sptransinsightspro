@@ -1,6 +1,6 @@
 import pytest
 
-from src.config import validate_config
+from src.config.config import validate_config
 
 _COMMON_BASE = {
     "EXTRACTION_INTERVAL_SECONDS": "120",

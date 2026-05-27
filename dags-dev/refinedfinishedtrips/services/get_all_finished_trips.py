@@ -1,13 +1,13 @@
-import logging
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import pandas as pd
 
+from observability.structured_event_logger import get_structured_logger
 from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
     extract_trips_per_line_per_vehicle,
 )
 
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _build_extraction_metrics(
@@ -33,22 +33,23 @@ def get_all_finished_trips(
         return config["general"]["trip_detection"]["stop_proximity_threshold_meters"]
 
     stop_proximity_threshold_meters = get_config(config)
-    positions_list = df_recent_positions.to_dict("records")
+    positions_list = cast(List[Dict[str, Any]], df_recent_positions.to_dict("records"))
     total_input_position_records = len(positions_list)
     num_processed = 0
     total_source_sentido_discrepancies = 0
     total_input_position_sanitization_drops = 0
     all_finished_trips = []
-    current_vehicle = None
+    current_vehicle_key: Optional[Tuple[str, str]] = None
     start_idx = 0
     for i, position in enumerate(positions_list):
         linha_lt = position["linha_lt"]
-        veiculo_id = position["veiculo_id"]
+        veiculo_id = str(position["veiculo_id"])
         vehicle_key = (linha_lt, veiculo_id)
         is_last = i == len(positions_list) - 1
-        vehicle_changed = current_vehicle is not None and current_vehicle != vehicle_key
-        if vehicle_changed:
-            prev_linha_lt, prev_veiculo_id = current_vehicle
+        previous_vehicle_key = current_vehicle_key
+        vehicle_changed = previous_vehicle_key != vehicle_key
+        if vehicle_changed and previous_vehicle_key is not None:
+            prev_linha_lt, prev_veiculo_id = previous_vehicle_key
             finished_trips, source_sentido_discrepancies, dropped_points = extract_trips_per_line_per_vehicle(
                 positions_list, start_idx, i - 1, prev_linha_lt, prev_veiculo_id, stop_proximity_threshold_meters
             )
@@ -58,11 +59,13 @@ def get_all_finished_trips(
             total_input_position_sanitization_drops += dropped_points
             num_processed += 1
             if num_processed % 500 == 0:
-                logger.info(
-                    f"Progress: {num_processed} vehicle/line combinations processed."
+                structured_logger.info(
+                    event="trip_extraction_progress",
+                    message="Trip extraction in progress",
+                    metadata={"vehicle_line_groups_processed": num_processed},
                 )
             start_idx = i
-        current_vehicle = vehicle_key
+        current_vehicle_key = vehicle_key
         if is_last:
             finished_trips, source_sentido_discrepancies, dropped_points = extract_trips_per_line_per_vehicle(
                 positions_list, start_idx, i, linha_lt, veiculo_id, stop_proximity_threshold_meters
@@ -80,20 +83,9 @@ def get_all_finished_trips(
         total_input_position_records=total_input_position_records,
         vehicle_line_groups_processed=num_processed,
     )
-    logger.info(f"Progress: {num_processed} vehicle/line combinations processed.")
-    logger.info(
-        "Total finished trips: %s, source sentido discrepancies: %s/%s",
-        total_trips,
-        total_source_sentido_discrepancies,
-        total_trips,
-    )
-    logger.info(
-        "Total invalid position records dropped by sanitization: %s out of %s",
-        total_input_position_sanitization_drops,
-        total_input_position_records,
-    )
-    logger.info(
-        "Trip extraction metrics: %s",
-        extraction_metrics,
+    structured_logger.info(
+        event="trip_extraction_completed",
+        message="Trip extraction completed",
+        metadata=extraction_metrics,
     )
     return all_finished_trips, extraction_metrics

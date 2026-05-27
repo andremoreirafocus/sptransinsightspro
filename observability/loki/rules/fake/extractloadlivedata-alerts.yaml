@@ -1,0 +1,47 @@
+groups:
+  - name: extractloadlivedata-service-alerts
+    interval: 1m
+    rules:
+      - alert: ServiceFailed
+        expr: |
+          sum by (execution_id) (
+            count_over_time(
+              {service="extractloadlivedata"}
+              | json
+              | execution_id!=""
+              | label_format execution_id="{{.execution_id}}"
+              | event="execution_failed_non_recoverable"
+              [5m]
+            )
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: extractloadlivedata
+          alertname: service_failed
+        annotations:
+          summary: "extractloadlivedata execution failed"
+          description: "Detected at least one execution_failed_non_recoverable event in the last 5 minutes."
+
+      - alert: ServiceWarningThreshold
+        expr: |
+          max by (execution_id) (
+            max_over_time(
+              {service="extractloadlivedata"}
+              | json
+              | execution_id!=""
+              | label_format execution_id="{{.execution_id}}"
+              | event="execution_completed"
+              | json retries_seen="metadata.retries_seen"
+              | unwrap retries_seen
+              [5m]
+            )
+          ) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: extractloadlivedata
+          alertname: service_warning_threshold
+        annotations:
+          summary: "extractloadlivedata completed with retries"
+          description: "Detected execution_completed with retries_seen > 0 in the last 5 minutes."

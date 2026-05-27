@@ -1,14 +1,21 @@
-from updatelatestpositions.services.create_latest_positions import (
-    create_latest_positions_table,
-)
-from pipeline_configurator.config import get_config
-from updatelatestpositions.config.updatelatestpositions_config_schema import (
-    GeneralConfig,
-)
+from datetime import datetime, timezone
+import uuid
 import os
 import logging
 
+from updatelatestpositions.orchestration_dependencies import (
+    UpdateLatestPositionsOrchestrationDependencies,
+    get_updatelatestpositions_orchestration_dependencies,
+)
+from updatelatestpositions.config.updatelatestpositions_config_schema import (
+    GeneralConfig,
+)
+from updatelatestpositions.domain.logger import UpdateLatestPositionsLogger
+from quality.execution_phase_metrics import ExecutionPhaseMetricsTracker
+from observability.structured_event_logger import get_structured_logger, set_execution_context
+
 PIPELINE_NAME = "updatelatestpositions"
+PHASE_ORDER = ["config_load", "update_latest_positions"]
 _IN_AIRFLOW = bool(os.getenv("AIRFLOW_HOME"))
 
 if _IN_AIRFLOW:
@@ -22,19 +29,48 @@ else:
         level=logging.INFO,
         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         handlers=[
-            RotatingFileHandler(
-                LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5
-            ),
+            RotatingFileHandler(LOG_FILENAME, maxBytes=5 * 1024 * 1024, backupCount=5),
             logging.StreamHandler(),
         ],
     )
 
-logger = logging.getLogger(__name__)
 
+def update_latest_positions_table(
+    deps: UpdateLatestPositionsOrchestrationDependencies | None = None,
+) -> None:
+    if deps is None:
+        deps = get_updatelatestpositions_orchestration_dependencies()
 
-def _load_pipeline_config():
+    execution_id = str(uuid.uuid4())
+    run_ts = datetime.now(timezone.utc)
+    structured_logger = UpdateLatestPositionsLogger(
+        get_structured_logger(
+            service=PIPELINE_NAME,
+            component="orchestrator",
+            logger_name=__name__,
+        )
+    )
+    tracker = ExecutionPhaseMetricsTracker(
+        pipeline=PIPELINE_NAME,
+        execution_id=execution_id,
+        logical_date_utc=run_ts.isoformat(),
+        phase_order=PHASE_ORDER,
+    )
+    set_execution_context(execution_id, correlation_id=execution_id)
+    structured_logger.info(
+        event="execution_started",
+        message="Starting execution",
+        status="STARTED",
+    )
+
+    structured_logger.info(
+        event="config_load_started",
+        message="Loading pipeline configuration",
+        status="STARTED",
+    )
+    tracker.begin("config_load")
     try:
-        pipeline_config = get_config(
+        pipeline_config = deps.get_config(
             PIPELINE_NAME,
             None,
             GeneralConfig,
@@ -42,15 +78,59 @@ def _load_pipeline_config():
             "minio_conn",
             "postgres_conn",
         )
+        tracker.finish("config_load", "success")
+        structured_logger.info(
+            event="config_load_succeeded",
+            message="Configuration loaded successfully",
+            status="SUCCEEDED",
+        )
     except Exception as e:
-        logger.error(f"Pipeline configuration validation failed: {e}")
-        raise ValueError(f"Pipeline configuration validation failed: {e}")
-    return pipeline_config
+        tracker.finish("config_load", "failed")
+        structured_logger.error(
+            event="execution_phase_metrics",
+            message="Execution phase metrics",
+            status="FAILED",
+            metadata=tracker.to_log_payload("failed"),
+        )
+        structured_logger.error(
+            event="execution_aborted",
+            message="Pipeline aborted: config load failed",
+            status="FAILED",
+            metadata={"phase": "config_load"},
+        )
+        raise ValueError("Configuration load and validation failed") from e
 
+    tracker.begin("update_latest_positions")
+    try:
+        deps.create_latest_positions(pipeline_config)
+        tracker.finish("update_latest_positions", "success")
+    except Exception as exc:
+        tracker.finish("update_latest_positions", "failed")
+        structured_logger.error(
+            event="execution_phase_metrics",
+            message="Execution phase metrics",
+            status="FAILED",
+            metadata=tracker.to_log_payload("failed"),
+        )
+        structured_logger.error(
+            event="execution_aborted",
+            message="Pipeline aborted: update latest positions failed",
+            status="FAILED",
+            metadata={"phase": "update_latest_positions"},
+        )
+        raise
 
-def update_latest_positions_table():
-    pipeline_config = _load_pipeline_config()
-    create_latest_positions_table(pipeline_config)
+    structured_logger.info(
+        event="execution_phase_metrics",
+        message="Execution phase metrics",
+        status="SUCCEEDED",
+        metadata=tracker.to_log_payload("success"),
+    )
+    structured_logger.info(
+        event="execution_finished",
+        message="Pipeline run complete",
+        status="SUCCEEDED",
+    )
 
 
 if _IN_AIRFLOW:

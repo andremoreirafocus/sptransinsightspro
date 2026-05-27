@@ -1,18 +1,19 @@
 from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Dict, Optional
 from zoneinfo import ZoneInfo
-import logging
 
 import pandas as pd
 
-logger = logging.getLogger(__name__)
+from observability.structured_event_logger import get_structured_logger
+
+structured_logger = get_structured_logger(logger_name=__name__)
 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def check_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
+def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -23,15 +24,13 @@ def check_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[C
     warn_threshold, fail_threshold = get_config(config)
 
     if df.empty:
-        logger.warning("Freshness check: no positions available for the analysis time window.")
-        return {
-            "check": "freshness",
-            "status": "FAIL",
+        result = {
             "observed_lag_minutes": None,
             "warn_threshold_minutes": warn_threshold,
             "fail_threshold_minutes": fail_threshold,
-            "note": "no positions available for the analysis time window",
         }
+        structured_logger.warning(event="freshness_evaluation", message="Freshness evaluation", metadata=result)
+        return result
 
     now_utc = (now_fn or _now_utc)()
     now_sp_naive = now_utc.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
@@ -41,24 +40,16 @@ def check_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[C
         latest_ts = latest_ts.tz_convert(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
     lag_minutes = (now_sp_naive - latest_ts).total_seconds() / 60
 
-    if lag_minutes > fail_threshold:
-        status = "FAIL"
-    elif lag_minutes > warn_threshold:
-        status = "WARN"
-    else:
-        status = "PASS"
-
-    logger.info(f"Freshness check: lag={lag_minutes:.2f} min (warn={warn_threshold}, fail={fail_threshold}) → {status}.")
-    return {
-        "check": "freshness",
-        "status": status,
+    result = {
         "observed_lag_minutes": round(lag_minutes, 2),
         "warn_threshold_minutes": warn_threshold,
         "fail_threshold_minutes": fail_threshold,
     }
+    structured_logger.info(event="freshness_evaluation", message="Freshness evaluation", metadata=result)
+    return result
 
 
-def check_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
+def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -70,16 +61,15 @@ def check_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional
     warn_threshold, fail_threshold, recent_window = get_config(config)
 
     if df.empty:
-        logger.warning("Recent gaps check: no positions available for the analysis time window.")
-        return {
-            "check": "recent_gaps",
-            "status": "FAIL",
+        result = {
             "max_gap_minutes": None,
+            "distinct_extracao_ts_in_window": 0,
             "warn_threshold_minutes": warn_threshold,
             "fail_threshold_minutes": fail_threshold,
             "recent_window_minutes": recent_window,
-            "note": "no positions available for the analysis time window",
         }
+        structured_logger.warning(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
+        return result
 
     now_utc = (now_fn or _now_utc)()
     # DuckDB strips tz when returning tz-aware timestamps into pandas, yielding
@@ -95,50 +85,66 @@ def check_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional
         .sort_values()
         .reset_index(drop=True)
     )
+    recent_ts = pd.to_datetime(recent_ts)
     distinct_count = len(recent_ts)
-    logger.info(f"Recent gaps check: {distinct_count} distinct extraction timestamps in last {recent_window} min window.")
 
     if distinct_count < 2:
-        logger.warning(f"Recent gaps check: insufficient extraction timestamps (found {distinct_count}, need ≥2).")
-        return {
-            "check": "recent_gaps",
-            "status": "FAIL",
+        result = {
             "max_gap_minutes": None,
             "distinct_extracao_ts_in_window": distinct_count,
             "warn_threshold_minutes": warn_threshold,
             "fail_threshold_minutes": fail_threshold,
             "recent_window_minutes": recent_window,
-            "note": f"fewer than 2 distinct extraction timestamps in recent window (found: {distinct_count})",
         }
+        structured_logger.warning(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
+        return result
 
     diffs = recent_ts.diff().dropna().dt.total_seconds() / 60
     max_gap = round(float(diffs.max()), 2)
 
-    if max_gap > fail_threshold:
-        status = "FAIL"
-    elif max_gap > warn_threshold:
-        status = "WARN"
-    else:
-        status = "PASS"
-
-    logger.info(f"Recent gaps check: max gap={max_gap} min (warn={warn_threshold}, fail={fail_threshold}) → {status}.")
-    return {
-        "check": "recent_gaps",
-        "status": status,
+    result = {
         "max_gap_minutes": max_gap,
         "distinct_extracao_ts_in_window": distinct_count,
         "warn_threshold_minutes": warn_threshold,
         "fail_threshold_minutes": fail_threshold,
         "recent_window_minutes": recent_window,
     }
+    structured_logger.info(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
+    return result
 
 
 def validate_positions_quality(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
-    logger.info(f"Running positions quality checks on {len(df)} position records.")
-    checks = [
-        check_freshness(config, df, now_fn),
-        check_recent_gaps(config, df, now_fn),
-    ]
+    freshness = evaluate_freshness(config, df, now_fn)
+    gaps = evaluate_recent_gaps(config, df, now_fn)
+
+    checks = []
+
+    lag = freshness["observed_lag_minutes"]
+    if lag is None:
+        checks.append({"check": "freshness", "status": "FAIL", "reason": "no positions available for the analysis time window", **freshness})
+    elif lag > freshness["fail_threshold_minutes"]:
+        checks.append({"check": "freshness", "status": "FAIL", **freshness})
+    elif lag > freshness["warn_threshold_minutes"]:
+        checks.append({"check": "freshness", "status": "WARN", **freshness})
+    else:
+        checks.append({"check": "freshness", "status": "PASS", **freshness})
+
+    max_gap = gaps["max_gap_minutes"]
+    distinct = gaps["distinct_extracao_ts_in_window"]
+    if max_gap is None:
+        reason = (
+            "no positions available for the analysis time window"
+            if distinct == 0
+            else f"fewer than 2 distinct extraction timestamps in recent window (found: {distinct})"
+        )
+        checks.append({"check": "recent_gaps", "status": "FAIL", "reason": reason, **gaps})
+    elif max_gap > gaps["fail_threshold_minutes"]:
+        checks.append({"check": "recent_gaps", "status": "FAIL", **gaps})
+    elif max_gap > gaps["warn_threshold_minutes"]:
+        checks.append({"check": "recent_gaps", "status": "WARN", **gaps})
+    else:
+        checks.append({"check": "recent_gaps", "status": "PASS", **gaps})
+
     statuses = [c["status"] for c in checks]
     if "FAIL" in statuses:
         overall = "FAIL"
@@ -146,9 +152,11 @@ def validate_positions_quality(config: Dict[str, Any], df: pd.DataFrame, now_fn:
         overall = "WARN"
     else:
         overall = "PASS"
-    logger.info(f"Positions quality overall status: {overall}.")
-    return {
+
+    result = {
         "status": overall,
         "positions_in_time_window_count": len(df),
         "checks": checks,
     }
+    structured_logger.info(event="positions_quality_validated", message="Positions quality validation", metadata=result)
+    return result

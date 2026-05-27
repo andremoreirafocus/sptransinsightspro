@@ -1,5 +1,7 @@
 import sys
 import os
+import glob
+import shutil
 import argparse
 
 from os_command_helper import run_command
@@ -16,8 +18,18 @@ def promote_pipeline(pipeline_name):
     infra_prod_path = os.path.join(prod_dir, "infra")
     quality_dev_path = os.path.join(dev_dir, "quality")
     quality_prod_path = os.path.join(prod_dir, "quality")
+    observability_dev_path = os.path.join(dev_dir, "observability")
+    observability_prod_path = os.path.join(prod_dir, "observability")
     pipeline_configurator_dev_path = os.path.join(dev_dir, "pipeline_configurator")
     pipeline_configurator_prod_path = os.path.join(prod_dir, "pipeline_configurator")
+    rsync_excludes = [
+        "--exclude",
+        "__pycache__",
+        "--exclude",
+        ".pytest_cache",
+        "--exclude",
+        "tests",
+    ]
     # 1. Check if pipeline exists
     if not os.path.isdir(pipeline_dev_path):
         print(f"❌ Pipeline folder '{pipeline_name}' not found in dags-dev/")
@@ -26,12 +38,20 @@ def promote_pipeline(pipeline_name):
     # 2. Validation (Linting + SAST + Tests)
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
-    total_steps = (3 if has_tests else 2) + 2
+    total_steps = (3 if has_tests else 2) + 3
     steps_consumed = run_code_validations(
-        pipeline_dev_path, pipeline_name, step_offset=1
+        pipeline_dev_path, pipeline_name, step_offset=1, total_steps=total_steps
     )
-    # 3. Atomic Sync Folder
-    sync_step = steps_consumed + 1
+    # 3. Type checking (mypy)
+    mypy_step = steps_consumed + 1
+    print(f"Step {mypy_step}/{total_steps}: Running mypy for {pipeline_name}...")
+    run_command(
+        [sys.executable, "-m", "mypy", "--exclude", "tests", pipeline_dev_path],
+        f"Type checking (mypy) failed for {pipeline_name}!",
+    )
+    print("✅ Type checking Passed.")
+    # 4. Atomic Sync Folder
+    sync_step = steps_consumed + 2
     print(
         f"Step {sync_step}/{total_steps}: Syncing folder '{pipeline_name}' to production..."
     )
@@ -41,19 +61,21 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
-            "--exclude",
-            ".pytest_cache",
-            "--exclude",
-            "tests",
+            *rsync_excludes,
             f"{pipeline_dev_path}/",
             f"{pipeline_prod_path}/",
         ],
         "Folder sync failed!",
     )
+    dag_entry_points = glob.glob(
+        os.path.join(dev_dir, f"{pipeline_name}-v*.py")
+    )
+    for dag_file in dag_entry_points:
+        dest = os.path.join(prod_dir, os.path.basename(dag_file))
+        shutil.copy2(dag_file, dest)
+        print(f"  Copied DAG entry point: {os.path.basename(dag_file)}")
     print(
-        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality and pipeline_configurator files..."
+        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality, observability and pipeline_configurator files..."
     )
     os.makedirs(infra_prod_path, exist_ok=True)
     run_command(
@@ -61,8 +83,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{infra_dev_path}/",
             f"{infra_prod_path}/",
         ],
@@ -74,12 +95,23 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{quality_dev_path}/",
             f"{quality_prod_path}/",
         ],
         "quality sync failed!",
+    )
+    os.makedirs(observability_prod_path, exist_ok=True)
+    run_command(
+        [
+            "rsync",
+            "-av",
+            "--delete",
+            *rsync_excludes,
+            f"{observability_dev_path}/",
+            f"{observability_prod_path}/",
+        ],
+        "observability sync failed!",
     )
     os.makedirs(pipeline_configurator_prod_path, exist_ok=True)
     run_command(
@@ -87,8 +119,7 @@ def promote_pipeline(pipeline_name):
             "rsync",
             "-av",
             "--delete",
-            "--exclude",
-            "__pycache__",
+            *rsync_excludes,
             f"{pipeline_configurator_dev_path}/",
             f"{pipeline_configurator_prod_path}/",
         ],

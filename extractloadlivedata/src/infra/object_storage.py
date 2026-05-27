@@ -1,10 +1,13 @@
 from minio import Minio
 import io
-import logging
 from typing import Any, Dict, List, Optional, Union
+from src.observability.process_structured_logger import get_structured_logger
+from src.observability.structured_event_logger import EVENT_STATUS_FAILED, EVENT_STATUS_SUCCEEDED
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="extractloadlivedata",
+    component="object_storage",
+    logger_name=__name__,)
 
 client_factory = Minio
 
@@ -37,7 +40,11 @@ def list_objects_in_object_storage_bucket(
         objects = client.list_objects(bucket_name, prefix=prefix, recursive=True)
         return [obj.object_name for obj in objects]
     except Exception as e:
-        logger.error(f"Error listing files in MinIO folder: {e}")
+        structured_logger.error(
+            event="object_storage_list_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error listing files in MinIO folder: {e}",
+        )
         return []
 
 
@@ -62,7 +69,11 @@ def read_file_from_object_storage(
         response.release_conn()
         return content
     except Exception as e:
-        logger.error(f"Error reading JSON from MinIO: {e}")
+        structured_logger.error(
+            event="object_storage_persist_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error reading JSON from MinIO: {e}",
+        )
         return None
 
 
@@ -102,6 +113,8 @@ def write_generic_bytes_to_object_storage(
         length=data_length,
         content_type="application/octet-stream",
     )
-    logger.info(
-        f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'"
+    structured_logger.debug(
+        event="object_storage_persist_succeeded",
+        status=EVENT_STATUS_SUCCEEDED,
+        message=f"Consolidated file uploaded to bucket '{bucket_name}' as '{object_name}'",
     )

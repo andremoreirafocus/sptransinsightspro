@@ -15,10 +15,17 @@ class TablesConfig(BaseModel):
     latest_positions_table_name: str
 
 
+class QualityConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    freshness_warn_staleness_minutes: int
+    freshness_fail_staleness_minutes: int
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     storage: StorageConfig
     tables: TablesConfig
+    quality: QualityConfig
 
 
 def validate_general_input(

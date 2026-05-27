@@ -72,6 +72,22 @@ Expected keys in `general`:
 }
 ```
 
+### Execution phase metrics
+- The DAG emits a structured `execution_phase_metrics` event at the end of each run.
+- The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
+- Tracked phases:
+  - `config_load`
+  - `load_trip_details`
+  - `transform_trip_details`
+  - `save_trip_details`
+- On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
+
+### Grafana Dashboard
+
+The dashboard is available at `observability/grafana/provisioning/dashboards/refinedsynctripdetails.json` and is provisioned automatically by Grafana.
+
+![Dashboard refinedsynctripdetails](refinedsynctripsdetails_dashboard.png)
+
 ## Installation instructions
 
 To install the requirements:
@@ -139,5 +155,5 @@ python ./refinedsynctripdetails-v<version number>.py
 
 Example:
 ```bash
-python ./refinedsynctripdetails-v2.py
+python ./refinedsynctripdetails-v3.py
 ```

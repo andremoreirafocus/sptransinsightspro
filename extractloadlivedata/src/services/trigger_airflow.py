@@ -1,14 +1,23 @@
-import requests
+import requests  # type: ignore[import-untyped]
 from datetime import datetime
 from zoneinfo import ZoneInfo
-import logging
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.infra.cache import add_to_cache, get_from_cache, remove_from_cache
+from src.observability.process_structured_logger import get_structured_logger
+from src.domain.events import (
+    EVENT_STATUS_FAILED,
+    EVENT_STATUS_SKIPPED,
+    EVENT_STATUS_STARTED,
+    EVENT_STATUS_SUCCEEDED,
+)
 from src.services.exceptions import IngestNotificationError
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+structured_logger = get_structured_logger(
+    service="extractloadlivedata",
+    component="trigger_airflow",
+    logger_name=__name__,
+)
 
 ConfigDict = Dict[str, Any]
 AuthTuple = Tuple[str, str]
@@ -27,14 +36,29 @@ def create_pending_invokation(
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
 
-    logger.info(f"Creating pending invokation for file '{filename}'")
-    # Use filename as key, storing the filename as value
-    marker_name = f"{filename.split('.')[0]}.pending"
-    cache_dir = get_config(config)
-    add_to_cache(cache_dir, marker_name, filename, cache_factory=cache_factory)
-
-    logger.info(
-        f"Pending invokation created in cache with key '{marker_name}' and value '{filename}'"
+    structured_logger.info(
+        event="airflow_invocation_cache_started",
+        status=EVENT_STATUS_STARTED,
+        message=f"Creating pending invokation for file '{filename}'",
+    )
+    try:
+        # Use filename as key, storing the filename as value
+        marker_name = f"{filename.split('.')[0]}.pending"
+        cache_dir = get_config(config)
+        add_to_cache(cache_dir, marker_name, filename, cache_factory=cache_factory)
+    except Exception as e:
+        structured_logger.error(
+            event="pending_storage_file_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to create pending invokation for file '{filename}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
+    structured_logger.info(
+        event="airflow_invocation_cache_succeeded",
+        status=EVENT_STATUS_SUCCEEDED,
+        message=f"Pending invokation created in cache with key '{marker_name}' and value '{filename}'",
     )
 
 
@@ -49,9 +73,23 @@ def remove_pending_invokation(
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
 
-    logger.info(f"Removing pending invokation marker '{marker_name}'")
-    cache_dir = get_config(config)
-    remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
+    structured_logger.info(
+        event="airflow_invocation_cache_started",
+        status=EVENT_STATUS_STARTED,
+        message=f"Removing pending invokation marker '{marker_name}'",
+    )
+    try:
+        cache_dir = get_config(config)
+        remove_from_cache(cache_dir, marker_name, cache_factory=cache_factory)
+    except Exception as e:
+        structured_logger.error(
+            event="pending_storage_file_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to remove pending invokation marker '{marker_name}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
 
 
 def get_pending_invokations(
@@ -64,10 +102,24 @@ def get_pending_invokations(
         cache_dir = config["INVOKATIONS_CACHE_DIR"]
         return cache_dir
 
-    logger.info("Checking for pending invokations...")
-    cache_dir = get_config(config)
-    pending_markers = get_from_cache(cache_dir, cache_factory=cache_factory)
-    logger.info(f"Found {len(pending_markers)} pending invokation(s).")
+    try:
+        cache_dir = get_config(config)
+        pending_markers = get_from_cache(cache_dir, cache_factory=cache_factory)
+    except Exception as e:
+        structured_logger.error(
+            event="pending_storage_scan_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to retrieve pending invokations: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
+    structured_logger.debug(
+        event="airflow_invocation_scan_succeeded",
+        status=EVENT_STATUS_SUCCEEDED,
+        message=f"Found {len(pending_markers)} pending invokation(s).",
+        metadata={"pending_count": len(pending_markers)},
+    )
     return pending_markers
 
 
@@ -83,9 +135,11 @@ def trigger_pending_airflow_dag_invokations(
     failure_count = 0
     if pending_markers:
         for pending_marker in pending_markers:
-            logger.info(f"Pending invokation found: {pending_marker}")
-            logger.info(
-                f"Found {len(pending_markers)} pending invokation(s). Processing..."
+            structured_logger.debug(
+                event="airflow_invocation_detected",
+                status=EVENT_STATUS_STARTED,
+                message=f"Processing pending invokation '{pending_marker}'.",
+                metadata={"pending_count": len(pending_markers)},
             )
             try:
                 if trigger_airflow_dag_run(config, pending_marker, post_fn=post_fn):
@@ -102,29 +156,50 @@ def trigger_pending_airflow_dag_invokations(
                 )
                 raise
     else:
-        logger.info("No pending invokations found.")
+        structured_logger.info(
+            event="airflow_invocation_scan_succeeded",
+            status=EVENT_STATUS_SKIPPED,
+            message="No pending invokations found.",
+        )
     if with_metrics:
         return {
             "result": None,
-            "metrics": {"success": success_count, "failed": failure_count, "retries": 0},
+            "metrics": {
+                "success": success_count,
+                "failed": failure_count,
+                "retries": 0,
+            },
         }
+    return None
 
 
 def get_utc_logical_date_from_file(pending_marker: str) -> str:
-    current_timezone_name = datetime.now(ZoneInfo("localtime")).tzname()
-    logger.info(f"Current timezone: {current_timezone_name}")
-    logger.info(f"pending_marker : {pending_marker}")
-    timestamp = pending_marker.split("-")[1].split(".")[0]
-    year = timestamp[0:4]
-    month = timestamp[4:6]
-    day = timestamp[6:8]
-    hour = timestamp[8:10]
-    minute = timestamp[10:12]
-    dt_obj = datetime(int(year), int(month), int(day), int(hour), int(minute))
-    dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
-    dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
-    logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return logical_date
+    try:
+        timestamp = pending_marker.split("-")[1].split(".")[0]
+        year = timestamp[0:4]
+        month = timestamp[4:6]
+        day = timestamp[6:8]
+        hour = timestamp[8:10]
+        minute = timestamp[10:12]
+        dt_obj = datetime(int(year), int(month), int(day), int(hour), int(minute))
+        dt_obj = dt_obj.replace(tzinfo=ZoneInfo("America/Sao_Paulo"))
+        dt_utc = dt_obj.astimezone(ZoneInfo("UTC"))
+        logical_date = dt_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+        structured_logger.debug(
+            event="get_utc_logical_date_succeeded",
+            status=EVENT_STATUS_SUCCEEDED,
+            message=f"Logical date extracted: {dt_utc}",
+        )
+        return logical_date
+    except Exception as e:
+        structured_logger.error(
+            event="get_utc_logical_date_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to extract logical date from marker '{pending_marker}': {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise
 
 
 def trigger_airflow_dag_run(
@@ -149,12 +224,18 @@ def trigger_airflow_dag_run(
 
         return airflow_url, auth
 
-    airflow_url, auth = get_config(config)
-    logger.info(f"Airflow URL: {airflow_url}")
+    try:
+        airflow_url, auth = get_config(config)
+    except Exception as e:
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to read Airflow configuration: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        raise IngestNotificationError("failed to read Airflow configuration") from e
     logical_date = get_utc_logical_date_from_file(pending_marker)
-    logger.info(
-        f"Triggering Airflow DAG for : {pending_marker} file and logical_date: {logical_date}"
-    )
     payload = {
         "logical_date": logical_date,
         "conf": {
@@ -163,7 +244,16 @@ def trigger_airflow_dag_run(
         },
         "note": "Triggered by microservice after successful Raw upload",
     }
-    logger.info(f"Request payload to be submitted: {payload}")
+    structured_logger.info(
+        event="notification_dispatch_started",
+        status=EVENT_STATUS_STARTED,
+        message=f"Triggering Airflow DAG for marker '{pending_marker}'.",
+        metadata={
+            "airflow_url": airflow_url,
+            "logical_date": logical_date,
+            "pending_marker": pending_marker,
+        },
+    )
     try:
         post_fn = post_fn or requests.post
         r = post_fn(
@@ -172,8 +262,10 @@ def trigger_airflow_dag_run(
             auth=auth,
             timeout=10,
         )
-        logger.info(
-            f"Airflow API response for marker '{pending_marker}': {r.status_code} - {r.text}"
+        structured_logger.info(
+            event="notification_dispatch_succeeded",
+            status=EVENT_STATUS_SUCCEEDED,
+            message=f"Airflow API response for marker '{pending_marker}': {r.status_code} - {r.text}",
         )
         # 200 = Success, 409 = Already exists (safe to proceed)
         if r.status_code in [200, 409, 201]:
@@ -182,14 +274,15 @@ def trigger_airflow_dag_run(
             f"airflow dag trigger failed for marker '{pending_marker}' with status {r.status_code}"
         )
     except Exception as e:
-        logger.error(
-            f"Error triggering Airflow DAG for marker '{pending_marker}':",
-            exc_info=True,
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error triggering Airflow DAG for marker '{pending_marker}'.",
+            error_type=type(e).__name__,
+            error_message=str(e),
         )
-        logger.error(f"Exception details: {e}")
         if isinstance(e, IngestNotificationError):
             raise
         raise IngestNotificationError(
             f"airflow dag trigger failed for marker '{pending_marker}'"
         ) from e
-

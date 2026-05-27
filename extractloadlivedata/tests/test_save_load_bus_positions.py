@@ -1,4 +1,5 @@
 import json
+import logging
 import pytest
 
 from src.services.save_load_bus_positions import (
@@ -15,6 +16,19 @@ from src.services.save_load_bus_positions import (
 from src.services.exceptions import SavePositionsToRawError
 from src.infra.compression import compress_data
 from tests.fakes.object_storage_client import FakeObjectStorageClient
+
+_LOGGER_NAME = "src.services.save_load_bus_positions"
+
+
+def _find_event(caplog: pytest.LogCaptureFixture, event: str) -> bool:
+    for record in caplog.records:
+        try:
+            payload = json.loads(record.message)
+            if payload.get("event") == event:
+                return True
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return False
 
 
 def build_sample_data():
@@ -34,13 +48,31 @@ def build_sample_data():
     }
 
 
-
 def test_get_file_name_from_data_formats():
     data = build_sample_data()
     data["payload"]["hr"] = "09:47"
     filename, partition = get_file_name_from_data(data)
     assert filename == "posicoes_onibus-202604090910.json"
     assert partition == "year=2026/month=04/day=09/"
+
+
+def test_get_file_name_from_data_z_suffix_utc_timestamp():
+    # Z-suffix format produced by strftime("%Y-%m-%dT%H:%M:%SZ")
+    # 2026-05-26T16:14:00Z = UTC 16:14 = São Paulo 13:14 (UTC-3)
+    data = build_sample_data()
+    data["metadata"]["extracted_at"] = "2026-05-26T16:14:00Z"
+    filename, partition = get_file_name_from_data(data)
+    assert filename == "posicoes_onibus-202605261314.json"
+    assert partition == "year=2026/month=05/day=26/"
+
+
+def test_get_file_name_from_data_utc_plus00_offset_timestamp():
+    # +00:00 format — backwards compatibility
+    data = build_sample_data()
+    data["metadata"]["extracted_at"] = "2026-05-26T16:14:00+00:00"
+    filename, partition = get_file_name_from_data(data)
+    assert filename == "posicoes_onibus-202605261314.json"
+    assert partition == "year=2026/month=05/day=26/"
 
 
 def test_get_payload_summary_counts():
@@ -224,7 +256,10 @@ def test_remove_local_file_removes_all_matches():
     removed = []
 
     def fake_glob(_pattern):
-        return ["/tmp/posicoes_onibus-202604090910.json", "/tmp/posicoes_onibus-202604090910.json.zst"]
+        return [
+            "/tmp/posicoes_onibus-202604090910.json",
+            "/tmp/posicoes_onibus-202604090910.json.zst",
+        ]
 
     def fake_remove(path):
         removed.append(path)
@@ -246,3 +281,87 @@ def test_get_pending_storage_save_list_filters():
 
     pending = get_pending_storage_save_list(config, listdir_fn=fake_listdir)
     assert pending == ["posicoes_onibus-1.json", "posicoes_onibus-2.json.zst"]
+
+
+# ── Step 0: new tests for previously-silent escape paths ─────────────────────
+
+
+# ── Step 2: new test for single-event validation failure ─────────────────────
+
+
+def test_data_structure_is_valid_invalid_data_emits_single_event(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        result = data_structure_is_valid({"payload": "not-a-dict", "metadata": {}})
+    assert result is False
+    matching = [
+        r
+        for r in caplog.records
+        if json.loads(r.message).get("event") == "object_storage_persist_failed"
+    ]
+    assert len(matching) == 1, f"Expected exactly 1 event, got {len(matching)}"
+    payload = json.loads(matching[0].message)
+    assert "metadata" in payload
+
+
+# ── Step 0: new tests for previously-silent escape paths ─────────────────────
+
+
+def test_get_file_name_from_data_missing_metadata_emits_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(ValueError):
+            get_file_name_from_data({"metadata": None})
+    assert _find_event(caplog, "metadata_validation_failed")
+
+
+def test_get_file_name_from_data_missing_extracted_at_emits_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(ValueError):
+            get_file_name_from_data({"metadata": {"source": "x"}})
+    assert _find_event(caplog, "metadata_validation_failed")
+
+
+def test_get_payload_summary_invalid_payload_emits_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(ValueError):
+            get_payload_summary({"payload": "not-a-dict"})
+    assert _find_event(caplog, "metadata_validation_failed")
+
+
+def test_get_pending_storage_save_list_listdir_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    config = {"INGEST_BUFFER_PATH": "/nonexistent"}
+
+    def bad_listdir(_path):
+        raise OSError("permission denied")
+
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(OSError):
+            get_pending_storage_save_list(config, listdir_fn=bad_listdir)
+    assert _find_event(caplog, "object_storage_list_failed")
+
+
+def test_save_bus_positions_to_storage_with_retries_config_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(SavePositionsToRawError):
+            save_bus_positions_to_storage_with_retries({}, build_sample_data())
+    assert _find_event(caplog, "object_storage_persist_failed")
+
+
+def test_save_bus_positions_to_storage_config_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(Exception):
+            save_bus_positions_to_storage({}, build_sample_data())
+    assert _find_event(caplog, "object_storage_persist_failed")

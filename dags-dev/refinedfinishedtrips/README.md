@@ -10,19 +10,19 @@ Para cada linha e veículo:
 - verifica a qualidade dos dados de posição antes de processar as viagens, executando duas verificações:
   - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado
   - **gaps de extração**: valida se não há lacunas significativas entre os timestamps de extração na janela recente
-- em caso de falha nas verificações de qualidade: interrompe o pipeline, salva um relatório de qualidade no bucket de metadata e notifica via webhook
-- em caso de aviso nas verificações de qualidade: salva um relatório de qualidade no bucket de metadata, notifica via webhook e continua o processamento
+- em caso de falha nas verificações de qualidade: interrompe o pipeline e salva um relatório de falha no bucket de metadata
+- em caso de aviso nas verificações de qualidade: salva um relatório parcial no bucket de metadata e continua o processamento
 - calcula as viagens finalizadas durante este período de tempo de análise
 - verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
-- em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
+- em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 - verifica o resultado da persistência, registrando quantas viagens:
   - foram efetivamente inseridas nesta execução
   - já haviam sido salvas anteriormente
-- em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis, notifica via webhook e interrompe a execução
-- ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata e notifica via webhook com o status consolidado das três fases (posições, extração de viagens e persistência)
+- em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
+- ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata com o status consolidado das três fases (posições, extração de viagens e persistência)
 
 ## Algoritmo de extração de viagens
 O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
@@ -121,7 +121,7 @@ Em conjunto, essas decisões tornam a tabela de viagens finalizadas mais confiá
 - avaliação de ciclo e regularidade
 - consumo analítico na camada de visualização
 
-## Relato de qualidade e notificação
+## Relatório de qualidade e observabilidade
 O pipeline produz relatórios estruturados para três fases:
 - `positions`
 - `trip_extraction`
@@ -130,7 +130,7 @@ O pipeline produz relatórios estruturados para três fases:
 Os relatórios de falha preservam os resultados parciais disponíveis até o ponto da interrupção.
 Assim, uma falha em `trip_extraction` ou `persistence` não perde o contexto já calculado nas fases anteriores.
 
-No relatório final, a fase `trip_extraction` também expõe métricas operacionais agregadas da execução, incluindo:
+No relatório final, a fase `trip_extraction` expõe métricas operacionais agregadas da execução, incluindo:
 - `trips_extracted`
 - `source_sentido_discrepancies`
 - `sanitization_dropped_points`
@@ -153,30 +153,90 @@ Se houver divergência entre as colunas declaradas e as colunas efetivamente pro
 
 Esse drift de lineage é reportado como artefato de governança no relatório de qualidade, sem por si só interromper a execução.
 
-A fase `persistence` do relatório final já expõe diretamente o resultado da persistência, incluindo:
+A fase `persistence` do relatório final expõe diretamente o resultado da persistência, incluindo:
 - `added_rows`
 - `previously_saved_rows`
 
-O resumo (`summary`) segue o contrato comum consumido pelo `alertservice`.
-O pipeline envia webhook para:
-- falhas em `positions`
-- avisos em `positions`
-- falhas em `trip_extraction`
-- falhas em `persistence`
-- relatório final consolidado
+Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
 
-O envio do webhook é explicitamente registrado em log, indicando se:
-- a notificação foi enviada
-- a notificação estava desabilitada
-- a tentativa falhou
-- Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedfinishedtrips_HHMM_uuid.json](./samples/quality-report-refinedfinishedtrips_HHMM_uuid.json).
+### Observabilidade (stack Loki + Grafana)
+
+A observabilidade deste pipeline é baseada em logging estruturado: todos os eventos são emitidos em JSON com os campos `service`, `event`, `status`, `execution_id` e `correlation_id`. No ambiente com Airflow, os logs são coletados pelo Promtail e enviados ao Loki.
+
+#### Taxonomia de eventos
+
+Cada fase do pipeline emite eventos de ciclo de vida (`_started`, `_succeeded`). Quatro eventos consolidados são emitidos ao final de cada execução:
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `execution_finished` | Execução concluída com sucesso | `execution_id`, `correlation_id`, `status` |
+| `execution_aborted` | Qualquer fase falha e interrompe o pipeline | `execution_id`, `correlation_id`, `status`, `message`, `metadata.phase` |
+| `execution_phase_metrics` | Ao final de toda execução (sucesso ou falha) | Duração e status de cada fase em `metadata.phase_metrics` |
+| `quality_report_metrics` | Após geração do relatório de qualidade | Métricas de volume, extração e persistência em `metadata` |
+
+Dois eventos de serviço são especialmente relevantes para monitoramento contínuo da qualidade dos dados de entrada:
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `freshness_evaluation` | A cada execução, após leitura das posições | `metadata.observed_lag_minutes`, `warn_threshold_minutes`, `fail_threshold_minutes` |
+| `recent_gaps_evaluation` | A cada execução, após leitura das posições | `metadata.max_gap_minutes`, `warn_threshold_minutes`, `fail_threshold_minutes` |
+
+#### Dashboard Grafana
+
+O dashboard está em [`observability/grafana/provisioning/dashboards/refinedfinishedtrips.json`](../../../../observability/grafana/provisioning/dashboards/refinedfinishedtrips.json) e é provisionado automaticamente pelo Grafana. Utiliza Loki como datasource. Todas as queries seguem o padrão:
+
+```
+{service="airflow_tasks"} | json | service_extracted="refinedfinishedtrips" | event="<evento>"
+```
+
+![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
+
+O dashboard está organizado em cinco linhas:
+
+**Linha 1 — Saúde operacional**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Executions | Timeseries (pontos) | Execuções concluídas (verde) e abortadas (vermelho) ao longo do tempo | `execution_finished` e `execution_aborted` — `count_over_time [2m]` |
+| Completed (last 1h) | Stat | Total de execuções bem-sucedidas na última hora | `execution_finished` — `count_over_time [1h]` |
+| Aborted (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções abortadas na última hora | `execution_aborted` — `count_over_time [1h]` |
+| Execution duration (s) | Timeseries | Duração média por fase: `total`, `trip_extraction`, `positions_load`, `positions_quality`, `persistence`, `quality_report`, `config_load` | `execution_phase_metrics` — `metadata.phase_metrics.<fase>.duration_seconds` via `avg_over_time [5m]` |
+
+**Linha 2 — Volume de viagens**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Trips added per run | Timeseries | Viagens novas inseridas por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
+| Trips extracted per run | Timeseries | Viagens detectadas pelo algoritmo por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.trips_extracted` |
+| Positions loaded per run | Timeseries | Volume de posições lidas do object storage por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.positions_in_time_window_count` |
+
+**Linha 3 — Qualidade da extração**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Vehicle-line groups processed | Timeseries | Grupos linha/veículo processados por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
+| Sentido discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado e o sentido da fonte por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
+| Position sanitization drops per run | Timeseries | Posições descartadas pela sanitização espacial por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
+
+**Linha 4 — Freshness dos dados de posição**
+
+| Painel | Tipo | O que mostra | Limiares |
+|---|---|---|---|
+| Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e o momento da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
+| Max extraction gap (s) | Timeseries | Maior lacuna em segundos entre ciclos consecutivos de extração na janela recente; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
+
+**Linha 5 — Logs**
+
+| Painel | O que mostra |
+|---|---|
+| Recent aborted executions | Stream filtrado dos eventos `execution_aborted` com fase e mensagem de falha |
+| Log stream | Todos os eventos do pipeline em ordem decrescente |
 
 ## Pré-requisitos
 - Disponibilidade do buckets da camada trusted, previamente criado no serviço de object storage
 - Disponibilidade do bucket da camada metadata no serviço de object storage para armazenamento dos relatórios de qualidade
 - Criação de uma chave de acesso ao serviço de object storage cadastrada no arquivo de configurações com acesso de leitura ao bucket na camada trusted e escrita ao bucket na camada metadata
 - Disponibilidade do serviço de banco de dados analítico, atualmente o PostgreSQL, para armazenamento dos dados na camada refined
-- alertservice disponível e configurado para receber notificações de qualidade (configurável via `webhook_url`; use `"disabled"` para desativar)
 - Arquivo `.env` com as credenciais necessárias
 - Um template está disponível em `.env.example`
 - Criação do arquivo de configurações
@@ -226,18 +286,13 @@ Chaves esperadas em `general`
     "trips_effective_window_threshold_minutes": 60,
     "trips_min_trips_threshold": 5
   },
-  "notifications": {
-    "webhook_url": "http://localhost:8000/notify"
-  }
 }
 ```
-Para desativar notificações do `alertservice`, configure:
-- `notifications.webhook_url = "disabled"`
 
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev
-- python3 -m venv .env
+- python3 -m venv .venv
 - source .venv/bin/activate
 - pip install -r requirements.txt
 
@@ -338,10 +393,5 @@ Crie `dags-dev/refinedfinishedtrips/.env` com base em `.env.example` preenchendo
 Com as tabelas já criadas conforme instruções acima, execute:
 
 ```shell
-python ./refinedfinishedtrips-v<version number>.py
-```
-
-Exemplo: 
-```shell
-python ./refinedfinishedtrips-v4.py
+python refinedfinishedtrips/extract_trips.py
 ```

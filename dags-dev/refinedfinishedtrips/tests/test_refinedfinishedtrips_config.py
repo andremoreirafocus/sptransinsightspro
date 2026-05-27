@@ -28,7 +28,6 @@ def make_valid_general():
             "trips_effective_window_threshold_minutes": 60,
             "trips_min_trips_threshold": 5,
         },
-        "notifications": {"webhook_url": "disabled"},
         "trip_detection": {"stop_proximity_threshold_meters": 100},
     }
 

@@ -4,7 +4,7 @@ import os
 from os_command_helper import run_command
 
 
-def _resolve_python_executable(folder: str) -> str:
+def resolve_python_executable(folder: str) -> str:
     for base in (folder, os.path.dirname(folder)):
         candidate = os.path.join(base, ".venv", "bin", "python")
         if os.path.isfile(candidate) and os.access(candidate, os.X_OK):
@@ -12,7 +12,9 @@ def _resolve_python_executable(folder: str) -> str:
     return sys.executable
 
 
-def run_code_validations(folder: str, label: str, step_offset: int = 1) -> int:
+def run_code_validations(
+    folder: str, label: str, step_offset: int = 1, total_steps: int = 0
+) -> int:
     """Run lint, SAST, and pytest (if tests exist) against a folder.
 
     Prints step labels starting from step_offset.
@@ -20,9 +22,12 @@ def run_code_validations(folder: str, label: str, step_offset: int = 1) -> int:
     """
     test_dir = os.path.join(folder, "tests")
     has_tests = os.path.isdir(test_dir)
-    python_executable = _resolve_python_executable(folder)
+    python_executable = resolve_python_executable(folder)
 
-    print(f"Step {step_offset}/?: Linting {label}...")
+    if total_steps <= 0:
+        total_steps = step_offset + (3 if has_tests else 2) - 1
+
+    print(f"Step {step_offset}/{total_steps}: Linting {label}...")
     run_command(
         [python_executable, "-m", "ruff", "check", folder],
         f"Linting failed for {label}!",
@@ -30,7 +35,7 @@ def run_code_validations(folder: str, label: str, step_offset: int = 1) -> int:
     print("✅ Linting Passed.")
 
     print(
-        f"Step {step_offset + 1}/?: Running SAST (bandit, high severity) for {label}..."
+        f"Step {step_offset + 1}/{total_steps}: Running SAST (bandit, high severity) for {label}..."
     )
     bandit_cmd = [
         python_executable,
@@ -54,7 +59,7 @@ def run_code_validations(folder: str, label: str, step_offset: int = 1) -> int:
     print("✅ SAST Passed.")
 
     if has_tests:
-        print(f"Step {step_offset + 2}/?: Running tests for {label}...")
+        print(f"Step {step_offset + 2}/{total_steps}: Running tests for {label}...")
         run_command(
             [python_executable, "-m", "pytest", test_dir],
             f"Tests failed for {label}!",

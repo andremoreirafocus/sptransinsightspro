@@ -1,10 +1,24 @@
-from src.extractloadlivedata import Services, extractloadlivedata
+from dataclasses import replace
+import json
+import logging
+
+from src.orchestration_dependencies import Services
+from src.extractloadlivedata import extractloadlivedata
 from src.services.exceptions import (
     IngestNotificationError,
     LocalIngestBufferSaveError,
     PositionsDownloadError,
 )
-from tests.fakes.alert_sender import FakeAlertSender
+
+def _find_event_payload(caplog, event_name: str):
+    for record in caplog.records:
+        try:
+            payload = json.loads(record.message)
+        except Exception:
+            continue
+        if payload.get("event") == event_name:
+            return payload
+    return None
 
 
 def _build_services(call_log, pending_list, storage_success=True):
@@ -17,7 +31,13 @@ def _build_services(call_log, pending_list, storage_success=True):
 
     def get_buses_positions_with_metadata(_payload):
         call_log.append("get_buses_positions_with_metadata")
-        return ["bus"], {}
+        return (
+            {
+                "metadata": {"extracted_at": "2026-05-13T15:30:45.123456+00:00"},
+                "payload": _payload,
+            },
+            {},
+        )
 
     def save_bus_positions_to_local_volume(_config, _buses_positions):
         call_log.append("save_bus_positions_to_local_volume")
@@ -44,18 +64,32 @@ def _build_services(call_log, pending_list, storage_success=True):
     def create_pending_invokation(_config, _filename):
         call_log.append("create_pending_invokation")
 
+    def get_pending_invokations(_config):
+        call_log.append("get_pending_invokations")
+        return pending_list
+
     def trigger_pending_airflow_dag_invokations(_config, with_metrics=False):
         call_log.append("trigger_pending_airflow_dag_invokations")
         if with_metrics:
-            return {"result": None, "metrics": {"success": 1, "failed": 0, "retries": 0}}
+            return {
+                "result": None,
+                "metrics": {"success": 1, "failed": 0, "retries": 0},
+            }
 
     def create_pending_processing_request(_config, _filename):
         call_log.append("create_pending_processing_request")
 
+    def get_pending_processing_requests(_config):
+        call_log.append("get_pending_processing_requests")
+        return pending_list
+
     def trigger_pending_processing_requests(_config, with_metrics=False):
         call_log.append("trigger_pending_processing_requests")
         if with_metrics:
-            return {"result": None, "metrics": {"success": 1, "failed": 0, "retries": 0}}
+            return {
+                "result": None,
+                "metrics": {"success": 1, "failed": 0, "retries": 0},
+            }
 
     return Services(
         extract_buses_positions_with_retries=extract_buses_positions_with_retries,
@@ -66,8 +100,10 @@ def _build_services(call_log, pending_list, storage_success=True):
         remove_local_file=remove_local_file,
         get_pending_storage_save_list=get_pending_storage_save_list,
         create_pending_invokation=create_pending_invokation,
+        get_pending_invokations=get_pending_invokations,
         trigger_pending_airflow_dag_invokations=trigger_pending_airflow_dag_invokations,
         create_pending_processing_request=create_pending_processing_request,
+        get_pending_processing_requests=get_pending_processing_requests,
         trigger_pending_processing_requests=trigger_pending_processing_requests,
     )
 
@@ -82,7 +118,9 @@ def test_extractloadlivedata_missing_notification_engine_is_handled():
 
 def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
     call_log = []
-    services = _build_services(call_log, pending_list=["posicoes.json"])
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "airflow",
@@ -96,7 +134,9 @@ def test_extractloadlivedata_airflow_branch_uses_airflow_notifications():
 
 def test_extractloadlivedata_processing_requests_branch_uses_processing_requests_notifications():
     call_log = []
-    services = _build_services(call_log, pending_list=["posicoes.json"])
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -115,20 +155,10 @@ def test_extractloadlivedata_positions_download_error_is_handled():
         call_log.append("extract_buses_positions_with_retries")
         raise PositionsDownloadError("download failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
     )
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -145,20 +175,10 @@ def test_extractloadlivedata_local_save_error_keeps_pending_processing():
         call_log.append("save_bus_positions_to_local_volume")
         raise LocalIngestBufferSaveError("local save failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=save_local_raises,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
     )
+    services = replace(services, save_bus_positions_to_local_volume=save_local_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -176,20 +196,10 @@ def test_extractloadlivedata_notification_error_is_handled():
         call_log.append("trigger_pending_processing_requests")
         raise IngestNotificationError("notification failed")
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=trigger_raises,
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
     )
+    services = replace(services, trigger_pending_processing_requests=trigger_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
@@ -198,143 +208,345 @@ def test_extractloadlivedata_notification_error_is_handled():
     assert "trigger_pending_processing_requests" in call_log
 
 
-def test_extractloadlivedata_phase_mapping_positions_download_uses_severe_prefix():
+def test_execution_report_success_without_pending_files(caplog):
     call_log = []
-    alerts = FakeAlertSender()
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    metadata = payload["metadata"]
+    assert "execution_seconds" in metadata
+    assert "items_total" in metadata
+    assert "items_failed" in metadata
+    assert "retries_seen" in metadata
+    assert "correlation_ids" in metadata
+    assert "correlation_ids_count" in metadata
+    assert metadata["items_failed"] == 0
+    assert metadata["correlation_ids_count"] == 1
+
+
+def test_execution_report_success_with_multiple_pending_files(caplog):
+    call_log = []
+    services = _build_services(
+        call_log,
+        pending_list=[
+            "posicoes_onibus-202605131530.json",
+            "posicoes_onibus-202605131531.json",
+        ],
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    metadata = payload["metadata"]
+    assert metadata["correlation_ids_count"] == 3
+    assert metadata["correlation_ids"] == [
+        "2026-05-13T15:30:45.123456+00:00",
+        "2026-05-13T18:30:00Z",
+        "2026-05-13T18:31:00Z",
+    ]
+
+
+def test_execution_report_dedup_repeated_logical_datetimes(caplog):
+    call_log = []
+    services = _build_services(
+        call_log,
+        pending_list=[
+            "posicoes_onibus-202605131530.json",
+            "posicoes_onibus-202605131530.json",
+            "posicoes_onibus-202605131531.json",
+        ],
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    metadata = payload["metadata"]
+    assert metadata["correlation_ids_count"] == 3
+    assert metadata["correlation_ids"] == [
+        "2026-05-13T15:30:45.123456+00:00",
+        "2026-05-13T18:30:00Z",
+        "2026-05-13T18:31:00Z",
+    ]
+
+
+def test_execution_report_failure_emits_enriched_final_failure(caplog):
+    call_log = []
 
     def extract_raises(_config, with_metrics=False):
         call_log.append("extract_buses_positions_with_retries")
         raise PositionsDownloadError("download failed")
 
     services = _build_services(call_log, pending_list=[])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
-        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
-    assert len(alerts.calls) == 1
-    summary = alerts.calls[0]["report"]
-    assert summary["status"] == "FAIL"
-    assert summary["failure_phase"] == "positions_download"
-    assert summary["failure_message"].startswith("[SEVERE] non recoverable ")
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert payload is not None
+    metadata = payload["metadata"]
+    assert "execution_seconds" in metadata
+    assert "items_total" in metadata
+    assert "items_failed" in metadata
+    assert "retries_seen" in metadata
+    assert "correlation_ids" in metadata
+    assert "correlation_ids_count" in metadata
+    assert metadata["items_failed"] > 0
+    assert "failed_phases" in metadata
+    assert len(metadata["failed_phases"]) > 0
 
 
-def test_extractloadlivedata_unknown_phase_fallback_message():
+def test_execution_report_failure_emits_failed_phases(caplog):
     call_log = []
-    alerts = FakeAlertSender()
 
-    def extract_raises_unknown(_config, with_metrics=False):
+    def extract_raises(_config, with_metrics=False):
         call_log.append("extract_buses_positions_with_retries")
-        raise RuntimeError("unexpected boom")
+        raise PositionsDownloadError("download failed")
 
     services = _build_services(call_log, pending_list=[])
-    services = Services(
-        extract_buses_positions_with_retries=extract_raises_unknown,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=services.trigger_pending_processing_requests,
-    )
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
-        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
-    assert len(alerts.calls) == 1
-    summary = alerts.calls[0]["report"]
-    assert summary["status"] == "FAIL"
-    assert summary["failure_phase"] == "unknown"
-    assert summary["failure_message"] == "ingest execution failed"
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert payload is not None
+    metadata = payload["metadata"]
+    assert metadata["failed_phases"] == ["positions_download"]
 
 
-def test_extractloadlivedata_counting_rules_in_notification_failure():
+def test_alert_rule_scenario_success_without_retries_no_warning_or_failure(caplog):
     call_log = []
-    alerts = FakeAlertSender()
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
 
-    def trigger_raises_with_metrics(_config, with_metrics=False):
-        call_log.append("trigger_pending_processing_requests")
-        error = IngestNotificationError("notification failed")
-        setattr(error, "metrics", {"success": 2, "failed": 1, "retries": 3})
-        raise error
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is not None
+    assert failed is None
+    assert completed["service"] == "extractloadlivedata"
+    assert "execution_id" in completed and completed["execution_id"]
+    assert completed["metadata"]["retries_seen"] == 0
+    # Alert rule expectations:
+    # - service_warning_threshold should NOT trigger (retries_seen == 0)
+    # - service_failed should NOT trigger (no failure event)
 
-    services = _build_services(call_log, pending_list=["posicoes.json"])
-    services = Services(
-        extract_buses_positions_with_retries=services.extract_buses_positions_with_retries,
-        get_buses_positions_with_metadata=services.get_buses_positions_with_metadata,
-        save_bus_positions_to_local_volume=services.save_bus_positions_to_local_volume,
-        save_bus_positions_to_storage_with_retries=services.save_bus_positions_to_storage_with_retries,
-        load_bus_positions_from_local_volume_file=services.load_bus_positions_from_local_volume_file,
-        remove_local_file=services.remove_local_file,
-        get_pending_storage_save_list=services.get_pending_storage_save_list,
-        create_pending_invokation=services.create_pending_invokation,
-        trigger_pending_airflow_dag_invokations=services.trigger_pending_airflow_dag_invokations,
-        create_pending_processing_request=services.create_pending_processing_request,
-        trigger_pending_processing_requests=trigger_raises_with_metrics,
+
+def test_alert_rule_scenario_success_with_retries_triggers_warning_context(caplog):
+    call_log = []
+
+    def extract_with_retries(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        payload = {"payload": True}
+        if with_metrics:
+            return {"result": payload, "metrics": {"retries": 2}}
+        return payload
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(
+        services, extract_buses_positions_with_retries=extract_with_retries
     )
     config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
-        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config, services=services, send_alert_fn=alerts)
-    assert len(alerts.calls) == 1
-    summary = alerts.calls[0]["report"]
-    assert summary["status"] == "FAIL"
-    assert summary["failure_phase"] == "ingest_notification"
-    assert summary["items_total"] == 6
-    assert summary["items_failed"] == 1
-    assert summary["retries"] == 3
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is not None
+    assert failed is None
+    assert completed["service"] == "extractloadlivedata"
+    assert "execution_id" in completed and completed["execution_id"]
+    assert completed["metadata"]["retries_seen"] > 0
+    # Alert rule expectation:
+    # - service_warning_threshold should trigger (retries_seen > 0)
 
 
-def test_extractloadlivedata_airflow_processing_requests_equivalent_summary():
-    call_log_airflow = []
-    alerts_airflow = FakeAlertSender()
-    services_airflow = _build_services(call_log_airflow, pending_list=["posicoes.json"])
-    config_airflow = {
-        "INGEST_BUFFER_PATH": "/tmp/ingest",
-        "NOTIFICATION_ENGINE": "airflow",
-        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
-    }
-    extractloadlivedata(
-        config=config_airflow, services=services_airflow, send_alert_fn=alerts_airflow
-    )
+def test_alert_rule_scenario_non_recoverable_failure_triggers_failure_context(caplog):
+    call_log = []
 
-    call_log_pr = []
-    alerts_pr = FakeAlertSender()
-    services_pr = _build_services(call_log_pr, pending_list=["posicoes.json"])
-    config_pr = {
+    def extract_raises(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        raise PositionsDownloadError("download failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
+    config = {
         "INGEST_BUFFER_PATH": "/tmp/ingest",
         "NOTIFICATION_ENGINE": "processing_requests",
-        "NOTIFICATIONS_WEBHOOK_URL": "http://fake-webhook",
     }
-    extractloadlivedata(config=config_pr, services=services_pr, send_alert_fn=alerts_pr)
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
 
-    assert len(alerts_airflow.calls) == 1
-    assert len(alerts_pr.calls) == 1
-    summary_airflow = alerts_airflow.calls[0]["report"]
-    summary_pr = alerts_pr.calls[0]["report"]
-    assert summary_airflow["status"] == "PASS"
-    assert summary_pr["status"] == "PASS"
-    assert summary_airflow["items_total"] == summary_pr["items_total"] == 4
-    assert summary_airflow["items_failed"] == summary_pr["items_failed"] == 0
+    completed = _find_event_payload(caplog, "execution_completed")
+    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert completed is None
+    assert failed is not None
+    assert failed["service"] == "extractloadlivedata"
+    assert "execution_id" in failed and failed["execution_id"]
+    assert failed["metadata"]["items_failed"] > 0
+    # Alert rule expectation:
+    # - service_failed should trigger (failure event exists)
+
+
+# ── Phase metrics: local_save and object_storage_save ────────────────────────
+
+
+def test_phase_metrics_local_save_succeeds_in_happy_path(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["local_save"]["attempted"] == 1
+    assert phase_metrics["local_save"]["succeeded"] == 1
+    assert phase_metrics["local_save"]["failed"] == 0
+
+
+def test_phase_metrics_local_save_fails_on_local_ingest_buffer_save_error(caplog):
+    call_log = []
+
+    def save_local_raises(_config, _buses_positions):
+        call_log.append("save_bus_positions_to_local_volume")
+        raise LocalIngestBufferSaveError("local save failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, save_bus_positions_to_local_volume=save_local_raises)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["local_save"]["attempted"] == 1
+    assert phase_metrics["local_save"]["failed"] == 1
+    assert phase_metrics["local_save"]["succeeded"] == 0
+
+
+def test_phase_metrics_object_storage_save_succeeds_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log,
+        pending_list=["posicoes_onibus-202605131530.json"],
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    phase_metrics = payload["metadata"]["phase_metrics"]
+    assert phase_metrics["object_storage_save"]["attempted"] == 1
+    assert phase_metrics["object_storage_save"]["succeeded"] == 1
+    assert phase_metrics["object_storage_save"]["failed"] == 0
+
+
+def test_phase_durations_local_save_present_in_happy_path(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert "local_save" in payload["metadata"]["phase_durations"]
+
+
+# ── Pending counts observability ─────────────────────────────────────────────
+
+
+def test_pending_storage_files_count_zero_with_no_pending_files(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_object_storage_save_files_count"] == 0
+
+
+def test_pending_storage_files_count_one_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_object_storage_save_files_count"] == 1
+
+
+def test_pending_notifications_count_one_with_one_pending_file(caplog):
+    call_log = []
+    services = _build_services(
+        call_log, pending_list=["posicoes_onibus-202605131530.json"]
+    )
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    payload = _find_event_payload(caplog, "execution_completed")
+    assert payload is not None
+    assert payload["metadata"]["pending_ingest_notifications_count"] == 1

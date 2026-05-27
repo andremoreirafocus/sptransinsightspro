@@ -4,7 +4,7 @@ import logging
 import sys
 from functools import partial
 from logging.handlers import RotatingFileHandler
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
@@ -17,7 +17,7 @@ from .infra.config import (
 )
 from .infra.storage import init_db, store_summary, query_window
 from .infra.notifier import format_summary, send_email
-from .process_notification import process_notification
+from .process_notification import QueryWindow, process_notification
 
 logging.basicConfig(
     level=logging.INFO,
@@ -68,7 +68,7 @@ def notify(request: Request, payload: NotificationPayload) -> Dict[str, Any]:
             pipeline_config=request.app.state.pipeline_config,
             subject_prefix=settings.email_subject_prefix,
             store_summary=store_summary,
-            query_window=query_window,
+            query_window=cast(QueryWindow, query_window),
             send_email=send_email_fn,
             format_summary=format_summary,
         )

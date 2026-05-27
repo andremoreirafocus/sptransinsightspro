@@ -1,3 +1,5 @@
+import logging
+
 import pandas as pd
 
 from refinedsynctripdetails.services.transform_trip_details_for_refined import (
@@ -98,3 +100,10 @@ def test_circular_direction_1_replaces_first_stop_with_intermediate_placeholder(
     assert pd.isna(transformed_row["first_stop_id"])
     assert pd.isna(transformed_row["first_stop_lat"])
     assert pd.isna(transformed_row["first_stop_lon"])
+
+
+def test_empty_dataframe_emits_skipped_warning(caplog):
+    with caplog.at_level(logging.WARNING):
+        transform_trip_details_for_refined(pd.DataFrame())
+    records = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("trip_details_transform_skipped" in r.getMessage() for r in records)

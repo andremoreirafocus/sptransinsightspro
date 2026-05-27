@@ -654,11 +654,6 @@ def test_transform_positions_success(
     assert result["quality_score"] == 100.0
 
 
-def test_transform_positions_missing_schema(raw_positions_valid):
-    with pytest.raises(ValueError):
-        transform_positions({"general": {}}, raw_positions_valid)
-
-
 def test_transform_positions_trip_details_empty(
     make_transform_positions_deps, raw_path_map, raw_positions_valid, config_valid
 ):

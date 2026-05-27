@@ -1,0 +1,75 @@
+groups:
+  - name: transformlivedata-pipeline-alerts
+    interval: 1m
+    rules:
+      - alert: PipelinePhaseFailed
+        expr: |
+          sum(count_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="transformlivedata"
+            | level="ERROR"
+            | event=~"load_positions_failed|raw_schema_validation_failed|transform_failed|expectations_validation_failed|save_trusted_failed|save_quarantine_failed|mark_processed_failed|quality_report_failed"
+            [5m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: transformlivedata
+          alertname: pipeline_phase_failed
+        annotations:
+          summary: "transformlivedata pipeline phase failed"
+          description: "A pipeline phase failed in the last 5 minutes."
+
+      - alert: AcceptanceRateBelowThreshold
+        expr: |
+          (
+            sum(last_over_time(
+              {service="airflow_tasks"}
+              | json
+              | service_extracted="transformlivedata"
+              | event="quality_report_metrics"
+              | json v="metadata.record_counts.accepted_records"
+              | unwrap v
+              [10m]
+            ))
+          )
+          /
+          (
+            sum(last_over_time(
+              {service="airflow_tasks"}
+              | json
+              | service_extracted="transformlivedata"
+              | event="quality_report_metrics"
+              | json v="metadata.record_counts.raw_input_records"
+              | unwrap v
+              [10m]
+            ))
+          )
+          < 0.98
+        for: 0m
+        labels:
+          severity: warning
+          service: transformlivedata
+          alertname: acceptance_rate_below_threshold
+        annotations:
+          summary: "transformlivedata acceptance rate below 0.98"
+          description: "The data acceptance rate dropped below the warn threshold of 98%. Data quality may be degraded for downstream consumers."
+
+      - alert: NoPipelineExecutionCompleted
+        expr: |
+          absent_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="transformlivedata"
+            | event="execution_finished"
+            [30m]
+          )
+        for: 0m
+        labels:
+          severity: critical
+          service: transformlivedata
+          alertname: no_pipeline_execution_completed
+        annotations:
+          summary: "transformlivedata has not completed any execution in 30 minutes"
+          description: "No execution_finished event detected in the last 30 minutes. The pipeline may be stuck or stopped."

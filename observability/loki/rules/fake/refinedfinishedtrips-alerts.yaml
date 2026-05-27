@@ -1,0 +1,79 @@
+groups:
+  - name: refinedfinishedtrips-pipeline-alerts
+    interval: 1m
+    rules:
+      - alert: ExecutionAborted
+        expr: |
+          sum(count_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedfinishedtrips"
+            | event="execution_aborted"
+            [5m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: refinedfinishedtrips
+          alertname: execution_aborted
+        annotations:
+          summary: "refinedfinishedtrips execution aborted"
+          description: "A pipeline execution was aborted in the last 5 minutes. The refined layer may be stale or incomplete."
+
+      - alert: NoPipelineExecutionCompleted
+        expr: |
+          absent_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedfinishedtrips"
+            | event="execution_finished"
+            [1h]
+          )
+        for: 0m
+        labels:
+          severity: critical
+          service: refinedfinishedtrips
+          alertname: no_pipeline_execution_completed
+        annotations:
+          summary: "refinedfinishedtrips has not completed any execution in 1 hour"
+          description: "No execution_finished event detected in the last hour. The pipeline may be stuck, failing on every run, or the upstream dataset signal has stopped."
+
+      - alert: PositionFreshnessHigh
+        expr: |
+          max_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedfinishedtrips"
+            | event="freshness_evaluation"
+            | json v="metadata.observed_lag_minutes"
+            | unwrap v
+            [10m]
+          ) > 10
+        for: 0m
+        labels:
+          severity: warning
+          service: refinedfinishedtrips
+          alertname: position_freshness_high
+        annotations:
+          summary: "refinedfinishedtrips position data freshness above warn threshold"
+          description: "observed_lag_minutes exceeded the warn threshold of 10 minutes. Trip quality may be degraded. Pipeline is still running."
+
+      - alert: ExtractionGapHigh
+        expr: |
+          max_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedfinishedtrips"
+            | event="recent_gaps_evaluation"
+            | json v="metadata.max_gap_minutes"
+            | unwrap v
+            [10m]
+          ) > 5
+        for: 0m
+        labels:
+          severity: warning
+          service: refinedfinishedtrips
+          alertname: extraction_gap_high
+        annotations:
+          summary: "refinedfinishedtrips extraction gap above warn threshold"
+          description: "max_gap_minutes exceeded the warn threshold of 5 minutes. Gaps in position data may affect trip detection. Pipeline is still running."

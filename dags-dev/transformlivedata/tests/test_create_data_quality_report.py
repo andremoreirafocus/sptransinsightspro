@@ -1,16 +1,14 @@
 import json
-import os
-import tempfile
 import pandas as pd
 import pytest
 from transformlivedata.services.create_data_quality_report import (
+    _compute_partial_metrics,
     _compute_quality_metrics,
     build_data_quality_report,
     build_quarantine_path,
+    create_data_quality_metrics,
     create_data_quality_report,
     create_failure_quality_report,
-    format_data_quality_report,
-    write_data_quality_report_json,
 )
 from quality.reporting import build_quality_report_path, save_quality_report
 
@@ -425,7 +423,7 @@ def test_build_data_quality_report_zero_total_gives_zero_acceptance_rate():
 # --- create_data_quality_report ---
 
 
-def test_create_data_quality_report_returns_report():
+def test_create_data_quality_report_returns_log_metadata():
     result = create_data_quality_report(
         config=make_storage_config(),
         execution_id="exec-1",
@@ -435,8 +433,9 @@ def test_create_data_quality_report_returns_report():
         expectations_result=make_expectations_result(),
         write_fn=lambda *a, **kw: None,
     )
-    assert "summary" in result
-    assert "details" in result
+    assert "summary_status" in result
+    assert "quality_report_path" in result
+    assert "record_counts" in result
 
 
 def test_create_data_quality_report_calls_write_fn():
@@ -453,10 +452,69 @@ def test_create_data_quality_report_calls_write_fn():
     assert len(calls) == 1
 
 
+def test_create_data_quality_metrics_returns_expected_compact_counts():
+    report = build_data_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        transform_result=make_transform_result(invalid_count=1, total=10),
+        expectations_result=make_expectations_result(gx_invalid_count=2, rows_failed=3),
+        pass_threshold=1.0,
+        warn_threshold=0.98,
+        batch_ts="2026-02-15T10:30:00",
+    )
+    metrics = create_data_quality_metrics(report)
+
+    assert metrics["record_counts"]["raw_input_records"] == 10
+    assert metrics["record_counts"]["transformed_records"] == 9
+    assert metrics["record_counts"]["accepted_records"] == 10
+    assert metrics["record_counts"]["rejected_records"] == 1
+    assert metrics["transformation_processing_issues"]["invalid_trips_count"] == 0
+    assert metrics["transformation_processing_issues"]["invalid_vehicle_ids_count"] == 0
+    assert metrics["post_transformation_validation_summary"]["records_failed"] == report["summary"]["items_failed"]
+    assert metrics["post_transformation_validation_summary"]["gx_records_failures"] == 3
+
+
+# --- _compute_partial_metrics ---
+
+
+def test_compute_partial_metrics_returns_empty_when_both_none():
+    result = _compute_partial_metrics(None, None)
+    assert result["record_counts"] == {}
+    assert result["transformation_processing_metrics"] == {}
+    assert result["transformation_processing_issues"] == {}
+    assert result["post_transformation_validation_summary"] == {}
+
+
+def test_compute_partial_metrics_extracts_transform_counts_when_only_transform_result():
+    result = _compute_partial_metrics(make_transform_result(invalid_count=2, total=10), None)
+    assert result["record_counts"]["transformed_records"] == 8
+    assert result["record_counts"]["raw_input_records"] == 10
+    assert result["record_counts"]["rejected_records"] == 2
+    assert result["post_transformation_validation_summary"] == {}
+
+
+def test_compute_partial_metrics_extracts_expectations_counts_when_only_expectations_result():
+    result = _compute_partial_metrics(None, make_expectations_result())
+    assert result["record_counts"]["accepted_records"] == 10
+    assert result["transformation_processing_metrics"] == {}
+
+
+def test_compute_partial_metrics_extracts_both_when_full_results():
+    result = _compute_partial_metrics(
+        make_transform_result(invalid_count=1, total=10),
+        make_expectations_result(),
+    )
+    assert result["record_counts"]["raw_input_records"] == 10
+    assert result["record_counts"]["accepted_records"] == 10
+    assert result["post_transformation_validation_summary"]["total_checks"] == 5
+
+
 # --- create_failure_quality_report ---
 
 
-def test_create_failure_quality_report_status_is_fail():
+def test_create_failure_quality_report_returns_fail_status():
     result = create_failure_quality_report(
         config=make_storage_config(),
         execution_id="exec-1",
@@ -466,10 +524,12 @@ def test_create_failure_quality_report_status_is_fail():
         failure_message="File not found",
         write_fn=lambda *a, **kw: None,
     )
-    assert result["summary"]["status"] == "FAIL"
+    assert result["summary_status"] == "FAIL"
+    assert result["failure_phase"] == "load"
+    assert result["failure_message"] == "File not found"
 
 
-def test_create_failure_quality_report_without_results_has_minimal_details():
+def test_create_failure_quality_report_without_results_returns_empty_metrics():
     result = create_failure_quality_report(
         config=make_storage_config(),
         execution_id="exec-1",
@@ -479,11 +539,11 @@ def test_create_failure_quality_report_without_results_has_minimal_details():
         failure_message="File not found",
         write_fn=lambda *a, **kw: None,
     )
-    assert result["details"]["transformation_row_counts"] == {}
-    assert result["details"]["outcome"]["status"] == "FAIL"
+    assert result["record_counts"] == {}
+    assert result["transformation_processing_metrics"] == {}
 
 
-def test_create_failure_quality_report_with_results_uses_full_report():
+def test_create_failure_quality_report_with_results_returns_full_metrics():
     result = create_failure_quality_report(
         config=make_storage_config(),
         execution_id="exec-1",
@@ -495,8 +555,25 @@ def test_create_failure_quality_report_with_results_uses_full_report():
         expectations_result=make_expectations_result(),
         write_fn=lambda *a, **kw: None,
     )
-    assert "transformation_row_counts" in result["details"]
-    assert result["summary"]["status"] == "FAIL"
+    assert result["summary_status"] == "FAIL"
+    assert "raw_input_records" in result["record_counts"]
+
+
+def test_create_failure_quality_report_uses_partial_metrics_when_only_transform_available():
+    result = create_failure_quality_report(
+        config=make_storage_config(),
+        execution_id="exec-1",
+        logical_date_utc="2026-02-15T10:00:00+00:00",
+        source_file="f.json",
+        failure_phase="expectations_validation",
+        failure_message="boom",
+        transform_result=make_transform_result(invalid_count=1, total=100),
+        write_fn=lambda *a, **kw: None,
+    )
+    assert result["record_counts"]["raw_input_records"] == 100
+    assert result["record_counts"]["transformed_records"] == 99
+    assert result["post_transformation_validation_summary"] == {}
+    assert result["failure_phase"] == "expectations_validation"
 
 
 def test_create_failure_quality_report_uses_logical_date_when_batch_ts_none():
@@ -549,117 +626,3 @@ def test_quarantine_path_ends_with_parquet_glob():
     assert path.endswith("*.parquet")
 
 
-# --- format_data_quality_report ---
-
-
-def _make_full_report(status="PASS"):
-    return {
-        "summary": {
-            "execution_id": "exec-1",
-            "logical_date_utc": "2026-02-15T10:00:00+00:00",
-            "source_file": "f.json",
-            "status": status,
-            "acceptance_rate": 1.0,
-            "items_failed": 0,
-        },
-        "details": {
-            "execution_id": "exec-1",
-            "logical_date_utc": "2026-02-15T10:00:00+00:00",
-            "source_file": "f.json",
-            "transformation_row_counts": {
-                "raw_records": 100,
-                "transformed_records": 100,
-                "accepted_records": 100,
-                "rejected_records": 0,
-            },
-            "transformation_metrics": {
-                "total_vehicles_processed": 100,
-                "valid_vehicles": 100,
-                "invalid_vehicles": 0,
-                "expected_vehicles": 100,
-                "total_lines_processed": 5,
-            },
-            "transformation_issues": {
-                "invalid_trips": [],
-                "invalid_vehicle_ids": [],
-                "distance_calculation_errors": 0,
-                "lines_with_invalid_vehicles": 0,
-            },
-            "expectations_summary": {
-                "total_checks": 5,
-                "expectations_successful": 5,
-                "expectations_with_violations": 0,
-                "expectations_failed_due_to_exceptions": 0,
-                "rows_failed": 0,
-                "violation_reasons": [],
-                "exception_reasons": [],
-            },
-            "outcome": {
-                "status": status,
-                "acceptance_rate": 1.0,
-                "policy_version": "v1",
-            },
-            "artifacts": {
-                "quality_report_path": "bucket/path.json",
-                "quarantine_path": "bucket/q/",
-                "column_lineage": {},
-            },
-        },
-    }
-
-
-def test_format_report_contains_execution_id():
-    output = format_data_quality_report(_make_full_report())
-    assert "exec-1" in output
-
-
-def test_format_report_contains_status():
-    output = format_data_quality_report(_make_full_report(status="PASS"))
-    assert "PASS" in output
-
-
-def test_format_report_includes_violation_reasons_when_present():
-    report = _make_full_report()
-    report["details"]["expectations_summary"]["violation_reasons"] = ["col_a is null"]
-    output = format_data_quality_report(report)
-    assert "col_a is null" in output
-
-
-def test_format_report_includes_exception_reasons_when_present():
-    report = _make_full_report()
-    report["details"]["expectations_summary"]["exception_reasons"] = ["timeout"]
-    output = format_data_quality_report(report)
-    assert "timeout" in output
-
-
-def test_format_report_includes_expectations_failed_due_to_exceptions_line():
-    report = _make_full_report()
-    report["details"]["expectations_summary"][
-        "expectations_failed_due_to_exceptions"
-    ] = 2
-    output = format_data_quality_report(report)
-    assert "Expectations failed due to exceptions: 2" in output
-
-
-def test_format_report_raises_on_malformed_input():
-    with pytest.raises(ValueError, match="Error parsing data_quality_report"):
-        format_data_quality_report(
-            {"details": {"outcome": {"acceptance_rate": "not_a_number"}}}
-        )
-
-
-# --- write_data_quality_report_json ---
-
-
-def test_write_data_quality_report_json_writes_valid_json():
-    report = {"status": "PASS", "count": 42}
-    with tempfile.NamedTemporaryFile(mode="r", suffix=".json", delete=False) as f:
-        path = f.name
-    try:
-        write_data_quality_report_json(report, path)
-        with open(path) as f:
-            parsed = json.load(f)
-        assert parsed["status"] == "PASS"
-        assert parsed["count"] == 42
-    finally:
-        os.unlink(path)

@@ -1,7 +1,20 @@
 import io
+import json
 
 import gtfs.services.transforms as transforms_module
 from gtfs.services.transforms import transform_and_validate_table
+
+
+def _parse_log_events(caplog, event_name: str) -> list[dict]:
+    results = []
+    for record in caplog.records:
+        try:
+            parsed = json.loads(record.getMessage())
+        except Exception:
+            continue
+        if parsed.get("event") == event_name:
+            results.append(parsed)
+    return results
 
 
 def make_config():
@@ -30,9 +43,6 @@ def test_transform_and_validate_table_skips_validation_when_suite_missing():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         calls.append((file_name, subfolder))
 
@@ -40,7 +50,6 @@ def test_transform_and_validate_table_skips_validation_when_suite_missing():
         make_config(),
         "routes",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
     )
 
@@ -62,9 +71,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_fails():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -81,7 +87,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_fails():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -132,9 +137,6 @@ def test_transform_and_validate_table_marks_valid_when_gx_passes():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -151,7 +153,6 @@ def test_transform_and_validate_table_marks_valid_when_gx_passes():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -171,9 +172,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_raises_exception():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         return None
 
@@ -184,7 +182,6 @@ def test_transform_and_validate_table_marks_invalid_when_gx_raises_exception():
         config,
         "stops",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
         validate_expectations_fn=fake_validate_expectations,
     )
@@ -198,9 +195,6 @@ def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
     def fake_load(config, table_name):
         return io.BytesIO(b"stop_id,stop_name\n1,A")
 
-    def fake_convert(df):
-        return b"parquet"
-
     def fake_save(config, file_name, buffer, subfolder=None):
         raise RuntimeError("save boom")
 
@@ -208,13 +202,33 @@ def test_transform_and_validate_table_marks_invalid_when_staging_save_fails():
         make_config(),
         "routes",
         load_fn=fake_load,
-        convert_fn=fake_convert,
         save_fn=fake_save,
     )
 
     assert result["is_valid"] is False
     assert result["staged_written"] is False
     assert result["errors"] == ["staging_save_failed:save boom"]
+
+
+def test_table_transform_succeeded_logs_row_count(caplog):
+    caplog.set_level("INFO")
+
+    def fake_load(config, table_name):
+        return io.BytesIO(b"stop_id,stop_name\n1,A\n2,B\n3,C")
+
+    def fake_save(config, file_name, buffer, subfolder=None):
+        pass
+
+    transform_and_validate_table(
+        make_config(),
+        "stops",
+        load_fn=fake_load,
+        save_fn=fake_save,
+    )
+
+    events = _parse_log_events(caplog, "table_transform_succeeded")
+    assert len(events) == 1
+    assert events[0]["metadata"]["row_count"] == 3
 
 
 def test_transform_table_wrappers_delegate_to_transform_and_validate_table():

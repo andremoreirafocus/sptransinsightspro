@@ -81,13 +81,72 @@ The [samples](./samples) folder contains a manually curated example of the conso
 }
 ```
 
-### Notification and observability (`alertservice`)
+### Observability (Loki + Grafana + Alertmanager stack)
 
-The report `summary` is sent via webhook to the `alertservice` microservice when enabled.
-The summary contains status information, failure phases, and transformation metrics to trigger immediate alerts (`FAIL`) or cumulative alerts (`WARN`) configured in `alertservice`.
-`alertservice` sends email notifications based on thresholds configured per pipeline:
-- **FAIL (immediate)**: any `FAIL` status sends an immediate email
-- **WARN (cumulative)**: warning alerts are aggregated within a configured time window, for example 24 hours, and sent when thresholds are reached
+The pipeline's observability is based on structured logging: all events are emitted as JSON with the fields `service`, `event`, `status`, `execution_id`, and `correlation_id`. In the Airflow environment, logs are collected by Promtail and sent to Loki. Third-party library logs are routed to the same format via the observability bridge.
+
+#### Event taxonomy
+
+Each pipeline phase emits lifecycle events (`_started`, `_succeeded`, `_failed`). Two consolidated events are emitted at the end of every execution:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `execution_finished` | Execution completed successfully | `execution_id`, `correlation_id`, `status` |
+| `execution_aborted` | Any phase fails and interrupts the pipeline | `execution_id`, `correlation_id`, `status`, `message` |
+| `execution_phase_metrics` | At the end of every execution (success or failure) | Duration and status of each phase in `metadata.phase_metrics` |
+| `quality_report_metrics` | After the quality report is generated | Record counts, transformation metrics, issues, and GX summary in `metadata` |
+
+#### Grafana dashboard
+
+The dashboard is located at [`observability/grafana/provisioning/dashboards/transformlivedata.json`](../../../../observability/grafana/provisioning/dashboards/transformlivedata.json) and is provisioned automatically by Grafana. It uses Loki as its datasource. All queries follow the pattern:
+
+```
+{service="airflow_tasks"} | json | service_extracted="transformlivedata" | event="<event>"
+```
+
+![Dashboard transformlivedata](transformlivedata_dashboard.png)
+
+The dashboard is organized into three rows:
+
+**Row 1 — Operational health**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Executions | Timeseries (dots) | Completed executions (green) and failed executions (red) over time | `execution_finished` and `execution_aborted` — `count_over_time [2m]` |
+| Completed (last 1h) | Stat | Total successful executions in the last hour | `execution_finished` — `count_over_time [1h]` |
+| Errors (last 1h) | Stat (red when ≥ 1) | Total failed executions in the last hour | `execution_aborted` — `count_over_time [1h]` |
+| Execution duration (s) | Timeseries | Average duration per phase: `total`, `load_positions`, `raw_schema_validation`, `transform`, `expectations_validation`, `save_trusted` | `execution_phase_metrics` — `metadata.phase_metrics.<phase>.duration_seconds` via `avg_over_time [5m]` |
+
+**Row 2 — Data quality**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Acceptance rate | Timeseries | Acceptance rate (`accepted / raw`); visual threshold at 0.98 (orange below, green above) | `quality_report_metrics` — `metadata.record_counts.accepted_records` / `raw_input_records` |
+| Raw records | Timeseries | Volume of raw records received per execution | `quality_report_metrics` — `metadata.record_counts.raw_input_records` |
+| Rejected records by reason | Timeseries | Breakdown of rejected records by cause: invalid vehicle IDs, distance-calculation errors, and GX failures | `quality_report_metrics` — `metadata.transformation_processing_issues.invalid_vehicle_ids_count`, `distance_calculation_errors_count`; `metadata.post_transformation_validation_summary.gx_records_failures` |
+
+The `gx_records_failures` field captures exclusively the rows rejected by Great Expectations after the transformation phase — distinct from the total rejected count, which also includes records filtered during transformation.
+
+**Row 3 — Logs**
+
+| Panel | What it shows |
+|---|---|
+| Recent failures | Filtered stream of `execution_aborted` events with failure details |
+| Log stream | All pipeline events in descending order |
+
+#### Alert rules
+
+Rules are defined in `observability/loki/rules/fake/transformlivedata-alerts.yaml` and evaluated every minute by the Loki Ruler:
+
+| Alert | Severity | Condition | Window |
+|---|---|---|---|
+| `PipelinePhaseFailed` | critical | Any `execution_aborted` event detected | 5m |
+| `AcceptanceRateBelowThreshold` | warning | Acceptance rate (`accepted / raw`) below 0.98 | 10m |
+| `NoPipelineExecutionCompleted` | critical | No `execution_finished` detected (`absent_over_time`) | 30m |
+
+Alertmanager (`observability/alertmanager/alertmanager.yml`) routes:
+- `critical` → immediate delivery, no grouping, repeat every 30 min
+- `warning` → 2-minute grouping, repeat every 12h
 
 ## Prerequisites
 
@@ -147,9 +206,6 @@ Expected keys in `general`:
     "raw_data_compression": true,
     "raw_data_compression_extension": ".zst"
   },
-  "notifications": {
-    "webhook_url": "http://localhost:8000/notify"
-  },
   "data_validations": {
     "json_validation": {
       "schemas": ["raw_data_json_schema"]
@@ -161,16 +217,11 @@ Expected keys in `general`:
 }
 ```
 
-Note: `webhook_url` is the URL of the `alertservice` microservice and is required.
-To disable notifications to `alertservice`, use the value `"disabled"`.
+Note: alert notifications are no longer handled by an application webhook in this pipeline; operational alerts must be configured in the observability stack (Loki/Grafana/Alertmanager).
 
 ## Unit tests
 
-Unit tests in this subproject are currently limited to the `transform_positions.py` module and cover the core transformation logic, including:
-- payload validation and minimum data structure checks
-- transformed-field mapping and enrichment
-- calculations and aggregations applied to vehicle positions
-- error scenarios for missing or invalid data
+Tests in this subproject cover the transformation logic, the quality report service, and the full pipeline orchestration.
 
 ## Installation instructions
 
@@ -250,27 +301,3 @@ CREATE TABLE trusted.positions (
     distance_to_last_stop DOUBLE PRECISION
 );
 ```
-
-## Structure of the table before enrichment with `trip_details`
-
-```sql
-CREATE TABLE trusted.positions (
-    id BIGSERIAL PRIMARY KEY,
-    extracao_ts TIMESTAMPTZ,       -- metadata.extracted_at
-    veiculo_id INTEGER,            -- p: vehicle id
-    linha_lt TEXT,                 -- c: full route sign
-    linha_code INTEGER,            -- cl: route code
-    linha_sentido INTEGER,         -- sl: direction
-    lt_destino TEXT,               -- lt0: destination
-    lt_origem TEXT,                -- lt1: origin
-    veiculo_acessivel BOOLEAN,     -- a: accessible
-    veiculo_ts TIMESTAMPTZ,        -- ta: UTC timestamp
-    veiculo_lat DOUBLE PRECISION,  -- py: latitude
-    veiculo_long DOUBLE PRECISION  -- px: longitude
-);
-```
-
-## Exploration queries
-
-The original README also includes a large set of ad hoc SQL exploration queries used during development and validation of the trusted `positions` table, terminals, route geometry, and vehicle trajectories.
-Those queries were kept in the Portuguese source document and can still be used directly as reference when needed.

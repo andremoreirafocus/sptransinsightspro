@@ -1,7 +1,7 @@
 # ADR-0010: Airflow Datasets para orquestração orientada a eventos
 
 **Data:** 2026-05-04  
-**Status:** Proposto
+**Status:** Aceito
 
 ## Contexto
 

@@ -1,14 +1,15 @@
 ## Objetivo deste subprojeto
-Automatizar as operações de implantação e promoção de código, garantindo que lint, SAST e testes unitários sejam executados antes de qualquer alteração em produção.
+Automatizar as operações de implantação e promoção de código, garantindo que lint, SAST, type checking e testes unitários sejam executados antes de qualquer alteração em produção.
 
 ## O que este subprojeto faz
 - valida a qualidade do código (lint via `ruff`, SAST via `bandit` e testes unitários via `pytest`) antes de qualquer operação
-- promove uma pipeline do ambiente de desenvolvimento (`dags-dev`) para o ambiente de produção (`airflow/dags`), sincronizando também os módulos compartilhados `infra`, `quality` e `pipeline_configurator`
+- valida tipagem estática com `mypy` antes de qualquer operação
+- promove uma pipeline do ambiente de desenvolvimento (`dags-dev`) para o ambiente de produção (`airflow/dags`), sincronizando também os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 - realiza o build e o redeploy de um microserviço via `docker compose`
 
 ## Pré-requisitos
 - Python 3.10+
-- `ruff`, `bandit` e `pytest` instalados no ambiente Python utilizado para executar os scripts
+- `ruff`, `bandit`, `mypy` e `pytest` instalados no ambiente Python utilizado para executar os scripts
 - `rsync` instalado (para promoção de pipelines)
 - Docker e Docker Compose instalados (para deploy de microserviços)
 - Executar os scripts a partir da pasta `automation/` ou com o PATH correto para os módulos auxiliares
@@ -26,7 +27,8 @@ Sobe a plataforma com bootstrap prévio da infraestrutura e do Airflow para evit
 5. Executa `bootstrap_postgres.sh`
 6. Sobe `airflow_webserver` e `airflow_scheduler`
 7. Executa `bootstrap_airflow_app.sh`
-8. Sobe o restante da plataforma com `docker compose up -d`
+8. Executa `bootstrap_observability.sh`
+9. Sobe o restante da plataforma com `docker compose up -d`
 
 **Uso:**
 ```bash
@@ -70,6 +72,21 @@ cd automation
 
 ---
 
+### `bootstrap_observability.sh`
+Garante o bootstrap da stack de observabilidade.
+
+**O que faz, em ordem:**
+1. Sobe `loki`, `promtail`, `grafana` e `alertmanager`
+2. Aguarda os endpoints de readiness/health dessa stack
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_observability.sh
+```
+
+---
+
 ### `promote_pipeline.py`
 Promove uma pipeline do ambiente de desenvolvimento para produção.
 
@@ -77,9 +94,10 @@ Promove uma pipeline do ambiente de desenvolvimento para produção.
 1. Verifica se a pasta da pipeline existe em `dags-dev/`
 2. Executa lint com `ruff` na pasta da pipeline
 3. Executa SAST com `bandit` (alta severidade) na pasta da pipeline
-4. Executa os testes unitários (se a pasta `tests/` existir)
-5. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>` excluindo `__pycache__`, `.pytest_cache` e `tests/`
-6. Sincroniza os módulos compartilhados `infra`, `quality` e `pipeline_configurator`
+4. Executa type checking com `mypy` na pasta da pipeline
+5. Executa os testes unitários (se a pasta `tests/` existir)
+6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>` excluindo `__pycache__`, `.pytest_cache` e `tests/`
+7. Sincroniza os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 
 **Uso:**
 ```bash
@@ -103,9 +121,10 @@ Realiza o build e redeploy de um microserviço Docker.
 1. Verifica se a pasta do serviço existe
 2. Executa lint com `ruff` na pasta do serviço
 3. Executa SAST com `bandit` (alta severidade) na pasta do serviço
-4. Executa os testes unitários (se a pasta `tests/` existir)
-5. Executa `docker compose build <serviço>`
-6. Executa `docker compose up -d <serviço>`
+4. Executa type checking com `mypy` na pasta do serviço
+5. Executa os testes unitários (se a pasta `tests/` existir)
+6. Executa `docker compose build <serviço>`
+7. Executa `docker compose up -d <serviço>`
 
 **Uso:**
 ```bash
@@ -124,9 +143,9 @@ python3 deploy_service.py alertservice alertservice
 ### `deploy_helpers.py`
 Módulo auxiliar interno. Não é executado diretamente.
 
-Expõe a função `run_code_validations(folder, label, step_offset)` que executa lint, SAST e testes em sequência, retornando o número de steps consumidos. Utilizado por `promote_pipeline.py` e `deploy_service.py`.
+Expõe a função `run_code_validations(folder, label, step_offset, total_steps)` que executa lint, SAST e testes em sequência, retornando o número de steps consumidos. Utilizado por `promote_pipeline.py` e `deploy_service.py`.
 
-Observação: quando existir `<folder>/.venv/bin/python`, este interpretador é utilizado automaticamente para `ruff`, `bandit` e `pytest`.
+Observação: quando existir `<folder>/.venv/bin/python`, este interpretador é utilizado automaticamente para `ruff`, `bandit`, `mypy` e `pytest`.
 
 ---
 
@@ -134,6 +153,15 @@ Observação: quando existir `<folder>/.venv/bin/python`, este interpretador é 
 Módulo auxiliar interno. Não é executado diretamente.
 
 Expõe a função `run_command(command, error_msg)` que executa subprocessos e interrompe a execução com mensagem de erro em caso de falha.
+
+---
+
+### `wait_helpers.sh`
+Módulo auxiliar interno para evitar duplicação de lógica de espera por serviços.
+
+Expõe funções reutilizadas pelos scripts de bootstrap:
+- `wait_for_condition(label, timeout_seconds, interval_seconds, cmd...)`
+- `check_http_url(url)`
 
 ## Fluxo típico de desenvolvimento
 

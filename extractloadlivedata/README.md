@@ -22,9 +22,229 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
 - registra em um banco de dados uma requisição de processamento para cada arquivo salvo na camada raw a ser processado pelo pipeline. O banco de dados em questão é hospedado na instância utilizada pelo Airflow. Caso a criação do do registro falhe, o mesmo continua salvo localmente até que a operação seja concluída com sucesso. Caso o Airflow esteja indisponível, ao retornar ao funcionamento, a DAG orquestradora identifica os registros de arquivos pendentes de transformação e dispara a DAG de transformação para cada arquivo, um por vez e na ordem de criação dos arquivos de posição dos ônibus, garantindo uma entrega ordenada das posições ao longo do tempo.
 - alternativamente, pode disparar diretamente a DAG de transformação via API do Airflow, sem criar registro no banco, dependendo da configuração
 
-## Execution Reporting (Alertservice)
-- Escopo: o serviço publica **somente resumo de execução** para alertservice; não há persistência de artefato JSON de relatório.
-- Contrato de resumo enviado:
+## Observabilidade: Structured Logging
+
+O serviço implementa observabilidade de nível de produção com **logs estruturados em JSON**, **métricas por fase** e **rastreamento de linhagem de dados** via correlation ID.
+
+### Logs Estruturados
+- **Formato**: JSON com campos `timestamp`, `level`, `service`, `component`, `event`, `status`, `message`, `metadata`
+- **Saída**: stdout para ingestão por Loki
+- **Taxonomia**: eventos estruturados em [src/domain/events.py](./src/domain/events.py)
+- **Status**: enum controlado (`STARTED`, `SUCCEEDED`, `FAILED`, `RETRY`, `SKIPPED`)
+
+### Rastreamento de Execução (execution_id)
+Cada execução recebe um `execution_id` em **formato ISO 8601** (timestamp UTC de início):
+- Exemplo: `"2026-05-13T15:30:15.987654+00:00"`
+- Correlaciona todos os logs de uma execução no Loki
+
+### Métricas por Fase (Phase Instrumentation)
+O serviço rastreia **tentativas, sucessos e falhas** em quatro fases:
+
+1. **Fase de Extração (extract)**
+   - Tenta extrair posições da API com retries e backoff exponencial
+   - Captura `logical_datetime` de `buses_positions["metadata"]["extracted_at"]` (timestamp do dado)
+
+2. **Fase de Salvamento Local (local_save)**
+   - Persiste o payload extraído no volume local de ingest buffer
+   - Execução condicionada ao sucesso da fase de extração
+
+3. **Fase de Salvamento no Object Storage (object_storage_save)**
+   - Percorre todos os arquivos pendentes no volume local e persiste cada um no MinIO
+   - Cada arquivo salvo com sucesso é removido do volume local
+   - Rastreia quantidade de arquivos pendentes ao início da fase via `pending_object_storage_save_files_count`
+
+4. **Fase de Notificação Ingest (notify)**
+   - Dispara requisição de processamento para cada arquivo salvo (via banco de dados ou API do Airflow)
+   - Rastreia sucesso/falha de cada notificação
+   - Rastreia quantidade de notificações pendentes ao início da fase via `pending_ingest_notifications_count`
+
+### Evento de Métricas Finais (execution_metrics_final)
+Emitido ao final de cada execução com estrutura completa de observabilidade:
+
+```json
+{
+  "event": "execution_metrics_final",
+  "status": "SUCCEEDED",
+  "execution_id": "2026-05-13T15:30:15.987654+00:00",
+  "metadata": {
+    "phase_metrics": {
+      "extract":             {"attempted": 1, "succeeded": 1, "failed": 0},
+      "local_save":          {"attempted": 1, "succeeded": 1, "failed": 0},
+      "object_storage_save": {"attempted": 1, "succeeded": 1, "failed": 0},
+      "notify":              {"attempted": 1, "succeeded": 1, "failed": 0}
+    },
+    "phase_durations": {
+      "extract":             3.21,
+      "local_save":          0.05,
+      "object_storage_save": 1.87,
+      "notify":              0.44
+    },
+    "items_total": 4,
+    "items_failed": 0,
+    "retries_seen": 0,
+    "execution_seconds": 5.57,
+    "pending_object_storage_save_files_count": 0,
+    "pending_ingest_notifications_count": 0,
+    "correlation_ids": ["2026-05-13T18:30:00Z"],
+    "correlation_ids_count": 1,
+    "correlation_ids_truncated": false
+  }
+}
+```
+
+### Rastreamento de Linhagem de Dados (Correlation ID)
+Cada operação é marcada com `correlation_id = logical_datetime` (timestamp do dado):
+- Permite rastrear "todo o processamento do dado extraído em 2026-05-13T15:30:45.123456Z" através de todas as pipelines
+- Habilita queries no Loki: `{correlation_id="2026-05-13T15:30:45.123456Z"}` para ver todas as operações deste dado
+- Propaga de extractloadlivedata → transformlivedata → refinedfinishedtrips para lineage completo
+
+### Taxonomia de Eventos
+
+Todos os eventos são emitidos via `{service="extractloadlivedata"}` (stream direto do container Docker).
+
+Eventos do **scheduler** (main.py):
+
+| Evento | Quando |
+|---|---|
+| `scheduler_config_loaded` | Configuração carregada com sucesso |
+| `scheduler_started` | Scheduler iniciado |
+| `scheduler_tick_started` / `scheduler_tick_completed` | Início e fim de cada tick do APScheduler |
+| `scheduler_stopped` | Scheduler parado (SIGTERM/SIGINT) |
+| `scheduler_shutdown_completed` | Shutdown do scheduler concluído |
+| `cli_dev_mode_requested` | Execução iniciada em modo `dev` (execução única) |
+| `cli_invalid_parameter` | Parâmetro CLI inválido |
+
+Eventos do **orquestrador** (extractloadlivedata.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `config_validation_succeeded` / `config_validation_failed` | Validação da configuração | `error_message` em caso de falha |
+| `notification_engine_selected` | Motor de notificação determinado | `metadata.engine` |
+| `execution_started` | Início de uma execução | `execution_id` |
+| `extract_positions_started` / `extract_positions_succeeded` | Fase de extração | — |
+| `local_storage_persist_started` / `local_storage_persist_succeeded` | Fase de salvamento local | `correlation_id` |
+| `pending_storage_scan_succeeded` / `pending_storage_scan_failed` | Varredura do buffer local | `metadata.pending_files_count` |
+| `pending_storage_detected` / `pending_storage_multiple_files_detected` | Arquivos pendentes detectados | `metadata.pending_files_count` |
+| `pending_storage_file_started` / `pending_storage_file_succeeded` / `pending_storage_file_failed` | Processamento de cada arquivo pendente no object storage | `metadata.filename` |
+| `object_storage_persist_started` / `object_storage_persist_succeeded` | Persistência de arquivo pendente no MinIO | `correlation_id`, `metadata.pending_file` |
+| `notification_dispatch_started` / `notification_dispatch_succeeded` / `notification_dispatch_failed` | Despacho de notificação | `metadata.filename` |
+| `notification_metrics_invalid` | Métricas de notificação inconsistentes | — |
+| `execution_metrics_final` | Ao final de toda execução | `metadata.phase_metrics`, `metadata.phase_durations`, `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`, `metadata.execution_seconds`, `metadata.pending_object_storage_save_files_count`, `metadata.pending_ingest_notifications_count` |
+| `execution_summary_emitted` | Resumo enviado ao alertservice | — |
+| `execution_completed` | Execução encerrada sem falhas fatais | `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen` |
+| `execution_failed_non_recoverable` | Execução encerrada com falha não recuperável | `metadata.items_failed`, `metadata.failure_phase` |
+
+Eventos de serviço — **Extração** (extract_buses_positions.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `api_authentication_successful` / `api_authentication_failed` | Autenticação na API SPTrans | `error_message` em falha |
+| `api_get_started` / `api_get_successful` / `api_get_failed` | Chamada GET à API | `metadata.attempt` |
+| `extract_positions_succeeded_after_retries` | Extração bem-sucedida após retries | `metadata.retries` |
+| `extract_positions_failed` | Extração falhou em todas as tentativas | `error_type`, `error_message` |
+| `summarize_extracted_positions_succeeded` | Resumo das posições extraídas gerado | `metadata.total_vehicles` |
+| `metadata_validation_failed` | Estrutura do payload inválida | `metadata.payload_sample` |
+
+Eventos de serviço — **Salvamento local** (save_load_bus_positions.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `local_storage_persist_started` | Início do salvamento no volume local | `metadata.filename` |
+| `local_storage_compression_succeeded` | Compressão Zstandard concluída | `metadata.filename` |
+| `local_storage_persist_succeeded` | Arquivo salvo no volume local | `metadata.filename` |
+| `local_storage_persist_failed` | Falha ao salvar no volume local | `metadata.filename`, `error_type` |
+
+Eventos de serviço — **Object storage** (save_load_bus_positions.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `object_storage_compression_started` / `object_storage_compression_succeeded` | Compressão antes do upload | `metadata.filename` |
+| `object_storage_persist_started` / `object_storage_persist_succeeded` / `object_storage_persist_failed` | Persistência no MinIO | `metadata.bucket`, `metadata.object_name` |
+| `object_storage_list_failed` | Falha ao listar objetos pendentes no MinIO | `error_type`, `error_message` |
+| `remove_pending_storage_file_succeeded` / `remove_pending_storage_file_failed` | Remoção do arquivo local após upload | `metadata.filename` |
+
+Eventos de serviço — **Banco de dados** (save_processing_requests.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `db_storage_persist_started` / `db_storage_persist_succeeded` / `db_storage_persist_failed` | Criação do registro de processamento no PostgreSQL | `metadata.filename`, `metadata.table` |
+
+Eventos de serviço — **Disparo via Airflow API** (trigger_airflow.py):
+
+| Evento | Quando | Conteúdo relevante |
+|---|---|---|
+| `get_utc_logical_date_succeeded` / `get_utc_logical_date_failed` | Cálculo da data lógica UTC | `metadata.logical_date` |
+
+### Dashboard Grafana
+
+O dashboard está em [`observability/grafana/provisioning/dashboards/extractloadlivedata.json`](./observability/grafana/provisioning/dashboards/extractloadlivedata.json) e é provisionado automaticamente pelo Grafana. Utiliza Loki como datasource. Todas as queries usam o stream `{service="extractloadlivedata"}`.
+
+Janela padrão: `now-1h`. Atualização: `30s`.
+
+![Dashboard extractloadlivedata](extractloadlivedata_dashboard.png)
+
+#### Teste de resiliência: falha deliberada do MinIO
+
+A imagem acima foi capturada durante um teste de resiliência em que o MinIO foi deliberadamente interrompido enquanto o serviço estava em operação. O dashboard revela com precisão como a arquitetura de buffer local se comporta sob falha e como o serviço se recupera automaticamente — sem perda de dados e sem intervenção manual.
+
+**O que cada painel mostra durante o incidente:**
+
+- **Extract Events**: permanece estável em 1 sucesso por ciclo durante todo o período — a camada de extração da API é completamente isolada da disponibilidade do MinIO. A coleta de dados nunca parou.
+- **Local Save Events**: inalterado durante todo o incidente — o salvamento local nunca falhou, confirmando que o buffer local absorveu todas as extrações enquanto o MinIO estava indisponível.
+- **Object Storage Save Events**: os eventos `failed` aumentam durante a indisponibilidade do MinIO. Quando o MinIO é restaurado, os eventos `succeeded` retomam e drenam o backlog acumulado.
+- **Object Storage Save Files Queue Depth**: o padrão em escada ascendente durante a falha evidencia os arquivos acumulando-se no buffer local a cada ciclo. A descida gradual após a restauração mostra a drenagem ordenada do backlog — um arquivo por ciclo, na ordem de criação.
+- **Notify Ingest Events** e **Notify Ingest Queue Depth**: seguem o mesmo padrão com um leve atraso natural porém com uma diferença, as notificações são efetuadas apenas após o salvamento bem-sucedido no object storage.
+
+Este comportamento é exatamente o que a arquitetura foi projetada para garantir: **o serviço continua extraindo, armazenando localmente e recuperando o backlog automaticamente quando a dependência externa é restaurada**.
+
+---
+
+**Linha 1 — Visão geral da execução**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Executions | Timeseries (pontos) | `execution_completed` (verde), `execution_failed_non_recoverable` (vermelho), erros e avisos ao longo do tempo | `count_over_time [2m]` |
+| Errors (last 1h) | Stat (vermelho se ≥ 1) | Total de logs com `level="ERROR"` na última hora | `count_over_time [1h]` |
+| Warnings (last 1h) | Stat (laranja se ≥ 1) | Total de logs com `level="WARNING"` na última hora | `count_over_time [1h]` |
+| Execution time (s) | Timeseries | Duração média por fase: `total`, `extract`, `local_save`, `object_storage_save`, `notify_ingest` | `execution_metrics_final` — `metadata.execution_seconds` e `metadata.phase_durations.<fase>` via `avg_over_time [5m]` |
+
+**Linha 2 — Eventos por fase** (`succeeded` e `failed` via `sum_over_time [2m]`)
+
+| Painel | Fase | Cor |
+|---|---|---|
+| Extract Events | `phase_metrics.extract` | verde / vermelho |
+| Object Storage Save Events | `phase_metrics.object_storage_save` | verde / vermelho |
+| Notify Ingest Events | `phase_metrics.notify` | verde / vermelho |
+
+**Linha 3 — Queue Depth** (profundidade de fila no início de cada ciclo)
+
+| Painel | Campo | Cor |
+|---|---|---|
+| Local Save Events | `phase_metrics.local_save` | verde / vermelho |
+| Object Storage Save Files Queue Depth | `pending_object_storage_save_files_count` | laranja |
+| Notify Ingest Queue Depth | `pending_ingest_notifications_count` | roxo |
+
+**Linha 4 — Logs**
+
+| Painel | Tipo | O que mostra |
+|---|---|---|
+| Recent failures | Logs | Stream filtrado por `level="ERROR"` em ordem decrescente |
+| Log stream | Logs | Todos os eventos do serviço em ordem decrescente |
+
+### Regras de Alerta
+
+As regras estão em `observability/loki/rules/fake/extractloadlivedata-alerts.yaml` e são avaliadas a cada minuto:
+
+| Alerta | Severidade | Condição | Janela |
+|---|---|---|---|
+| `ServiceFailed` | critical | Evento `execution_failed_non_recoverable` detectado | 5m |
+| `ServiceWarningThreshold` | warning | `execution_completed` com `metadata.retries_seen > 0` | 5m |
+
+## Execution Summary
+
+Ao final de cada execução, o serviço constrói um resumo de execução e o emite como evento estruturado `execution_summary_emitted` no log.
+
+- Contrato do resumo:
   - `contract_version`, `pipeline`, `execution_id`, `status`
   - `items_total`, `items_failed`, `retries`, `acceptance_rate`
   - `generated_at_utc` (timestamp UTC da geração do resumo)
@@ -47,9 +267,6 @@ Embora esta não seja a melhor opção para resiliência completa do fluxo, há 
   - `ingest_notification`: `ingest notification failed`
   - `unknown`: `ingest execution failed`
 - Regra de severidade: apenas `positions_download` e `local_ingest_buffer_save_positions` recebem prefixo `[SEVERE] non recoverable `.
-- Regra de envio webhook:
-  - webhook ausente/`disabled`/`none`/`null` -> envio é pulado com log informativo.
-  - erro de envio não interrompe o serviço (com log de erro).
 
 
 ## Pré-requisitos
@@ -116,7 +333,6 @@ AIRFLOW_PASSWORD = "ingest_password"  # senha para autenticação na API do Airf
 AIRFLOW_WEBSERVER = "localhost"  # hostname do webserver do Airflow
 AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
 INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
-NOTIFICATIONS_WEBHOOK_URL="http://localhost:8000/notify" # url para envio de alertas através do alertservice
 
 ## Testes unitários
 Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas. A cobertura atual inclui:
@@ -124,7 +340,7 @@ Os testes são focados em comportamento relevante e invariantes de negócio, usa
 - `tests/test_save_load_bus_positions.py`: validação de estrutura, compressão, leitura de arquivos, persistência com retries, remoção de arquivos locais e filtros de pendências.
 - `tests/test_save_processing_requests.py`: criação e disparo de requests de processamento com cache e persistência no banco.
 - `tests/test_trigger_airflow.py`: criação e disparo de invocações do Airflow via HTTP e cache.
-- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, validação de configuração, e testes de orquestração com alertservice integrado.
+- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, validação de configuração, métricas por fase (`extract`, `local_save`, `object_storage_save`, `notify`), contagens de pendências (`pending_object_storage_save_files_count`, `pending_ingest_notifications_count`) e testes de orquestração com alertservice integrado.
 - `tests/test_alertservice.py`: construção de payload, envio de alertas com webhook enabled/disabled, e comportamento não-bloqueante em falhas.
 - `tests/test_reporting.py`: construção de sumário de execução com contrato validado (success e failure paths).
 - `tests/test_sql_db_v2.py`: contratos de persistência, seleção e atualização com engine injetado.
@@ -164,3 +380,4 @@ No docker compose:
     Para iniciar o container 
 ```shell
         docker compose up -d extractloadlivedata
+```

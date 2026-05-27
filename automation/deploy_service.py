@@ -18,11 +18,29 @@ def deploy_service(service_name, service_folder):
     print(f"🚀 Deploying microservice: {service_name} (folder: {service_folder})")
 
     # Validation (Linting + Tests)
-    steps_consumed = run_code_validations(service_path, service_name, step_offset=1)
+    test_dir = os.path.join(service_path, "tests")
+    has_tests = os.path.isdir(test_dir)
+    steps_consumed = 3 if has_tests else 2
+    total_steps = steps_consumed + 3
+    steps_consumed = run_code_validations(
+        service_path, service_name, step_offset=1, total_steps=total_steps
+    )
+    mypy_step = steps_consumed + 1
+    print(f"Step {mypy_step}/{total_steps}: Running mypy for {service_name}...")
+    run_command(
+        [
+            sys.executable,
+            "-m",
+            "mypy",
+            "--explicit-package-bases",
+            os.path.join(service_path, "src"),
+        ],
+        f"Type checking (mypy) failed for {service_name}!",
+    )
+    print("✅ Type checking Passed.")
 
     compose_file = os.path.join(project_root, "docker-compose.yml")
-    build_step = steps_consumed + 1
-    total_steps = steps_consumed + 2
+    build_step = steps_consumed + 2
     print(f"Step {build_step}/{total_steps}: Building {service_name}...")
     run_command(
         ["docker", "compose", "-f", compose_file, "build", service_name],

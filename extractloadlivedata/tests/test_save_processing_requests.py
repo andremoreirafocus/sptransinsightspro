@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import datetime
 import pytest
 
@@ -12,6 +14,19 @@ from src.services.save_processing_requests import (
 from src.services.exceptions import IngestNotificationError
 from tests.fakes.cache import fake_cache_factory
 
+_LOGGER_NAME = "src.services.save_processing_requests"
+
+
+def _find_event(caplog: pytest.LogCaptureFixture, event: str) -> bool:
+    for record in caplog.records:
+        try:
+            payload = json.loads(record.message)
+            if payload.get("event") == event:
+                return True
+        except (json.JSONDecodeError, AttributeError):
+            pass
+    return False
+
 
 def test_get_utc_logical_date_from_file():
     dt = get_utc_logical_date_from_file("posicoes_onibus-202604090910.json")
@@ -22,12 +37,8 @@ def test_get_utc_logical_date_from_file():
 def test_cache_create_get_remove_flow():
     config = {"PROCESSING_REQUESTS_CACHE_DIR": "/tmp/cache"}
     marker = "posicoes_onibus-202604090910.json"
-    create_pending_processing_request(
-        config, marker, cache_factory=fake_cache_factory
-    )
-    pending = get_pending_processing_requests(
-        config, cache_factory=fake_cache_factory
-    )
+    create_pending_processing_request(config, marker, cache_factory=fake_cache_factory)
+    pending = get_pending_processing_requests(config, cache_factory=fake_cache_factory)
     assert len(pending) == 1
     remove_pending_processing_request(
         config, pending[0], cache_factory=fake_cache_factory
@@ -79,7 +90,9 @@ def test_save_processing_request_failure():
     def fake_engine_factory(_uri):
         return None
 
-    with pytest.raises(IngestNotificationError, match="failed to save processing request"):
+    with pytest.raises(
+        IngestNotificationError, match="failed to save processing request"
+    ):
         save_processing_request(
             config,
             "posicoes_onibus-202604090910.json",
@@ -92,9 +105,7 @@ def test_trigger_pending_processing_requests_removes_on_success():
     config = {"PROCESSING_REQUESTS_CACHE_DIR": "/tmp/cache"}
     marker = "posicoes_onibus-202604090910.json"
 
-    create_pending_processing_request(
-        config, marker, cache_factory=fake_cache_factory
-    )
+    create_pending_processing_request(config, marker, cache_factory=fake_cache_factory)
 
     def fake_save_fn(_config, _marker):
         return True
@@ -117,20 +128,33 @@ def test_trigger_pending_processing_requests_returns_metrics():
         return True
 
     result = trigger_pending_processing_requests(
-        config, cache_factory=fake_cache_factory, save_fn=fake_save_fn, with_metrics=True
+        config,
+        cache_factory=fake_cache_factory,
+        save_fn=fake_save_fn,
+        with_metrics=True,
     )
     assert result["metrics"]["success"] == 1
     assert result["metrics"]["failed"] == 0
     assert result["metrics"]["retries"] == 0
 
 
+# ── Step 0: new tests for previously-silent escape paths ─────────────────────
+
+
+def test_create_pending_processing_request_config_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(Exception):
+            create_pending_processing_request({}, "posicoes_onibus-202604090910.json")
+    assert _find_event(caplog, "pending_storage_file_failed")
+
+
 def test_trigger_pending_processing_requests_keeps_on_failure():
     config = {"PROCESSING_REQUESTS_CACHE_DIR": "/tmp/cache"}
     marker = "posicoes_onibus-202604090910.json"
 
-    create_pending_processing_request(
-        config, marker, cache_factory=fake_cache_factory
-    )
+    create_pending_processing_request(config, marker, cache_factory=fake_cache_factory)
 
     def fake_save_fn(_config, _marker):
         return False

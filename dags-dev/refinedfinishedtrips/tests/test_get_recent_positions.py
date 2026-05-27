@@ -53,11 +53,11 @@ def test_sql_query_includes_distance_and_position_columns():
     assert "distance_to_last_stop" in result.columns
 
 
-def test_missing_config_key_raises_value_error():
+def test_missing_config_key_raises_key_error():
     config = make_config()
     del config["general"]
     fake = FakeDuckDBConnection(df=pd.DataFrame())
-    with pytest.raises(ValueError):
+    with pytest.raises(KeyError, match="general"):
         get_recent_positions(config, duckdb_client=fake)
 
 

@@ -1,8 +1,8 @@
+import pytest
 from updatelatestpositions.services.get_latest_path_for_query import (
     get_latest_path_for_query,
 )
 from fakes.fake_object_storage import FakeObject
-import pytest
 
 
 def make_config():
@@ -93,8 +93,24 @@ def test_tries_second_hour_when_first_empty():
     assert result is not None
 
 
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["general"]["storage"]["trusted_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        get_latest_path_for_query(config)
+def test_list_objects_failure_raises_value_error():
+    def fake_list(connection, bucket, prefix):
+        raise RuntimeError("connection refused")
+
+    with pytest.raises(ValueError, match="Object storage scan failed for bucket 'trusted' prefix"):
+        get_latest_path_for_query(make_config(), list_objects_fn=fake_list)
+
+
+def test_path_discovery_empty_emits_warning(caplog):
+    import logging
+
+    def fake_list(connection, bucket, prefix):
+        return []
+
+    with caplog.at_level(logging.WARNING):
+        get_latest_path_for_query(make_config(), list_objects_fn=fake_list)
+
+    records = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("path_discovery_empty" in r.getMessage() for r in records)
+
+

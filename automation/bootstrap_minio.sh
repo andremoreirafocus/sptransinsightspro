@@ -4,6 +4,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/wait_helpers.sh"
 
 SERVICE_NAME="minio"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
@@ -29,22 +31,11 @@ require_env() {
 }
 
 wait_for_minio() {
-  local elapsed=0
-
-  echo "Waiting for MinIO to become available..."
-
-  until python3 -c 'import sys, urllib.request; urllib.request.urlopen(sys.argv[1], timeout=2)' \
-    "${MINIO_HEALTHCHECK_URL}" >/dev/null 2>&1; do
-    sleep "${WAIT_INTERVAL_SECONDS}"
-    elapsed=$((elapsed + WAIT_INTERVAL_SECONDS))
-
-    if [ "${elapsed}" -ge "${WAIT_TIMEOUT_SECONDS}" ]; then
-      echo "Timed out waiting for MinIO to become available."
-      exit 1
-    fi
-  done
-
-  echo "MinIO is available."
+  wait_for_condition \
+    "MinIO to become available" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    check_http_url "${MINIO_HEALTHCHECK_URL}"
 }
 
 get_minio_network() {

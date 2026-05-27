@@ -73,9 +73,6 @@ Expected keys in `general`:
   "tables": {
     "trip_details_table_name": "trip_details"
   },
-  "notifications": {
-    "webhook_url": "disabled"
-  },
   "data_validations": {
     "expectations_validation": {
       "expectations_suites": [
@@ -124,7 +121,7 @@ Expectations artifacts loaded automatically through `pipeline_configurator`:
 - `acceptance_rate` is a continuous value between 0.0 and 1.0, calculated as `(validated_items_count - rows_failed) / validated_items_count` over the total number of items processed across all phases. It used to be binary (0.0 or 1.0).
 - The [samples](./samples) folder contains a manually curated example of the consolidated quality report: [quality-report-gtfs_HHMM_uuid.json](./samples/quality-report-gtfs_HHMM_uuid.json).
 
-### Quality reporting and notification (`alertservice`)
+### Quality reporting
 
 - On failures in any phase, the pipeline generates and persists a consolidated report with:
   - `failure_phase`
@@ -132,9 +129,102 @@ Expectations artifacts loaded automatically through `pipeline_configurator`:
   - per-phase results in `details.stages`
   - `validated_items_count`, `error_details`, `relocation_status`, `relocation_error` for each phase
   - `column_lineage` artifacts in the enrichment stage
-- The `summary` section is sent via webhook to the `alertservice` microservice when enabled.
-- The summary contains status, failure-phase information, and validation metrics to trigger immediate alerts (`FAIL`) or cumulative alerts (`WARN`) configured in `alertservice`.
-- Notification is triggered by the DAG (`_send_webhook_from_report`) after report persistence, separately from the report-building service.
+
+### Observability (Loki + Grafana)
+
+The pipeline's observability is based on structured logging: all events are emitted as JSON with the fields `service`, `event`, `status`, `execution_id`. In the Airflow environment, logs are collected by Promtail and sent to Loki.
+
+#### Event taxonomy
+
+Events emitted by the **orchestrator**:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `execution_started` | Start of execution | `execution_id` |
+| `execution_finished` | Execution completed successfully | `execution_id`, `status` |
+| `execution_aborted` | Any phase fails and stops the pipeline | `execution_id`, `status`, `metadata.phase` |
+| `execution_phase_metrics` | At the end of every execution (success or failure) | `metadata.phase_metrics.<phase>.duration_seconds`, `metadata.overall_status` |
+
+Phases tracked in `execution_phase_metrics`: `extract_load_files`, `transformation`, `enrichment`, `quality_report`.
+
+Events emitted by services — **Extract & Load**:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `gtfs_extraction_started` | Start of GTFS file download | — |
+| `gtfs_extraction_succeeded` | Files extracted successfully | `metadata.file_count`, `metadata.downloads_folder` |
+| `gtfs_extraction_failed` | Download failed | `error_type`, `error_message` |
+| `raw_validation_started` | Start of raw CSV validation | — |
+| `raw_file_validation_error` | A file failed validation | `metadata.file`, `metadata.reason` |
+| `raw_validation_completed` | Raw CSV validation finished | — |
+| `raw_files_upload_started` | Start of upload to raw storage | — |
+| `raw_files_upload_succeeded` | Upload completed | — |
+
+Events emitted by services — **Transformation**:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `csv_load_started` | Start of loading a CSV from the raw layer | `metadata.table` |
+| `csv_load_succeeded` | CSV loaded successfully | `metadata.table` |
+| `csv_load_failed` | CSV load failed | `metadata.table` |
+| `table_transform_started` | Start of transforming a table | `metadata.table` |
+| `table_csv_load_failed` | CSV load failure during transformation | `metadata.table` |
+| `table_csv_parse_failed` | CSV parse failure | `metadata.table` |
+| `table_validation_started` | Start of GX validation for a table | `metadata.table` |
+| `table_validation_failed` | GX validation failed | `metadata.table`, `metadata.failures` |
+| `table_validation_skipped` | No GX suite configured for the table | `metadata.table` |
+| `table_staging_failed` | Failed to persist to staging in the trusted bucket | `metadata.table` |
+| `table_transform_succeeded` | Table transformation completed | `metadata.table` |
+| `buffer_save_started` | Start of buffer save to object storage | — |
+| `buffer_save_succeeded` | Buffer saved successfully | — |
+| `buffer_save_failed` | Buffer save failed | `error_type`, `error_message` |
+| `file_relocation_started` | Start of file relocation (staging → final or quarantine) | `metadata.source`, `metadata.destination` |
+| `file_relocation_item_failed` | A file failed to relocate | `metadata.file` |
+| `file_relocation_completed` | Relocation completed | `metadata.relocated_count` |
+
+Events emitted by services — **Enrichment**:
+
+| Event | When | Relevant content |
+|---|---|---|
+| `trip_details_creation_started` | Start of `trip_details` table creation | — |
+| `trip_details_creation_succeeded` | `trip_details` created and exported to staging | `metadata.row_count`, `metadata.path` |
+| `trip_details_creation_failed` | `trip_details` creation failed | `error_type`, `error_message` |
+
+#### Grafana dashboard
+
+The dashboard is at [`observability/grafana/provisioning/dashboards/gtfs.json`](../../../../observability/grafana/provisioning/dashboards/gtfs.json) and is provisioned automatically by Grafana. It uses Loki as the datasource. All queries follow the pattern:
+
+```
+{service="airflow_tasks"} | json | service_extracted="gtfs" | event="<event>"
+```
+
+![Dashboard gtfs](gtfs_dashboard.png)
+
+Default window: `now-30d`. Refresh: `1h`. The dashboard is organized into three rows:
+
+**Row 1 — Operational health**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Executions | Timeseries (dots) | Completed (green) and aborted (red) executions over time | `execution_finished` and `execution_aborted` — `count_over_time [1d]` |
+| Completed (last 24h) | Stat (green) | Total successful executions in the last 24h | `execution_finished` — `count_over_time [24h]` |
+| Aborted (last 24h) | Stat (red if ≥ 1) | Total aborted executions in the last 24h | `execution_aborted` — `count_over_time [24h]` |
+| Phase duration per run (s) | Timeseries | Duration per phase: `extract_load_files`, `transformation`, `enrichment`, `quality_report` | `execution_phase_metrics` — `metadata.phase_metrics.<phase>.duration_seconds` via `avg_over_time [1d]` |
+
+**Row 2 — Data volume**
+
+| Panel | Type | What it shows | Loki event / field |
+|---|---|---|---|
+| Trip details row count per run | Timeseries | Rows in the `trip_details` table produced per execution | `trip_details_creation_succeeded` — `metadata.row_count` via `last_over_time [1d]` |
+| GTFS files extracted per run | Timeseries | Number of GTFS files extracted per execution | `gtfs_extraction_succeeded` — `metadata.file_count` via `last_over_time [1d]` |
+| Raw file validation errors per run | Timeseries | Number of raw CSV validation errors | `raw_file_validation_error` — `count_over_time [1d]` |
+
+**Row 3 — Logs**
+
+| Panel | What it shows |
+|---|---|
+| Recent aborted executions | Filtered stream of `execution_aborted` events with phase and failure message |
+| Log stream | All pipeline events in descending order |
 
 ### Test rules
 
@@ -169,5 +259,5 @@ python ./gtfs-v<version number>.py
 
 Example:
 ```bash
-python ./gtfs-v3.py
+python ./gtfs-v6.py
 ```

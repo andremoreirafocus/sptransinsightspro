@@ -1,12 +1,25 @@
-import requests
-import time
-from datetime import datetime
-import logging
-from typing import Any, Callable, Dict, Optional, Tuple
+from src.observability.process_structured_logger import get_structured_logger
+from src.domain.events import (
+    EVENT_STATUS_FAILED,
+    EVENT_STATUS_RETRY,
+    EVENT_STATUS_STARTED,
+    EVENT_STATUS_SUCCEEDED,
+)
 from src.services.exceptions import PositionsDownloadError
+import requests  # type: ignore[import-untyped]
+import time
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Optional, Tuple
+import re
+from html import unescape
+import json
 
-# This logger inherits the configuration from the root logger in main.py
-logger = logging.getLogger(__name__)
+
+structured_logger = get_structured_logger(
+    service="extractloadlivedata",
+    component="extract_buses_positions",
+    logger_name=__name__,
+)
 DEFAULT_API_TIMEOUT_SECONDS = 10
 ConfigDict = Dict[str, Any]
 PayloadDict = Dict[str, Any]
@@ -26,9 +39,21 @@ def extract_buses_positions_with_retries(
 
         return api_max_retries, token, api_base_url
 
-    api_max_retries, token, api_base_url = get_config(config)
+    try:
+        api_max_retries, token, api_base_url = get_config(config)
+        sleep_fn = sleep_fn or time.sleep
+    except Exception as e:
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Failed to read API configuration: {e}",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        error = PositionsDownloadError("failed to read API configuration")
+        setattr(error, "retries", 0)
+        raise error from e
 
-    sleep_fn = sleep_fn or time.sleep
     back_off = 1
     for retries in range(api_max_retries + 1):
         buses_positions_payload = extract_buses_positions(
@@ -36,30 +61,42 @@ def extract_buses_positions_with_retries(
             base_url=api_base_url,
             session=session,
         )
-        if buses_positions_response_is_valid(buses_positions_payload):
-            if retries > 0:
-                logger.info(
-                    f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}."
-                )
-            if with_metrics:
-                return {
-                    "result": buses_positions_payload,
-                    "metrics": {
-                        "retries": retries,
-                    },
-                }
-            return buses_positions_payload
+        structured_logger.debug(
+            event="api_get_successful",
+            status=EVENT_STATUS_SUCCEEDED,
+            message=f"Size of buses_positions_payload in bytes: {len(json.dumps(buses_positions_payload, ensure_ascii=False).encode('utf-8'))}",
+        )
+        if buses_positions_payload is not None:
+            if buses_positions_response_is_valid(buses_positions_payload):
+                if retries > 0:
+                    structured_logger.warning(
+                        event="extract_positions_succeeded_after_retries",
+                        status=EVENT_STATUS_SUCCEEDED,
+                        message=f"Download successful after {retries} {'retry' if retries == 1 else 'retries'}.",
+                    )
+                if with_metrics:
+                    return {
+                        "result": buses_positions_payload,
+                        "metrics": {
+                            "retries": retries,
+                        },
+                    }
+                return buses_positions_payload
         if retries >= api_max_retries:
-            logger.error(
-                "Max retries reached. Download failed. Skipping this extraction cycle."
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=EVENT_STATUS_FAILED,
+                message="Max retries reached. Download failed. Skipping this extraction cycle.",
             )
             error = PositionsDownloadError(
                 "max retries reached while downloading positions"
             )
             setattr(error, "retries", retries)
             raise error
-        logger.warning(
-            f"Invalid buses positions response structure! Retrying in {back_off} seconds..."
+        structured_logger.warning(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_RETRY,
+            message=f"Extraction of buses positions did not succeed. Retrying in {back_off} seconds...",
         )
         sleep_fn(back_off)
         back_off *= 2
@@ -73,14 +110,16 @@ def get_buses_positions_with_metadata(
     )
     buses_positions = {
         "metadata": {
-            "extracted_at": datetime.now().isoformat(),
+            "extracted_at": datetime.now(timezone.utc).replace(second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "source": "sptrans_api_v2",
             "total_vehicles": total_vehicles,
         },
         "payload": buses_positions_payload,
     }
-    logger.info(
-        f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}"
+    structured_logger.info(
+        event="summarize_extracted_positions_succeeded",
+        status=EVENT_STATUS_SUCCEEDED,
+        message=f"[{datetime.now().strftime('%H:%M:%S')}] Ref SPTrans: {reference_time} | Veículos Ativos: {total_vehicles}",
     )
     return buses_positions, reference_time
 
@@ -88,36 +127,69 @@ def get_buses_positions_with_metadata(
 def extract_buses_positions(
     base_url: str, token: str, session: Optional[Any] = None
 ) -> Optional[PayloadDict]:
+    def sanitize_html_text(raw: str, max_len: int = 100) -> str:
+        _TAG_RE = re.compile(r"<[^>]+>")
+        if not raw:
+            return ""
+        no_tags = _TAG_RE.sub(" ", raw)
+        normalized = " ".join(unescape(no_tags).split())
+        return normalized[:max_len]
+
     session = session or requests.Session()
     auth_url = f"{base_url}/Login/Autenticar?token={token}"
+    posicao_url = f"{base_url}/Posicao"
     try:
         response_auth = session.post(auth_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response_auth.status_code == 200 and response_auth.text.lower() == "true":
-            logger.info(
-                f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!"
+            structured_logger.debug(
+                event="api_authentication_successful",
+                status=EVENT_STATUS_STARTED,
+                message=f"[{datetime.now().strftime('%H:%M:%S')}] Succesfully authenticated!",
             )
         else:
-            logger.error("Authentication error. Verify your Token.")
-            logger.error(response_auth.status_code, response_auth.text)
-            return
+            structured_logger.error(
+                event="api_authentication_failed",
+                status=EVENT_STATUS_FAILED,
+                message=f"Error during authentication. {sanitize_html_text(response_auth.text)}",
+            )
+            return None
     except Exception as e:
-        logger.error(f"Error connecting: {e}")
+        structured_logger.error(
+            event="api_authentication_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error connecting: {str(e)}",
+        )
         return None
     try:
-        posicao_url = f"{base_url}/Posicao"
-        logger.info(f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!")
+        structured_logger.debug(
+            event="api_get_started",
+            status=EVENT_STATUS_STARTED,
+            message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao started!",
+        )
         response = session.get(posicao_url, timeout=DEFAULT_API_TIMEOUT_SECONDS)
         if response.status_code == 200:
-            logger.info(
-                f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!"
+            structured_logger.debug(
+                event="api_get_successful",
+                status=EVENT_STATUS_SUCCEEDED,
+                message=f"[{datetime.now().strftime('%H:%M:%S')}] Get posicao status OK!",
             )
             data = response.json()
             return data
         else:
-            logger.error(f"Error getting positions: {response.status_code}")
+            structured_logger.error(
+                event="api_get_failed",
+                status=EVENT_STATUS_FAILED,
+                message=f"Error {response.status_code} getting positions from {posicao_url}: {sanitize_html_text(response.text)}",
+            )
+            return None
     except Exception as e:
-        logger.error(f"Error during execution: {e}")
+        structured_logger.error(
+            event="api_get_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error during execution: {str(e)}",
+        )
         return None
+    return None
 
 
 def buses_positions_response_is_valid(buses_positions: Any) -> bool:
@@ -127,20 +199,32 @@ def buses_positions_response_is_valid(buses_positions: Any) -> bool:
     :return: True if valid, False otherwise
     """
     if not isinstance(buses_positions, dict):
-        logger.error("Payload does not have a valid structure.")
-        logger.error(f"Payload content: {buses_positions}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_FAILED,
+            message="Payload does not have a valid structure.",
+            metadata={"payload_sample": str(buses_positions)[:200]},
+        )
         return False
     required_fields = ["hr", "l"]
     for field in required_fields:
         if field not in buses_positions:
-            logger.error(f"Missing required payload field: {field}")
+            structured_logger.error(
+                event="extract_positions_failed",
+                status=EVENT_STATUS_FAILED,
+                message=f"Missing required payload field: {field}",
+            )
             return False
     return True
 
 
 def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
     if not isinstance(buses_positions, dict):
-        logger.error(f"Incorrect data type: {type(buses_positions)}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Incorrect data type: {type(buses_positions)}",
+        )
         return "NaN", "NaN"
     try:
         reference_time = buses_positions.get("hr", "NaN")
@@ -148,5 +232,9 @@ def get_buses_positions_summary(buses_positions: Any) -> Tuple[str, Any]:
         total_vehicles = sum([len(line.get("vs", [])) for line in lines])
         return reference_time, total_vehicles
     except Exception as e:
-        logger.error(f"Error processing positions summary: {e}")
+        structured_logger.error(
+            event="extract_positions_failed",
+            status=EVENT_STATUS_FAILED,
+            message=f"Error processing positions summary: {e}",
+        )
         return "NaN", "NaN"

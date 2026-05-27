@@ -1,0 +1,59 @@
+groups:
+  - name: updatelatestpositions-pipeline-alerts
+    interval: 1m
+    rules:
+      - alert: ExecutionAborted
+        expr: |
+          sum(count_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="updatelatestpositions"
+            | event="execution_aborted"
+            [5m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: updatelatestpositions
+          alertname: execution_aborted
+        annotations:
+          summary: "updatelatestpositions execution aborted"
+          description: "A pipeline execution was aborted in the last 5 minutes."
+
+      - alert: NoPipelineExecutionCompleted
+        expr: |
+          absent_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="updatelatestpositions"
+            | event="execution_finished"
+            [10m]
+          )
+        for: 0m
+        labels:
+          severity: critical
+          service: updatelatestpositions
+          alertname: no_pipeline_execution_completed
+        annotations:
+          summary: "updatelatestpositions has not completed in 10 minutes"
+          description: "No execution_finished in the last 10 minutes. The dataset signal from transformlivedata may have stopped."
+
+      - alert: PositionFreshnessHigh
+        expr: |
+          max_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="updatelatestpositions"
+            | event="freshness_evaluation"
+            | json v="metadata.observed_lag_minutes"
+            | unwrap v
+            [10m]
+          ) > 10
+        for: 0m
+        labels:
+          severity: warning
+          service: updatelatestpositions
+          alertname: position_freshness_high
+        annotations:
+          summary: "updatelatestpositions position data freshness above warn threshold"
+          description: "observed_lag_minutes exceeded 10 minutes. The latest_positions table may be serving stale data to Power BI."

@@ -1,4 +1,5 @@
 import io
+
 import pytest
 from gtfs.services.load_raw_csv_to_buffer_from_storage import (
     load_raw_csv_to_buffer_from_storage,
@@ -48,8 +49,9 @@ def test_object_name_uses_correct_path():
     assert object_name == "gtfs/stops.txt"
 
 
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["general"]["storage"]["raw_bucket"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        load_raw_csv_to_buffer_from_storage(config, "stops")
+def test_read_error_raises_value_error():
+    def fake_read(connection, bucket, object_name):
+        raise RuntimeError("storage unavailable")
+
+    with pytest.raises(ValueError, match="Failed to load raw csv buffer from object storage"):
+        load_raw_csv_to_buffer_from_storage(make_config(), "stops", read_fn=fake_read)

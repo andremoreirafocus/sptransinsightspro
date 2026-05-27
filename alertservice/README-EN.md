@@ -1,3 +1,5 @@
+> **⚠️ DEPRECATED** — This microservice has been deprecated. Platform pipelines no longer use this service. Observability and alerting are handled by the Loki/Grafana/Alertmanager stack.
+
 ## Purpose of this subproject
 
 Receive pipeline quality summaries via webhook and send email notifications, including immediate alerts for failures and cumulative alerts for warnings.

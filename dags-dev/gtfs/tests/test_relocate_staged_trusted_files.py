@@ -111,17 +111,6 @@ def test_relocate_staged_files_rejects_invalid_target():
         )
 
 
-def test_relocate_staged_files_raises_for_missing_required_config():
-    config = make_config()
-    del config["general"]["storage"]["quarantined_subfolder"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        relocate_staged_trusted_files(
-            config,
-            [{"table_name": "stops", "staging_object_name": "gtfs/staging/stops.parquet"}],
-            target="quarantine",
-        )
-
-
 def test_move_object_with_minio_reads_writes_and_removes():
     calls = {"response_closed": False, "response_released": False}
     FakeMinioClient.configure(calls, payload=b"abc123")

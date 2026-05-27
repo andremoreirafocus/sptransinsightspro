@@ -78,6 +78,7 @@ def test_save_called_with_correct_table_name():
         get_path_fn=fake_get_path,
         duckdb_client=fake_con,
         save_fn=fake_save,
+        evaluate_freshness_fn=lambda config, df: None,
     )
     assert save_calls == ["refined.latest_positions"]
 
@@ -96,9 +97,3 @@ def test_duckdb_error_raises_value_error():
             save_fn=lambda *a: None,
         )
 
-
-def test_missing_config_key_raises_value_error():
-    config = make_config()
-    del config["connections"]["database"]["host"]
-    with pytest.raises(ValueError, match="Missing required configuration key"):
-        create_latest_positions_table(config)

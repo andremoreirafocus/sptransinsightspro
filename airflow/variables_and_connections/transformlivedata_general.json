@@ -18,9 +18,6 @@
             "raw_data_compression": true,
             "raw_data_compression_extension": ".zst"
         },
-        "notifications": {
-            "webhook_url": "http://alertservice:8000/notify"
-        },
         "data_validations": {
             "json_validation": {
                 "schemas": ["raw_data_json_schema"]

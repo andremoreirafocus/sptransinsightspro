@@ -1,12 +1,12 @@
 import logging
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Mapping
 
 
 logger = logging.getLogger(__name__)
 
 
 def evaluate_cumulative_warn(
-    rows: Iterable[Dict[str, Any]], thresholds: Dict[str, Any]
+    rows: Iterable[Mapping[str, Any]], thresholds: Dict[str, Any]
 ) -> bool:
     rows_list = list(rows)
     if not rows_list:
