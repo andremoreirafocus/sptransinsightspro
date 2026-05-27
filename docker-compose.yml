@@ -24,8 +24,8 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
-      AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
+      AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
       AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
     volumes:
@@ -49,8 +49,8 @@ services:
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
-      AIRFLOW__CORE__FERNET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA=}'
-      AIRFLOW__WEBSERVER__SECRET_KEY: '${FERNET_KEY:-LBi3PfqopCGRKZlFz2mXEjOCgxBtYy7q_Q3vF3rcUeA2}'
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
+      AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
     volumes:
       - ./airflow/dags:/opt/airflow/dags
       - ./airflow/requirements.txt:/requirements.txt
@@ -137,28 +137,6 @@ services:
       - ./jupyter/notebooks:/home/jovyan/work
     networks:
       - rede_fia
-
-  alertservice:
-    build:
-      context: ./alertservice
-      dockerfile: Dockerfile
-    container_name: alertservice
-    ports:
-      - "8000:8000"
-    environment:
-      SMTP_HOST: ${ALERTSERVICE_SMTP_HOST:-sandbox.smtp.mailtrap.io}
-      SMTP_PORT: ${ALERTSERVICE_SMTP_PORT:-587}
-      SMTP_USER: ${ALERTSERVICE_SMTP_USER}
-      SMTP_PASSWORD: ${ALERTSERVICE_SMTP_PASSWORD}
-      SMTP_USE_TLS: ${ALERTSERVICE_SMTP_USE_TLS:-true}
-      EMAIL_FROM: ${ALERTSERVICE_EMAIL_FROM:-andre.moreira.engineer@gmail.com}
-      EMAIL_TO: ${ALERTSERVICE_EMAIL_TO:-andremoreira.focus@gmail.com}
-      EMAIL_SUBJECT_PREFIX: "[DQ] status update for pipeline"
-    volumes:
-      - alertservice_data:/app/storage
-    networks:
-      - rede_fia
-    restart: always
 
   loki:
     image: grafana/loki:2.9.8
