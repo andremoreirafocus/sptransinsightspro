@@ -67,12 +67,12 @@ Regras atualmente configuradas para `refinedfinishedtrips`:
 - `ExtractionGapHigh` (`severity=warning`): dispara quando `max_gap_minutes` excede o limiar de aviso de 5 minutos — sinal antecipado antes que o pipeline comece a ser interrompido.
 
 Configuração de e-mail usada pelo Alertmanager:
-- `ALERTSERVICE_SMTP_HOST`
-- `ALERTSERVICE_SMTP_PORT`
-- `ALERTSERVICE_SMTP_USER`
-- `ALERTSERVICE_SMTP_PASSWORD`
-- `ALERTSERVICE_EMAIL_FROM`
-- `ALERTSERVICE_EMAIL_TO`
+- `ALERTMANAGER_SMTP_HOST`
+- `ALERTMANAGER_SMTP_PORT`
+- `ALERTMANAGER_SMTP_USER`
+- `ALERTMANAGER_SMTP_PASSWORD`
+- `ALERTMANAGER_EMAIL_FROM`
+- `ALERTMANAGER_EMAIL_TO`
 
 ## Arquitetura
 

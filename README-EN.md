@@ -78,6 +78,11 @@ docker compose up -d loki promtail grafana alertmanager
 The `.env` file at the project root contains all environment variables required for the infrastructure to work (MinIO, Airflow, and `extractloadlivedata`), using `.env.example` as the configuration template.
 For observability and alert-specific details, see [observability/README-EN.md](./observability/README-EN.md).
 
+## Prerequisites
+
+- Docker 28.3.2 or higher
+- Docker Compose v2.39.1 or higher
+
 ## Running Sptransinsights
 
 After starting the project following the instructions below, you must then execute the initialization commands documented in each subproject, especially:

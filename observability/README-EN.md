@@ -67,12 +67,12 @@ Rules currently configured for `refinedfinishedtrips`:
 - `ExtractionGapHigh` (`severity=warning`): fires when `max_gap_minutes` exceeds the warn threshold of 5 minutes — early signal before the pipeline starts aborting.
 
 Email configuration used by Alertmanager:
-- `ALERTSERVICE_SMTP_HOST`
-- `ALERTSERVICE_SMTP_PORT`
-- `ALERTSERVICE_SMTP_USER`
-- `ALERTSERVICE_SMTP_PASSWORD`
-- `ALERTSERVICE_EMAIL_FROM`
-- `ALERTSERVICE_EMAIL_TO`
+- `ALERTMANAGER_SMTP_HOST`
+- `ALERTMANAGER_SMTP_PORT`
+- `ALERTMANAGER_SMTP_USER`
+- `ALERTMANAGER_SMTP_PASSWORD`
+- `ALERTMANAGER_EMAIL_FROM`
+- `ALERTMANAGER_EMAIL_TO`
 
 ## Architecture
 

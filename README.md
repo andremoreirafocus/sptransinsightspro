@@ -58,6 +58,11 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
 Para detalhes específicos de observabilidade e alertas, consulte [observability/README.md](./observability/README.md).
 
+## Pré-requisitos
+
+- Docker 28.3.2 ou superior
+- Docker Compose v2.39.1 ou superior
+
 ## Para executar o Sptransinsights
 O caminho recomendado para iniciar a plataforma sem falhas prematuras de serviços dependentes de banco é:
 

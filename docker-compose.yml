@@ -23,7 +23,7 @@ services:
     restart: always
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres/airflow
       AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
       AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
       AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
@@ -48,7 +48,7 @@ services:
     container_name: airflow_scheduler
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow_postgres/airflow
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres/airflow
       AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
       AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
     volumes:
@@ -132,7 +132,7 @@ services:
       - "8888:8888"
     environment:
       - JUPYTER_ENABLE_LAB=yes
-      - JUPYTER_TOKEN=bus_analytics  # Use a secure token in production
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN}
     volumes:
       - ./jupyter/notebooks:/home/jovyan/work
     networks:
@@ -176,8 +176,8 @@ services:
     ports:
       - "3000:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./observability/grafana/provisioning/datasources:/etc/grafana/provisioning/datasources:ro
@@ -192,13 +192,13 @@ services:
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
     environment:
-      ALERTSERVICE_SMTP_HOST: ${ALERTSERVICE_SMTP_HOST:-sandbox.smtp.mailtrap.io}
-      ALERTSERVICE_SMTP_PORT: ${ALERTSERVICE_SMTP_PORT:-587}
-      ALERTSERVICE_SMTP_USER: ${ALERTSERVICE_SMTP_USER}
-      ALERTSERVICE_SMTP_PASSWORD: ${ALERTSERVICE_SMTP_PASSWORD}
-      ALERTSERVICE_SMTP_USE_TLS: ${ALERTSERVICE_SMTP_USE_TLS:-true}
-      ALERTSERVICE_EMAIL_FROM: ${ALERTSERVICE_EMAIL_FROM:-andre.moreira.engineer@gmail.com}
-      ALERTSERVICE_EMAIL_TO: ${ALERTSERVICE_EMAIL_TO:-andremoreira.focus@gmail.com}
+      ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST}
+      ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT}
+      ALERTMANAGER_SMTP_USER: ${ALERTMANAGER_SMTP_USER}
+      ALERTMANAGER_SMTP_PASSWORD: ${ALERTMANAGER_SMTP_PASSWORD}
+      ALERTMANAGER_SMTP_USE_TLS: ${ALERTMANAGER_SMTP_USE_TLS}
+      ALERTMANAGER_EMAIL_FROM: ${ALERTMANAGER_EMAIL_FROM}
+      ALERTMANAGER_EMAIL_TO: ${ALERTMANAGER_EMAIL_TO}
     ports:
       - "9093:9093"
     volumes:
