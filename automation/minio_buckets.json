@@ -1,0 +1,8 @@
+{
+  "buckets": [
+    { "name": "raw" },
+    { "name": "trusted" },
+    { "name": "quarantined" },
+    { "name": "metadata" }
+  ]
+}

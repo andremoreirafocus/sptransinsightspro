@@ -80,6 +80,23 @@ create_access_user_if_missing() {
   return 1
 }
 
+BUCKETS_FILE="${SCRIPT_DIR}/minio_buckets.json"
+
+create_buckets() {
+  local network_name="$1"
+  local buckets_file="$2"
+
+  if [ ! -f "${buckets_file}" ]; then
+    echo "Buckets file not found: ${buckets_file}"
+    exit 1
+  fi
+
+  while IFS= read -r bucket; do
+    run_mc "${network_name}" mb --ignore-existing "local/${bucket}"
+    echo "Bucket '${bucket}' is ready."
+  done < <(jq -r '.buckets[].name' "${buckets_file}")
+}
+
 cd "${PROJECT_ROOT}"
 load_env_file
 
@@ -98,5 +115,8 @@ fi
 
 echo "Bootstrapping MinIO access credentials..."
 create_access_user_if_missing
+
+echo "Provisioning MinIO buckets..."
+create_buckets "${MINIO_NETWORK}" "${BUCKETS_FILE}"
 
 echo "MinIO bootstrap completed."

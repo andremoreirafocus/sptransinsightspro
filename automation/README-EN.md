@@ -45,18 +45,38 @@ cd automation
 
 ### `bootstrap_minio.sh`
 
-Ensures that the platform access credential exists in MinIO.
+Ensures that the platform access credential and the required buckets exist in MinIO.
 
 **What it does, in order:**
 1. Waits until MinIO becomes available
 2. Authenticates with `MINIO_ROOT_USER` and `MINIO_ROOT_PASSWORD`
 3. Ensures the access user defined by `MINIO_PLATFORM_ACCESS_KEY` and `MINIO_PLATFORM_SECRET_KEY` exists
 4. Attaches the `readwrite` policy when that user is created for the first time
+5. Provisions the buckets declared in `minio_buckets.json` (idempotent)
 
 **Usage:**
 ```bash
 cd automation
 ./bootstrap_minio.sh
+```
+
+---
+
+### `minio_buckets.json`
+
+Declares the buckets that must exist in MinIO. Read by `bootstrap_minio.sh` during bootstrap.
+
+To add a new bucket, add an entry to this file — no script changes are needed.
+
+```json
+{
+  "buckets": [
+    { "name": "raw" },
+    { "name": "trusted" },
+    { "name": "quarantined" },
+    { "name": "metadata" }
+  ]
+}
 ```
 
 ---
