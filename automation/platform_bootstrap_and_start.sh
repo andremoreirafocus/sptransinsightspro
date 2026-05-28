@@ -68,6 +68,9 @@ docker compose up -d airflow_webserver airflow_scheduler
 echo "==> Running Airflow application bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_airflow_app.sh"
 
+echo "==> Unpausing selected Airflow DAGs..."
+bash "${SCRIPT_DIR}/unpause_airflow_dags.sh"
+
 echo "==> Running observability bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_observability.sh"
 
