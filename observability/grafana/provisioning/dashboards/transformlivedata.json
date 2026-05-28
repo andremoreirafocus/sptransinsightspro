@@ -23,7 +23,7 @@
             "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }]
           },
           {
-            "matcher": { "id": "byName", "options": "failed" },
+            "matcher": { "id": "byName", "options": "aborted" },
             "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
           }
         ]
@@ -44,8 +44,8 @@
         },
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "sum(count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\" [2m]))",
-          "legendFormat": "failed",
+          "expr": "sum(count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_aborted\" [2m]))",
+          "legendFormat": "aborted",
           "queryType": "range",
           "refId": "B"
         }
@@ -121,13 +121,13 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\" [1h])",
+          "expr": "count_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_aborted\" [1h])",
           "instant": true,
           "queryType": "instant",
           "refId": "A"
         }
       ],
-      "title": "Errors (last 1h)",
+      "title": "Aborted (last 1h)",
       "type": "stat"
     },
     {
@@ -372,7 +372,7 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_failed\"",
+          "expr": "{service=\"airflow_tasks\"} | json | service_extracted=\"transformlivedata\" | event=\"execution_aborted\"",
           "queryType": "range",
           "refId": "A"
         }
