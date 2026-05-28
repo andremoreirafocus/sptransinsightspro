@@ -71,6 +71,9 @@ bash "${SCRIPT_DIR}/bootstrap_airflow_app.sh"
 echo "==> Running observability bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_observability.sh"
 
+echo "==> Running extractloadlivedata bootstrap..."
+bash "${SCRIPT_DIR}/bootstrap_extractloadlivedata.sh"
+
 echo "==> Starting the remaining platform services..."
 docker compose up -d
 

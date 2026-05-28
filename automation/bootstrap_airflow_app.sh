@@ -10,6 +10,7 @@ ENV_FILE="${PROJECT_ROOT}/.env"
 source "${SCRIPT_DIR}/wait_helpers.sh"
 
 SERVICE_NAME="airflow_webserver"
+POSTGRES_SERVICE_NAME="airflow_postgres"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-2}"
 
@@ -34,6 +35,24 @@ docker_compose_exec() {
   docker compose exec -T "${SERVICE_NAME}" "$@"
 }
 
+docker_compose_run() {
+  docker compose run --rm -T "${SERVICE_NAME}" "$@"
+}
+
+wait_for_airflow_postgres() {
+  wait_for_condition \
+    "Airflow Postgres to become available" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    docker compose exec -T "${POSTGRES_SERVICE_NAME}" \
+      pg_isready -U "${AIRFLOW_DB_USER}" -d airflow
+}
+
+initialize_airflow_db() {
+  echo "Initializing Airflow metadata database..."
+  docker_compose_run airflow db init
+}
+
 wait_for_airflow() {
   wait_for_condition \
     "Airflow CLI to become available" \
@@ -48,17 +67,23 @@ admin_user_exists() {
       "${AIRFLOW_ADMIN_USERNAME}"
 }
 
+import_variable_file() {
+  local filename="$1"
+  echo "Importing Airflow variable file: ${filename}"
+  docker_compose_exec airflow variables import "/opt/airflow/variables_and_connections/${filename}"
+}
+
 import_variables() {
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/variables.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/transformlivedata_general.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/transformlivedata_data_expectations.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/transformlivedata_raw_data_json_schema.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_general.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_data_expectations_stops.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_data_expectations_stop_times.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/gtfs_data_expectations_trip_details.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/refinedfinishedtrips_general.json
-  docker_compose_exec airflow variables import /opt/airflow/variables_and_connections/updatelatestpositions_general.json
+  import_variable_file "variables.json"
+  import_variable_file "transformlivedata_general.json"
+  import_variable_file "transformlivedata_data_expectations.json"
+  import_variable_file "transformlivedata_raw_data_json_schema.json"
+  import_variable_file "gtfs_general.json"
+  import_variable_file "gtfs_data_expectations_stops.json"
+  import_variable_file "gtfs_data_expectations_stop_times.json"
+  import_variable_file "gtfs_data_expectations_trip_details.json"
+  import_variable_file "refinedfinishedtrips_general.json"
+  import_variable_file "updatelatestpositions_general.json"
 }
 
 trap 'rm -f "${GENERATED_CONNECTIONS_FILE}"' EXIT
@@ -80,6 +105,8 @@ require_env "POSTGRES_DB_PASSWORD"
 require_env "AIRFLOW_DB_USER"
 require_env "AIRFLOW_DB_PASSWORD"
 
+wait_for_airflow_postgres
+initialize_airflow_db
 wait_for_airflow
 
 echo "Bootstrapping Airflow application configuration..."
@@ -103,6 +130,7 @@ python3 "${SCRIPT_DIR}/render_airflow_connections.py" \
   "${GENERATED_CONNECTIONS_FILE}"
 
 echo "Importing Airflow connections and variables..."
+echo "Importing Airflow connections file: generated_connections.json"
 docker_compose_exec airflow connections import /opt/airflow/variables_and_connections/generated_connections.json
 import_variables
 

@@ -32,7 +32,8 @@ Starts the platform with prior infrastructure and Airflow bootstrap to avoid sta
 6. Starts `airflow_webserver` and `airflow_scheduler`
 7. Runs `bootstrap_airflow_app.sh`
 8. Runs `bootstrap_observability.sh`
-9. Starts the rest of the platform with `docker compose up -d`
+9. Runs `bootstrap_extractloadlivedata.sh`
+10. Starts the rest of the platform with `docker compose up -d`
 
 **Usage:**
 ```bash
@@ -84,12 +85,30 @@ Ensures bootstrap for the observability stack.
 
 **What it does, in order:**
 1. Starts `loki`, `promtail`, `grafana`, and `alertmanager`
-2. Waits for the stack readiness/health endpoints
+2. Waits for `loki`, `grafana`, and `alertmanager` through HTTP readiness/health endpoints
+3. Waits for `promtail` through the log signal `server listening on addresses`
 
 **Usage:**
 ```bash
 cd automation
 ./bootstrap_observability.sh
+```
+
+---
+
+### `bootstrap_extractloadlivedata.sh`
+
+Ensures the `extractloadlivedata` service is built and started, with automatic fallback when BuildKit fails.
+
+**What it does, in order:**
+1. Tries `docker compose build extractloadlivedata`
+2. If the BuildKit build fails, retries with `DOCKER_BUILDKIT=0`
+3. Starts the service with `docker compose up -d extractloadlivedata`
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_extractloadlivedata.sh
 ```
 
 ---
