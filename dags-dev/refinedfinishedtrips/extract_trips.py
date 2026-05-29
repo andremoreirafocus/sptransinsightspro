@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 from typing import Any, Dict
 import uuid
+from zoneinfo import ZoneInfo
 
 from refinedfinishedtrips.config.refinedfinishedtrips_config_schema import (
     GeneralConfig,
@@ -54,17 +55,22 @@ def extract_trips_for_all_Lines_and_vehicles(
         "quality_report",
     ]
     execution_id = str(uuid.uuid4())
-    run_ts = datetime.now(timezone.utc)
+    run_ts_utc = datetime.now(timezone.utc)
+    run_ts_localtime = run_ts_utc.astimezone(ZoneInfo("America/Sao_Paulo"))
     structured_logger = RefinedFinishedTripsLogger(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
     effective_correlation_id = correlation_id if correlation_id is not None else execution_id
-    state = PipelineTaskRunState(execution_id=execution_id, correlation_id=effective_correlation_id, run_ts=run_ts)
+    state = PipelineTaskRunState(
+        execution_id=execution_id,
+        correlation_id=effective_correlation_id,
+        run_ts=run_ts_localtime,
+    )
     set_execution_context(state.execution_id, state.correlation_id)
     tracker = ExecutionPhaseMetricsTracker(
         pipeline=str(pipeline_name),
         execution_id=execution_id,
-        logical_date_utc=run_ts.isoformat(),
+        logical_date_utc=run_ts_utc.isoformat(),
         phase_order=phase_order,
     )
     structured_logger.info(
@@ -176,7 +182,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         report = deps.create_final_quality_report(
             pipeline_config,
             execution_id,
-            run_ts,
+            run_ts_localtime,
             positions_result,
             trips_result,
             persistence_result,
