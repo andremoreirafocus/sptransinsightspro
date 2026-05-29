@@ -1,0 +1,66 @@
+services:
+  airflow_postgres_staging:
+    image: postgres:13
+    container_name: airflow_postgres_staging
+    environment:
+      - POSTGRES_USER=${AIRFLOW_DB_USER}
+      - POSTGRES_PASSWORD=${AIRFLOW_DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - airflow_staging_db_data:/var/lib/postgresql/data
+    networks:
+      - rede_fia_staging
+
+  airflow_webserver_staging:
+    image: apache/airflow:2.11.2-python3.11
+    container_name: airflow_webserver_staging
+    restart: always
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres_staging/airflow
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
+      AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/requirements.txt:/requirements.txt
+      - airflow_staging_logs:/opt/airflow/logs
+    ports:
+      - "8081:8080"
+    depends_on:
+      - airflow_postgres_staging
+    networks:
+      - rede_fia_staging
+    command: >
+      bash -c "pip install -r /requirements.txt && airflow db init && airflow webserver"
+
+  airflow_scheduler_staging:
+    image: apache/airflow:2.11.2-python3.11
+    container_name: airflow_scheduler_staging
+    restart: always
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres_staging/airflow
+      AIRFLOW__CORE__FERNET_KEY: '${AIRFLOW_FERNET_KEY}'
+      AIRFLOW__WEBSERVER__SECRET_KEY: '${AIRFLOW_SECRET_KEY}'
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'False'
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags:ro
+      - ./airflow/requirements.txt:/requirements.txt
+      - airflow_staging_logs:/opt/airflow/logs
+    depends_on:
+      - airflow_postgres_staging
+    networks:
+      - rede_fia_staging
+    command: >
+      bash -c "pip install -r /requirements.txt && airflow scheduler"
+
+networks:
+  rede_fia_staging:
+    driver: bridge
+
+volumes:
+  airflow_staging_db_data: {}
+  airflow_staging_logs: {}
