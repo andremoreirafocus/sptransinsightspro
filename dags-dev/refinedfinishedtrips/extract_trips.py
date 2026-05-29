@@ -33,6 +33,7 @@ def _build_column_lineage() -> Dict[str, Any]:
 def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     def create_execution_aborted_log_record(message: str, phase: str) -> None:
         structured_logger.error(
@@ -57,7 +58,8 @@ def extract_trips_for_all_Lines_and_vehicles(
     structured_logger = RefinedFinishedTripsLogger(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
-    state = PipelineTaskRunState(execution_id=execution_id, correlation_id=execution_id, run_ts=run_ts)
+    effective_correlation_id = correlation_id if correlation_id is not None else execution_id
+    state = PipelineTaskRunState(execution_id=execution_id, correlation_id=effective_correlation_id, run_ts=run_ts)
     set_execution_context(state.execution_id, state.correlation_id)
     tracker = ExecutionPhaseMetricsTracker(
         pipeline=str(pipeline_name),

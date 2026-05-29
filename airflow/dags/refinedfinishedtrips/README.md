@@ -289,8 +289,6 @@ Chaves esperadas em `general`
 }
 ```
 
-A notificação de alertas operacionais é gerenciada pela stack de observabilidade (Loki/Grafana); não há webhook de aplicação neste pipeline.
-
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev

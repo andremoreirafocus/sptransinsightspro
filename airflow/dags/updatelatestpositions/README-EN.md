@@ -7,17 +7,27 @@ Configuration is loaded automatically through `pipeline_configurator`, according
 
 ## What this subproject does
 
-- reads the most recent real-time positions stored in the `positions` table under the `sptrans` area of the trusted bucket in the object storage service
-- saves this data into the refined layer implemented in the low-latency analytical database, for use by the visualization layer
+- Reads the most recent real-time positions stored in the trusted layer of the object storage service
+- Evaluates the freshness of the data read relative to the current time, emitting observability events with the observed lag
+- Saves the data into the refined layer implemented in the low-latency analytical database, for use by the visualization layer
+
+### Freshness evaluation
+
+After reading the positions, the pipeline evaluates the time elapsed since the most recent vehicle timestamp to the current time (São Paulo timezone).
+
+- If the observed lag exceeds the warning threshold (`freshness_warn_staleness_minutes`), an observability event is emitted at warning level
+- If the lag exceeds the failure threshold (`freshness_fail_staleness_minutes`), the Loki alert is triggered
+- The emitted event is `freshness_evaluation` and carries `observed_lag_minutes`, `warn_threshold_minutes`, and `fail_threshold_minutes`
+- Thresholds are configurable via `general.quality` in the configuration file
 
 ## Prerequisites
 
-- availability of the trusted-layer bucket, already created in the object storage service
-- creation of an object storage access key registered in the configuration file with read access to the trusted-layer bucket
-- availability of the analytical database service, currently PostgreSQL, for storing data in the refined layer
+- Availability of the trusted-layer bucket, already created in the object storage service
+- Creation of an object storage access key registered in the configuration file with read access to the trusted-layer bucket
+- Availability of the analytical database service, currently PostgreSQL, for storing data in the refined layer
 - `.env` file with the required credentials
-- a template is available in `.env.example`
-- creation of the configuration file
+- A template is available in `.env.example`
+- Creation of the configuration file
 
 ## Configuration
 
@@ -53,17 +63,70 @@ Expected keys in `general`:
   "tables": {
     "positions_table_name": "positions",
     "latest_positions_table_name": "refined.latest_positions"
+  },
+  "quality": {
+    "freshness_warn_staleness_minutes": 10,
+    "freshness_fail_staleness_minutes": 30
   }
 }
 ```
 
 ### Execution phase metrics
+
 - The DAG emits a structured `execution_phase_metrics` event at the end of each run.
 - The event includes `execution_id`, `overall_status`, `total_duration_seconds`, and `phase_metrics`.
 - Tracked phases:
   - `config_load`
   - `update_latest_positions`
 - On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
+
+### Event taxonomy
+
+All events follow the structured logging standard and are queryable in Loki via `event="<name>"`.
+
+**Orchestrator events:**
+
+| Event | Description |
+|---|---|
+| `execution_started` | DAG execution started |
+| `config_load_started` | Configuration loading started |
+| `config_load_succeeded` | Configuration loaded successfully |
+| `execution_phase_metrics` | Phase duration metrics emitted at end of execution |
+| `execution_finished` | Execution completed successfully |
+| `execution_aborted` | Execution aborted due to failure |
+
+**Service events:**
+
+| Event | Description |
+|---|---|
+| `path_discovery_started` | Search for the most recent parquet file started |
+| `path_discovery_succeeded` | Path found successfully |
+| `path_discovery_empty` | No file found within the 2-hour window |
+| `path_discovery_failed` | Path discovery failed |
+| `prefix_scan_started` | Prefix scan in object storage started |
+| `positions_update_skipped` | Update skipped due to absence of recent data |
+| `positions_query_started` | DuckDB query against parquet started |
+| `positions_query_succeeded` | Query completed successfully |
+| `freshness_evaluation` | Freshness evaluation of the data read |
+| `positions_save_started` | Persistence to the refined layer started |
+| `positions_save_succeeded` | Data persisted successfully |
+| `positions_update_failed` | Position update failed |
+
+### Loki alerts
+
+Alert rules are defined in `observability/loki/rules/fake/updatelatestpositions-alerts.yaml`.
+
+| Alert | Severity | Condition |
+|---|---|---|
+| `ExecutionAborted` | critical | Any execution aborted in the last 5 min |
+| `NoPipelineExecutionCompleted` | critical | No `execution_finished` in the last 10 min |
+| `PositionFreshnessHigh` | warning | `observed_lag_minutes` above 10 min in the last 10 min |
+
+### Grafana dashboard
+
+The dashboard is available at `observability/grafana/provisioning/dashboards/updatelatestpositions.json` and is provisioned automatically by Grafana.
+
+![Dashboard updatelatestpositions](updatelatestpositions_dashboard.png)
 
 ## Installation instructions
 
@@ -105,7 +168,7 @@ CREATE TABLE refined.latest_positions (
 ### Airflow (production)
 
 In Airflow, configuration and credentials are managed through Variables and Connections stored by Airflow itself, as listed below. Any change to this information must be made through the Airflow UI or through the command line by connecting to the Airflow webserver with `docker exec`.
-- Variable `updatelatestpositions_general` (JSON)
+- Variable `updatelatestpositions_general` (JSON) — imported from `airflow/variables_and_connections/updatelatestpositions_general.json`
 - Credentials via Connections (MinIO and Postgres)
 
 Before executing the DAG in Airflow, the `refined.latest_positions` table must already exist as described above.

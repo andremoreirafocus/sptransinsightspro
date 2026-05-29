@@ -49,10 +49,17 @@ if _IN_AIRFLOW:
         "retries": 0,
     }
 
-    def _transform_positions_task(**context):
+    def _transform_positions_task(outlet_events, **context):
         logical_date = context["dag_run"].logical_date
         logical_date_string = logical_date.isoformat()
         transform_positions(logical_date_string)
+        outlet_events[TRANSFORMED_POSITIONS_READY_SIGNAL].extra = {
+            "correlation_id": logical_date_string
+        }
+        logging.getLogger(__name__).info(
+            "Dataset outlet event published: correlation_id=%s",
+            logical_date_string,
+        )
 
     with DAG(
         DAG_NAME,

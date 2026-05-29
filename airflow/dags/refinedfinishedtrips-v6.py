@@ -1,6 +1,8 @@
 from refinedfinishedtrips.extract_trips import (
     extract_trips_for_all_Lines_and_vehicles,
 )
+from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
+from observability.structured_event_logger import get_structured_logger
 import os
 import logging
 
@@ -46,6 +48,24 @@ if _IN_AIRFLOW:
         "retries": 3,
     }
 
+    def extract_trips_airflow_wrapper(triggering_dataset_events):
+        events = triggering_dataset_events.get(TRANSFORMED_POSITIONS_READY_SIGNAL.uri, [])
+        raw_payload = events[0].extra if events else {}
+        correlation_id = raw_payload.get("correlation_id") if raw_payload else None
+        logger = RefinedFinishedTripsLogger(
+            get_structured_logger(
+                service=PIPELINE_NAME,
+                component="orchestrator",
+                logger_name=__name__,
+            )
+        )
+        logger.info(
+            event="dataset_trigger_received",
+            message="Dataset trigger received from sptrans://trusted/transformed_positions_ready",
+            metadata={"payload": raw_payload},
+        )
+        extract_trips_for_all_Lines_and_vehicles(PIPELINE_NAME, correlation_id=correlation_id)
+
     with DAG(
         DAG_NAME,
         default_args=default_args,
@@ -55,7 +75,7 @@ if _IN_AIRFLOW:
         tags=["sptrans"],
     ) as dag:
         extract_trips_task = PythonOperator(
-            task_id="extract_trips", python_callable=extract_trips
+            task_id="extract_trips", python_callable=extract_trips_airflow_wrapper
         )
         extract_trips_task
 else:

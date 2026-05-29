@@ -217,8 +217,6 @@ Expected keys in `general`:
 }
 ```
 
-Note: alert notifications are no longer handled by an application webhook in this pipeline; operational alerts must be configured in the observability stack (Loki/Grafana/Alertmanager).
-
 ## Unit tests
 
 Tests in this subproject cover the transformation logic, the quality report service, and the full pipeline orchestration.

@@ -37,6 +37,7 @@ else:
 
 def update_latest_positions_table(
     deps: UpdateLatestPositionsOrchestrationDependencies | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     if deps is None:
         deps = get_updatelatestpositions_orchestration_dependencies()
@@ -56,7 +57,8 @@ def update_latest_positions_table(
         logical_date_utc=run_ts.isoformat(),
         phase_order=PHASE_ORDER,
     )
-    set_execution_context(execution_id, correlation_id=execution_id)
+    effective_correlation_id = correlation_id if correlation_id is not None else execution_id
+    set_execution_context(execution_id, correlation_id=effective_correlation_id)
     structured_logger.info(
         event="execution_started",
         message="Starting execution",
@@ -149,6 +151,24 @@ if _IN_AIRFLOW:
         "retries": 3,
     }
 
+    def update_latest_positions_airflow_wrapper(triggering_dataset_events):
+        events = triggering_dataset_events.get(TRANSFORMED_POSITIONS_READY_SIGNAL.uri, [])
+        raw_payload = events[0].extra if events else {}
+        correlation_id = raw_payload.get("correlation_id") if raw_payload else None
+        logger = UpdateLatestPositionsLogger(
+            get_structured_logger(
+                service=PIPELINE_NAME,
+                component="orchestrator",
+                logger_name=__name__,
+            )
+        )
+        logger.info(
+            event="dataset_trigger_received",
+            message="Dataset trigger received from sptrans://trusted/transformed_positions_ready",
+            metadata={"payload": raw_payload},
+        )
+        update_latest_positions_table(correlation_id=correlation_id)
+
     with DAG(
         DAG_NAME,
         default_args=default_args,
@@ -159,7 +179,7 @@ if _IN_AIRFLOW:
     ) as dag:
         update_latest_positions_task = PythonOperator(
             task_id="update_to_db",
-            python_callable=update_latest_positions_table,
+            python_callable=update_latest_positions_airflow_wrapper,
         )
 
         update_latest_positions_task
