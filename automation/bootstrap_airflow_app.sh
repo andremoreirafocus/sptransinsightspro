@@ -61,6 +61,14 @@ wait_for_airflow() {
     docker_compose_exec airflow users list --output json
 }
 
+wait_for_scheduler_started() {
+  wait_for_condition \
+    "Airflow scheduler process to start" \
+    "${WAIT_TIMEOUT_SECONDS}" \
+    "${WAIT_INTERVAL_SECONDS}" \
+    docker compose exec -T airflow_scheduler sh -c 'grep -rqa scheduler /proc/[0-9]*/cmdline 2>/dev/null'
+}
+
 admin_user_exists() {
   docker_compose_exec airflow users list --output json | \
     python3 -c 'import json, sys; username = sys.argv[1]; users = json.load(sys.stdin); sys.exit(0 if any(user.get("username") == username for user in users) else 1)' \
@@ -108,6 +116,7 @@ require_env "AIRFLOW_DB_PASSWORD"
 wait_for_airflow_postgres
 initialize_airflow_db
 wait_for_airflow
+wait_for_scheduler_started
 
 echo "Bootstrapping Airflow application configuration..."
 

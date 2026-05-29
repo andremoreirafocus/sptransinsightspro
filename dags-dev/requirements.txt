@@ -24,7 +24,7 @@ psycopg2-binary==2.9.11
 pyarrow==23.0.1
 pycparser==3.0
 pycryptodome==3.23.0
-pydantic==2.11.4
+pydantic==2.6.4
 pydantic_core==2.33.2
 Pygments==2.20.0
 pytest==9.0.3
