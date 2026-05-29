@@ -9,6 +9,7 @@ from transformlivedata.lineage.lineage_functions import (
 from dateutil import parser  # type: ignore[import-untyped]
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from math import radians, sin, cos, sqrt, atan2
 import pandas as pd
@@ -416,7 +417,7 @@ def transform_positions(
             status="FAILED",
         )
         raise ValueError("metadata.extracted_at is required in raw positions.")
-    batch_ts = parser.parse(extracted_at)
+    batch_ts = parser.parse(extracted_at).astimezone(ZoneInfo("America/Sao_Paulo"))
     valid_df_columns = [
         "extracao_ts",
         "veiculo_id",
