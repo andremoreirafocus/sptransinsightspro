@@ -27,3 +27,4 @@ The goal is not to justify choices after the fact, but to record the reasoning a
 | [ADR-0009](./0009-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Accepted |
 | [ADR-0010](./0010-airflow-datasets-for-event-driven-orchestration-EN.md) | Airflow Datasets for event-driven orchestration | Proposed |
 | [ADR-0011](./0011-structured-logging-with-canonical-contract-and-decoupled-transport-EN.md) | Structured logging with canonical contract and decoupled transport | Accepted |
+| [ADR-0012](./0012-power-bi-to-self-hosted-metabase-migration-EN.md) | Power BI to self-hosted Metabase migration | Proposed |

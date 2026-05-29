@@ -89,7 +89,7 @@ Caso deseje iniciar serviços específicos:
 ```shell
 docker compose up -d minio
 docker compose up -d postgres
-docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
+docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
 docker compose up -d jupyter
 docker compose up -d loki promtail grafana alertmanager
