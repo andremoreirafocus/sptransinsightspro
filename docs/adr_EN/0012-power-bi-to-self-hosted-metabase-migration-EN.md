@@ -1,7 +1,7 @@
 # ADR-0012: Power BI to self-hosted Metabase migration
 
 **Date:** 2026-05-29  
-**Status:** Proposed
+**Status:** Accepted
 
 ## Context
 
@@ -58,4 +58,3 @@ Rejected at this stage because it keeps external licensing dependency and does n
 - The team assumes direct responsibility for BI platform operations, updates, and availability.
 - Migration requires dashboard conversion effort and parity validation.
 - Functional differences between Power BI and Metabase may require modeling and visualization adaptations for some dashboards.
-

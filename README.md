@@ -92,6 +92,7 @@ docker compose up -d postgres
 docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
 docker compose up -d jupyter
+docker compose up -d metabase
 docker compose up -d loki promtail grafana alertmanager
 ```
 
@@ -113,6 +114,9 @@ Porém será necessário seguir as instruções abaixo, executando alguns comand
 
  Jupyter:
  http://localhost:8888/
+
+ Metabase:
+ http://localhost:3001/
 
  Loki (readiness):
  http://localhost:3100/ready

@@ -1,7 +1,7 @@
 # ADR-0012: Migração do Power BI para Metabase self-hosted
 
 **Data:** 2026-05-29  
-**Status:** Proposto
+**Status:** Aceito
 
 ## Contexto
 

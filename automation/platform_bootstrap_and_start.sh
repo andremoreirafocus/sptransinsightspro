@@ -80,4 +80,9 @@ bash "${SCRIPT_DIR}/bootstrap_extractloadlivedata.sh"
 echo "==> Starting the remaining platform services..."
 docker compose up -d
 
+echo "==> Running Metabase bootstrap..."
+if ! bash "${SCRIPT_DIR}/bootstrap_metabase.sh"; then
+  echo "[WARN] Metabase bootstrap failed. Platform startup completed without Metabase."
+fi
+
 echo "Platform started with bootstrap completed."
