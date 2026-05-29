@@ -73,9 +73,6 @@ Expected keys in `general`:
   "tables": {
     "trip_details_table_name": "trip_details"
   },
-  "notifications": {
-    "webhook_url": "disabled"
-  },
   "data_validations": {
     "expectations_validation": {
       "expectations_suites": [
@@ -124,7 +121,7 @@ Expectations artifacts loaded automatically through `pipeline_configurator`:
 - `acceptance_rate` is a continuous value between 0.0 and 1.0, calculated as `(validated_items_count - rows_failed) / validated_items_count` over the total number of items processed across all phases. It used to be binary (0.0 or 1.0).
 - The [samples](./samples) folder contains a manually curated example of the consolidated quality report: [quality-report-gtfs_HHMM_uuid.json](./samples/quality-report-gtfs_HHMM_uuid.json).
 
-### Quality reporting and notification (`alertservice`)
+### Quality reporting
 
 - On failures in any phase, the pipeline generates and persists a consolidated report with:
   - `failure_phase`
@@ -132,9 +129,6 @@ Expectations artifacts loaded automatically through `pipeline_configurator`:
   - per-phase results in `details.stages`
   - `validated_items_count`, `error_details`, `relocation_status`, `relocation_error` for each phase
   - `column_lineage` artifacts in the enrichment stage
-- The `summary` section is sent via webhook to the `alertservice` microservice when enabled.
-- The summary contains status, failure-phase information, and validation metrics to trigger immediate alerts (`FAIL`) or cumulative alerts (`WARN`) configured in `alertservice`.
-- Notification is triggered by the DAG (`_send_webhook_from_report`) after report persistence, separately from the report-building service.
 
 ### Observability (Loki + Grafana)
 

@@ -82,6 +82,12 @@ Expected keys in `general`:
   - `save_trip_details`
 - On failures, the event is emitted with `overall_status="failed"` before the final exception is raised.
 
+### Grafana Dashboard
+
+The dashboard is available at `observability/grafana/provisioning/dashboards/refinedsynctripdetails.json` and is provisioned automatically by Grafana.
+
+![Dashboard refinedsynctripdetails](refinedsynctripsdetails_dashboard.png)
+
 ## Installation instructions
 
 To install the requirements:

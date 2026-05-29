@@ -457,7 +457,7 @@ def create_trip_details(run_context: Dict[str, Any], stage_results: Dict[str, An
 
 def build_run_context() -> Dict[str, Any]:
     execution_id = str(uuid.uuid4())
-    batch_ts = datetime.now(timezone.utc).isoformat()
+    batch_ts = datetime.now(timezone.utc).replace(second=0, microsecond=0).isoformat()
     return {"execution_id": execution_id, "batch_ts": batch_ts}
 
 

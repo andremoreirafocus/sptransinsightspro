@@ -75,6 +75,12 @@ Chaves esperadas em `general`
   - `save_trip_details`
 - Em falhas, o evento é emitido com `overall_status="failed"` antes da exceção final.
 
+### Dashboard Grafana
+
+O dashboard está disponível em `observability/grafana/provisioning/dashboards/refinedsynctripdetails.json` e é provisionado automaticamente pelo Grafana.
+
+![Dashboard refinedsynctripdetails](refinedsynctripsdetails_dashboard.png)
+
 ## Instruções para instalação
 Para instalar os requisitos:
 - cd dags-dev

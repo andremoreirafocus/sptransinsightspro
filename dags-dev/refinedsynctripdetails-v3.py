@@ -44,6 +44,7 @@ else:
 
 def refined_sync_trip_details(
     deps: RefinedSyncTripDetailsOrchestrationDependencies | None = None,
+    correlation_id: str | None = None,
 ) -> None:
     if deps is None:
         deps = get_refinedsynctripdetails_orchestration_dependencies()
@@ -63,7 +64,8 @@ def refined_sync_trip_details(
         logical_date_utc=run_ts.isoformat(),
         phase_order=PHASE_ORDER,
     )
-    set_execution_context(execution_id, correlation_id=execution_id)
+    effective_correlation_id = correlation_id if correlation_id is not None else execution_id
+    set_execution_context(execution_id, correlation_id=effective_correlation_id)
     structured_logger.info(
         event="execution_started",
         message="Starting execution",
@@ -195,6 +197,24 @@ if _IN_AIRFLOW:
         "email_on_retry": False,
     }
 
+    def refined_sync_trip_details_airflow_wrapper(triggering_dataset_events):
+        events = triggering_dataset_events.get(TRIP_DATA_SIGNAL.uri, [])
+        raw_payload = events[0].extra if events else {}
+        correlation_id = raw_payload.get("correlation_id") if raw_payload else None
+        logger = RefinedSyncTripDetailsLogger(
+            get_structured_logger(
+                service=PIPELINE_NAME,
+                component="orchestrator",
+                logger_name=__name__,
+            )
+        )
+        logger.info(
+            event="dataset_trigger_received",
+            message="Dataset trigger received from gtfs://trip_details_ready",
+            metadata={"payload": raw_payload},
+        )
+        refined_sync_trip_details(correlation_id=correlation_id)
+
     with DAG(
         DAG_NAME,
         default_args=default_args,
@@ -204,7 +224,7 @@ if _IN_AIRFLOW:
     ) as dag:
         refined_sync_trip_details_task = PythonOperator(
             task_id="refined_sync_trip_details",
-            python_callable=refined_sync_trip_details,
+            python_callable=refined_sync_trip_details_airflow_wrapper,
         )
 
         refined_sync_trip_details_task

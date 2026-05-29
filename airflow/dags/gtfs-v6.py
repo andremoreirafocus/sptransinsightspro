@@ -14,7 +14,7 @@ PIPELINE_NAME = "gtfs"
 _IN_AIRFLOW = bool(os.getenv("AIRFLOW_HOME"))
 
 if _IN_AIRFLOW:
-    VERSION = 7
+    VERSION = 6
     DAG_NAME = f"{PIPELINE_NAME}-v{VERSION}"
 else:
     from logging.handlers import RotatingFileHandler
@@ -82,17 +82,9 @@ if _IN_AIRFLOW:
         input = ti.xcom_pull(task_ids="extract_load_files")
         return transform_wrapper(input)
 
-    def create_trip_details_airflow_wrapper(ti, outlet_events):
+    def create_trip_details_airflow_wrapper(ti):
         input = ti.xcom_pull(task_ids="transform")
-        result = create_trip_details_wrapper(input)
-        outlet_events[TRIP_DATA_SIGNAL].extra = {
-            "correlation_id": result["run_context"]["batch_ts"]
-        }
-        logging.getLogger(__name__).info(
-            "Dataset outlet event published: correlation_id=%s",
-            result["run_context"]["batch_ts"],
-        )
-        return result
+        return create_trip_details_wrapper(input)
 
     def build_quality_report_airflow_wrapper(ti):
         input = ti.xcom_pull(task_ids="create_trip_details")
