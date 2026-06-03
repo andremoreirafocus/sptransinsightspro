@@ -54,10 +54,6 @@ Pass a caller-assembled `details` dict to preserve partial pipeline results coll
 Persists a quality report to object storage. `path` format is `"{bucket}/{object_name}"`.
 Storage failures are re-raised. Does not send any notification.
 
-**`save_and_notify_quality_report(report, path, connection_data, webhook_url, write_fn=...)`**
-Persists a quality report and sends the summary to a webhook in a single call.
-Webhook failures are logged and swallowed so that a notification outage never blocks the pipeline.
-Pass `"disabled"`, `"none"`, or `"null"` as `webhook_url` to skip notification.
 
 ## Usage
 
