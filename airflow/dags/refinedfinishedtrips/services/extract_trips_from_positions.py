@@ -356,23 +356,43 @@ def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata:
         sentido = trip_metadata["sentido"]
         trip_id = get_trip_id(linha_lt, sentido)
         vehicle_id = veiculo_id
-        trip_start_time = position_records[trip_metadata["start_position_index"]][
-            "veiculo_ts"
-        ]
-        trip_end_time = position_records[trip_metadata["end_position_index"]][
-            "veiculo_ts"
-        ]
-        duration = trip_end_time - trip_start_time
+        trip_start_record_index = trip_metadata["start_position_index"]
+        trip_end_record_index = trip_metadata["end_position_index"]
+        trip_start_time = position_records[trip_start_record_index]["veiculo_ts"]
+        trip_end_time = position_records[trip_end_record_index]["veiculo_ts"]
+        duration_seconds = int((trip_end_time - trip_start_time).total_seconds())
         is_circular = position_records[0]["is_circular"]
-        average_speed = 0.0
+        if is_circular:
+            start_record = position_records[trip_start_record_index]
+            end_record = position_records[trip_end_record_index]
+            distance_meters = _calculate_distance_meters(
+                float(start_record["veiculo_lat"]),
+                float(start_record["veiculo_long"]),
+                float(end_record["veiculo_lat"]),
+                float(end_record["veiculo_long"]),
+            )
+        else:
+            start_record = position_records[trip_start_record_index]
+            if (
+                "trip_linear_distance" not in start_record
+                or start_record["trip_linear_distance"] is None
+                or float(start_record["trip_linear_distance"]) == 0
+            ):
+                raise ValueError(
+                    f"trip_linear_distance is null, missing, or zero for non-circular trip "
+                    f"(linha_lt={linha_lt}, vehicle={vehicle_id}, trip_start_time={trip_start_time})"
+                )
+            distance_meters = float(start_record["trip_linear_distance"])
+        avg_speed_kmh = (distance_meters / duration_seconds * 3.6) if duration_seconds > 0 else 0.0
         trip_record = (
             trip_id,
             int(vehicle_id),
             trip_start_time,
             trip_end_time,
-            duration,
+            duration_seconds,
             is_circular,
-            average_speed,
+            distance_meters,
+            avg_speed_kmh,
         )
         trips.append(trip_record)
     return trips

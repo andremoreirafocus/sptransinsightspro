@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Dict
 import uuid
 from zoneinfo import ZoneInfo
@@ -35,6 +35,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
     correlation_id: str | None = None,
+    logic_date_str: str | None = None,
 ) -> None:
     def create_execution_aborted_log_record(message: str, phase: str) -> None:
         structured_logger.error(
@@ -61,6 +62,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
     effective_correlation_id = correlation_id if correlation_id is not None else execution_id
+    logic_date: date = date.fromisoformat(logic_date_str) if logic_date_str else date.today()
     state = PipelineTaskRunState(
         execution_id=execution_id,
         correlation_id=effective_correlation_id,
@@ -166,7 +168,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         raise
     tracker.begin("persistence")
     try:
-        save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips)
+        save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips, logic_date=logic_date)
         persistence_result = {"status": "PASS", **save_result}
         state.persistence_result = persistence_result
         tracker.finish("persistence", "success")

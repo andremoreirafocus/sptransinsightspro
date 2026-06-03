@@ -38,6 +38,7 @@ if _IN_AIRFLOW:
     from airflow.utils.dates import days_ago
 
     TRANSFORMED_POSITIONS_READY_SIGNAL = Dataset("sptrans://trusted/transformed_positions_ready")
+    FINISHEDTRIPS_READY_SIGNAL = Dataset("sptrans://refined/finished_trips_ready")
     default_args = {
         "owner": "airflow",
         "depends_on_past": False,
@@ -48,7 +49,7 @@ if _IN_AIRFLOW:
         "retries": 3,
     }
 
-    def extract_trips_airflow_wrapper(triggering_dataset_events):
+    def extract_trips_airflow_wrapper(triggering_dataset_events, outlet_events):
         events = triggering_dataset_events.get(TRANSFORMED_POSITIONS_READY_SIGNAL.uri, [])
         raw_payload = events[0].extra if events else {}
         correlation_id = raw_payload.get("correlation_id") if raw_payload else None
@@ -65,6 +66,12 @@ if _IN_AIRFLOW:
             metadata={"payload": raw_payload},
         )
         extract_trips_for_all_Lines_and_vehicles(PIPELINE_NAME, correlation_id=correlation_id)
+        outlet_events[FINISHEDTRIPS_READY_SIGNAL].extra = {"correlation_id": correlation_id}
+        logger.info(
+            event="dataset_outlet_published",
+            message="Dataset outlet event published: sptrans://refined/finished_trips_ready",
+            metadata={"correlation_id": correlation_id},
+        )
 
     with DAG(
         DAG_NAME,
@@ -75,7 +82,9 @@ if _IN_AIRFLOW:
         tags=["sptrans"],
     ) as dag:
         extract_trips_task = PythonOperator(
-            task_id="extract_trips", python_callable=extract_trips_airflow_wrapper
+            task_id="extract_trips",
+            python_callable=extract_trips_airflow_wrapper,
+            outlets=[FINISHEDTRIPS_READY_SIGNAL],
         )
         extract_trips_task
 else:

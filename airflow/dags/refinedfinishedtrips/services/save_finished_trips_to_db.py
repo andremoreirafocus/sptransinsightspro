@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Callable, Dict, List, Tuple
 
 from sqlalchemy import create_engine, text
@@ -7,7 +8,7 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], engine_factory: Callable = create_engine) -> Dict[str, Any]:
+def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], logic_date: date, engine_factory: Callable = create_engine) -> Dict[str, Any]:
     def get_config(config):
         general = config["general"]
         tables = general["tables"]
@@ -33,7 +34,6 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
         with engine.begin() as conn:
             max_result = conn.execute(text(f"SELECT MAX(trip_end_time) FROM {table_name}"))
             latest_trip_end_time = max_result.fetchone()[0]
-
         if latest_trip_end_time is not None:
             new_trips_tuples = [t for t in trips_tuples if t[3] > latest_trip_end_time]
             structured_logger.info(
@@ -46,7 +46,6 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             )
         else:
             new_trips_tuples = trips_tuples
-
         with engine.begin() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
             conn.execute(
@@ -59,8 +58,8 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
                 insert_stmt = text(f"""
                     INSERT INTO {staging_table} (
                         trip_id, vehicle_id, trip_start_time, trip_end_time,
-                        duration, is_circular, average_speed
-                    ) VALUES (:t_id, :v_id, :t_start, :t_end, :dur, :circ, :spd)
+                        duration_seconds, is_circular, distance_meters, avg_speed_kmh, logic_date
+                    ) VALUES (:t_id, :v_id, :t_start, :t_end, :dur_s, :circ, :dist_m, :spd_kmh, :logic_date)
                 """)
                 params = [
                     {
@@ -68,9 +67,11 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
                         "v_id": t[1],
                         "t_start": t[2],
                         "t_end": t[3],
-                        "dur": t[4],
+                        "dur_s": t[4],
                         "circ": t[5],
-                        "spd": t[6],
+                        "dist_m": t[6],
+                        "spd_kmh": t[7],
+                        "logic_date": logic_date,
                     }
                     for t in new_trips_tuples
                 ]
@@ -79,11 +80,11 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             upsert_query = text(f"""
                 INSERT INTO {table_name} (
                     trip_id, vehicle_id, trip_start_time, trip_end_time,
-                    duration, is_circular, average_speed
+                    duration_seconds, is_circular, distance_meters, avg_speed_kmh, logic_date
                 )
                 SELECT
                     trip_id, vehicle_id, trip_start_time, trip_end_time,
-                    duration, is_circular, average_speed
+                    duration_seconds, is_circular, distance_meters, avg_speed_kmh, logic_date
                 FROM {staging_table}
                 ON CONFLICT (trip_start_time, vehicle_id, trip_id)
                 DO NOTHING;
@@ -102,15 +103,16 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             "previously_saved_rows": previously_saved_rows,
         }
     except Exception as e:
-        error_message = (
-            "Persistence failed while saving finished trips to database"
-        )
+        error_message = f"Persistence failed while saving finished trips to database: {e}"
         structured_logger.error(event="trips_save_failed", message=error_message)
         raise ValueError(error_message) from e
     finally:
         try:
             with engine.begin() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
-        except Exception:
-            pass
+        except Exception as cleanup_error:
+            structured_logger.warning(
+                event="staging_table_cleanup_failed",
+                message=f"Failed to drop staging table {staging_table}: {cleanup_error}",
+            )
         engine.dispose()

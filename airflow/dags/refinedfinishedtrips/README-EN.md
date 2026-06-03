@@ -31,7 +31,7 @@ For each route and vehicle:
 The current algorithm was designed to produce trips with higher operational fidelity, especially in three key dimensions for analysis:
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 
 These fields are especially sensitive to common noise in production position data, such as:
 - a bus standing still at a terminal before starting a trip
@@ -151,9 +151,11 @@ The final report also includes, under `details.artifacts.column_lineage`, the de
 - `vehicle_id`
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 - `is_circular`
-- `average_speed`
+- `distance_meters`
+- `avg_speed_kmh`
+- `logic_date`
 
 This lineage is validated against the real output contract of the pipeline.
 If there is any divergence between declared columns and the columns actually produced/persisted, the artifact records:
@@ -226,6 +228,7 @@ The dashboard is organized in five rows:
 | Vehicle-line groups processed | Timeseries | Route/vehicle groups processed per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
 | Sentido discrepancies per run | Timeseries | Discrepancies between derived and source direction per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Positions discarded by spatial sanitization per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
+| Non-circular trips with distance per run | Timeseries | Non-circular trips with distance computed per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.non_circular_trips_with_distance` |
 
 **Row 4 — Position data freshness**
 
@@ -338,9 +341,11 @@ CREATE TABLE refined.finished_trips (
     vehicle_id INTEGER,
     trip_start_time TIMESTAMPTZ NOT NULL,
     trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
+    duration_seconds INTEGER,
     is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
+    distance_meters DOUBLE PRECISION,
+    avg_speed_kmh DOUBLE PRECISION,
+    logic_date DATE,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 

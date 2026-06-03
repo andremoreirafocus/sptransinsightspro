@@ -16,6 +16,7 @@ Para cada linha e veículo:
 - verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
+- falhas isoladas na extração de uma combinação linha/veículo são capturadas individualmente: a execução continua para os demais grupos e o total de falhas é registrado na métrica `vehicle_line_groups_failed`
 - em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 - verifica o resultado da persistência, registrando quantas viagens:
@@ -28,7 +29,7 @@ Para cada linha e veículo:
 O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 
 Esses campos são especialmente sensíveis a ruídos comuns do dado de posição em produção, como:
 - ônibus parado em terminal antes de iniciar a viagem
@@ -135,6 +136,7 @@ No relatório final, a fase `trip_extraction` expõe métricas operacionais agre
 - `source_sentido_discrepancies`
 - `sanitization_dropped_points`
 - `vehicle_line_groups_processed`
+- `vehicle_line_groups_failed`
 - `input_position_records`
 
 O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.finished_trips`:
@@ -142,9 +144,11 @@ O relatório final também inclui, em `details.artifacts.column_lineage`, a linh
 - `vehicle_id`
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 - `is_circular`
-- `average_speed`
+- `distance_meters`
+- `avg_speed_kmh`
+- `logic_date`
 
 Essa linhagem é validada contra o contrato real de saída da pipeline.
 Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
@@ -215,8 +219,10 @@ O dashboard está organizado em cinco linhas:
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
 | Vehicle-line groups processed | Timeseries | Grupos linha/veículo processados por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
+| Vehicle-line groups failed | Timeseries | Grupos linha/veículo com falha de extração por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_failed` |
 | Sentido discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado e o sentido da fonte por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Posições descartadas pela sanitização espacial por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
+| Non-circular trips with distance per run | Timeseries | Viagens não circulares com distância calculada por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.non_circular_trips_with_distance` |
 
 **Linha 4 — Freshness dos dados de posição**
 
@@ -322,9 +328,11 @@ CREATE TABLE refined.finished_trips (
     vehicle_id INTEGER,
     trip_start_time TIMESTAMPTZ NOT NULL,
     trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
+    duration_seconds INTEGER,
     is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
+    distance_meters DOUBLE PRECISION,
+    avg_speed_kmh DOUBLE PRECISION,
+    logic_date DATE,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 

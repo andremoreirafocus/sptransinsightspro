@@ -61,7 +61,8 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
             SELECT
                 veiculo_ts, linha_lt, veiculo_id, linha_sentido, is_circular, extracao_ts,
                 veiculo_lat, veiculo_long,
-                distance_to_first_stop, distance_to_last_stop
+                distance_to_first_stop, distance_to_last_stop,
+                trip_linear_distance
             FROM read_parquet('{s3_path}', hive_partitioning = true)
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
             ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;
