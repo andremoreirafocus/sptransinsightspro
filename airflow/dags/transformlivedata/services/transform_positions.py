@@ -439,6 +439,7 @@ def transform_positions(
         "last_stop_lon",
         "distance_to_first_stop",
         "distance_to_last_stop",
+        "trip_linear_distance",
     ]
     lineage = merge_lineage_fragments(lineage_api, lineage_join, lineage_calc)
     result = build_transformation_result(

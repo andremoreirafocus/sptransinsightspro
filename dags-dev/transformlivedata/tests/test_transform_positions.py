@@ -559,6 +559,7 @@ def trip_details_valid():
                 "last_stop_id": 456,
                 "last_stop_lat": -23.520000,
                 "last_stop_lon": -46.630000,
+                "trip_linear_distance": 1300.0,
             },
             {
                 "trip_id": "2104-10-1",
@@ -569,6 +570,7 @@ def trip_details_valid():
                 "last_stop_id": 456,
                 "last_stop_lat": -23.520000,
                 "last_stop_lon": -46.630000,
+                "trip_linear_distance": 1300.0,
             },
         ]
     )
