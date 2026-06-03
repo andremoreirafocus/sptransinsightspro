@@ -13,10 +13,11 @@ Para cada linha e veículo:
 - em caso de falha nas verificações de qualidade: interrompe o pipeline e salva um relatório de falha no bucket de metadata
 - em caso de aviso nas verificações de qualidade: salva um relatório parcial no bucket de metadata e continua o processamento
 - calcula as viagens finalizadas durante este período de tempo de análise
-- verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
+- verifica a qualidade da extração de viagens, executando três verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
-- falhas isoladas na extração de uma combinação linha/veículo são capturadas individualmente: a execução continua para os demais grupos e o total de falhas é registrado na métrica `vehicle_line_groups_failed`
+  - **vehicle group failure rate**: aviso se a taxa de falhas de processamento por grupo linha/veículo exceder o limiar configurado; falhas isoladas não interrompem a execução — refletem degradação de qualidade nos dados upstream
+- falhas isoladas na extração de uma combinação linha/veículo são capturadas individualmente: a execução continua para os demais grupos e o total de falhas é registrado na métrica `vehicle_line_processing_failed`
 - em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 - verifica o resultado da persistência, registrando quantas viagens:
@@ -135,9 +136,10 @@ No relatório final, a fase `trip_extraction` expõe métricas operacionais agre
 - `trips_extracted`
 - `source_sentido_discrepancies`
 - `sanitization_dropped_points`
-- `vehicle_line_groups_processed`
-- `vehicle_line_groups_failed`
 - `input_position_records`
+- `circular_trips`
+- `non_circular_trips`
+- `checks` — resultados das três verificações de qualidade, cada uma com `status` e os campos detalhados da avaliação; a verificação `vehicle_group_failure_rate` inclui `vehicle_line_processing_succeeded`, `vehicle_line_processing_failed` e `vehicle_line_processing_failure_rate`
 
 O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.finished_trips`:
 - `trip_id`
@@ -218,11 +220,12 @@ O dashboard está organizado em cinco linhas:
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Vehicle-line groups processed | Timeseries | Grupos linha/veículo processados por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
-| Vehicle-line groups failed | Timeseries | Grupos linha/veículo com falha de extração por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_failed` |
+| Vehicle-line processing succeeded | Timeseries | Grupos linha/veículo processados com sucesso por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_succeeded` |
+| Vehicle-line processing failed | Timeseries | Grupos linha/veículo com falha de processamento por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
 | Sentido discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado e o sentido da fonte por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Posições descartadas pela sanitização espacial por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
-| Non-circular trips with distance per run | Timeseries | Viagens não circulares com distância calculada por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.non_circular_trips_with_distance` |
+| Circular trips per run | Timeseries | Viagens circulares identificadas por execução | `trip_extraction_completed` — `metadata.circular_trips` |
+| Non-circular trips per run | Timeseries | Viagens não circulares identificadas por execução | `trip_extraction_completed` — `metadata.non_circular_trips` |
 
 **Linha 4 — Freshness dos dados de posição**
 
@@ -290,7 +293,8 @@ Chaves esperadas em `general`
     "gaps_fail_gap_minutes": 15,
     "gaps_recent_window_minutes": 60,
     "trips_effective_window_threshold_minutes": 60,
-    "trips_min_trips_threshold": 5
+    "trips_min_trips_threshold": 5,
+    "vehicle_line_processing_failure_rate_threshold": 0.05
   },
 }
 ```

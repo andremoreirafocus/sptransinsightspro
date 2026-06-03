@@ -15,9 +15,10 @@ For each route and vehicle:
 - if quality checks fail: stops the pipeline and saves a quality report to the metadata bucket
 - if quality checks produce a warning: saves a quality report to the metadata bucket and continues processing
 - computes finished trips during the analysis time window
-- checks the quality of trip extraction by running two validations over the effective extraction window, measured by the interval between the first and last `extracao_ts` in the dataset:
+- checks the quality of trip extraction by running three validations over the effective extraction window, measured by the interval between the first and last `extracao_ts` in the dataset:
   - **zero trips**: warning if the effective extraction window exceeds the configured threshold and no trip is identified
   - **low trip count**: warning if the effective extraction window exceeds the configured threshold and the number of identified trips is below the expected minimum
+  - **vehicle group failure rate**: warning if the rate of processing failures per route/vehicle group exceeds the configured threshold; isolated failures do not stop execution — they reflect data quality degradation in upstream data
 - if a failure occurs during the trip-extraction phase: saves a failure report with the partial results already available and stops execution
 - saves finished trips to the refined layer implemented in the low-latency analytical database for use by the visualization layer
 - checks the persistence result, recording how many trips:
@@ -143,8 +144,10 @@ In the final report, the `trip_extraction` phase also exposes aggregated operati
 - `trips_extracted`
 - `source_sentido_discrepancies`
 - `sanitization_dropped_points`
-- `vehicle_line_groups_processed`
 - `input_position_records`
+- `circular_trips`
+- `non_circular_trips`
+- `checks` — results of the three quality validations, each with a `status` and detailed evaluation fields; the `vehicle_group_failure_rate` check includes `vehicle_line_processing_succeeded`, `vehicle_line_processing_failed`, and `vehicle_line_processing_failure_rate`
 
 The final report also includes, under `details.artifacts.column_lineage`, the declared lineage of the columns persisted to `refined.finished_trips`:
 - `trip_id`
@@ -225,10 +228,12 @@ The dashboard is organized in five rows:
 
 | Panel | Type | What it shows | Loki event / field |
 |---|---|---|---|
-| Vehicle-line groups processed | Timeseries | Route/vehicle groups processed per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
+| Vehicle-line processing succeeded | Timeseries | Route/vehicle groups processed successfully per execution | `trip_extraction_completed` — `metadata.vehicle_line_processing_succeeded` |
+| Vehicle-line processing failed | Timeseries | Route/vehicle groups that failed processing per execution | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
 | Sentido discrepancies per run | Timeseries | Discrepancies between derived and source direction per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Positions discarded by spatial sanitization per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
-| Non-circular trips with distance per run | Timeseries | Non-circular trips with distance computed per execution | `quality_report_metrics` (status=SUCCEEDED) — `metadata.non_circular_trips_with_distance` |
+| Circular trips per run | Timeseries | Circular trips identified per execution | `trip_extraction_completed` — `metadata.circular_trips` |
+| Non-circular trips per run | Timeseries | Non-circular trips identified per execution | `trip_extraction_completed` — `metadata.non_circular_trips` |
 
 **Row 4 — Position data freshness**
 
@@ -301,7 +306,8 @@ Expected keys in `general`:
     "gaps_fail_gap_minutes": 15,
     "gaps_recent_window_minutes": 60,
     "trips_effective_window_threshold_minutes": 60,
-    "trips_min_trips_threshold": 5
+    "trips_min_trips_threshold": 5,
+    "vehicle_line_processing_failure_rate_threshold": 0.05
   },
 }
 ```
