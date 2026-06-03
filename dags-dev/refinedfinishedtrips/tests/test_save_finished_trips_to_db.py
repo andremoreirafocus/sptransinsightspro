@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -6,6 +6,7 @@ from refinedfinishedtrips.tests.fakes.fake_db_engine import make_fake_engine_fac
 from refinedfinishedtrips.services.save_finished_trips_to_db import save_finished_trips_to_db
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
+LOGIC_DATE = date(2026, 4, 14)
 
 
 def make_config():
@@ -26,7 +27,8 @@ def make_config():
 def make_trip_tuple(trip_end_offset_seconds: int = 3600):
     start = BASE_TS
     end = BASE_TS + timedelta(seconds=trip_end_offset_seconds)
-    return ("1234-10-0", 100, start, end, end - start, False, 0.0)
+    duration_s = int((end - start).total_seconds())
+    return ("1234-10-0", 100, start, end, duration_s, False, 10000.0, 10.0)
 
 
 def test_missing_config_key_raises_key_error():
@@ -34,19 +36,19 @@ def test_missing_config_key_raises_key_error():
     del config["connections"]
     factory = make_fake_engine_factory()
     with pytest.raises(KeyError, match="connections"):
-        save_finished_trips_to_db(config, [], engine_factory=factory)
+        save_finished_trips_to_db(config, [], logic_date=LOGIC_DATE, engine_factory=factory)
 
 
 def test_empty_trips_no_parameterized_insert_executed():
     factory = make_fake_engine_factory()
-    save_finished_trips_to_db(make_config(), [], engine_factory=factory)
+    save_finished_trips_to_db(make_config(), [], logic_date=LOGIC_DATE, engine_factory=factory)
     parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
     assert parameterized_calls == []
 
 
 def test_non_empty_trips_insert_statement_executed():
     factory = make_fake_engine_factory(rowcount=1)
-    save_finished_trips_to_db(make_config(), [make_trip_tuple()], engine_factory=factory)
+    save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
     statements = [stmt for stmt, _ in factory.engine.executed_statements]
     assert any("INSERT" in stmt.upper() for stmt in statements)
 
@@ -54,32 +56,32 @@ def test_non_empty_trips_insert_statement_executed():
 def test_engine_error_raises_value_error():
     factory = make_fake_engine_factory(raises=Exception("DB unavailable"))
     with pytest.raises(ValueError, match="Persistence failed"):
-        save_finished_trips_to_db(make_config(), [make_trip_tuple()], engine_factory=factory)
+        save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
 
 
 def test_returns_added_and_previously_saved_row_counts():
     factory = make_fake_engine_factory(rowcount=1)
-    result = save_finished_trips_to_db(make_config(), [make_trip_tuple()], engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
     assert result == {"added_rows": 1, "previously_saved_rows": 0}
 
 
 def test_returns_zero_counts_for_empty_trips():
     factory = make_fake_engine_factory(rowcount=0)
-    result = save_finished_trips_to_db(make_config(), [], engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), [], logic_date=LOGIC_DATE, engine_factory=factory)
     assert result == {"added_rows": 0, "previously_saved_rows": 0}
 
 
 def test_previously_saved_rows_computed_from_rowcount():
     factory = make_fake_engine_factory(rowcount=2)
     trips = [make_trip_tuple(), make_trip_tuple(), make_trip_tuple()]
-    result = save_finished_trips_to_db(make_config(), trips, engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), trips, logic_date=LOGIC_DATE, engine_factory=factory)
     assert result == {"added_rows": 2, "previously_saved_rows": 1}
 
 
 def test_db_empty_max_returns_none_all_trips_saved():
     trip = make_trip_tuple(trip_end_offset_seconds=3600)
     factory = make_fake_engine_factory(rowcount=1, max_trip_end_time=None)
-    result = save_finished_trips_to_db(make_config(), [trip], engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), [trip], logic_date=LOGIC_DATE, engine_factory=factory)
     assert result["added_rows"] == 1
 
 
@@ -89,7 +91,7 @@ def test_trips_older_than_latest_saved_are_filtered_out():
     new_trip = make_trip_tuple(trip_end_offset_seconds=7200)   # trip_end_time > latest_saved_ts → kept
 
     factory = make_fake_engine_factory(rowcount=1, max_trip_end_time=latest_saved_ts)
-    result = save_finished_trips_to_db(make_config(), [old_trip, new_trip], engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), [old_trip, new_trip], logic_date=LOGIC_DATE, engine_factory=factory)
 
     parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
     inserted_end_times = [row["t_end"] for batch in parameterized_calls for row in batch]
@@ -103,8 +105,31 @@ def test_all_trips_older_than_latest_saved_results_in_no_insert():
     old_trip = make_trip_tuple(trip_end_offset_seconds=3600)   # older than latest_saved_ts
 
     factory = make_fake_engine_factory(rowcount=0, max_trip_end_time=latest_saved_ts)
-    result = save_finished_trips_to_db(make_config(), [old_trip], engine_factory=factory)
+    result = save_finished_trips_to_db(make_config(), [old_trip], logic_date=LOGIC_DATE, engine_factory=factory)
 
     parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
     assert parameterized_calls == []
     assert result == {"added_rows": 0, "previously_saved_rows": 1}
+
+
+def test_logic_date_included_in_insert_params():
+    factory = make_fake_engine_factory(rowcount=1)
+    save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
+    parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
+    assert any("logic_date" in row for batch in parameterized_calls for row in batch)
+
+
+def test_save_finished_trips_to_db_accepts_logic_date_parameter():
+    factory = make_fake_engine_factory(rowcount=0)
+    with pytest.raises(TypeError):
+        save_finished_trips_to_db(make_config(), [], engine_factory=factory)
+
+
+def test_duration_and_average_speed_absent_from_insert():
+    factory = make_fake_engine_factory(rowcount=1)
+    save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
+    parameterized_calls = [params for _, params in factory.engine.executed_statements if params is not None]
+    for batch in parameterized_calls:
+        for row in batch:
+            assert "duration" not in row
+            assert "average_speed" not in row

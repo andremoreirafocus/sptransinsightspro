@@ -89,6 +89,8 @@ def validate_trips_quality(
         "sanitization_dropped_points": extraction_metrics.get("total_input_position_sanitization_drops", 0),
         "input_position_records": extraction_metrics.get("total_input_position_records", len(df)),
         "vehicle_line_groups_processed": extraction_metrics.get("vehicle_line_groups_processed", 0),
+        "vehicle_line_groups_failed": extraction_metrics.get("vehicle_line_groups_failed", 0),
+        "non_circular_trips_with_distance": extraction_metrics.get("non_circular_trips_with_distance"),
         "checks": checks,
     }
     structured_logger.info(event="trips_quality_validated", message="Trips quality validation", metadata=result)

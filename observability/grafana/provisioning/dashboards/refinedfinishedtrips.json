@@ -454,6 +454,42 @@
       "datasource": { "type": "loki", "uid": "${datasource}" },
       "fieldConfig": {
         "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "non_circular_with_distance" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "teal", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "id": 15,
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "sum(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"quality_report_metrics\" | status=\"SUCCEEDED\" | json v=\"metadata.non_circular_trips_with_distance\" | unwrap v [5m]))",
+          "legendFormat": "non_circular_with_distance",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Non-circular trips with distance per run",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
           "color": { "mode": "thresholds" },
           "thresholds": {
             "mode": "absolute",
@@ -473,7 +509,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 32 },
       "id": 13,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -514,7 +550,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 32 },
       "id": 14,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -534,7 +570,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
       "id": 11,
       "options": {
         "dedupStrategy": "none",
@@ -559,7 +595,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
       "id": 12,
       "options": {
         "dedupStrategy": "none",
@@ -607,5 +643,5 @@
   "timezone": "browser",
   "title": "refinedfinishedtrips",
   "uid": "refinedfinishedtrips",
-  "version": 1
+  "version": 2
 }

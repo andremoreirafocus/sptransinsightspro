@@ -23,6 +23,7 @@ def _pos(
     is_circular: bool = False,
     veiculo_lat: float = -23.5,
     veiculo_long: float = -46.6,
+    trip_linear_distance: float = 10000.0,
 ):
     return {
         "distance_to_first_stop": distance_to_first_stop,
@@ -34,6 +35,7 @@ def _pos(
         "is_circular": is_circular,
         "veiculo_lat": veiculo_lat,
         "veiculo_long": veiculo_long,
+        "trip_linear_distance": trip_linear_distance,
     }
 
 
@@ -331,49 +333,181 @@ def test_extract_raw_trips_metadata_circular_noisy_direction_flip_without_moveme
 # --- generate_trips_table ---
 
 
-def test_generate_trips_table_tuple_has_seven_fields():
+def test_generate_trips_table_tuple_has_all_required_fields():
     start_ts = BASE_TS
     end_ts = BASE_TS + timedelta(seconds=3600)
     position_records = [
-        {"veiculo_ts": start_ts, "is_circular": False},
-        {"veiculo_ts": end_ts, "is_circular": False},
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert len(result) == 1
-    assert len(result[0]) == 7
+    assert len(result[0]) == 8
 
 
 def test_generate_trips_table_trip_id_from_linha_and_derived_sentido():
     position_records = [
-        {"veiculo_ts": BASE_TS, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 2}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert result[0][0] == "1234-10-1"
 
 
-def test_generate_trips_table_duration_equals_end_minus_start():
+def test_generate_trips_table_duration_seconds_equals_end_minus_start():
     start_ts = BASE_TS
     end_ts = BASE_TS + timedelta(seconds=3600)
     position_records = [
-        {"veiculo_ts": start_ts, "is_circular": False},
-        {"veiculo_ts": end_ts, "is_circular": False},
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
-    assert result[0][4] == end_ts - start_ts
+    assert result[0][4] == int((end_ts - start_ts).total_seconds())
 
 
-def test_generate_trips_table_average_speed_always_zero():
+def test_generate_trips_table_avg_speed_kmh_computed_from_distance_and_duration():
+    distance_m = 10000.0
+    duration_s = 3600
     position_records = [
-        {"veiculo_ts": BASE_TS, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert abs(result[0][7] - (distance_m / duration_s * 3.6)) < 1e-9
+
+
+def test_generate_trips_table_duration_seconds_is_int():
+    start_ts = BASE_TS
+    end_ts = BASE_TS + timedelta(seconds=3600)
+    position_records = [
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert type(result[0][4]) is int
+
+
+def test_non_circular_distance_meters_from_trip_linear_distance():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 15000.0},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 15000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][6] == 15000.0
+
+
+def test_null_trip_linear_distance_raises_value_error():
+    import pytest
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": None},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": None},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    with pytest.raises(ValueError):
+        generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+
+def test_missing_trip_linear_distance_key_raises_value_error():
+    import pytest
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    with pytest.raises(ValueError):
+        generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+
+def test_circular_distance_meters_is_haversine_between_start_and_end():
+    from math import radians, sin, cos, atan2, sqrt
+    lat1, lon1 = -23.5, -46.6
+    lat2, lon2 = -23.6, -46.7
+    R = 6371000
+    phi1, phi2 = radians(lat1), radians(lat2)
+    d_phi = radians(lat2 - lat1)
+    d_lam = radians(lon2 - lon1)
+    a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lam / 2) ** 2
+    expected = R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=60), "is_circular": True, "veiculo_lat": -23.55, "veiculo_long": -46.65},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 2, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert abs(result[0][6] - expected) < 1.0
+
+
+def test_circular_distance_meters_is_zero_for_same_point():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": -23.5, "veiculo_long": -46.6},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert result[0][6] == 0.0
+
+
+def test_circular_distance_does_not_accumulate_intermediate_samples():
+    lat1, lon1 = -23.5, -46.6
+    lat2, lon2 = -23.6, -46.7
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=1000), "is_circular": True, "veiculo_lat": -23.55, "veiculo_long": -46.65},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=2000), "is_circular": True, "veiculo_lat": -23.58, "veiculo_long": -46.68},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 3, "sentido": 1}]
+    result_with_intermediates = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+    position_records_direct = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata_direct = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result_direct = generate_trips_table(position_records_direct, trips_metadata_direct, LINHA_LT, VEICULO_ID)
+
+    assert result_with_intermediates[0][6] == result_direct[0][6]
+
+
+def test_avg_speed_kmh_computed_correctly_from_distance_and_duration():
+    distance_m = 18000.0
+    duration_s = 3600
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    expected = distance_m / duration_s * 3.6
+    assert abs(result[0][7] - expected) < 1e-9
+
+
+def test_avg_speed_kmh_is_zero_when_duration_seconds_is_zero():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][7] == 0.0
+
+
+def test_avg_speed_kmh_is_zero_when_duration_seconds_is_negative():
+    position_records = [
+        {"veiculo_ts": BASE_TS + timedelta(seconds=10), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][7] == 0.0
 
 
 # --- extract_trips_per_line_per_vehicle ---

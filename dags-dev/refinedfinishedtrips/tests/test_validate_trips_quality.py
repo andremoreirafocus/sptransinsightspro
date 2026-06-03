@@ -215,3 +215,23 @@ def test_validate_trips_quality_tz_aware_and_tz_naive_equivalent():
     result_naive = validate_trips_quality(make_config(), df_naive, trips, {})
     assert result_aware["effective_window_minutes"] == result_naive["effective_window_minutes"]
     assert result_aware["status"] == result_naive["status"]
+
+
+def test_non_circular_trips_with_distance_in_result():
+    df = make_df(window_minutes=180)
+    extraction_metrics = {"non_circular_trips_with_distance": 42}
+    result = validate_trips_quality(make_config(), df, [], extraction_metrics)
+    assert result["non_circular_trips_with_distance"] == 42
+
+
+def test_vehicle_line_groups_failed_in_result():
+    df = make_df(window_minutes=180)
+    extraction_metrics = {"vehicle_line_groups_failed": 3}
+    result = validate_trips_quality(make_config(), df, [], extraction_metrics)
+    assert result["vehicle_line_groups_failed"] == 3
+
+
+def test_vehicle_line_groups_failed_defaults_to_zero_when_absent():
+    df = make_df(window_minutes=180)
+    result = validate_trips_quality(make_config(), df, [], {})
+    assert result["vehicle_line_groups_failed"] == 0

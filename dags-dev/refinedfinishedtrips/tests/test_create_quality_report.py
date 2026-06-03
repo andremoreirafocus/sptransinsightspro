@@ -367,3 +367,35 @@ def test_create_final_quality_report_includes_column_lineage():
     artifacts = report["details"]["artifacts"]
     assert artifacts["column_lineage"]["table_name"] == "finished_trips"
     assert artifacts["column_lineage"]["drift_detected"] is False
+
+
+def test_non_circular_trips_with_distance_in_summary():
+    write = WriteCapture()
+    trips_result = make_trips_result()
+    trips_result["non_circular_trips_with_distance"] = 17
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=trips_result,
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    assert report["summary"]["non_circular_trips_with_distance"] == 17
+
+
+def test_vehicle_line_groups_failed_in_summary():
+    write = WriteCapture()
+    trips_result = make_trips_result()
+    trips_result["vehicle_line_groups_failed"] = 5
+    report = create_final_quality_report(
+        config=make_config(),
+        execution_id=EXEC_ID,
+        run_ts=RUN_TS,
+        positions_result=make_positions_result(),
+        trips_result=trips_result,
+        persistence_result=make_persistence_result(),
+        write_fn=write,
+    )
+    assert report["summary"]["vehicle_line_groups_failed"] == 5

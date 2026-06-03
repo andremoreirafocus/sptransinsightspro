@@ -71,3 +71,9 @@ def test_connection_closed_after_successful_call():
     fake = FakeDuckDBConnection(df=pd.DataFrame())
     get_recent_positions(make_config(), duckdb_client=fake)
     assert fake.closed is True
+
+
+def test_sql_selects_trip_linear_distance():
+    fake = FakeDuckDBConnection(df=pd.DataFrame())
+    get_recent_positions(make_config(), duckdb_client=fake)
+    assert any("trip_linear_distance" in sql for sql in fake.executed_sql)

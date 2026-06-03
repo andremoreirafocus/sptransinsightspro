@@ -98,8 +98,8 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 "checks": [],
             }
 
-        def save_finished_trips_to_db(config, trips):
-            recorder.save_calls.append(trips)
+        def save_finished_trips_to_db(config, trips, *, logic_date=None):
+            recorder.save_calls.append({"trips": trips, "logic_date": logic_date})
             if save_trips_raises is not None:
                 raise save_trips_raises
             return {"added_rows": len(trips), "previously_saved_rows": 0}

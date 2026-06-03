@@ -10,9 +10,11 @@ def get_finished_trips_output_columns() -> List[str]:
         "vehicle_id",
         "trip_start_time",
         "trip_end_time",
-        "duration",
+        "duration_seconds",
         "is_circular",
-        "average_speed",
+        "distance_meters",
+        "avg_speed_kmh",
+        "logic_date",
     ]
 
 
@@ -34,17 +36,25 @@ def get_finished_trips_lineage() -> Dict[str, Any]:
             "sources": ["veiculo_ts", "end_position_index"],
             "derivation": 'position_records[end_position_index]["veiculo_ts"]',
         },
-        "duration": {
+        "duration_seconds": {
             "sources": ["trip_start_time", "trip_end_time"],
-            "derivation": "trip_end_time - trip_start_time",
+            "derivation": "int((trip_end_time - trip_start_time).total_seconds())",
         },
         "is_circular": {
             "sources": ["is_circular"],
             "derivation": 'copied from position_records[0]["is_circular"]',
         },
-        "average_speed": {
-            "sources": [],
-            "derivation": "constant 0.0 placeholder in current implementation",
+        "distance_meters": {
+            "sources": ["trip_linear_distance", "veiculo_lat", "veiculo_long"],
+            "derivation": "trip_linear_distance from start record for non-circular; Haversine(start, end) for circular",
+        },
+        "avg_speed_kmh": {
+            "sources": ["distance_meters", "duration_seconds"],
+            "derivation": "distance_meters / duration_seconds * 3.6; 0.0 when duration_seconds <= 0",
+        },
+        "logic_date": {
+            "sources": ["logic_date_str"],
+            "derivation": "parsed from payload received by the orchestrator, representing the date for which the trips are being extracted",
         },
     }
     return {

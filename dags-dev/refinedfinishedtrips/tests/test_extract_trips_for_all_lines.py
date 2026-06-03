@@ -178,7 +178,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
     )
     extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
     assert len(recorder.save_calls) == 1
-    assert recorder.save_calls[0] == []
+    assert recorder.save_calls[0]["trips"] == []
 
 
 def test_two_vehicles_save_called_once_with_combined_result():
@@ -244,3 +244,25 @@ def test_quality_report_metrics_emitted_on_failure(caplog):
     assert len(events) == 1
     event = events[0]
     assert event["status"] == "FAILED"
+
+
+# ---------------------------------------------------------------------------
+# logic_date propagation (Step 9)
+# ---------------------------------------------------------------------------
+
+
+def test_logic_date_parsed_from_logic_date_str():
+    from datetime import date
+    deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, logic_date_str="2026-06-01")
+    assert recorder.save_calls[0]["logic_date"] == date(2026, 6, 1)
+
+
+def test_logic_date_passed_to_save_finished_trips_to_db():
+    deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, logic_date_str="2026-06-01")
+    assert len(recorder.save_calls) == 1
+    assert "logic_date" in recorder.save_calls[0]
+    assert recorder.save_calls[0]["logic_date"] is not None
+
+
