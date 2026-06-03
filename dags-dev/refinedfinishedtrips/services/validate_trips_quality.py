@@ -46,6 +46,21 @@ def evaluate_low_trip_count(config: Dict[str, Any], effective_window_minutes: fl
     return result
 
 
+def evaluate_vehicle_group_failure_rate(config: Dict[str, Any], processed: int, failed: int) -> Dict[str, Any]:
+    def get_config(config):
+        return config["general"]["quality"]["vehicle_line_processing_failure_rate_threshold"]
+
+    threshold = get_config(config)
+    total_groups = processed + failed
+    failure_rate = round(failed / total_groups, 4) if total_groups > 0 else 0.0
+    return {
+        "vehicle_line_processing_succeeded": processed,
+        "vehicle_line_processing_failed": failed,
+        "vehicle_line_processing_failure_rate": failure_rate,
+        "failure_rate_threshold": threshold,
+    }
+
+
 def validate_trips_quality(
     config: Dict[str, Any],
     df: pd.DataFrame,
@@ -57,6 +72,11 @@ def validate_trips_quality(
 
     zero_trips = evaluate_zero_trips(config, effective_window, trips_count)
     low_trip_count = evaluate_low_trip_count(config, effective_window, trips_count)
+    vehicle_group_failure = evaluate_vehicle_group_failure_rate(
+        config,
+        processed=extraction_metrics.get("vehicle_line_processing_succeeded", 0),
+        failed=extraction_metrics.get("vehicle_line_processing_failed", 0),
+    )
 
     checks = []
 
@@ -80,6 +100,16 @@ def validate_trips_quality(
     else:
         checks.append({"check": "low_trip_count", "status": "PASS", **low_trip_count})
 
+    if vehicle_group_failure["vehicle_line_processing_failure_rate"] > vehicle_group_failure["failure_rate_threshold"]:
+        checks.append({
+            "check": "vehicle_group_failure_rate",
+            "status": "WARN",
+            "reason": f"vehicle/line group failure rate {vehicle_group_failure['vehicle_line_processing_failure_rate']:.1%} exceeds threshold {vehicle_group_failure['failure_rate_threshold']:.1%}",
+            **vehicle_group_failure,
+        })
+    else:
+        checks.append({"check": "vehicle_group_failure_rate", "status": "PASS", **vehicle_group_failure})
+
     overall = "WARN" if any(c["status"] == "WARN" for c in checks) else "PASS"
     result = {
         "status": overall,
@@ -88,9 +118,8 @@ def validate_trips_quality(
         "source_sentido_discrepancies": extraction_metrics.get("total_source_sentido_discrepancies", 0),
         "sanitization_dropped_points": extraction_metrics.get("total_input_position_sanitization_drops", 0),
         "input_position_records": extraction_metrics.get("total_input_position_records", len(df)),
-        "vehicle_line_groups_processed": extraction_metrics.get("vehicle_line_groups_processed", 0),
-        "vehicle_line_groups_failed": extraction_metrics.get("vehicle_line_groups_failed", 0),
-        "non_circular_trips_with_distance": extraction_metrics.get("non_circular_trips_with_distance"),
+        "circular_trips": extraction_metrics.get("circular_trips", 0),
+        "non_circular_trips": extraction_metrics.get("non_circular_trips", 0),
         "checks": checks,
     }
     structured_logger.info(event="trips_quality_validated", message="Trips quality validation", metadata=result)

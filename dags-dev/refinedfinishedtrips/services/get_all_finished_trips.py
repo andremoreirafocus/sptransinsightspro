@@ -9,9 +9,10 @@ from refinedfinishedtrips.services.extract_trips_per_line_per_vehicle import (
 
 structured_logger = get_structured_logger(logger_name=__name__)
 
-def _get_count_of_non_circular_trips_with_distance(trips: list) -> int:
+def _count_trips_by_type(trips: list) -> tuple:
     _TRIP_IS_CIRCULAR = 5
-    return sum(1 for t in trips if not t[_TRIP_IS_CIRCULAR])
+    circular = sum(1 for t in trips if t[_TRIP_IS_CIRCULAR])
+    return circular, len(trips) - circular
 
 
 def _build_extraction_metrics(
@@ -19,18 +20,20 @@ def _build_extraction_metrics(
     total_source_sentido_discrepancies: int,
     total_input_position_sanitization_drops: int,
     total_input_position_records: int,
-    vehicle_line_groups_processed: int,
-    vehicle_line_groups_failed: int,
-    non_circular_trips_with_distance: int,
+    vehicle_line_processing_succeeded: int,
+    vehicle_line_processing_failed: int,
+    circular_trips: int,
+    non_circular_trips: int,
 ) -> Dict[str, int]:
     return {
         "total_finished_trips": total_trips,
         "total_source_sentido_discrepancies": total_source_sentido_discrepancies,
         "total_input_position_sanitization_drops": total_input_position_sanitization_drops,
         "total_input_position_records": total_input_position_records,
-        "vehicle_line_groups_processed": vehicle_line_groups_processed,
-        "vehicle_line_groups_failed": vehicle_line_groups_failed,
-        "non_circular_trips_with_distance": non_circular_trips_with_distance,
+        "vehicle_line_processing_succeeded": vehicle_line_processing_succeeded,
+        "vehicle_line_processing_failed": vehicle_line_processing_failed,
+        "circular_trips": circular_trips,
+        "non_circular_trips": non_circular_trips,
     }
 
 
@@ -76,7 +79,7 @@ def get_all_finished_trips(
                 structured_logger.info(
                     event="trip_extraction_progress",
                     message="Trip extraction in progress",
-                    metadata={"vehicle_line_groups_processed": num_processed},
+                    metadata={"vehicle_line_processing_succeeded": num_processed},
                 )
             start_idx = i
         current_vehicle_key = vehicle_key
@@ -93,15 +96,16 @@ def get_all_finished_trips(
             except Exception:
                 num_failed += 1
     total_trips = len(all_finished_trips)
-    non_circular_trips_with_distance = _get_count_of_non_circular_trips_with_distance(all_finished_trips)
+    circular_trips, non_circular_trips = _count_trips_by_type(all_finished_trips)
     extraction_metrics = _build_extraction_metrics(
         total_trips=total_trips,
         total_source_sentido_discrepancies=total_source_sentido_discrepancies,
         total_input_position_sanitization_drops=total_input_position_sanitization_drops,
         total_input_position_records=total_input_position_records,
-        vehicle_line_groups_processed=num_processed,
-        vehicle_line_groups_failed=num_failed,
-        non_circular_trips_with_distance=non_circular_trips_with_distance,
+        vehicle_line_processing_succeeded=num_processed,
+        vehicle_line_processing_failed=num_failed,
+        circular_trips=circular_trips,
+        non_circular_trips=non_circular_trips,
     )
     structured_logger.info(
         event="trip_extraction_completed",

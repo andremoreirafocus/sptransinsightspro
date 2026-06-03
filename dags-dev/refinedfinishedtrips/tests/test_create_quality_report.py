@@ -190,7 +190,8 @@ def make_trips_result(
     trips_extracted=10,
     source_sentido_discrepancies=0,
     sanitization_dropped_points=0,
-    vehicle_line_groups_processed=0,
+    circular_trips=0,
+    non_circular_trips=10,
 ):
     return {
         "status": status,
@@ -198,7 +199,8 @@ def make_trips_result(
         "trips_extracted": trips_extracted,
         "source_sentido_discrepancies": source_sentido_discrepancies,
         "sanitization_dropped_points": sanitization_dropped_points,
-        "vehicle_line_groups_processed": vehicle_line_groups_processed,
+        "circular_trips": circular_trips,
+        "non_circular_trips": non_circular_trips,
         "checks": [],
     }
 
@@ -267,7 +269,7 @@ def test_create_final_quality_report_summary_contains_all_metrics():
             trips_extracted=1247,
             source_sentido_discrepancies=13,
             sanitization_dropped_points=879,
-            vehicle_line_groups_processed=8577,
+            circular_trips=42,
         ),
         persistence_result=make_persistence_result(
             added_rows=245, previously_saved_rows=1002
@@ -279,7 +281,7 @@ def test_create_final_quality_report_summary_contains_all_metrics():
     assert summary["trips_extracted"] == 1247
     assert summary["source_sentido_discrepancies"] == 13
     assert summary["sanitization_dropped_points"] == 879
-    assert summary["vehicle_line_groups_processed"] == 8577
+    assert summary["circular_trips"] == 42
     assert summary["added_rows"] == 245
     assert summary["previously_saved_rows"] == 1002
 
@@ -369,33 +371,30 @@ def test_create_final_quality_report_includes_column_lineage():
     assert artifacts["column_lineage"]["drift_detected"] is False
 
 
-def test_non_circular_trips_with_distance_in_summary():
+def test_circular_trips_in_summary():
     write = WriteCapture()
-    trips_result = make_trips_result()
-    trips_result["non_circular_trips_with_distance"] = 17
     report = create_final_quality_report(
         config=make_config(),
         execution_id=EXEC_ID,
         run_ts=RUN_TS,
         positions_result=make_positions_result(),
-        trips_result=trips_result,
+        trips_result=make_trips_result(circular_trips=17),
         persistence_result=make_persistence_result(),
         write_fn=write,
     )
-    assert report["summary"]["non_circular_trips_with_distance"] == 17
+    assert report["summary"]["circular_trips"] == 17
 
 
-def test_vehicle_line_groups_failed_in_summary():
+def test_vehicle_line_processing_not_in_summary():
     write = WriteCapture()
-    trips_result = make_trips_result()
-    trips_result["vehicle_line_groups_failed"] = 5
     report = create_final_quality_report(
         config=make_config(),
         execution_id=EXEC_ID,
         run_ts=RUN_TS,
         positions_result=make_positions_result(),
-        trips_result=trips_result,
+        trips_result=make_trips_result(),
         persistence_result=make_persistence_result(),
         write_fn=write,
     )
-    assert report["summary"]["vehicle_line_groups_failed"] == 5
+    assert "vehicle_line_processing_succeeded" not in report["summary"]
+    assert "vehicle_line_processing_failed" not in report["summary"]

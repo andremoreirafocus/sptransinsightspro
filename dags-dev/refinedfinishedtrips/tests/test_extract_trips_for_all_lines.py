@@ -152,7 +152,7 @@ def test_trip_extraction_metrics_reach_final_report():
         "total_source_sentido_discrepancies": 3,
         "total_input_position_sanitization_drops": 7,
         "total_input_position_records": 42,
-        "vehicle_line_groups_processed": 1,
+        "vehicle_line_processing_succeeded": 1,
     }
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         extract_trips_output=([], extraction_metrics)
@@ -163,7 +163,7 @@ def test_trip_extraction_metrics_reach_final_report():
     assert trips_result["source_sentido_discrepancies"] == 3
     assert trips_result["sanitization_dropped_points"] == 7
     assert trips_result["input_position_records"] == 42
-    assert trips_result["vehicle_line_groups_processed"] == 1
+    assert trips_result["vehicle_line_processing_succeeded"] == 1
     assert recorder.final_report_calls[0]["column_lineage"]["table_name"] == "finished_trips"
 
 

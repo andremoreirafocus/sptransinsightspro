@@ -47,10 +47,10 @@ def _fail_for(failing_vehicle_id: str):
     return _fn
 
 
-def test_all_succeed_vehicle_line_groups_failed_is_zero():
+def test_all_succeed_vehicle_line_processing_failed_is_zero():
     df = _make_df("1", "2")
     _, metrics = get_all_finished_trips(_CONFIG, df, _extract_trips_fn=_always_succeeds)
-    assert metrics["vehicle_line_groups_failed"] == 0
+    assert metrics["vehicle_line_processing_failed"] == 0
 
 
 def test_all_succeed_trips_are_returned():
@@ -62,13 +62,13 @@ def test_all_succeed_trips_are_returned():
 def test_single_vehicle_failure_increments_failed_counter():
     df = _make_df("1", "2")
     _, metrics = get_all_finished_trips(_CONFIG, df, _extract_trips_fn=_fail_for("1"))
-    assert metrics["vehicle_line_groups_failed"] == 1
+    assert metrics["vehicle_line_processing_failed"] == 1
 
 
 def test_single_vehicle_failure_does_not_prevent_other_vehicles_from_being_processed():
     df = _make_df("1", "2")
     trips, metrics = get_all_finished_trips(_CONFIG, df, _extract_trips_fn=_fail_for("1"))
-    assert metrics["vehicle_line_groups_processed"] == 1
+    assert metrics["vehicle_line_processing_succeeded"] == 1
     assert len(trips) == 1
 
 
@@ -81,7 +81,7 @@ def test_all_fail_no_trips_returned():
 def test_all_fail_failed_counter_equals_vehicle_count():
     df = _make_df("1", "2")
     _, metrics = get_all_finished_trips(_CONFIG, df, _extract_trips_fn=_always_fails)
-    assert metrics["vehicle_line_groups_failed"] == 2
+    assert metrics["vehicle_line_processing_failed"] == 2
 
 
 def test_multiple_failures_accumulate_in_counter():
@@ -95,5 +95,5 @@ def test_multiple_failures_accumulate_in_counter():
         return [_FAKE_TRIP], 0, 0
 
     _, metrics = get_all_finished_trips(_CONFIG, df, _extract_trips_fn=_fail_first_two)
-    assert metrics["vehicle_line_groups_failed"] == 2
-    assert metrics["vehicle_line_groups_processed"] == 1
+    assert metrics["vehicle_line_processing_failed"] == 2
+    assert metrics["vehicle_line_processing_succeeded"] == 1

@@ -94,7 +94,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 "source_sentido_discrepancies": metrics.get("total_source_sentido_discrepancies", 0),
                 "sanitization_dropped_points": metrics.get("total_input_position_sanitization_drops", 0),
                 "input_position_records": metrics.get("total_input_position_records", len(df)),
-                "vehicle_line_groups_processed": metrics.get("vehicle_line_groups_processed", 0),
+                "vehicle_line_processing_succeeded": metrics.get("vehicle_line_processing_succeeded", 0),
                 "checks": [],
             }
 
