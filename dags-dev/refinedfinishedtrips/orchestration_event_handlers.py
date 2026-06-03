@@ -37,12 +37,6 @@ def handle_phase_metrics_event(
     )
 
 
-def handle_finishedtrips_ready_dataset_emission(logic_date_str: str) -> None:
-    # Actual Airflow Dataset outlet emission is performed by the DAG wrapper via outlet_events.
-    # This handler is the reference implementation for non-Airflow contexts.
-    pass
-
-
 def handle_failure_event(
     state: PipelineTaskRunState,
     deps: RefinedFinishedTripsOrchestrationDependencies,

@@ -34,7 +34,6 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
         with engine.begin() as conn:
             max_result = conn.execute(text(f"SELECT MAX(trip_end_time) FROM {table_name}"))
             latest_trip_end_time = max_result.fetchone()[0]
-
         if latest_trip_end_time is not None:
             new_trips_tuples = [t for t in trips_tuples if t[3] > latest_trip_end_time]
             structured_logger.info(
@@ -47,7 +46,6 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             )
         else:
             new_trips_tuples = trips_tuples
-
         with engine.begin() as conn:
             conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
             conn.execute(
@@ -105,15 +103,16 @@ def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple],
             "previously_saved_rows": previously_saved_rows,
         }
     except Exception as e:
-        error_message = (
-            "Persistence failed while saving finished trips to database"
-        )
+        error_message = f"Persistence failed while saving finished trips to database: {e}"
         structured_logger.error(event="trips_save_failed", message=error_message)
         raise ValueError(error_message) from e
     finally:
         try:
             with engine.begin() as conn:
                 conn.execute(text(f"DROP TABLE IF EXISTS {staging_table};"))
-        except Exception:
-            pass
+        except Exception as cleanup_error:
+            structured_logger.warning(
+                event="staging_table_cleanup_failed",
+                message=f"Failed to drop staging table {staging_table}: {cleanup_error}",
+            )
         engine.dispose()

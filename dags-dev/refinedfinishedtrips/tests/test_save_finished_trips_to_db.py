@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import date, datetime, timedelta, timezone
 
 import pytest
@@ -123,6 +125,24 @@ def test_save_finished_trips_to_db_accepts_logic_date_parameter():
     factory = make_fake_engine_factory(rowcount=0)
     with pytest.raises(TypeError):
         save_finished_trips_to_db(make_config(), [], engine_factory=factory)
+
+
+def test_staging_table_cleanup_failure_is_logged_as_warning(caplog):
+    # 4th begin() is the cleanup DROP TABLE in finally
+    factory = make_fake_engine_factory(rowcount=1, raises_on_nth_begin=4)
+    with caplog.at_level(logging.WARNING):
+        result = save_finished_trips_to_db(make_config(), [make_trip_tuple()], logic_date=LOGIC_DATE, engine_factory=factory)
+    assert result == {"added_rows": 1, "previously_saved_rows": 0}
+    warning_events = []
+    for record in caplog.records:
+        try:
+            parsed = json.loads(record.getMessage())
+        except Exception:
+            continue
+        if parsed.get("event") == "staging_table_cleanup_failed":
+            warning_events.append(parsed)
+    assert len(warning_events) == 1
+    assert "simulated failure on begin #4" in warning_events[0]["message"]
 
 
 def test_duration_and_average_speed_absent_from_insert():

@@ -1,7 +1,6 @@
 from datetime import datetime, timezone
 
 import pandas as pd
-import pytest
 
 from refinedfinishedtrips.services.get_all_finished_trips import get_all_finished_trips
 
