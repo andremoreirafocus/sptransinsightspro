@@ -197,7 +197,7 @@ O dashboard está em [`observability/grafana/provisioning/dashboards/refinedfini
 
 ![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
 
-O dashboard está organizado em cinco linhas:
+O dashboard está organizado em quatro linhas de métricas e uma linha de logs:
 
 **Linha 1 — Saúde operacional**
 
@@ -208,31 +208,29 @@ O dashboard está organizado em cinco linhas:
 | Aborted (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções abortadas na última hora | `execution_aborted` — `count_over_time [1h]` |
 | Execution duration (s) | Timeseries | Duração média por fase: `total`, `trip_extraction`, `positions_load`, `positions_quality`, `persistence`, `quality_report`, `config_load` | `execution_phase_metrics` — `metadata.phase_metrics.<fase>.duration_seconds` via `avg_over_time [5m]` |
 
-**Linha 2 — Volume de viagens**
+**Linha 2 — Resultado e volume**
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Trips added per run | Timeseries | Viagens novas inseridas por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
-| Trips extracted per run | Timeseries | Viagens detectadas pelo algoritmo por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.trips_extracted` |
+| Trips added per run | Timeseries | Métrica principal: viagens novas inseridas na camada refined por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
+| Trips extracted per run | Timeseries | Viagens detectadas pelo algoritmo por execução, com decomposição em `circular_trips` e `non_circular_trips` para verificação visual da composição | `quality_report_metrics` — `metadata.trips_extracted`; `trip_extraction_completed` — `metadata.circular_trips`, `metadata.non_circular_trips` |
 | Positions loaded per run | Timeseries | Volume de posições lidas do object storage por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.positions_in_time_window_count` |
 
-**Linha 3 — Qualidade da extração**
+**Linha 3 — Qualidade do processamento**
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Vehicle-line processing succeeded | Timeseries | Grupos linha/veículo processados com sucesso por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_succeeded` |
-| Vehicle-line processing failed | Timeseries | Grupos linha/veículo com falha de processamento por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
-| Sentido discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado e o sentido da fonte por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
+| Vehicle-line processing succeeded per run | Timeseries | Grupos linha/veículo processados com sucesso por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_succeeded` |
+| Trip direction discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado espacialmente e o sentido da fonte por execução; comparável diretamente com o volume de viagens extraídas na linha acima | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Posições descartadas pela sanitização espacial por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
-| Circular trips per run | Timeseries | Viagens circulares identificadas por execução | `trip_extraction_completed` — `metadata.circular_trips` |
-| Non-circular trips per run | Timeseries | Viagens não circulares identificadas por execução | `trip_extraction_completed` — `metadata.non_circular_trips` |
 
-**Linha 4 — Freshness dos dados de posição**
+**Linha 4 — Falhas e freshness**
 
-| Painel | Tipo | O que mostra | Limiares |
+| Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
+| Vehicle-line processing failed per run | Timeseries | Grupos linha/veículo com falha de processamento por execução; aumento indica degradação de qualidade nos dados upstream | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
+| Trip extraction max position window gap (s) | Timeseries | Maior lacuna em segundos entre posições consecutivas na janela de extração; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
 | Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e o momento da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
-| Max extraction gap (s) | Timeseries | Maior lacuna em segundos entre ciclos consecutivos de extração na janela recente; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
 
 **Linha 5 — Logs**
 
