@@ -13,6 +13,7 @@ _CIRCULAR_SEEKING_START = "SEEKING_START"
 _CIRCULAR_SEEKING_TERMINAL_EXIT = "SEEKING_TERMINAL_EXIT"
 _CIRCULAR_IN_TRIP = "IN_TRIP"
 _MIN_MOVEMENT_DISTANCE_METERS = 30.0
+_MAX_BUS_SPEED_KMH = 80.0
 
 
 def extract_raw_trips_metadata(
@@ -76,13 +77,11 @@ def extract_non_circular_trips_metadata(
                 departure_direction = _DIRECTION_LAST_TO_FIRST
                 has_moved_away_from_departure_stop = False
             elif trip_start_record_index is not None:
-                # Bus has exited the departure zone — trip is now in progress
-                has_moved_away_from_departure_stop = True
                 state = _IN_TRIP
 
         elif state == _IN_TRIP:
             if departure_direction == _DIRECTION_FIRST_TO_LAST:
-                if not at_first_stop:
+                if not at_first_stop and not at_last_stop:
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_last_stop:
                     derived_sentido = 1
@@ -103,7 +102,7 @@ def extract_non_circular_trips_metadata(
                     has_moved_away_from_departure_stop = False
 
             elif departure_direction == _DIRECTION_LAST_TO_FIRST:
-                if not at_last_stop:
+                if not at_last_stop and not at_first_stop:
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_first_stop:
                     derived_sentido = 2
@@ -384,6 +383,8 @@ def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata:
                 )
             distance_meters = float(start_record["trip_linear_distance"])
         avg_speed_kmh = (distance_meters / duration_seconds * 3.6) if duration_seconds > 0 else 0.0
+        if avg_speed_kmh > _MAX_BUS_SPEED_KMH:
+            continue
         trip_record = (
             trip_id,
             int(vehicle_id),

@@ -3,7 +3,9 @@ from refinedfinishedtrips.extract_trips import (
 )
 from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
 from observability.structured_event_logger import get_structured_logger
+from datetime import date
 import os
+import uuid
 import logging
 
 PIPELINE_NAME = "refinedfinishedtrips"
@@ -29,7 +31,11 @@ logger = logging.getLogger(__name__)
 
 
 def extract_trips():
-    extract_trips_for_all_Lines_and_vehicles(PIPELINE_NAME)
+    extract_trips_for_all_Lines_and_vehicles(
+        PIPELINE_NAME,
+        correlation_id=str(uuid.uuid4()),
+        logic_date_str=date.today().isoformat(),
+    )
 
 
 if _IN_AIRFLOW:
@@ -53,6 +59,7 @@ if _IN_AIRFLOW:
         events = triggering_dataset_events.get(TRANSFORMED_POSITIONS_READY_SIGNAL.uri, [])
         raw_payload = events[0].extra if events else {}
         correlation_id = raw_payload.get("correlation_id") if raw_payload else None
+        logic_date_str = raw_payload.get("logic_date_str") if raw_payload else None
         logger = RefinedFinishedTripsLogger(
             get_structured_logger(
                 service=PIPELINE_NAME,
@@ -65,7 +72,11 @@ if _IN_AIRFLOW:
             message="Dataset trigger received from sptrans://trusted/transformed_positions_ready",
             metadata={"payload": raw_payload},
         )
-        extract_trips_for_all_Lines_and_vehicles(PIPELINE_NAME, correlation_id=correlation_id)
+        extract_trips_for_all_Lines_and_vehicles(
+            PIPELINE_NAME,
+            correlation_id=correlation_id,
+            logic_date_str=logic_date_str,
+        )
         outlet_events[FINISHEDTRIPS_READY_SIGNAL].extra = {"correlation_id": correlation_id}
         logger.info(
             event="dataset_outlet_published",

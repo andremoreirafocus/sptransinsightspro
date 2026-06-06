@@ -57,7 +57,7 @@ def test_positions_fail_raises_and_save_not_called():
         positions_status="FAIL"
     )
     with pytest.raises(ValueError, match="Positions quality check FAILED"):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert recorder.save_calls == []
 
 
@@ -66,7 +66,7 @@ def test_positions_fail_failure_report_called():
         positions_status="FAIL"
     )
     with pytest.raises(ValueError):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.failure_report_calls) == 1
     assert recorder.failure_report_calls[0]["failure_phase"] == "positions_quality"
 
@@ -76,7 +76,7 @@ def test_positions_fail_final_report_not_called():
         positions_status="FAIL"
     )
     with pytest.raises(ValueError):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert recorder.final_report_calls == []
 
 
@@ -85,7 +85,7 @@ def test_trip_extraction_failure_calls_create_failure_report_with_positions_resu
         extract_trips_raises=RuntimeError("trip extraction exploded")
     )
     with pytest.raises(RuntimeError, match="trip extraction exploded"):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.failure_report_calls) == 1
     call = recorder.failure_report_calls[0]
     assert call["failure_phase"] == "trip_extraction"
@@ -100,7 +100,7 @@ def test_persistence_failure_calls_create_failure_report_with_partial_results():
         save_trips_raises=RuntimeError("save failed")
     )
     with pytest.raises(RuntimeError, match="save failed"):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.failure_report_calls) == 1
     call = recorder.failure_report_calls[0]
     assert call["failure_phase"] == "persistence"
@@ -120,7 +120,7 @@ def test_positions_warn_pipeline_continues_and_save_called():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         positions_status="WARN"
     )
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.save_calls) == 1
 
 
@@ -131,13 +131,13 @@ def test_positions_warn_pipeline_continues_and_save_called():
 
 def test_all_phases_pass_final_report_called():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.final_report_calls) == 1
 
 
 def test_all_phases_pass_final_report_status_pass():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.final_report_calls) == 1
     call = recorder.final_report_calls[0]
     assert call["positions_result"]["status"] == "PASS"
@@ -157,7 +157,7 @@ def test_trip_extraction_metrics_reach_final_report():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         extract_trips_output=([], extraction_metrics)
     )
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.final_report_calls) == 1
     trips_result = recorder.final_report_calls[0]["trips_result"]
     assert trips_result["source_sentido_discrepancies"] == 3
@@ -176,7 +176,7 @@ def test_no_trips_extracted_save_called_with_empty_list():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         extract_trips_output=([], {})
     )
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.save_calls) == 1
     assert recorder.save_calls[0]["trips"] == []
 
@@ -186,7 +186,7 @@ def test_two_vehicles_save_called_once_with_combined_result():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario(
         extract_trips_output=(trips, {})
     )
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
     assert len(recorder.save_calls) == 1
 
 
@@ -202,7 +202,7 @@ def test_execution_aborted_event_emitted_on_pipeline_failure(caplog):
     caplog.set_level("ERROR")
 
     with pytest.raises(ValueError):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
 
     events = _parse_events(caplog, "execution_aborted")
     assert len(events) == 1
@@ -223,7 +223,7 @@ def test_quality_report_metrics_emitted_on_success(caplog):
     deps, _ = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
     caplog.set_level("INFO")
 
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
 
     events = _parse_events(caplog, "quality_report_metrics")
     assert len(events) == 1
@@ -238,7 +238,7 @@ def test_quality_report_metrics_emitted_on_failure(caplog):
     caplog.set_level("INFO")
 
     with pytest.raises(ValueError):
-        extract_trips_for_all_Lines_and_vehicles(make_config(), deps)
+        extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-04-14")
 
     events = _parse_events(caplog, "quality_report_metrics")
     assert len(events) == 1
@@ -254,13 +254,13 @@ def test_quality_report_metrics_emitted_on_failure(caplog):
 def test_logic_date_parsed_from_logic_date_str():
     from datetime import date
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, logic_date_str="2026-06-01")
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-06-01")
     assert recorder.save_calls[0]["logic_date"] == date(2026, 6, 1)
 
 
 def test_logic_date_passed_to_save_finished_trips_to_db():
     deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
-    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, logic_date_str="2026-06-01")
+    extract_trips_for_all_Lines_and_vehicles(make_config(), deps, correlation_id="test-correlation-id", logic_date_str="2026-06-01")
     assert len(recorder.save_calls) == 1
     assert "logic_date" in recorder.save_calls[0]
     assert recorder.save_calls[0]["logic_date"] is not None
