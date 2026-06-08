@@ -54,7 +54,7 @@ if _IN_AIRFLOW:
         logical_date_string = logical_date.isoformat()
         transform_positions(logical_date_string)
         outlet_events[TRANSFORMED_POSITIONS_READY_SIGNAL].extra = {
-            "correlation_id": logical_date_string
+            "logical_date_string": logical_date_string
         }
         logging.getLogger(__name__).info(
             "Dataset outlet event published: correlation_id=%s",

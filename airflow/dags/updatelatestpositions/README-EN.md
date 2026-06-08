@@ -7,6 +7,7 @@ Configuration is loaded automatically through `pipeline_configurator`, according
 
 ## What this subproject does
 
+- Triggered by the Dataset `sptrans://trusted/transformed_positions_ready` published by `transformlivedata`; consumes the payload with the key `logical_date_string` (UTC ISO 8601 timestamp) for observability correlation
 - Reads the most recent real-time positions stored in the trusted layer of the object storage service
 - Evaluates the freshness of the data read relative to the current time, emitting observability events with the observed lag
 - Saves the data into the refined layer implemented in the low-latency analytical database, for use by the visualization layer

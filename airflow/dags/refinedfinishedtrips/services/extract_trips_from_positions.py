@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from math import atan2, cos, radians, sin, sqrt
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -9,10 +9,14 @@ _SEEKING_DEPARTURE = "SEEKING_DEPARTURE"
 _IN_TRIP = "IN_TRIP"
 _DIRECTION_FIRST_TO_LAST = "first_to_last"
 _DIRECTION_LAST_TO_FIRST = "last_to_first"
+_SEEKING = "SEEKING"
+_AT_STOP = "AT_STOP"
+_BETWEEN_STOPS = "BETWEEN_STOPS"
 _CIRCULAR_SEEKING_START = "SEEKING_START"
 _CIRCULAR_SEEKING_TERMINAL_EXIT = "SEEKING_TERMINAL_EXIT"
 _CIRCULAR_IN_TRIP = "IN_TRIP"
 _MIN_MOVEMENT_DISTANCE_METERS = 30.0
+_MAX_BUS_SPEED_KMH = 80.0
 
 
 def extract_raw_trips_metadata(
@@ -50,6 +54,97 @@ def extract_non_circular_trips_metadata(
     position_records: List[Dict[str, Any]],
     stop_proximity_threshold_meters: int,
 ) -> List[Dict[str, Any]]:
+    """Three-state machine: SEEKING → AT_STOP → BETWEEN_STOPS → (emit) → AT_STOP.
+
+    trip_start_record_index is the last record inside the departure micro-region,
+    stripping all dwell time from the trip.
+
+    first_incomplete_trip_already_handled: one-way gate that prevents emitting the first
+    observed arrival when the bus entered the window mid-route. If the very first
+    record is already inside a terminal micro-region the gate starts open (True)
+    because the bus was confirmed at the stop before the window opened.
+    """
+    trips_metadata: List[Dict[str, Any]] = []
+    if len(position_records) < 2:
+        return trips_metadata
+
+    first_record = position_records[0]
+    first_at_first = first_record["distance_to_first_stop"] < stop_proximity_threshold_meters
+    first_at_last = first_record["distance_to_last_stop"] < stop_proximity_threshold_meters
+    first_incomplete_trip_already_handled: bool = (first_at_first or first_at_last)
+
+    state = _SEEKING
+    trip_start_record_index: Optional[int] = None
+    departure_stop: Optional[str] = None
+
+    for current_index, position_record in enumerate(position_records):
+        at_first_stop = position_record["distance_to_first_stop"] < stop_proximity_threshold_meters
+        at_last_stop = position_record["distance_to_last_stop"] < stop_proximity_threshold_meters
+        is_circular = position_record["is_circular"]
+
+        if state == _SEEKING:
+            if at_first_stop and not at_last_stop:
+                state = _AT_STOP
+                departure_stop = "first"
+                trip_start_record_index = current_index
+            elif at_last_stop and not at_first_stop:
+                state = _AT_STOP
+                departure_stop = "last"
+                trip_start_record_index = current_index
+
+        if state == _AT_STOP:
+            at_departure = (
+                (departure_stop == "first" and at_first_stop)
+                or (departure_stop == "last" and at_last_stop)
+            )
+            at_arrival = (
+                (departure_stop == "first" and at_last_stop and not at_first_stop)
+                or (departure_stop == "last" and at_first_stop and not at_last_stop)
+            )
+            if at_departure:
+                trip_start_record_index = current_index
+            elif at_arrival:
+                departure_stop = "last" if departure_stop == "first" else "first"
+                trip_start_record_index = current_index
+            else:
+                state = _BETWEEN_STOPS
+
+        if state == _BETWEEN_STOPS:
+            at_arrival = (
+                (departure_stop == "first" and at_last_stop)
+                or (departure_stop == "last" and at_first_stop)
+            )
+            at_departure = (
+                (departure_stop == "first" and at_first_stop)
+                or (departure_stop == "last" and at_last_stop)
+            )
+            if at_arrival:
+                if first_incomplete_trip_already_handled:
+                    derived_sentido = 1 if departure_stop == "first" else 2
+                    _emit_trip(
+                        trips_metadata,
+                        position_records,
+                        cast(int, trip_start_record_index),
+                        current_index,
+                        derived_sentido,
+                        is_circular,
+                        stop_proximity_threshold_meters,
+                    )
+                first_incomplete_trip_already_handled = True
+                departure_stop = "last" if departure_stop == "first" else "first"
+                trip_start_record_index = current_index
+                state = _AT_STOP
+            elif at_departure:
+                state = _AT_STOP
+                trip_start_record_index = current_index
+
+    return trips_metadata
+
+
+def extract_non_circular_trips_metadata_old(
+    position_records: List[Dict[str, Any]],
+    stop_proximity_threshold_meters: int,
+) -> List[Dict[str, Any]]:
     trips_metadata: List[Dict[str, Any]] = []
     if len(position_records) < 2:
         return trips_metadata
@@ -76,13 +171,11 @@ def extract_non_circular_trips_metadata(
                 departure_direction = _DIRECTION_LAST_TO_FIRST
                 has_moved_away_from_departure_stop = False
             elif trip_start_record_index is not None:
-                # Bus has exited the departure zone — trip is now in progress
-                has_moved_away_from_departure_stop = True
                 state = _IN_TRIP
 
         elif state == _IN_TRIP:
             if departure_direction == _DIRECTION_FIRST_TO_LAST:
-                if not at_first_stop:
+                if not at_first_stop and not at_last_stop:
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_last_stop:
                     derived_sentido = 1
@@ -103,7 +196,7 @@ def extract_non_circular_trips_metadata(
                     has_moved_away_from_departure_stop = False
 
             elif departure_direction == _DIRECTION_LAST_TO_FIRST:
-                if not at_last_stop:
+                if not at_last_stop and not at_first_stop:
                     has_moved_away_from_departure_stop = True
                 if has_moved_away_from_departure_stop and at_first_stop:
                     derived_sentido = 2
@@ -384,6 +477,8 @@ def generate_trips_table(position_records: List[Dict[str, Any]], trips_metadata:
                 )
             distance_meters = float(start_record["trip_linear_distance"])
         avg_speed_kmh = (distance_meters / duration_seconds * 3.6) if duration_seconds > 0 else 0.0
+        if avg_speed_kmh > _MAX_BUS_SPEED_KMH:
+            continue
         trip_record = (
             trip_id,
             int(vehicle_id),

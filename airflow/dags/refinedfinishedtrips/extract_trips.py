@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict
 import uuid
 from zoneinfo import ZoneInfo
@@ -34,8 +34,9 @@ def _build_column_lineage() -> Dict[str, Any]:
 def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
-    correlation_id: str | None = None,
-    logic_date_str: str | None = None,
+    *,
+    correlation_id: str,
+    logic_date_str: str,
 ) -> None:
     def create_execution_aborted_log_record(message: str, phase: str) -> None:
         structured_logger.error(
@@ -61,8 +62,8 @@ def extract_trips_for_all_Lines_and_vehicles(
     structured_logger = RefinedFinishedTripsLogger(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
-    effective_correlation_id = correlation_id if correlation_id is not None else execution_id
-    logic_date: date = date.fromisoformat(logic_date_str) if logic_date_str else date.today()
+    effective_correlation_id = correlation_id
+    logic_date: datetime = datetime.fromisoformat(logic_date_str)
     state = PipelineTaskRunState(
         execution_id=execution_id,
         correlation_id=effective_correlation_id,
