@@ -140,12 +140,12 @@ def test_extract_raw_trips_metadata_one_complete_trip_last_to_first():
 def test_extract_raw_trips_metadata_two_consecutive_trips():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=1),       # at first stop → trip 1 start
-        _pos(500, 2000, offset_seconds=60, linha_sentido=1),     # departed (→ _IN_TRIP)
-        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),   # mid-route (sets has_moved)
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),     # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),   # mid-route
         _pos(2000, 60, offset_seconds=180, linha_sentido=1),     # arrived at last stop → trip 1 end
         _pos(2800, 80, offset_seconds=240, linha_sentido=2),     # dwell at last stop → trip 2 start
-        _pos(2000, 500, offset_seconds=300, linha_sentido=2),    # departed (→ _IN_TRIP)
-        _pos(1200, 1200, offset_seconds=360, linha_sentido=2),   # mid-route (sets has_moved)
+        _pos(2000, 500, offset_seconds=300, linha_sentido=2),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=360, linha_sentido=2),   # mid-route
         _pos(60, 2000, offset_seconds=420, linha_sentido=2),     # arrived at first stop → trip 2 end
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
@@ -160,13 +160,71 @@ def test_extract_raw_trips_metadata_dwell_time_excluded_from_trip_start():
         _pos(30, 3000, offset_seconds=0, linha_sentido=1),      # dwell record 1
         _pos(60, 3100, offset_seconds=60, linha_sentido=1),     # dwell record 2
         _pos(80, 3200, offset_seconds=120, linha_sentido=1),    # dwell record 3 — last in zone
-        _pos(500, 2500, offset_seconds=180, linha_sentido=1),   # departed (→ _IN_TRIP)
-        _pos(1200, 1500, offset_seconds=240, linha_sentido=1),  # mid-route (sets has_moved)
+        _pos(500, 2500, offset_seconds=180, linha_sentido=1),   # departed → BETWEEN_STOPS
+        _pos(1200, 1500, offset_seconds=240, linha_sentido=1),  # mid-route
         _pos(2500, 60, offset_seconds=300, linha_sentido=1),    # arrived at last stop
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["start_position_index"] == 2
+
+
+def test_extract_raw_trips_metadata_mid_route_start_first_arrival_discarded_second_emitted():
+    # Bus enters window between stops — first_incomplete_trip_already_handled starts False.
+    # The first complete traversal (mid-route → last stop → first stop) is discarded.
+    # Only the second traversal (first stop → last stop) is emitted.
+    position_records = [
+        _pos(800, 1200, offset_seconds=0, linha_sentido=2),    # between stops (mid-route)
+        _pos(900, 900, offset_seconds=60, linha_sentido=2),    # between stops
+        _pos(2500, 60, offset_seconds=120, linha_sentido=2),   # arrived at last stop
+        _pos(2800, 80, offset_seconds=180, linha_sentido=2),   # dwell at last stop
+        _pos(2000, 500, offset_seconds=240, linha_sentido=2),  # departed
+        _pos(1200, 1200, offset_seconds=300, linha_sentido=2), # mid-route
+        _pos(60, 2500, offset_seconds=360, linha_sentido=2),   # arrived at first stop (discarded)
+        _pos(80, 2800, offset_seconds=420, linha_sentido=1),   # dwell at first stop
+        _pos(500, 2000, offset_seconds=480, linha_sentido=1),  # departed
+        _pos(2000, 60, offset_seconds=540, linha_sentido=1),   # arrived at last stop (emitted)
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 1
+    assert result[0]["start_position_index"] == 7
+    assert result[0]["end_position_index"] == 9
+
+
+def test_extract_raw_trips_metadata_direct_stop_to_stop_jump_discards_transit():
+    # Bus is at first stop, then teleports directly to last stop (no BETWEEN_STOPS record).
+    # The transit attempt is silently discarded; detection continues from the new terminal.
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),    # at first stop → departure
+        _pos(3000, 60, offset_seconds=60, linha_sentido=2),   # directly at last stop (jump)
+        _pos(2800, 80, offset_seconds=120, linha_sentido=2),  # dwell at last stop
+        _pos(2000, 500, offset_seconds=180, linha_sentido=2), # departed
+        _pos(60, 2000, offset_seconds=240, linha_sentido=2),  # arrived at first stop
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 2
+    assert result[0]["start_position_index"] == 2
+    assert result[0]["end_position_index"] == 4
+
+
+def test_extract_raw_trips_metadata_bus_turned_back_mid_route():
+    # Bus departs first stop, goes between stops, then returns to first stop (turned back).
+    # That transit attempt is discarded; the bus re-departs and completes a valid trip.
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),    # at first stop → departure
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),  # between stops
+        _pos(60, 3000, offset_seconds=120, linha_sentido=1),  # turned back — at first stop again
+        _pos(80, 3200, offset_seconds=180, linha_sentido=1),  # dwell at first stop
+        _pos(500, 2000, offset_seconds=240, linha_sentido=1), # re-departed
+        _pos(2000, 60, offset_seconds=300, linha_sentido=1),  # arrived at last stop
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 1
+    assert result[0]["start_position_index"] == 3
+    assert result[0]["end_position_index"] == 5
 
 
 def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
@@ -187,8 +245,8 @@ def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
 def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_source_sentido_discrepancy():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # at first stop, wrong sentido
-        _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed (→ _IN_TRIP)
-        _pos(1200, 1200, offset_seconds=120, linha_sentido=2),  # mid-route (sets has_moved)
+        _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=2),  # mid-route
         _pos(2000, 60, offset_seconds=180, linha_sentido=2),    # arrived — sentido=2, derived=1
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
@@ -200,8 +258,8 @@ def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_source_sentido_
 def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # boundary at departure
-        _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # departed (→ _IN_TRIP)
-        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),  # mid-route (sets has_moved)
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),  # mid-route
         _pos(2000, 60, offset_seconds=180, linha_sentido=2),    # boundary at arrival
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
