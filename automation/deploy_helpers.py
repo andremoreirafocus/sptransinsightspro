@@ -13,19 +13,31 @@ def resolve_python_executable(folder: str) -> str:
 
 
 def run_code_validations(
-    folder: str, label: str, step_offset: int = 1, total_steps: int = 0
+    folder: str,
+    label: str,
+    step_offset: int = 1,
+    total_steps: int = 0,
+    mypy_extra_args: list | None = None,
+    mypy_target: str | None = None,
 ) -> int:
-    """Run lint, SAST, and pytest (if tests exist) against a folder.
+    """Run lint, SAST, pytest (if tests exist), and mypy against a folder.
 
     Prints step labels starting from step_offset.
-    Returns the number of steps consumed (2 if no tests, 3 if tests found).
+    Returns the number of steps consumed (3 if no tests, 4 if tests found).
+    mypy_extra_args defaults to ["--exclude", "tests"].
+    mypy_target defaults to folder.
     """
     test_dir = os.path.join(folder, "tests")
     has_tests = os.path.isdir(test_dir)
     python_executable = resolve_python_executable(folder)
 
+    if mypy_extra_args is None:
+        mypy_extra_args = ["--exclude", "tests"]
+    if mypy_target is None:
+        mypy_target = folder
+
     if total_steps <= 0:
-        total_steps = step_offset + (3 if has_tests else 2) - 1
+        total_steps = step_offset + (4 if has_tests else 3) - 1
 
     print(f"Step {step_offset}/{total_steps}: Linting {label}...")
     run_command(
@@ -66,4 +78,12 @@ def run_code_validations(
         )
         print("✅ Unit Tests Passed.")
 
-    return 3 if has_tests else 2
+    mypy_step_offset = step_offset + (3 if has_tests else 2)
+    print(f"Step {mypy_step_offset}/{total_steps}: Running mypy for {label}...")
+    run_command(
+        [python_executable, "-m", "mypy", *mypy_extra_args, mypy_target],
+        f"Type checking (mypy) failed for {label}!",
+    )
+    print("✅ Type checking Passed.")
+
+    return 4 if has_tests else 3

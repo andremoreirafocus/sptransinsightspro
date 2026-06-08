@@ -125,54 +125,77 @@ cd automation
 ---
 
 ### `promote_pipeline.py`
-Promove uma pipeline do ambiente de desenvolvimento para produção.
+Promove uma pipeline do ambiente de desenvolvimento para produção. Requer obrigatoriamente uma das flags `--check` ou `--prod`.
 
-**O que faz, em ordem:**
+**Flags**
+- `--check`: executa apenas as validações (lint, SAST, testes, type checking). Sem sincronização.
+- `--prod`: executa as validações e sincroniza para produção.
+
+**O que faz, em ordem (ambas as flags):**
 1. Verifica se a pasta da pipeline existe em `dags-dev/`
 2. Executa lint com `ruff` na pasta da pipeline
 3. Executa SAST com `bandit` (alta severidade) na pasta da pipeline
-4. Executa type checking com `mypy` na pasta da pipeline
-5. Executa os testes unitários (se a pasta `tests/` existir)
-6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>` excluindo `__pycache__`, `.pytest_cache` e `tests/`
+4. Executa os testes unitários (se a pasta `tests/` existir)
+5. Executa type checking com `mypy` na pasta da pipeline
+
+**Apenas com `--prod`:**
+6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>`, excluindo `__pycache__`, `.pytest_cache` e `tests/`
 7. Sincroniza os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 
 **Uso:**
 ```bash
 cd dags-dev
-python3 ../automation/promote_pipeline.py <nome_da_pipeline>
+python3 ../automation/promote_pipeline.py <nome_da_pipeline> --check
+python3 ../automation/promote_pipeline.py <nome_da_pipeline> --prod
 ```
 
 **Exemplos:**
 ```bash
-python3 ../automation/promote_pipeline.py transformlivedata
-python3 ../automation/promote_pipeline.py gtfs
-python3 ../automation/promote_pipeline.py updatelatestpositions
+# Apenas validar
+python3 ../automation/promote_pipeline.py transformlivedata --check
+python3 ../automation/promote_pipeline.py gtfs --check
+
+# Validar e promover para produção
+python3 ../automation/promote_pipeline.py transformlivedata --prod
+python3 ../automation/promote_pipeline.py gtfs --prod
 ```
 
 ---
 
 ### `deploy_service.py`
-Realiza o build e redeploy de um microserviço Docker.
+Realiza o build e redeploy de um microserviço Docker. Requer obrigatoriamente uma das flags `--check` ou `--prod`.
 
-**O que faz, em ordem:**
+**Flags**
+- `--check`: executa apenas as validações (lint, SAST, testes, type checking). Sem build ou deploy.
+- `--prod`: executa as validações, build e deploy.
+
+**O que faz, em ordem (ambas as flags):**
 1. Verifica se a pasta do serviço existe
 2. Executa lint com `ruff` na pasta do serviço
 3. Executa SAST com `bandit` (alta severidade) na pasta do serviço
-4. Executa type checking com `mypy` na pasta do serviço
-5. Executa os testes unitários (se a pasta `tests/` existir)
+4. Executa os testes unitários (se a pasta `tests/` existir)
+5. Executa type checking com `mypy` na pasta do serviço
+
+**Apenas com `--prod`:**
 6. Executa `docker compose build <serviço>`
 7. Executa `docker compose up -d <serviço>`
 
 **Uso:**
 ```bash
 cd automation
-python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico>
+python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico> --check
+python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico> --prod
 ```
 
 **Exemplos:**
 ```bash
-python3 deploy_service.py extractloadlivedata extractloadlivedata
-python3 deploy_service.py alertservice alertservice
+# Apenas validar
+python3 deploy_service.py extractloadlivedata extractloadlivedata --check
+python3 deploy_service.py alertservice alertservice --check
+
+# Validar e fazer deploy
+python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
+python3 deploy_service.py alertservice alertservice --prod
 ```
 
 ---
@@ -208,5 +231,5 @@ dags-dev/<pipeline>  →  promote_pipeline.py  →  airflow/dags/<pipeline>
 
 1. Desenvolver e testar a pipeline em `dags-dev/<pipeline>/`
 2. Garantir que `pytest <pipeline>/tests/` passa localmente
-3. Executar `promote_pipeline.py <pipeline>` para promover para produção
-4. O script valida, sincroniza e atualiza os módulos compartilhados automaticamente
+3. Executar `promote_pipeline.py <pipeline> --check` para validar
+4. Executar `promote_pipeline.py <pipeline> --prod` para promover para produção

@@ -135,55 +135,78 @@ cd automation
 
 ### `promote_pipeline.py`
 
-Promotes a pipeline from the development environment to production.
+Promotes a pipeline from the development environment to production. One of the flags `--check` or `--prod` is required.
 
-**What it does, in order:**
+**Flags**
+- `--check`: runs validations only (lint, SAST, tests, type-check). No sync.
+- `--prod`: runs validations and syncs to production.
+
+**What it does, in order (both flags):**
 1. Checks whether the pipeline folder exists in `dags-dev/`
 2. Runs lint with `ruff` on the pipeline folder
 3. Runs SAST with `bandit` at high severity on the pipeline folder
-4. Runs type checking with `mypy` on the pipeline folder
-5. Runs unit tests if the `tests/` folder exists
+4. Runs unit tests if the `tests/` folder exists
+5. Runs type checking with `mypy` on the pipeline folder
+
+**With `--prod` only:**
 6. Synchronizes the pipeline folder to `airflow/dags/<pipeline>`, excluding `__pycache__`, `.pytest_cache`, and `tests/`
 7. Synchronizes the shared modules `infra`, `quality`, `observability`, and `pipeline_configurator`
 
 **Usage:**
 ```bash
 cd dags-dev
-python3 ../automation/promote_pipeline.py <pipeline_name>
+python3 ../automation/promote_pipeline.py <pipeline_name> --check
+python3 ../automation/promote_pipeline.py <pipeline_name> --prod
 ```
 
 **Examples:**
 ```bash
-python3 ../automation/promote_pipeline.py transformlivedata
-python3 ../automation/promote_pipeline.py gtfs
-python3 ../automation/promote_pipeline.py updatelatestpositions
+# Validate only
+python3 ../automation/promote_pipeline.py transformlivedata --check
+python3 ../automation/promote_pipeline.py gtfs --check
+
+# Validate and promote to production
+python3 ../automation/promote_pipeline.py transformlivedata --prod
+python3 ../automation/promote_pipeline.py gtfs --prod
 ```
 
 ---
 
 ### `deploy_service.py`
 
-Builds and redeploys a Docker microservice.
+Builds and redeploys a Docker microservice. One of the flags `--check` or `--prod` is required.
 
-**What it does, in order:**
+**Flags**
+- `--check`: runs validations only (lint, SAST, tests, type-check). No build or deploy.
+- `--prod`: runs validations, build, and deploy.
+
+**What it does, in order (both flags):**
 1. Checks whether the service folder exists
 2. Runs lint with `ruff` on the service folder
 3. Runs SAST with `bandit` at high severity on the service folder
-4. Runs type checking with `mypy` on the service folder
-5. Runs unit tests if the `tests/` folder exists
+4. Runs unit tests if the `tests/` folder exists
+5. Runs type checking with `mypy` on the service folder
+
+**With `--prod` only:**
 6. Runs `docker compose build <service>`
 7. Runs `docker compose up -d <service>`
 
 **Usage:**
 ```bash
 cd automation
-python3 deploy_service.py <docker_compose_service_name> <service_folder>
+python3 deploy_service.py <docker_compose_service_name> <service_folder> --check
+python3 deploy_service.py <docker_compose_service_name> <service_folder> --prod
 ```
 
 **Examples:**
 ```bash
-python3 deploy_service.py extractloadlivedata extractloadlivedata
-python3 deploy_service.py alertservice alertservice
+# Validate only
+python3 deploy_service.py extractloadlivedata extractloadlivedata --check
+python3 deploy_service.py alertservice alertservice --check
+
+# Validate and deploy
+python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
+python3 deploy_service.py alertservice alertservice --prod
 ```
 
 ---
@@ -222,5 +245,5 @@ dags-dev/<pipeline>  ->  promote_pipeline.py  ->  airflow/dags/<pipeline>
 
 1. Develop and test the pipeline in `dags-dev/<pipeline>/`
 2. Make sure `pytest <pipeline>/tests/` passes locally
-3. Run `promote_pipeline.py <pipeline>` to promote it to production
-4. The script validates, synchronizes, and updates shared modules automatically
+3. Run `promote_pipeline.py <pipeline> --check` to validate
+4. Run `promote_pipeline.py <pipeline> --prod` to promote to production
