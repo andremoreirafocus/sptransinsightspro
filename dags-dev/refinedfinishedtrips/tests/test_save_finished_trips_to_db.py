@@ -1,6 +1,6 @@
 import json
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -8,7 +8,7 @@ from refinedfinishedtrips.tests.fakes.fake_db_engine import make_fake_engine_fac
 from refinedfinishedtrips.services.save_finished_trips_to_db import save_finished_trips_to_db
 
 BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
-LOGIC_DATE = date(2026, 4, 14)
+LOGIC_DATE = datetime(2026, 4, 14, tzinfo=timezone.utc)
 
 
 def make_config():

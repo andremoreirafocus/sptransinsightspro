@@ -27,6 +27,18 @@ For each route and vehicle:
 - if a failure occurs during the persistence phase: saves a failure report with the partial results already available and stops execution
 - at the end of every successful execution, saves a complete quality report to the metadata bucket with the consolidated status of the three phases: positions, trip extraction, and persistence
 
+## Airflow Dataset integration
+
+**Inlet** — triggered by the Dataset `sptrans://trusted/transformed_positions_ready` published by `transformlivedata`. The consumed payload carries:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
+**Outlet** — after successful completion, publishes the Dataset `sptrans://refined/finished_trips_ready`. The emitted payload carries:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
 ## Trip extraction algorithm
 
 The current algorithm was designed to produce trips with higher operational fidelity, especially in three key dimensions for analysis:
@@ -351,7 +363,7 @@ CREATE TABLE refined.finished_trips (
     is_circular BOOLEAN,
     distance_meters DOUBLE PRECISION,
     avg_speed_kmh DOUBLE PRECISION,
-    logic_date DATE,
+    logic_date TIMESTAMPTZ,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 

@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Tuple
 
 from sqlalchemy import create_engine, text
@@ -8,7 +8,7 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], logic_date: date, engine_factory: Callable = create_engine) -> Dict[str, Any]:
+def save_finished_trips_to_db(config: Dict[str, Any], trips_tuples: List[Tuple], logic_date: datetime, engine_factory: Callable = create_engine) -> Dict[str, Any]:
     def get_config(config):
         general = config["general"]
         tables = general["tables"]

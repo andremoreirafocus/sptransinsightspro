@@ -1,7 +1,7 @@
 {
   "refinedfinishedtrips_general": {
     "analysis": {
-      "hours_window": 12
+      "hours_window": 3
     },
     "storage": {
       "app_folder": "sptrans",

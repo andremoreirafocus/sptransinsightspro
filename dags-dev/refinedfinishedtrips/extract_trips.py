@@ -1,4 +1,4 @@
-from datetime import date, datetime, timezone
+from datetime import datetime, timezone
 from typing import Any, Dict
 import uuid
 from zoneinfo import ZoneInfo
@@ -63,7 +63,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
     effective_correlation_id = correlation_id
-    logic_date: date = date.fromisoformat(logic_date_str)
+    logic_date: datetime = datetime.fromisoformat(logic_date_str)
     state = PipelineTaskRunState(
         execution_id=execution_id,
         correlation_id=effective_correlation_id,

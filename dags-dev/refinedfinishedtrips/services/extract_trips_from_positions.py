@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from math import atan2, cos, radians, sin, sqrt
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 logger = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ def extract_non_circular_trips_metadata(
                     _emit_trip(
                         trips_metadata,
                         position_records,
-                        trip_start_record_index,
+                        cast(int, trip_start_record_index),
                         current_index,
                         derived_sentido,
                         is_circular,

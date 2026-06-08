@@ -26,6 +26,18 @@ Para cada linha e veículo:
 - em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata com o status consolidado das três fases (posições, extração de viagens e persistência)
 
+## Integração com Airflow Datasets
+
+**Inlet** — acionado pelo Dataset `sptrans://trusted/transformed_positions_ready` publicado pelo `transformlivedata`. O payload consumido carrega:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
+**Outlet** — após conclusão bem-sucedida, publica o Dataset `sptrans://refined/finished_trips_ready`. O payload emitido carrega:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
 ## Algoritmo de extração de viagens
 O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
 - `trip_start_time`
@@ -334,7 +346,7 @@ CREATE TABLE refined.finished_trips (
     is_circular BOOLEAN,
     distance_meters DOUBLE PRECISION,
     avg_speed_kmh DOUBLE PRECISION,
-    logic_date DATE,
+    logic_date TIMESTAMPTZ,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 
