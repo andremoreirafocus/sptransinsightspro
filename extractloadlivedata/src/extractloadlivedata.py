@@ -252,6 +252,7 @@ def extractloadlivedata(
                 _handle_failure("local_ingest_buffer_save_positions")
             finally:
                 phase_durations["local_save"] = time.time() - local_save_start
+    pending_storage_save_list: list = []
     try:
         pending_storage_save_list = services.get_pending_storage_save_list(config)
         pending_object_storage_save_files_count = len(pending_storage_save_list)
@@ -272,7 +273,6 @@ def extractloadlivedata(
         items_failed += 1
         failed_phases.append("save_positions_to_object_storage")
         _handle_failure("save_positions_to_object_storage")
-        return
     if pending_storage_save_list:
         if len(pending_storage_save_list) > 1:
             structured_logger.warning(
@@ -377,39 +377,70 @@ def extractloadlivedata(
                     _handle_failure("save_positions_to_object_storage")
         finally:
             phase_durations["object_storage_save"] = time.time() - save_start
-        try:
-            if notification_engine == "airflow":
-                pending_notifications_list = services.get_pending_invokations(config)
-            else:
-                pending_notifications_list = services.get_pending_processing_requests(config)
-            pending_ingest_notifications_count = len(pending_notifications_list)
-        except Exception as e:
-            structured_logger.error(
-                event="pending_notifications_scan_failed",
-                status=EVENT_STATUS_FAILED,
-                message="Failed to scan pending notifications list.",
-                error_type=type(e).__name__,
-                error_message=str(e),
+    try:
+        if notification_engine == "airflow":
+            pending_notifications_list = services.get_pending_invokations(config)
+        else:
+            pending_notifications_list = services.get_pending_processing_requests(config)
+        pending_ingest_notifications_count = len(pending_notifications_list)
+    except Exception as e:
+        structured_logger.error(
+            event="pending_notifications_scan_failed",
+            status=EVENT_STATUS_FAILED,
+            message="Failed to scan pending notifications list.",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+    notify_start = time.time()
+    try:
+        structured_logger.info(
+            event="notification_dispatch_started",
+            status=EVENT_STATUS_STARTED,
+            correlation_id=logical_datetime,
+            message="Notification dispatch started.",
+            metadata={"notification_engine": notification_engine},
+        )
+        if notification_engine == "airflow":
+            notification_result = services.trigger_pending_airflow_dag_invokations(
+                config, with_metrics=True
             )
-        notify_start = time.time()
-        try:
-            structured_logger.info(
-                event="notification_dispatch_started",
-                status=EVENT_STATUS_STARTED,
-                correlation_id=logical_datetime,
-                message="Notification dispatch started.",
-                metadata={"notification_engine": notification_engine},
+        else:
+            notification_result = services.trigger_pending_processing_requests(
+                config, with_metrics=True
             )
-            if notification_engine == "airflow":
-                notification_result = services.trigger_pending_airflow_dag_invokations(
-                    config, with_metrics=True
-                )
-            else:
-                notification_result = services.trigger_pending_processing_requests(
-                    config, with_metrics=True
-                )
-            success_count, failed_count, retries_count = _parse_notification_metrics(
-                notification_result["metrics"]
+        success_count, failed_count, retries_count = _parse_notification_metrics(
+            notification_result["metrics"]
+        )
+        items_total += success_count + failed_count
+        items_failed += failed_count
+        retries_seen += retries_count
+        phase_metrics["notify"]["attempted"] = success_count + failed_count
+        phase_metrics["notify"]["succeeded"] = success_count
+        phase_metrics["notify"]["failed"] = failed_count
+        structured_logger.info(
+            event="notification_dispatch_succeeded",
+            status=EVENT_STATUS_SUCCEEDED,
+            correlation_id=logical_datetime,
+            message="Notification dispatch completed.",
+            metadata={
+                "success_count": success_count,
+                "failed_count": failed_count,
+                "retries_count": retries_count,
+            },
+        )
+    except IngestNotificationError as e:
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=EVENT_STATUS_FAILED,
+            correlation_id=logical_datetime,
+            message="Ingest notification failed.",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        metrics = getattr(e, "metrics", None)
+        try:
+            success_count, failed_count, retries_count = (
+                _parse_notification_metrics(metrics)
             )
             items_total += success_count + failed_count
             items_failed += failed_count
@@ -417,61 +448,30 @@ def extractloadlivedata(
             phase_metrics["notify"]["attempted"] = success_count + failed_count
             phase_metrics["notify"]["succeeded"] = success_count
             phase_metrics["notify"]["failed"] = failed_count
-            structured_logger.info(
-                event="notification_dispatch_succeeded",
-                status=EVENT_STATUS_SUCCEEDED,
-                correlation_id=logical_datetime,
-                message="Notification dispatch completed.",
-                metadata={
-                    "success_count": success_count,
-                    "failed_count": failed_count,
-                    "retries_count": retries_count,
-                },
-            )
-        except IngestNotificationError as e:
+        except (KeyError, TypeError) as metrics_error:
             structured_logger.error(
-                event="notification_dispatch_failed",
+                event="notification_metrics_invalid",
                 status=EVENT_STATUS_FAILED,
-                correlation_id=logical_datetime,
-                message="Ingest notification failed.",
-                error_type=type(e).__name__,
-                error_message=str(e),
-            )
-            metrics = getattr(e, "metrics", None)
-            try:
-                success_count, failed_count, retries_count = (
-                    _parse_notification_metrics(metrics)
-                )
-                items_total += success_count + failed_count
-                items_failed += failed_count
-                retries_seen += retries_count
-                phase_metrics["notify"]["attempted"] = success_count + failed_count
-                phase_metrics["notify"]["succeeded"] = success_count
-                phase_metrics["notify"]["failed"] = failed_count
-            except (KeyError, TypeError) as metrics_error:
-                structured_logger.error(
-                    event="notification_metrics_invalid",
-                    status=EVENT_STATUS_FAILED,
-                    message="Invalid ingest notification metrics contract.",
-                    error_type=type(metrics_error).__name__,
-                    error_message=str(metrics_error),
-                )
-                items_failed += 1
-            failed_phases.append("ingest_notification")
-            _handle_failure("ingest_notification")
-        except Exception as e:
-            structured_logger.error(
-                event="notification_dispatch_failed",
-                status=EVENT_STATUS_FAILED,
-                message="Unexpected ingest notification error.",
-                error_type=type(e).__name__,
-                error_message=str(e),
+                message="Invalid ingest notification metrics contract.",
+                error_type=type(metrics_error).__name__,
+                error_message=str(metrics_error),
             )
             items_failed += 1
-            failed_phases.append("ingest_notification")
-            _handle_failure("ingest_notification")
-        finally:
-            phase_durations["notify"] = time.time() - notify_start
+        failed_phases.append("ingest_notification")
+        _handle_failure("ingest_notification")
+    except Exception as e:
+        structured_logger.error(
+            event="notification_dispatch_failed",
+            status=EVENT_STATUS_FAILED,
+            message="Unexpected ingest notification error.",
+            error_type=type(e).__name__,
+            error_message=str(e),
+        )
+        items_failed += 1
+        failed_phases.append("ingest_notification")
+        _handle_failure("ingest_notification")
+    finally:
+        phase_durations["notify"] = time.time() - notify_start
     execution_end = time.time()
     execution_seconds = execution_end - execution_start
     items_total = sum(phase_metrics[op]["attempted"] for op in phase_metrics)
