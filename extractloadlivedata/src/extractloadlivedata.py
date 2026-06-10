@@ -292,91 +292,89 @@ def extractloadlivedata(
                 },
             )
         save_start = time.time()
-        try:
-            for pending_storage_save_file in pending_storage_save_list:
-                items_total += 1
-                phase_metrics["object_storage_save"]["attempted"] += 1
-                file_logical_datetime = get_utc_logical_date_from_file(
-                    pending_storage_save_file
+        for pending_storage_save_file in pending_storage_save_list:
+            items_total += 1
+            phase_metrics["object_storage_save"]["attempted"] += 1
+            file_logical_datetime = get_utc_logical_date_from_file(
+                pending_storage_save_file
+            )
+            if file_logical_datetime:
+                worked_correlation_ids.append(file_logical_datetime)
+            structured_logger.debug(
+                event="pending_storage_file_started",
+                status=EVENT_STATUS_STARTED,
+                correlation_id=file_logical_datetime,
+                message="Attempting storage persistence for pending file.",
+                metadata={"pending_file": pending_storage_save_file},
+            )
+            try:
+                pending_storage_save_file_content = (
+                    services.load_bus_positions_from_local_volume_file(
+                        ingest_buffer_folder, pending_storage_save_file
+                    )
                 )
-                if file_logical_datetime:
-                    worked_correlation_ids.append(file_logical_datetime)
                 structured_logger.debug(
-                    event="pending_storage_file_started",
+                    event="object_storage_persist_started",
                     status=EVENT_STATUS_STARTED,
                     correlation_id=file_logical_datetime,
-                    message="Attempting storage persistence for pending file.",
+                    message="Starting object storage persistence for pending file payload.",
                     metadata={"pending_file": pending_storage_save_file},
                 )
-                try:
-                    pending_storage_save_file_content = (
-                        services.load_bus_positions_from_local_volume_file(
-                            ingest_buffer_folder, pending_storage_save_file
-                        )
+                save_result = services.save_bus_positions_to_storage_with_retries(
+                    config, pending_storage_save_file_content, with_metrics=True
+                )
+                retries_seen = int(save_result["metrics"]["retries"])
+                structured_logger.debug(
+                    event="object_storage_persist_succeeded",
+                    status=EVENT_STATUS_SUCCEEDED,
+                    correlation_id=file_logical_datetime,
+                    message="Object storage persistence completed for pending file payload.",
+                    metadata={"pending_file": pending_storage_save_file},
+                )
+                structured_logger.info(
+                    event="pending_storage_file_succeeded",
+                    status=EVENT_STATUS_SUCCEEDED,
+                    correlation_id=file_logical_datetime,
+                    message="Pending file saved to storage successfully.",
+                    metadata={
+                        "pending_file": pending_storage_save_file,
+                        "retries_seen": retries_seen,
+                    },
+                )
+                phase_metrics["object_storage_save"]["succeeded"] += 1
+                services.remove_local_file(
+                    config, pending_storage_save_file_content
+                )
+                if notification_engine == "airflow":
+                    services.create_pending_invokation(
+                        config, pending_storage_save_file
                     )
-                    structured_logger.debug(
-                        event="object_storage_persist_started",
-                        status=EVENT_STATUS_STARTED,
-                        correlation_id=file_logical_datetime,
-                        message="Starting object storage persistence for pending file payload.",
-                        metadata={"pending_file": pending_storage_save_file},
+                else:
+                    services.create_pending_processing_request(
+                        config, pending_storage_save_file
                     )
-                    save_result = services.save_bus_positions_to_storage_with_retries(
-                        config, pending_storage_save_file_content, with_metrics=True
-                    )
-                    retries_seen = int(save_result["metrics"]["retries"])
-                    structured_logger.debug(
-                        event="object_storage_persist_succeeded",
-                        status=EVENT_STATUS_SUCCEEDED,
-                        correlation_id=file_logical_datetime,
-                        message="Object storage persistence completed for pending file payload.",
-                        metadata={"pending_file": pending_storage_save_file},
-                    )
-                    structured_logger.info(
-                        event="pending_storage_file_succeeded",
-                        status=EVENT_STATUS_SUCCEEDED,
-                        correlation_id=file_logical_datetime,
-                        message="Pending file saved to storage successfully.",
-                        metadata={
-                            "pending_file": pending_storage_save_file,
-                            "retries_seen": retries_seen,
-                        },
-                    )
-                    phase_metrics["object_storage_save"]["succeeded"] += 1
-                    services.remove_local_file(
-                        config, pending_storage_save_file_content
-                    )
-                    if notification_engine == "airflow":
-                        services.create_pending_invokation(
-                            config, pending_storage_save_file
-                        )
-                    else:
-                        services.create_pending_processing_request(
-                            config, pending_storage_save_file
-                        )
-                except SavePositionsToRawError as e:
-                    retries_seen += int(getattr(e, "retries", 0))
-                    items_failed += 1
-                    phase_metrics["object_storage_save"]["failed"] += 1
-                    failed_phases.append("save_positions_to_object_storage")
-                    _handle_failure("save_positions_to_object_storage")
-                    break
-                except Exception as e:
-                    structured_logger.error(
-                        event="pending_storage_file_failed",
-                        status=EVENT_STATUS_FAILED,
-                        correlation_id=file_logical_datetime,
-                        message="Unexpected pending file processing error.",
-                        error_type=type(e).__name__,
-                        error_message=str(e),
-                        metadata={"pending_file": pending_storage_save_file},
-                    )
-                    items_failed += 1
-                    phase_metrics["object_storage_save"]["failed"] += 1
-                    failed_phases.append("save_positions_to_object_storage")
-                    _handle_failure("save_positions_to_object_storage")
-        finally:
-            phase_durations["object_storage_save"] = time.time() - save_start
+            except SavePositionsToRawError as e:
+                retries_seen += int(getattr(e, "retries", 0))
+                items_failed += 1
+                phase_metrics["object_storage_save"]["failed"] += 1
+                failed_phases.append("save_positions_to_object_storage")
+                _handle_failure("save_positions_to_object_storage")
+                break
+            except Exception as e:
+                structured_logger.error(
+                    event="pending_storage_file_failed",
+                    status=EVENT_STATUS_FAILED,
+                    correlation_id=file_logical_datetime,
+                    message="Unexpected pending file processing error.",
+                    error_type=type(e).__name__,
+                    error_message=str(e),
+                    metadata={"pending_file": pending_storage_save_file},
+                )
+                items_failed += 1
+                phase_metrics["object_storage_save"]["failed"] += 1
+                failed_phases.append("save_positions_to_object_storage")
+                _handle_failure("save_positions_to_object_storage")
+        phase_durations["object_storage_save"] = time.time() - save_start
     try:
         if notification_engine == "airflow":
             pending_notifications_list = services.get_pending_invokations(config)
