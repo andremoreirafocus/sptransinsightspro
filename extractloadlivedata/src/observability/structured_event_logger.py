@@ -1,5 +1,6 @@
 import json
 import logging
+from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, Literal, Optional, TypeAlias
@@ -43,6 +44,17 @@ def _normalize_metadata(metadata: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 def _normalize_status_value(status: LogStatusType, field_name: str) -> str:
     return _normalize_non_empty_string(status, field_name)
+
+
+_execution_context: ContextVar[Optional[str]] = ContextVar("_execution_context", default=None)
+
+
+def set_execution_context(execution_id: str) -> None:
+    _execution_context.set(execution_id)
+
+
+def clear_execution_context() -> None:
+    _execution_context.set(None)
 
 
 @dataclass(frozen=True)
@@ -91,8 +103,9 @@ class StructuredEventLogger:
             "message": _normalize_non_empty_string(message, "message"),
         }
 
-        if execution_id is not None:
-            payload["execution_id"] = execution_id
+        resolved_execution_id = execution_id if execution_id is not None else _execution_context.get()
+        if resolved_execution_id is not None:
+            payload["execution_id"] = resolved_execution_id
         if correlation_id is not None:
             payload["correlation_id"] = correlation_id
         if status is not None:
