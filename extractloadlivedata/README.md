@@ -30,7 +30,7 @@ O serviço implementa observabilidade de nível de produção com **logs estrutu
 - **Formato**: JSON com campos `timestamp`, `level`, `service`, `component`, `event`, `status`, `message`, `metadata`
 - **Saída**: stdout para ingestão por Loki
 - **Taxonomia**: eventos estruturados em [src/domain/events.py](./src/domain/events.py)
-- **Status**: enum controlado (`STARTED`, `SUCCEEDED`, `FAILED`, `RETRY`, `SKIPPED`)
+- **Status**: enum controlado (`STARTED`, `SUCCEEDED`, `FAILED`, `WITH_FAILURES`, `RETRY`, `SKIPPED`)
 
 ### Rastreamento de Execução (execution_id)
 Cada execução recebe um `execution_id` em **formato ISO 8601** (timestamp UTC de início):
@@ -130,9 +130,9 @@ Eventos do **orquestrador** (extractloadlivedata.py):
 | `notification_dispatch_started` / `notification_dispatch_succeeded` / `notification_dispatch_failed` | Despacho de notificação | `metadata.filename` |
 | `notification_metrics_invalid` | Métricas de notificação inconsistentes | — |
 | `execution_metrics_final` | Ao final de toda execução | `metadata.phase_metrics`, `metadata.phase_durations`, `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`, `metadata.execution_seconds`, `metadata.pending_object_storage_save_files_count`, `metadata.pending_ingest_notifications_count` |
-| `execution_summary_emitted` | Resumo enviado ao alertservice | — |
-| `execution_completed` | Execução encerrada sem falhas fatais | `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen` |
-| `execution_failed_non_recoverable` | Execução encerrada com falha não recuperável | `metadata.items_failed`, `metadata.failure_phase` |
+| `execution_completed` | Execução encerrada; status `SUCCEEDED` se nenhuma fase falhou, `WITH_FAILURES` se alguma fase falhou | `metadata.items_total`, `metadata.items_failed`, `metadata.retries_seen`; `metadata.failed_phases` apenas em `WITH_FAILURES` |
+| `execution_aborted` | Execução abortada antes de iniciar por falha na validação de configuração | `metadata.failed_phases`, `metadata.error_type`, `metadata.error_message` |
+| `phase_failure_recorded` | Falha registrada em uma fase; nível `CRITICAL` para fases severas, `ERROR` para as demais | `metadata.failure_phase`, `metadata.items_failed` |
 
 Eventos de serviço — **Extração** (extract_buses_positions.py):
 
@@ -203,7 +203,7 @@ Este comportamento é exatamente o que a arquitetura foi projetada para garantir
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Executions | Timeseries (pontos) | `execution_completed` (verde), `execution_failed_non_recoverable` (vermelho), erros e avisos ao longo do tempo | `count_over_time [2m]` |
+| Executions | Timeseries (pontos) | `completed` (verde), `completed_with_failures` (laranja), `aborted` (vermelho), erros e avisos ao longo do tempo | `count_over_time [2m]` |
 | Errors (last 1h) | Stat (vermelho se ≥ 1) | Total de logs com `level="ERROR"` na última hora | `count_over_time [1h]` |
 | Warnings (last 1h) | Stat (laranja se ≥ 1) | Total de logs com `level="WARNING"` na última hora | `count_over_time [1h]` |
 | Execution time (s) | Timeseries | Duração média por fase: `total`, `extract`, `local_save`, `object_storage_save`, `notify_ingest` | `execution_metrics_final` — `metadata.execution_seconds` e `metadata.phase_durations.<fase>` via `avg_over_time [5m]` |
@@ -228,7 +228,7 @@ Este comportamento é exatamente o que a arquitetura foi projetada para garantir
 
 | Painel | Tipo | O que mostra |
 |---|---|---|
-| Recent failures | Logs | Stream filtrado por `level="ERROR"` em ordem decrescente |
+| Recent failures | Logs | Stream filtrado por `level=~"ERROR|CRITICAL"` em ordem decrescente |
 | Log stream | Logs | Todos os eventos do serviço em ordem decrescente |
 
 ### Regras de Alerta
@@ -237,36 +237,32 @@ As regras estão em `observability/loki/rules/fake/extractloadlivedata-alerts.ya
 
 | Alerta | Severidade | Condição | Janela |
 |---|---|---|---|
-| `ServiceFailed` | critical | Evento `execution_failed_non_recoverable` detectado | 5m |
+| `ServiceFailed` | critical | `execution_aborted` detectado ou `execution_completed` com status `WITH_FAILURES` | 5m |
 | `ServiceWarningThreshold` | warning | `execution_completed` com `metadata.retries_seen > 0` | 5m |
 
-## Execution Summary
+## Eventos Terminais de Execução
 
-Ao final de cada execução, o serviço constrói um resumo de execução e o emite como evento estruturado `execution_summary_emitted` no log.
+Ao final de cada execução, o serviço emite um evento terminal com o resultado consolidado.
 
-- Contrato do resumo:
-  - `contract_version`, `pipeline`, `execution_id`, `status`
-  - `items_total`, `items_failed`, `retries`, `acceptance_rate`
-  - `generated_at_utc` (timestamp UTC da geração do resumo)
-  - `failure_phase`, `failure_message` (apenas em `FAIL`)
-  - `quality_report_path` com valor `"null"` por compatibilidade de contrato.
-- Enum de status de execução:
-  - `PASS`: nenhuma falha, zero retries
-  - `WARN`: nenhuma falha mas com retries detectados
-  - `FAIL`: uma ou mais fases falharam
-- Enum de fase de falha (orquestração):
-  - `positions_download`
-  - `local_ingest_buffer_save_positions`
-  - `save_positions_to_raw`
-  - `ingest_notification`
-  - fallback: `unknown`
-- Mensagens fixas por fase:
-  - `positions_download`: `[SEVERE] non recoverable api get failed`
-  - `local_ingest_buffer_save_positions`: `[SEVERE] non recoverable save to local buffer failed`
-  - `save_positions_to_raw`: `save to raw storage failed`
-  - `ingest_notification`: `ingest notification failed`
-  - `unknown`: `ingest execution failed`
-- Regra de severidade: apenas `positions_download` e `local_ingest_buffer_save_positions` recebem prefixo `[SEVERE] non recoverable `.
+### execution_completed
+Emitido quando a execução chega ao fim, independentemente de falhas em fases individuais:
+- `status: SUCCEEDED` — nenhuma fase falhou
+- `status: WITH_FAILURES` — uma ou mais fases falharam; `metadata.failed_phases` lista as fases com falha
+
+### execution_aborted
+Emitido quando a execução é interrompida antes de iniciar por falha na validação de configuração:
+- `status: FAILED`
+- `metadata.failed_phases: ["config_validation"]`
+- `metadata.error_type` e `metadata.error_message` com o detalhe do erro
+
+### Enum de fase de falha
+- `positions_download`
+- `local_ingest_buffer_save_positions`
+- `save_positions_to_object_storage`
+- `ingest_notification`
+
+### Regra de severidade
+Apenas `positions_download` e `local_ingest_buffer_save_positions` disparam `phase_failure_recorded` em nível `CRITICAL`. As demais fases usam `ERROR`.
 
 
 ## Pré-requisitos
@@ -335,16 +331,7 @@ AIRFLOW_DAG_NAME = "transformlivedata-v5"  # DAG alvo para invocação via API
 INVOKATIONS_CACHE_DIR = "../.diskcache_pending_invocations"  # cache para invocações pendentes do Airflow
 
 ## Testes unitários
-Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas. A cobertura atual inclui:
-- `tests/test_extract_buses_positions.py`: validações de payload, autenticação e fluxo de retries na extração.
-- `tests/test_save_load_bus_positions.py`: validação de estrutura, compressão, leitura de arquivos, persistência com retries, remoção de arquivos locais e filtros de pendências.
-- `tests/test_save_processing_requests.py`: criação e disparo de requests de processamento com cache e persistência no banco.
-- `tests/test_trigger_airflow.py`: criação e disparo de invocações do Airflow via HTTP e cache.
-- `tests/test_extractloadlivedata_orchestrator.py`: roteamento do orquestrador entre `processing_requests` e `airflow`, validação de configuração, métricas por fase (`extract`, `local_save`, `object_storage_save`, `notify`), contagens de pendências (`pending_object_storage_save_files_count`, `pending_ingest_notifications_count`) e testes de orquestração com alertservice integrado.
-- `tests/test_alertservice.py`: construção de payload, envio de alertas com webhook enabled/disabled, e comportamento não-bloqueante em falhas.
-- `tests/test_reporting.py`: construção de sumário de execução com contrato validado (success e failure paths).
-- `tests/test_sql_db_v2.py`: contratos de persistência, seleção e atualização com engine injetado.
-- `tests/test_object_storage.py`: leitura, listagem e escrita no object storage com cliente injetado.
+Os testes são focados em comportamento relevante e invariantes de negócio, usando injeção de dependências e fakes (sem monkeypatch), para garantir isolamento das integrações externas.
 
 
 ## Para instalar os requisitos

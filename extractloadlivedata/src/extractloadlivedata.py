@@ -8,20 +8,17 @@ from src.services.exceptions import (
     SavePositionsToRawError,
 )
 from datetime import datetime, timezone
-from typing import Any, Dict, Literal, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import time
 
 from src.domain.events import (
     EVENT_STATUS_FAILED,
     EVENT_STATUS_STARTED,
     EVENT_STATUS_SUCCEEDED,
+    EVENT_STATUS_WITH_FAILURES,
 )
 from src.orchestration_dependencies import Services, ConfigDict
-from src.quality.reporting import (
-    build_execution_report_metadata,
-    build_quality_summary,
-    create_failure_quality_report,
-)
+from src.quality.reporting import build_execution_report_metadata
 from src.observability.process_structured_logger import get_structured_logger
 
 structured_logger = get_structured_logger(
@@ -68,57 +65,23 @@ def extractloadlivedata(
             return f"{SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX}api get failed"
         if phase == "local_ingest_buffer_save_positions":
             return f"{SEVERE_NON_RECOVERABLE_FAILURE_MESSAGE_PREFIX}save to local buffer failed"
-        if phase == "save_positions_to_raw":
-            return "save to raw storage failed"
+        if phase == "save_positions_to_object_storage":
+            return "save to object storage failed"
         if phase == "ingest_notification":
             return "ingest notification failed"
         return "ingest execution failed"
 
-    def _emit_failure_alert(failure_phase: str, message: Optional[str] = None) -> None:
-        failure_message = message or _phase_message(failure_phase)
-        summary = create_failure_quality_report(
-            pipeline="extractloadlivedata",
+    def _handle_failure(failure_phase: str) -> None:
+        failure_message = _phase_message(failure_phase)
+        _severe = {"positions_download", "local_ingest_buffer_save_positions"}
+        log = structured_logger.critical if failure_phase in _severe else structured_logger.error
+        log(
+            event="phase_failure_recorded",
+            status=EVENT_STATUS_FAILED,
             execution_id=execution_id,
-            failure_phase=failure_phase,
-            failure_message=failure_message,
-            quality_report_path="null",
-            acceptance_rate=1.0,
-            items_failed=items_failed,
-            items_total=items_total,
-            retries=retries_seen,
-        )
-        structured_logger.info(
-            event="execution_summary_emitted",
-            status=EVENT_STATUS_SUCCEEDED,
-            execution_id=execution_id,
-            message="Failure quality metrics summary saved.",
+            message=failure_message,
             metadata={
                 "failure_phase": failure_phase,
-                "summary_payload": summary,
-                "items_total": items_total,
-                "items_failed": items_failed,
-                "retries_seen": retries_seen,
-            },
-        )
-    def _emit_final_summary(status: Literal["PASS", "WARN", "FAIL"]) -> None:
-        summary = build_quality_summary(
-            pipeline="extractloadlivedata",
-            execution_id=execution_id,
-            status=status,
-            items_failed=items_failed,
-            quality_report_path="null",
-            acceptance_rate=1.0,
-            items_total=items_total,
-            retries=retries_seen,
-        )
-        structured_logger.info(
-            event="execution_summary_emitted",
-            status=EVENT_STATUS_SUCCEEDED,
-            execution_id=execution_id,
-            message="Final quality metrics summary saved.",
-            metadata={
-                "summary_status": status,
-                "summary_payload": summary,
                 "items_total": items_total,
                 "items_failed": items_failed,
                 "retries_seen": retries_seen,
@@ -166,6 +129,17 @@ def extractloadlivedata(
             error_type=type(e).__name__,
             error_message=str(e),
         )
+        structured_logger.error(
+            event="execution_aborted",
+            status=EVENT_STATUS_FAILED,
+            execution_id=execution_id,
+            message="Execution aborted: configuration validation failed.",
+            metadata={
+                "failed_phases": ["config_validation"],
+                "error_type": type(e).__name__,
+                "error_message": str(e),
+            },
+        )
         return
     structured_logger.info(
         event="notification_engine_selected",
@@ -205,7 +179,7 @@ def extractloadlivedata(
         items_failed += 1
         phase_metrics["extract"]["failed"] = 1
         failed_phases.append("positions_download")
-        _emit_failure_alert("positions_download")
+        _handle_failure("positions_download")
     except Exception as e:
         structured_logger.error(
             event="extract_positions_failed",
@@ -217,8 +191,8 @@ def extractloadlivedata(
         )
         items_failed += 1
         phase_metrics["extract"]["failed"] = 1
-        failed_phases.append("unknown")
-        _emit_failure_alert("unknown")
+        failed_phases.append("positions_download")
+        _handle_failure("positions_download")
     finally:
         phase_durations["extract"] = time.time() - extract_start
     if download_successful:
@@ -242,8 +216,8 @@ def extractloadlivedata(
                 error_message=str(e),
             )
             items_failed += 1
-            failed_phases.append("unknown")
-            _emit_failure_alert("unknown")
+            failed_phases.append("positions_download")
+            _handle_failure("positions_download")
         if phase_metrics["extract"]["succeeded"] == 1:
             local_save_start = time.time()
             try:
@@ -268,7 +242,7 @@ def extractloadlivedata(
                 items_failed += 1
                 phase_metrics["local_save"]["failed"] = 1
                 failed_phases.append("local_ingest_buffer_save_positions")
-                _emit_failure_alert("local_ingest_buffer_save_positions")
+                _handle_failure("local_ingest_buffer_save_positions")
             except Exception as e:
                 structured_logger.error(
                     event="local_ingest_buffer_phase_failed",
@@ -281,8 +255,8 @@ def extractloadlivedata(
                 )
                 items_failed += 1
                 phase_metrics["local_save"]["failed"] = 1
-                failed_phases.append("unknown")
-                _emit_failure_alert("unknown")
+                failed_phases.append("local_ingest_buffer_save_positions")
+                _handle_failure("local_ingest_buffer_save_positions")
             finally:
                 phase_durations["local_save"] = time.time() - local_save_start
     try:
@@ -305,8 +279,8 @@ def extractloadlivedata(
             error_message=str(e),
         )
         items_failed += 1
-        failed_phases.append("unknown")
-        _emit_failure_alert("unknown")
+        failed_phases.append("save_positions_to_object_storage")
+        _handle_failure("save_positions_to_object_storage")
         return
     if pending_storage_save_list:
         if len(pending_storage_save_list) > 1:
@@ -399,8 +373,8 @@ def extractloadlivedata(
                     retries_seen += int(getattr(e, "retries", 0))
                     items_failed += 1
                     phase_metrics["object_storage_save"]["failed"] += 1
-                    failed_phases.append("save_positions_to_raw")
-                    _emit_failure_alert("save_positions_to_raw")
+                    failed_phases.append("save_positions_to_object_storage")
+                    _handle_failure("save_positions_to_object_storage")
                     break
                 except Exception as e:
                     structured_logger.error(
@@ -415,8 +389,8 @@ def extractloadlivedata(
                     )
                     items_failed += 1
                     phase_metrics["object_storage_save"]["failed"] += 1
-                    failed_phases.append("unknown")
-                    _emit_failure_alert("unknown")
+                    failed_phases.append("save_positions_to_object_storage")
+                    _handle_failure("save_positions_to_object_storage")
         finally:
             phase_durations["object_storage_save"] = time.time() - save_start
         try:
@@ -505,7 +479,7 @@ def extractloadlivedata(
                 )
                 items_failed += 1
             failed_phases.append("ingest_notification")
-            _emit_failure_alert("ingest_notification")
+            _handle_failure("ingest_notification")
         except Exception as e:
             structured_logger.error(
                 event="notification_dispatch_failed",
@@ -516,8 +490,8 @@ def extractloadlivedata(
                 error_message=str(e),
             )
             items_failed += 1
-            failed_phases.append("unknown")
-            _emit_failure_alert("unknown")
+            failed_phases.append("ingest_notification")
+            _handle_failure("ingest_notification")
         finally:
             phase_durations["notify"] = time.time() - notify_start
     execution_end = time.time()
@@ -544,23 +518,19 @@ def extractloadlivedata(
         metadata=execution_report_metadata,
     )
 
-    if items_failed > 0:
-        structured_logger.error(
-            event="execution_failed_non_recoverable",
-            status=EVENT_STATUS_FAILED,
+    if bool(failed_phases):
+        structured_logger.info(
+            event="execution_completed",
+            status=EVENT_STATUS_WITH_FAILURES,
             execution_id=execution_id,
-            message="Execution finished with non-recoverable failures.",
+            message="extractloadlivedata execution completed with failures.",
             metadata={**execution_report_metadata, "failed_phases": failed_phases},
         )
-        return
-    if retries_seen > 0:
-        _emit_final_summary("WARN")
     else:
-        _emit_final_summary("PASS")
-    structured_logger.info(
-        event="execution_completed",
-        status=EVENT_STATUS_SUCCEEDED,
-        execution_id=execution_id,
-        message="extractloadlivedata execution completed successfully.",
-        metadata=execution_report_metadata,
-    )
+        structured_logger.info(
+            event="execution_completed",
+            status=EVENT_STATUS_SUCCEEDED,
+            execution_id=execution_id,
+            message="extractloadlivedata execution completed successfully.",
+            metadata=execution_report_metadata,
+        )

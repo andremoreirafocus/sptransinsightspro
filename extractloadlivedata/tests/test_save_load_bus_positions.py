@@ -9,11 +9,12 @@ from src.services.save_load_bus_positions import (
     load_bus_positions_from_local_volume_file,
     remove_local_file,
     get_pending_storage_save_list,
+    save_bus_positions_to_local_volume,
     save_bus_positions_to_storage,
     save_bus_positions_to_storage_with_retries,
     save_data_to_raw_object_storage,
 )
-from src.services.exceptions import SavePositionsToRawError
+from src.services.exceptions import LocalIngestBufferSaveError, SavePositionsToRawError
 from src.infra.compression import compress_data
 from tests.fakes.object_storage_client import FakeObjectStorageClient
 
@@ -365,3 +366,21 @@ def test_save_bus_positions_to_storage_config_error_emits_log(
         with pytest.raises(Exception):
             save_bus_positions_to_storage({}, build_sample_data())
     assert _find_event(caplog, "object_storage_persist_failed")
+
+
+def test_get_payload_summary_missing_hr_emits_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(ValueError):
+            get_payload_summary({"payload": {"hr": 999}})
+    assert _find_event(caplog, "metadata_validation_failed")
+
+
+def test_save_bus_positions_to_local_volume_config_error_emits_log(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.ERROR, logger=_LOGGER_NAME):
+        with pytest.raises(LocalIngestBufferSaveError):
+            save_bus_positions_to_local_volume({}, build_sample_data())
+    assert _find_event(caplog, "local_storage_persist_failed")
