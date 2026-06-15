@@ -38,15 +38,19 @@ def deploy_service(service_name, service_folder, run_deploy):
         compose_file = os.path.join(project_root, "docker-compose.yml")
         build_step = steps_consumed + 1
         print(f"Step {build_step}/{total_steps}: Building {service_name}...")
+
+        prefix = os.environ.get("DOCKER_CMD_PREFIX", "").split()
+        docker_compose_cmd = prefix + ["docker", "compose"]
+
         run_command(
-            ["docker", "compose", "-f", compose_file, "build", service_name],
+            docker_compose_cmd + ["-f", compose_file, "build", service_name],
             "Build failed!",
         )
         print("✅ Build Successful.")
 
         print(f"Step {build_step + 1}/{total_steps}: Restarting {service_name}...")
         run_command(
-            ["docker", "compose", "-f", compose_file, "up", "-d", service_name],
+            docker_compose_cmd + ["-f", compose_file, "up", "-d", service_name],
             "Deployment failed!",
         )
         print(f"✅ Service '{service_name}' is up and running.")

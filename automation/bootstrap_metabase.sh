@@ -7,6 +7,8 @@ SQL_ROOT="${PROJECT_ROOT}/database/bootstrap"
 ENV_FILE="${PROJECT_ROOT}/.env"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/wait_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-180}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-5}"
@@ -37,12 +39,12 @@ wait_for_postgres_service() {
     "service '${POSTGRES_SERVICE_NAME}' to accept connections" \
     "${WAIT_TIMEOUT_SECONDS}" \
     "${WAIT_INTERVAL_SECONDS}" \
-    docker compose exec -T "${POSTGRES_SERVICE_NAME}" pg_isready -U "${db_user}" -d postgres
+    ${DOCKER_COMPOSE} exec -T "${POSTGRES_SERVICE_NAME}" pg_isready -U "${db_user}" -d postgres
 }
 
 run_metabase_sql_bootstrap() {
   local db_user="$1"
-  docker compose exec -T "${POSTGRES_SERVICE_NAME}" psql \
+  ${DOCKER_COMPOSE} exec -T "${POSTGRES_SERVICE_NAME}" psql \
     -v ON_ERROR_STOP=1 \
     -v metabase_db_name="${METABASE_DB_NAME}" \
     -v metabase_internal_user="${METABASE_INTERNAL_USER}" \
@@ -70,7 +72,7 @@ echo "==> Running Metabase SQL bootstrap..."
 run_metabase_sql_bootstrap "${DB_USER}"
 
 echo "==> Starting Metabase service..."
-docker compose up -d metabase
+${DOCKER_COMPOSE} up -d metabase
 
 wait_for_condition \
   "service 'metabase' to become available" \

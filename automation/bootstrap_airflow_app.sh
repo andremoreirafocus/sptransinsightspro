@@ -8,6 +8,8 @@ GENERATED_CONNECTIONS_FILE="${VARIABLES_DIR}/generated_connections.json"
 ENV_FILE="${PROJECT_ROOT}/.env"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/wait_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 SERVICE_NAME="airflow_webserver"
 POSTGRES_SERVICE_NAME="airflow_postgres"
@@ -32,11 +34,11 @@ require_env() {
 }
 
 docker_compose_exec() {
-  docker compose exec -T "${SERVICE_NAME}" "$@"
+  ${DOCKER_COMPOSE} exec -T "${SERVICE_NAME}" "$@"
 }
 
 docker_compose_run() {
-  docker compose run --rm -T "${SERVICE_NAME}" "$@"
+  ${DOCKER_COMPOSE} run --rm -T "${SERVICE_NAME}" "$@"
 }
 
 wait_for_airflow_postgres() {
@@ -44,7 +46,7 @@ wait_for_airflow_postgres() {
     "Airflow Postgres to become available" \
     "${WAIT_TIMEOUT_SECONDS}" \
     "${WAIT_INTERVAL_SECONDS}" \
-    docker compose exec -T "${POSTGRES_SERVICE_NAME}" \
+    ${DOCKER_COMPOSE} exec -T "${POSTGRES_SERVICE_NAME}" \
       pg_isready -U "${AIRFLOW_DB_USER}" -d airflow
 }
 
@@ -58,7 +60,7 @@ wait_for_airflow() {
     "Airflow CLI to become available" \
     "${WAIT_TIMEOUT_SECONDS}" \
     "${WAIT_INTERVAL_SECONDS}" \
-    docker_compose_exec airflow users list --output json
+    docker_compose_exec env PYTHONWARNINGS=ignore airflow users list --output json
 }
 
 wait_for_scheduler_started() {
@@ -66,12 +68,12 @@ wait_for_scheduler_started() {
     "Airflow scheduler process to start" \
     "${WAIT_TIMEOUT_SECONDS}" \
     "${WAIT_INTERVAL_SECONDS}" \
-    docker compose exec -T airflow_scheduler sh -c 'grep -rqa scheduler /proc/[0-9]*/cmdline 2>/dev/null'
+    ${DOCKER_COMPOSE} exec -T airflow_scheduler sh -c 'grep -rqa scheduler /proc/[0-9]*/cmdline 2>/dev/null'
 }
 
 admin_user_exists() {
-  docker_compose_exec airflow users list --output json | \
-    python3 -c 'import json, sys; username = sys.argv[1]; users = json.load(sys.stdin); sys.exit(0 if any(user.get("username") == username for user in users) else 1)' \
+  docker_compose_exec env PYTHONWARNINGS=ignore airflow users list --output json | \
+    python3 -c 'import json, sys; username = sys.argv[1]; raw = sys.stdin.read(); start = raw.find("["); users = json.loads(raw[start:]) if start != -1 else []; sys.exit(0 if any(user.get("username") == username for user in users) else 1)' \
       "${AIRFLOW_ADMIN_USERNAME}"
 }
 

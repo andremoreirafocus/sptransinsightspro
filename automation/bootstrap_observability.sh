@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/wait_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-2}"
@@ -24,7 +26,7 @@ wait_for_http_service() {
 }
 
 check_promtail_ready() {
-  docker logs promtail 2>&1 | grep -F 'server listening on addresses' >/dev/null
+  ${DOCKER} logs promtail 2>&1 | grep -F 'server listening on addresses' >/dev/null
 }
 
 wait_for_promtail() {
@@ -38,7 +40,7 @@ wait_for_promtail() {
 cd "${PROJECT_ROOT}"
 
 echo "Bootstrapping observability stack..."
-docker compose up -d loki promtail grafana alertmanager
+${DOCKER_COMPOSE} up -d loki promtail grafana alertmanager
 
 wait_for_http_service "loki" "${LOKI_READY_URL}"
 wait_for_promtail
