@@ -202,11 +202,9 @@ python3 deploy_service.py <docker_compose_service_name> <service_folder> --prod
 ```bash
 # Validate only
 python3 deploy_service.py extractloadlivedata extractloadlivedata --check
-python3 deploy_service.py alertservice alertservice --check
 
 # Validate and deploy
 python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
-python3 deploy_service.py alertservice alertservice --prod
 ```
 
 ---

@@ -191,11 +191,9 @@ python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico> --prod
 ```bash
 # Apenas validar
 python3 deploy_service.py extractloadlivedata extractloadlivedata --check
-python3 deploy_service.py alertservice alertservice --check
 
 # Validar e fazer deploy
 python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
-python3 deploy_service.py alertservice alertservice --prod
 ```
 
 ---

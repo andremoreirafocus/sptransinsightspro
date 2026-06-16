@@ -101,3 +101,7 @@ Implementação local inicial concluída para observabilidade de logs estruturad
 - `loki` adicionado ao `docker-compose.yml` com configuração em `observability/loki/loki-config.yml`
 - `promtail` adicionado ao `docker-compose.yml` com configuração em `observability/promtail/promtail-config.yml`
 - `grafana` adicionado ao `docker-compose.yml` com datasource Loki provisionado em `observability/grafana/provisioning/datasources/loki.yml`
+
+## Substituição do `alertservice`
+
+A camada de alertas desta stack — Loki Ruler avaliando regras sobre os logs estruturados (`observability/loki/rules/`) e Alertmanager roteando por severidade e enviando e-mails — substitui o `alertservice` ([ADR-0009](./0009-alertservice.md), agora Deprecado). O alerta de FAIL/WARN deixou de depender de um webhook de relatório de qualidade (acoplamento de runtime com o `transformlivedata`) e passou a ser derivado dos eventos de log estruturados de todos os pipelines, com regras por pipeline para falha de fase (severidade `critical`) e degradação de qualidade/execução (severidade `warning`).

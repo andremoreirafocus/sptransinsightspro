@@ -1,7 +1,9 @@
 # ADR-0009: Design do alertservice (webhook, alertas cumulativos, SQLite)
 
 **Data:** 2026-04-15  
-**Status:** Aceito
+**Status:** Deprecado — funcionalidade substituída pela stack do [ADR-0011](./0011-logging-estruturado-com-contrato-canonico-e-transporte-desacoplado.md)
+
+> **Deprecação (2026-06-16):** o `alertservice` foi descontinuado. A responsabilidade de alertas por e-mail de FAIL/WARN sobre qualidade e execução dos pipelines foi assumida pela stack de observabilidade do [ADR-0011](./0011-logging-estruturado-com-contrato-canonico-e-transporte-desacoplado.md): o Loki Ruler avalia regras de alerta sobre os logs estruturados (`observability/loki/rules/`) e o Alertmanager aplica roteamento por severidade e envia os e-mails. Os alertas passaram a ser derivados dos eventos de log estruturados — não mais de um webhook de relatório de qualidade — e a cobertura foi generalizada para todos os pipelines (`extractloadlivedata`, `transformlivedata`, `refinedfinishedtrips`), não apenas o `transformlivedata`. O conteúdo abaixo é mantido como registro histórico da decisão original.
 
 ## Contexto
 

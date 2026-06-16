@@ -24,7 +24,7 @@ The goal is not to justify choices after the fact, but to record the reasoning a
 | [ADR-0006](./0006-configuration-driven-validation-EN.md) | Configuration-driven validation (JSON Schema + Great Expectations) | Accepted |
 | [ADR-0007](./0007-dependency-injection-as-testability-strategy-EN.md) | Dependency injection as a testability strategy | Accepted |
 | [ADR-0008](./0008-pipeline-promotion-workflow-EN.md) | Pipeline promotion workflow (`dags-dev` -> `airflow/dags`) | Accepted |
-| [ADR-0009](./0009-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Accepted |
+| [ADR-0009](./0009-alertservice-design-EN.md) | `alertservice` design (webhook, cumulative alerts, SQLite) | Deprecated (superseded by ADR-0011) |
 | [ADR-0010](./0010-airflow-datasets-for-event-driven-orchestration-EN.md) | Airflow Datasets for event-driven orchestration | Proposed |
 | [ADR-0011](./0011-structured-logging-with-canonical-contract-and-decoupled-transport-EN.md) | Structured logging with canonical contract and decoupled transport | Accepted |
 | [ADR-0012](./0012-power-bi-to-self-hosted-metabase-migration-EN.md) | Power BI to self-hosted Metabase migration | Accepted |
