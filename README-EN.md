@@ -44,6 +44,7 @@ Details about the DAGs:
 - [DAG orchestratetransform](./dags-dev/orchestratetransform/README-EN.md): identifies bus position data pending processing and triggers the transformation DAG.
 - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README-EN.md): transforms trusted enriched data into completed trips in the refined layer, with quality checks over positions, extraction, and persistence, plus consolidated reporting.
   - Since version 6 of this pipeline, the Airflow DAG no longer depends on a cron schedule and is instead triggered by an Airflow Dataset emitted by the `transformlivedata` pipeline. This maximizes freshness of the completed trips calculated in the refined layer, updating them immediately after successful publication of transformed data, and simplifies maintenance by removing coupling between upstream and downstream cron schedules.
+- [DAG refinedtripfacts](./dags-dev/refinedtripfacts/README-EN.md): builds the analytical fact table `refined.trip_facts` from the finished trips produced by `refinedfinishedtrips`, deriving analytical attributes to support advanced operational metrics in Metabase. Triggered by the `finished_trips_ready` Dataset emitted by `refinedfinishedtrips`.
 - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README-EN.md): loads canonical trip details from the trusted layer into the refined layer, with light adaptation for the visualization layer, especially for circular routes. This DAG starts as soon as `gtfs` finishes successfully through Airflow Datasets.
 - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README-EN.md): transforms trusted data into latest-position data for each bus in the refined layer. Since version 4 of this pipeline, the Airflow DAG no longer depends on a cron schedule and is instead triggered by an Airflow Dataset emitted by `transformlivedata`, maximizing freshness of `refined.latest_positions`, which is updated immediately after successful publication of transformed data, and simplifying maintenance by removing coupling between upstream and downstream cron schedules.
 
@@ -57,6 +58,8 @@ The diagram below complements the DAG descriptions by showing the event-driven o
 - `refinedsynctripdetails` is triggered by that Dataset, which means it runs automatically after successful completion of the `gtfs` pipeline
 - `transformlivedata` publishes the Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` and `updatelatestpositions` are triggered by that Dataset, which means they run automatically after successful completion of the `transformlivedata` pipeline
+- `refinedfinishedtrips` publishes the Dataset `sptrans://refined/finished_trips_ready`
+- `refinedtripfacts` is triggered by that Dataset, which means it runs automatically after successful completion of the `refinedfinishedtrips` pipeline
 
 ### Local Centralised Log Stack (Loki + Promtail + Grafana + Alertmanager)
 
@@ -90,6 +93,7 @@ After starting the project following the instructions below, you must then execu
 - [gtfs](./dags-dev/gtfs/README-EN.md)
 - [transformlivedata](./dags-dev/transformlivedata/README-EN.md)
 - [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README-EN.md)
+- [refinedtripfacts](./dags-dev/refinedtripfacts/README-EN.md)
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README-EN.md)
 - [extractloadlivedata](./extractloadlivedata/README-EN.md)
 

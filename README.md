@@ -41,6 +41,7 @@ Detalhes sobre as DAGs:
     - [DAG orchestratetransform](./dags-dev/orchestratetransform/README.md): processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.
     - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md): processo de transformação para criação das viagens finalizadas na camada refined a partir dos dados enriquecidos da camada trusted, com checagens de qualidade sobre posições, extração e persistência, além de geração de relatório consolidado.
         - A partir da versão 6 desta pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness das viagens finalizadas calculadas na camada refined, que passam a ser atualizadas logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
+    - [DAG refinedtripfacts](./dags-dev/refinedtripfacts/README.md): processo de construção da tabela fato analítica `refined.trip_facts` a partir das viagens finalizadas produzidas pelo `refinedfinishedtrips`, derivando atributos analíticos para suporte a métricas operacionais avançadas em Metabase. Disparada pelo Dataset `finished_trips_ready` emitido pelo `refinedfinishedtrips`.
     - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README.md): processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow.
     - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README.md): processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
 
@@ -52,7 +53,9 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `gtfs` publica o Dataset `gtfs://trip_details_ready`
 - `refinedsynctripdetails` é disparada por esse Dataset, ou seja, é executado automaticamente após a conclusão com sucesso do pipeline gtfs
 - `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
-- `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+- `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset, ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+- `refinedfinishedtrips` publica o Dataset `sptrans://refined/finished_trips_ready`
+- `refinedtripfacts` é disparada por esse Dataset, ou seja, é executada automaticamente após a conclusão com sucesso do pipeline refinedfinishedtrips
 
 ## Configuração
 O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
@@ -101,6 +104,7 @@ Porém será necessário seguir as instruções abaixo, executando alguns comand
 - [gtfs](./dags-dev/gtfs/README.md)
 - [transformlivedata](./dags-dev/transformlivedata/README.md)
 - [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
+- [refinedtripfacts](./dags-dev/refinedtripfacts/README.md)
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
 - [extractloadlivedata](./extractloadlivedata/README.md)
 
