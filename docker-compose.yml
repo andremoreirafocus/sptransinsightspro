@@ -1,7 +1,14 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   minio:
     image:  quay.io/minio/minio:${MINIO_VERSION}
     container_name: minio
+    logging: *default-logging
     ports:
       - "9000:9000"
       - "9001:9001"
@@ -17,9 +24,11 @@ services:
     command: server --console-address ":9001" /data
     networks:
        rede_fia:  
+
   airflow_webserver:
     image: apache/airflow:2.11.2-python3.11
     container_name: airflow_webserver
+    logging: *default-logging
     restart: always
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
@@ -46,6 +55,7 @@ services:
     image: apache/airflow:2.11.2-python3.11
     restart: always
     container_name: airflow_scheduler
+    logging: *default-logging
     environment:
       AIRFLOW__CORE__EXECUTOR: LocalExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow_postgres/airflow
@@ -66,6 +76,7 @@ services:
   airflow_postgres:
     image: postgres:13
     container_name: airflow_postgres
+    logging: *default-logging
     environment:
       - POSTGRES_USER=${AIRFLOW_DB_USER}
       - POSTGRES_PASSWORD=${AIRFLOW_DB_PASSWORD}
@@ -81,6 +92,7 @@ services:
       context: ./postgres
       dockerfile: Dockerfile
     container_name: postgres
+    logging: *default-logging
     ports:
       - 5532:5432
     environment:
@@ -97,6 +109,7 @@ services:
       context: extractloadlivedata
       dockerfile: Dockerfile
     container_name: extractloadlivedata
+    logging: *default-logging
     depends_on:
       - minio
     env_file:
@@ -128,6 +141,7 @@ services:
       context: jupyter
       dockerfile: Dockerfile    
     container_name: jupyter_exploration
+    logging: *default-logging
     ports:
       - "8888:8888"
     environment:
@@ -141,6 +155,7 @@ services:
   loki:
     image: grafana/loki:2.9.8
     container_name: loki
+    logging: *default-logging
     command: -config.file=/etc/loki/local-config.yml
     ports:
       - "3100:3100"
@@ -155,6 +170,7 @@ services:
   promtail:
     image: grafana/promtail:2.9.8
     container_name: promtail
+    logging: *default-logging
     command: -config.file=/etc/promtail/config.yml
     depends_on:
       - loki
@@ -171,6 +187,7 @@ services:
   grafana:
     image: grafana/grafana:11.1.4
     container_name: grafana
+    logging: *default-logging
     depends_on:
       - loki
     ports:
@@ -191,6 +208,7 @@ services:
       context: ./observability/alertmanager
       dockerfile: Dockerfile
     container_name: alertmanager
+    logging: *default-logging
     environment:
       ALERTMANAGER_SMTP_HOST: ${ALERTMANAGER_SMTP_HOST}
       ALERTMANAGER_SMTP_PORT: ${ALERTMANAGER_SMTP_PORT}
@@ -208,6 +226,7 @@ services:
   metabase:
     image: metabase/metabase:v0.52.9
     container_name: metabase
+    logging: *default-logging
     ports:
       - "3001:3000"
     environment:
