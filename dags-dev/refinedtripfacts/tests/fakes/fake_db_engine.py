@@ -1,37 +1,43 @@
 from contextlib import contextmanager
-from typing import List, Tuple
+from typing import Any, List, Optional, Tuple
 
 
 class FakeRow:
-    def __init__(self, value):
-        self._value = value
+    def __init__(self, *values: Any) -> None:
+        self._values = values
 
-    def __getitem__(self, index):
-        return self._value
+    def __getitem__(self, index: int) -> Any:
+        return self._values[index]
 
 
 class FakeExecuteResult:
-    def __init__(self, rowcount: int = 0, row=None):
+    def __init__(self, rowcount: int = 0, row: Optional[FakeRow] = None) -> None:
         self.rowcount = rowcount
         self._row = row
 
-    def fetchone(self):
+    def fetchone(self) -> Optional[FakeRow]:
         return self._row
 
 
 class FakeDbConnection:
-    def __init__(self, engine):
+    def __init__(self, engine: "FakeDbEngine") -> None:
         self._engine = engine
 
-    def execute(self, stmt, params=None):
+    def execute(self, stmt: Any, params: Any = None) -> FakeExecuteResult:
         self._engine.executed_statements.append((str(stmt), params))
-        return FakeExecuteResult(row=FakeRow(self._engine._scalar_count))
+        if self._engine._responses:
+            return self._engine._responses.pop(0)
+        return FakeExecuteResult()
 
 
 class FakeDbEngine:
-    def __init__(self, scalar_count: int = 0, raises=None):
+    def __init__(
+        self,
+        responses: Optional[List[FakeExecuteResult]] = None,
+        raises: Optional[Exception] = None,
+    ) -> None:
         self.executed_statements: List[Tuple] = []
-        self._scalar_count = scalar_count
+        self._responses: List[FakeExecuteResult] = list(responses or [])
         self._raises = raises
 
     @contextmanager
@@ -40,14 +46,20 @@ class FakeDbEngine:
             raise self._raises
         yield FakeDbConnection(self)
 
-    def dispose(self):
+    def dispose(self) -> None:
         pass
 
 
-def make_fake_engine_factory(scalar_count: int = 0, raises=None):
-    engine = FakeDbEngine(scalar_count=scalar_count, raises=raises)
+def make_fake_engine_factory(
+    responses: Optional[List[FakeExecuteResult]] = None,
+    scalar_count: int = 0,
+    raises: Optional[Exception] = None,
+) -> Any:
+    if responses is None:
+        responses = [FakeExecuteResult(row=FakeRow(scalar_count))]
+    engine = FakeDbEngine(responses=responses, raises=raises)
 
-    def factory(db_uri):
+    def factory(db_uri: str) -> FakeDbEngine:
         return engine
 
     factory.engine = engine
