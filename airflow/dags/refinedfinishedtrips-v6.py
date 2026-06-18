@@ -44,7 +44,7 @@ if _IN_AIRFLOW:
         "max_active_runs": 1,
         "email_on_failure": False,
         "email_on_retry": False,
-        "retries": 3,
+        "retries": 0,
     }
 
     def extract_trips_airflow_wrapper(triggering_dataset_events, outlet_events):

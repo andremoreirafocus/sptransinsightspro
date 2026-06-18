@@ -148,7 +148,7 @@ if _IN_AIRFLOW:
         "max_active_runs": 1,
         "email_on_failure": False,
         "email_on_retry": False,
-        "retries": 3,
+        "retries": 0,
     }
 
     def update_latest_positions_airflow_wrapper(triggering_dataset_events):
