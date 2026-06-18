@@ -39,5 +39,6 @@ run_sql_file "${SQL_ROOT}/shared/001_create_sptrans_insights_database.sql"
 run_sql_file "${SQL_ROOT}/postgres/003_refined_finished_trips.sql"
 run_sql_file "${SQL_ROOT}/postgres/002_refined_trip_details.sql"
 run_sql_file "${SQL_ROOT}/postgres/001_refined_latest_positions.sql"
+run_sql_file "${SQL_ROOT}/postgres/005_refined_trip_facts.sql"
 
 echo "Bootstrap for ${SERVICE_NAME} completed."
