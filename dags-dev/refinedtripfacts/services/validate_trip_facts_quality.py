@@ -3,7 +3,7 @@ from typing import Any, Dict, Literal
 _STATUS_PRIORITY: Dict[str, int] = {"FAIL": 2, "WARN": 1, "PASS": 0}
 
 
-def _worst(*statuses: str) -> Literal["PASS", "WARN", "FAIL"]:
+def _worst(*statuses: Literal["PASS", "WARN", "FAIL"]) -> Literal["PASS", "WARN", "FAIL"]:
     return max(statuses, key=lambda s: _STATUS_PRIORITY.get(s, 0))  # type: ignore[return-value]
 
 
