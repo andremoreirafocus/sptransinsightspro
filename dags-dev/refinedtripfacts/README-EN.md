@@ -191,14 +191,20 @@ In Airflow, configuration and credentials are managed through Variables and Conn
 
 Before executing the DAG in Airflow, the required tables must already exist as described above.
 
-## Local execution instructions
-
-Create `dags-dev/refinedtripfacts/.env` based on `.env.example` and fill in all fields.
-With the tables already created, run:
+## Tests
 
 ```bash
-python refinedtripfacts/build_trip_facts.py
+# Unit tests (no database required, default run)
+pytest tests/ --ignore=tests/integration
+
+# Integration tests (require a real PostgreSQL, opt-in)
+# One-time prerequisite: create the test_sptrans database
+bash tests/integration/bootstrap_test_db.sh
+
+pytest tests/integration -m integration
 ```
+
+Integration test connection is configured in `tests/integration/.env` (use `.env.example` as template). The target database must be `test_sptrans` — never production.
 
 ## Data dictionary
 
@@ -217,8 +223,8 @@ python refinedtripfacts/build_trip_facts.py
 | `is_circular` | BOOLEAN | `refined.finished_trips.is_circular` | Propagated directly |
 | `distance_meters` | DOUBLE PRECISION | `refined.finished_trips.distance_meters` | Propagated directly. Inherited semantics: **linear proxy between terminals for non-circular trips**; **point-to-point distance for circular trips**. The `is_circular` field qualifies the interpretation. |
 | `avg_speed_kmh` | DOUBLE PRECISION | `refined.finished_trips.avg_speed_kmh` | Propagated directly |
-| `started_at_time_dim_key` | INTEGER NOT NULL | `started_at` | `to_char(trip_start_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH')::int` |
-| `ended_at_time_dim_key` | INTEGER NOT NULL | `ended_at` | `to_char(trip_end_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH')::int` |
+| `started_at_time_dim_key` | INTEGER NOT NULL | `started_at` | `to_char(trip_start_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH24')::int` |
+| `ended_at_time_dim_key` | INTEGER NOT NULL | `ended_at` | `to_char(trip_end_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH24')::int` |
 | `logic_date` | TIMESTAMPTZ NOT NULL | `refined.finished_trips.logic_date` | Propagated directly — identifies the ingestion batch that originated the trip |
 | `created_at` | TIMESTAMPTZ NOT NULL | system | `DEFAULT NOW()` — insertion timestamp in the refined layer |
 

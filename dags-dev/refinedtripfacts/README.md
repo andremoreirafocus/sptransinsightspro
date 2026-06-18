@@ -122,6 +122,21 @@ Chaves esperadas em `general`:
 }
 ```
 
+## Testes
+
+```bash
+# Testes unitários (sem banco, execução padrão)
+pytest tests/ --ignore=tests/integration
+
+# Testes de integração (requerem PostgreSQL real, opt-in)
+# Pré-requisito (uma vez): criar o banco test_sptrans
+bash tests/integration/bootstrap_test_db.sh
+
+pytest tests/integration -m integration
+```
+
+A conexão dos testes de integração é configurada em `tests/integration/.env` (baseie-se em `.env.example`). O banco alvo deve ser `test_sptrans` — nunca o banco de produção.
+
 ## Instruções para instalação
 
 - `cd dags-dev`
@@ -191,14 +206,6 @@ No Airflow, as configurações e credenciais são gerenciadas via Variables e Co
 
 Antes da execução da DAG no Airflow, as tabelas devem estar criadas conforme instruções acima.
 
-## Instruções para execução em modo local
-
-Crie `dags-dev/refinedtripfacts/.env` com base em `.env.example` preenchendo todos os campos.
-Com as tabelas já criadas, execute:
-
-```shell
-python refinedtripfacts/build_trip_facts.py
-```
 
 ## Dicionário de dados
 
@@ -217,8 +224,8 @@ python refinedtripfacts/build_trip_facts.py
 | `is_circular` | BOOLEAN | `refined.finished_trips.is_circular` | Propagado diretamente |
 | `distance_meters` | DOUBLE PRECISION | `refined.finished_trips.distance_meters` | Propagado diretamente. Semântica herdada: **proxy linear entre os terminais para viagens não-circulares**; **distância ponto-a-ponto para viagens circulares**. O campo `is_circular` qualifica a interpretação. |
 | `avg_speed_kmh` | DOUBLE PRECISION | `refined.finished_trips.avg_speed_kmh` | Propagado diretamente |
-| `started_at_time_dim_key` | INTEGER NOT NULL | `started_at` | `to_char(trip_start_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH')::int` |
-| `ended_at_time_dim_key` | INTEGER NOT NULL | `ended_at` | `to_char(trip_end_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH')::int` |
+| `started_at_time_dim_key` | INTEGER NOT NULL | `started_at` | `to_char(trip_start_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH24')::int` |
+| `ended_at_time_dim_key` | INTEGER NOT NULL | `ended_at` | `to_char(trip_end_time AT TIME ZONE 'America/Sao_Paulo', 'YYYYMMDDHH24')::int` |
 | `logic_date` | TIMESTAMPTZ NOT NULL | `refined.finished_trips.logic_date` | Propagado diretamente — identifica o batch de ingestão que originou a viagem |
 | `created_at` | TIMESTAMPTZ NOT NULL | sistema | `DEFAULT NOW()` — timestamp de inserção na camada refined |
 
