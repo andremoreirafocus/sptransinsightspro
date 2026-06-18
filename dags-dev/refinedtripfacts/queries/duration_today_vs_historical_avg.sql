@@ -34,8 +34,10 @@ SELECT
     t.today_median_seconds,
     h.historical_median_seconds,
     ROUND(
-        (t.today_median_seconds - h.historical_median_seconds)
-            / NULLIF(h.historical_median_seconds, 0) * 100,
+        (
+            (t.today_median_seconds - h.historical_median_seconds)
+                / NULLIF(h.historical_median_seconds, 0) * 100
+        )::numeric,
         2
     ) AS deviation_pct
 FROM today t
