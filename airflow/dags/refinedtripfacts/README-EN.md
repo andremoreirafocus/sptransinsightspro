@@ -35,8 +35,6 @@ The overall status is the worst of the three checks: PASS < WARN < FAIL.
 
 The final report also includes, under `details.artifacts.column_lineage`, the declared lineage of columns persisted to `refined.trip_facts`, validated against the real output contract. Any divergence records `drift_detected: true` — without interrupting execution.
 
-In the [samples](./samples) folder there is a manually curated example of the consolidated quality report: [quality-report-refinedtripfacts_2128_394a9854.json](./samples/quality-report-refinedtripfacts_2128_394a9854.json).
-
 ### Event taxonomy
 
 #### Orchestrator events
@@ -119,10 +117,6 @@ Expected keys in `general`:
     "completeness_loss_rate_warn_threshold": 0.01,
     "completeness_loss_rate_fail_threshold": 0.05,
     "avg_speed_kmh_max": 120.0
-  },
-  "storage": {
-    "metadata_bucket": "metadata",
-    "quality_report_folder": "quality-reports"
   }
 }
 ```
@@ -187,16 +181,6 @@ CREATE TABLE refined.dim_time (
 ```
 
 `time_key` format: `YYYYMMDDHH` in the `America/Sao_Paulo` timezone. Example: `2026060814` = June 8 2026 at 14:00 São Paulo time.
-
-## Running locally
-
-Create `dags-dev/refinedtripfacts/.env` from `.env.example` and fill in all fields.
-
-With the required tables already created as described above, set the test date in `refinedtripfacts-v1.py` and run:
-
-```bash
-python refinedtripfacts-v1.py
-```
 
 ## Airflow (production)
 

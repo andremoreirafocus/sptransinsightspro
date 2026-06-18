@@ -18,6 +18,7 @@ ACTIVE_DAGS=(
   "orchestratetransform-v2"
   "transformlivedata-v10"
   "refinedfinishedtrips-v6"
+  "refinedtripfacts-v1"
   "refinedsynctripdetails-v3"
   "updatelatestpositions-v4"
 )

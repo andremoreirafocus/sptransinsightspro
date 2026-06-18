@@ -35,8 +35,6 @@ O status final é o pior dos três checks: PASS < WARN < FAIL.
 
 O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.trip_facts`, validada contra o contrato real de saída. Se houver divergência, o artefato registra `drift_detected: true` — sem interromper a execução.
 
-Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedtripfacts_2128_394a9854.json](./samples/quality-report-refinedtripfacts_2128_394a9854.json).
-
 ### Taxonomia de eventos
 
 #### Eventos do orquestrador
@@ -119,10 +117,6 @@ Chaves esperadas em `general`:
     "completeness_loss_rate_warn_threshold": 0.01,
     "completeness_loss_rate_fail_threshold": 0.05,
     "avg_speed_kmh_max": 120.0
-  },
-  "storage": {
-    "metadata_bucket": "metadata",
-    "quality_report_folder": "quality-reports"
   }
 }
 ```
@@ -202,16 +196,6 @@ CREATE TABLE refined.dim_time (
 ```
 
 `time_key` formato: `YYYYMMDDHH` no fuso horário `America/Sao_Paulo`. Exemplo: `2026060814` = 8 de junho de 2026 às 14h no horário de São Paulo.
-
-## Instruções para execução em modo local
-
-Crie `dags-dev/refinedtripfacts/.env` com base em `.env.example` preenchendo todos os campos.
-
-Com as tabelas já criadas conforme instruções acima, ajuste a data de teste em `refinedtripfacts-v1.py` e execute:
-
-```bash
-python refinedtripfacts-v1.py
-```
 
 ## Airflow (produção)
 

@@ -93,6 +93,7 @@ import_variables() {
   import_variable_file "gtfs_data_expectations_stop_times.json"
   import_variable_file "gtfs_data_expectations_trip_details.json"
   import_variable_file "refinedfinishedtrips_general.json"
+  import_variable_file "refinedtripfacts_general.json"
   import_variable_file "updatelatestpositions_general.json"
 }
 

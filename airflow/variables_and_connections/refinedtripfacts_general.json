@@ -1,0 +1,18 @@
+{
+  "refinedtripfacts_general": {
+    "tables": {
+      "finished_trips_table_name": "refined.finished_trips",
+      "trip_facts_table_name": "refined.trip_facts",
+      "dim_time_table_name": "refined.dim_time"
+    },
+    "quality": {
+      "completeness_loss_rate_warn_threshold": 0.01,
+      "completeness_loss_rate_fail_threshold": 0.05,
+      "avg_speed_kmh_max": 120.0
+    },
+    "storage": {
+      "metadata_bucket": "metadata",
+      "quality_report_folder": "quality-reports"
+    }
+  }
+}

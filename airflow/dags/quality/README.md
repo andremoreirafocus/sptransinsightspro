@@ -34,6 +34,8 @@ Returns a dict with:
 
 Shared quality reporting infrastructure used by all pipelines. Provides the common contract for building, persisting, and notifying quality reports.
 
+> **Pré-requisito:** as funções cujo resultado se destina a um consumidor de notificação — `build_quality_summary` (cujo bloco de summary é consumido por um `alertservice`) e qualquer caminho de envio via webhook — pressupõem que um `alertservice` faça parte da arquitetura implantada. Esse serviço não está presente em todas as implantações; verifique se ele existe antes de utilizar essas funções.
+
 **`build_quality_report_path(metadata_bucket, quality_report_folder, pipeline_name, batch_ts, filename_suffix="", filename_label=None)`**
 Builds the partitioned MinIO path for a quality report.
 `pipeline_name` controls the sub-directory; `filename_label` controls the name token in the filename (defaults to `pipeline_name` when omitted). Use `filename_label` when the two differ — for example `transformlivedata` reports live under `transformlivedata/` but are named `quality-report-positions_{HHMM}.json`.
