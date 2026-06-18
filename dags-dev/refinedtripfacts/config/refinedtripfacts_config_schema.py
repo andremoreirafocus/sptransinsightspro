@@ -17,10 +17,17 @@ class QualityConfig(BaseModel):
     avg_speed_kmh_max: float
 
 
+class StorageConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    metadata_bucket: str
+    quality_report_folder: str
+
+
 class GeneralConfig(BaseModel):
     model_config = ConfigDict(extra="forbid")
     tables: TablesConfig
     quality: QualityConfig
+    storage: StorageConfig
 
 
 def validate_general_input(

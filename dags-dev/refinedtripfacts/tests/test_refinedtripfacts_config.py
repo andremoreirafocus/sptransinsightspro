@@ -18,6 +18,10 @@ def make_valid_general():
             "completeness_loss_rate_fail_threshold": 0.05,
             "avg_speed_kmh_max": 120.0,
         },
+        "storage": {
+            "metadata_bucket": "metadata",
+            "quality_report_folder": "quality-reports",
+        },
     }
 
 
