@@ -75,9 +75,9 @@ else:
     def main():
         year = 2026
         month = 6
-        day = 8
-        hour = 15
-        minute = 0
+        day = 18
+        hour = 21
+        minute = 18
         test_logic_date = f"{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00+00:00"
         build_trip_facts(logic_date_str=test_logic_date)
 

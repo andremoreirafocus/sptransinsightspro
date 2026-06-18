@@ -100,7 +100,6 @@ DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
-DB_SSLMODE="prefer"
 MINIO_ENDPOINT=<hostname:port>
 ACCESS_KEY=<key>
 SECRET_KEY=<secret>
