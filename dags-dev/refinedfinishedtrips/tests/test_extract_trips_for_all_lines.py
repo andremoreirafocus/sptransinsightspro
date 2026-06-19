@@ -266,3 +266,14 @@ def test_logic_date_passed_to_save_finished_trips_to_db():
     assert recorder.save_calls[0]["logic_date"] is not None
 
 
+def test_logic_date_passed_to_positions_quality_validation():
+    from datetime import datetime
+    deps, recorder = FakeRefinedFinishedTripsOrchestrationDependencies.create_scenario()
+    extract_trips_for_all_Lines_and_vehicles(
+        make_config(),
+        deps,
+        correlation_id="test-correlation-id",
+        logic_date_str="2026-06-01T00:00:00+00:00",
+    )
+    assert len(recorder.positions_quality_calls) == 1
+    assert recorder.positions_quality_calls[0]["reference_datetime"] == datetime.fromisoformat("2026-06-01T00:00:00+00:00")

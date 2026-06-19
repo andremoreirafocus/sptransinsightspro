@@ -10,7 +10,7 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def get_recent_positions(config: Dict[str, Any], logic_date_str: str, duckdb_client: Optional[Any] = None) -> pd.DataFrame:
+def get_recent_positions(config: Dict[str, Any], logic_date: datetime, duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config):
         general = config["general"]
         analysis = general["analysis"]
@@ -39,12 +39,11 @@ def get_recent_positions(config: Dict[str, Any], logic_date_str: str, duckdb_cli
         positions_table_name,
         connection,
     ) = get_config(config)
-    # now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
-    now: datetime = datetime.fromisoformat(logic_date_str).astimezone(ZoneInfo("America/Sao_Paulo"))
-    year = now.strftime("%Y")
-    month = now.strftime("%m")
-    day = now.strftime("%d")
-    current_hour = int(now.strftime("%H"))
+    logic_date_sp = logic_date.astimezone(ZoneInfo("America/Sao_Paulo"))
+    year = logic_date_sp.strftime("%Y")
+    month = logic_date_sp.strftime("%m")
+    day = logic_date_sp.strftime("%d")
+    current_hour = int(logic_date_sp.strftime("%H"))
     min_hour = current_hour - hours_interval
     if min_hour < 0:
         min_hour = 0

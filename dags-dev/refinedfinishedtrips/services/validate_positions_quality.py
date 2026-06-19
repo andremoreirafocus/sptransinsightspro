@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Dict, Optional
+from datetime import datetime, timedelta
+from typing import Any, Dict
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -9,11 +9,11 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def _now_utc() -> datetime:
-    return datetime.now(timezone.utc)
-
-
-def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
+def evaluate_freshness(
+    config: Dict[str, Any],
+    df: pd.DataFrame,
+    reference_datetime: datetime,
+) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -32,13 +32,12 @@ def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optiona
         structured_logger.warning(event="freshness_evaluation", message="Freshness evaluation", metadata=result)
         return result
 
-    now_utc = (now_fn or _now_utc)()
-    now_sp_naive = now_utc.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+    reference_sp_naive = reference_datetime.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
     latest_ts = df["veiculo_ts"].max()
     # Normalize to SP-naive regardless of whether the parquet column is tz-aware
     if latest_ts.tzinfo is not None:
         latest_ts = latest_ts.tz_convert(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
-    lag_minutes = (now_sp_naive - latest_ts).total_seconds() / 60
+    lag_minutes = (reference_sp_naive - latest_ts).total_seconds() / 60
 
     result = {
         "observed_lag_minutes": round(lag_minutes, 2),
@@ -49,7 +48,11 @@ def evaluate_freshness(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optiona
     return result
 
 
-def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
+def evaluate_recent_gaps(
+    config: Dict[str, Any],
+    df: pd.DataFrame,
+    reference_datetime: datetime,
+) -> Dict[str, Any]:
     def get_config(config):
         quality = config["general"]["quality"]
         return (
@@ -71,14 +74,13 @@ def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optio
         structured_logger.warning(event="recent_gaps_evaluation", message="Recent gaps evaluation", metadata=result)
         return result
 
-    now_utc = (now_fn or _now_utc)()
     # DuckDB strips tz when returning tz-aware timestamps into pandas, yielding
     # datetime64[us] (tz-naive) with SP-local values. Match the cutoff accordingly.
     if isinstance(df["extracao_ts"].dtype, pd.DatetimeTZDtype):
-        cutoff = now_utc - timedelta(minutes=recent_window)
+        cutoff = reference_datetime - timedelta(minutes=recent_window)
     else:
-        now_sp_naive = now_utc.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
-        cutoff = now_sp_naive - timedelta(minutes=recent_window)
+        reference_sp_naive = reference_datetime.astimezone(ZoneInfo("America/Sao_Paulo")).replace(tzinfo=None)
+        cutoff = reference_sp_naive - timedelta(minutes=recent_window)
     recent_ts = (
         df[df["extracao_ts"] >= cutoff]["extracao_ts"]
         .drop_duplicates()
@@ -113,9 +115,13 @@ def evaluate_recent_gaps(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optio
     return result
 
 
-def validate_positions_quality(config: Dict[str, Any], df: pd.DataFrame, now_fn: Optional[Callable[[], datetime]] = None) -> Dict[str, Any]:
-    freshness = evaluate_freshness(config, df, now_fn)
-    gaps = evaluate_recent_gaps(config, df, now_fn)
+def validate_positions_quality(
+    config: Dict[str, Any],
+    df: pd.DataFrame,
+    reference_datetime: datetime,
+) -> Dict[str, Any]:
+    freshness = evaluate_freshness(config, df, reference_datetime=reference_datetime)
+    gaps = evaluate_recent_gaps(config, df, reference_datetime=reference_datetime)
 
     checks = []
 

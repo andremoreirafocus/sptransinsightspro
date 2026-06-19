@@ -13,6 +13,7 @@ _BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
 @dataclass
 class OrchestrationCallRecorder:
     save_calls: list = field(default_factory=list)
+    positions_quality_calls: list = field(default_factory=list)
     failure_report_calls: list = field(default_factory=list)
     final_report_calls: list = field(default_factory=list)
 
@@ -50,10 +51,11 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 return pipeline_name_or_config
             return {}
 
-        def get_recent_positions(config, logic_date_str):
+        def get_recent_positions(config, logic_date):
             return cls._default_positions_df()
 
-        def validate_positions_quality(config, df):
+        def validate_positions_quality(config, df, reference_datetime):
+            recorder.positions_quality_calls.append({"reference_datetime": reference_datetime, "row_count": len(df)})
             if positions_status == "FAIL":
                 return {
                     "status": "FAIL",
