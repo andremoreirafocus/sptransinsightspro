@@ -2,41 +2,45 @@
   "summary": {
     "contract_version": "v1",
     "pipeline": "refinedtripfacts",
-    "execution_id": "394a9854-dd45-46d6-8ce8-73c655302e97",
+    "execution_id": "e921501c-41e7-4cea-93b6-a688fa6b28cf",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
     "items_failed": 0,
-    "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=18/hour=21/quality-report-refinedtripfacts_2128_394a9854.json",
-    "generated_at_utc": "2026-06-18T21:28:31.583737+00:00",
-    "finished_trips_read": 20,
-    "facts_derived": 20,
-    "inserted_rows": 20,
+    "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=19/hour=01/quality-report-refinedtripfacts_0145_e921501c.json",
+    "generated_at_utc": "2026-06-19T01:45:27.874640+00:00",
+    "finished_trips_read": 172,
+    "expected_count": 24,
+    "existing_count": 24,
+    "facts_derived": 172,
+    "inserted_rows": 172,
     "skipped_rows": 0,
-    "persisted_facts": 20,
+    "persisted_facts": 172,
     "uncovered_dim_keys": 0,
     "loss_rate": 0.0,
     "drift_detected": false
   },
   "details": {
-    "execution_id": "394a9854-dd45-46d6-8ce8-73c655302e97",
+    "execution_id": "e921501c-41e7-4cea-93b6-a688fa6b28cf",
     "status": "PASS",
     "failure_phase": null,
     "failure_message": null,
     "phases": {
       "input_trips_measurement": {
-        "finished_trips_read": 20
+        "finished_trips_read": 172
       },
       "dim_time_provisioning": {
-        "rows_ensured": 24
+        "rows_ensured": 0,
+        "expected_count": 24,
+        "existing_count": 24
       },
       "trip_facts_creation": {
-        "facts_derived": 20,
-        "inserted_rows": 20,
+        "facts_derived": 172,
+        "inserted_rows": 172,
         "skipped_rows": 0
       },
       "trip_facts_verification": {
-        "persisted_facts": 20,
+        "persisted_facts": 172,
         "negative_duration": 0,
         "negative_distance": 0,
         "time_incoherent": 0,
@@ -46,14 +50,14 @@
       "data_quality_validation": {
         "status": "PASS",
         "loss_rate": 0.0,
-        "persisted_facts": 20,
-        "finished_trips_read": 20,
+        "persisted_facts": 172,
+        "finished_trips_read": 172,
         "checks": [
           {
             "check": "completeness",
             "status": "PASS",
-            "finished_trips_read": 20,
-            "persisted_facts": 20,
+            "finished_trips_read": 172,
+            "persisted_facts": 172,
             "loss_rate": 0.0,
             "warn_threshold": 0.01,
             "fail_threshold": 0.05
@@ -76,7 +80,7 @@
       }
     },
     "artifacts": {
-      "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=18/hour=21/quality-report-refinedtripfacts_2128_394a9854.json",
+      "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=19/hour=01/quality-report-refinedtripfacts_0145_e921501c.json",
       "column_lineage": {
         "table_name": "trip_facts",
         "columns": {

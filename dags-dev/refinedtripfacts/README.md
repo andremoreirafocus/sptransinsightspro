@@ -79,6 +79,50 @@ A observabilidade é baseada em logging estruturado: todos os eventos são emiti
 
 O dashboard Grafana `refinedtripfacts` (`observability/grafana/provisioning/dashboards/refinedtripfacts.json`) cobre: saúde de execução, duração por fase, volume e taxas de perda, violações de domínio, cobertura de dim_time e stream de logs. As regras de alerta Loki estão em `observability/loki/rules/fake/refinedtripfacts-alerts.yaml`.
 
+#### Dashboard Grafana
+
+O dashboard está em [`observability/grafana/provisioning/dashboards/refinedtripfacts.json`](../../../../observability/grafana/provisioning/dashboards/refinedtripfacts.json) e é provisionado automaticamente pelo Grafana. Utiliza Loki como datasource. Todas as queries seguem o padrão:
+
+```
+{service="airflow_tasks"} | json | service_extracted="refinedtripfacts" | event="<evento>"
+```
+
+![Dashboard refinedtripfacts](refinedtripfacts_dashboard.png)
+
+O dashboard está organizado em três linhas de métricas e uma linha de logs:
+
+**Linha 1 — Saúde de execução**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Executions | Timeseries (pontos) | Execuções concluídas (verde) e abortadas (vermelho) ao longo do tempo | `execution_finished` e `execution_aborted` — `count_over_time [2m]` |
+| Completed (last 1h) | Stat | Total de execuções bem-sucedidas na última hora | `execution_finished` — `count_over_time [1h]` |
+| Aborted (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções abortadas na última hora | `execution_aborted` — `count_over_time [1h]` |
+| Execution duration (s) | Timeseries | Duração média por fase: `total`, `config_load`, `input_trips_measurement`, `dim_time_provisioning`, `trip_facts_creation`, `trip_facts_verification`, `data_quality_validation`, `quality_report` | `execution_phase_metrics` — `metadata.phase_metrics.<fase>.duration_seconds` via `avg_over_time [5m]` |
+
+**Linha 2 — Volume e taxas**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Finished trips read | Timeseries | Viagens finalizadas lidas por execução — baseline de volume de entrada | `input_trips_measurement_succeeded` — `metadata.finished_trips_read` via `last_over_time [5m]` |
+| Facts Derivation loss rate | Timeseries | Taxa de perda entre `finished_trips_read` e `persisted_facts`; escala 0–100% | `quality_report_metrics` — `metadata.loss_rate` via `last_over_time [5m]` |
+| Facts Insertion loss rate | Timeseries | Taxa de perda entre `facts_derived` e linhas inseridas (`skipped_rows / facts_derived`); escala 0–100% | `quality_report_metrics` — expressão matemática `skipped_rows / facts_derived` |
+
+**Linha 3 — Qualidade**
+
+| Painel | Tipo | O que mostra | Evento Loki / campo |
+|---|---|---|---|
+| Facts Derivation violations | Timeseries | Violações de domínio por execução: `negative_duration`, `negative_distance`, `time_incoherent`, `implausible_speed`; linha de alerta em 1 | `trip_facts_verification_succeeded` — `metadata.<violação>` via `last_over_time [5m]` |
+| Dim time keys: expected vs existing | Timeseries | Chaves de dim_time necessárias vs. já existentes antes do provisionamento | `quality_report_metrics` — `metadata.expected_count`, `metadata.existing_count` via `last_over_time [5m]` |
+| Uncovered dim_time keys | Timeseries | Fatos persistidos sem chave correspondente em `dim_time`; deve ser sempre zero; linha de alerta em 1 | `quality_report_metrics` — `metadata.uncovered_dim_keys` via `last_over_time [5m]` |
+
+**Linha 4 — Logs**
+
+| Painel | O que mostra |
+|---|---|
+| Recent aborted executions | Stream filtrado dos eventos `execution_aborted` com fase e mensagem de falha |
+| Log stream | Todos os eventos do pipeline em ordem decrescente |
+
 ## Pré-requisitos
 
 - Tabelas `refined.trip_facts` e `refined.dim_time` existentes no banco `sptrans_insights` (criadas via `automation/bootstrap_postgres.sh`)
