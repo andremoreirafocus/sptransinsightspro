@@ -50,6 +50,7 @@ def provision_dim_time(
 
     finished_trips_table, dim_time_table, db_uri = get_config(config)
     engine = engine_factory(db_uri)
+    min_ts = max_ts = expected_count = existing_count = None
     try:
         with engine.begin() as conn:
             span_result = conn.execute(
@@ -63,6 +64,11 @@ def provision_dim_time(
             min_ts, max_ts = row[0], row[1]
             min_date = min_ts.astimezone(_SP).date()
             max_date = max_ts.astimezone(_SP).date()
+            structured_logger.info(
+                event="dim_time_provisioning_trips_min_max_ts",
+                message="Trip time span derived from finished_trips",
+                metadata={"min_ts": str(min_ts), "max_ts": str(max_ts)},
+            )
             expected_count = ((max_date - min_date).days + 1) * 24
 
             count_result = conn.execute(
@@ -75,7 +81,7 @@ def provision_dim_time(
             existing_count = count_result.fetchone()[0]
 
             if existing_count >= expected_count:
-                return {"rows_ensured": 0}
+                return {"rows_ensured": 0, "expected_count": expected_count, "existing_count": existing_count}
 
             rows = _generate_dim_rows(min_date, max_date)
             insert_result = conn.execute(
@@ -87,7 +93,7 @@ def provision_dim_time(
                 ),
                 rows,
             )
-            return {"rows_ensured": insert_result.rowcount}
+            return {"rows_ensured": insert_result.rowcount, "expected_count": expected_count, "existing_count": existing_count}
     except Exception as e:
         structured_logger.error(
             event="dim_time_provisioning_failed",
@@ -99,6 +105,10 @@ def provision_dim_time(
                 "logic_date": str(logic_date),
                 "finished_trips_table": finished_trips_table,
                 "dim_time_table": dim_time_table,
+                "min_ts": str(min_ts),
+                "max_ts": str(max_ts),
+                "expected_count": expected_count,
+                "existing_count": existing_count,
             },
         )
         raise ValueError(

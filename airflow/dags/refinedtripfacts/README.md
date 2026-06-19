@@ -35,6 +35,8 @@ O status final é o pior dos três checks: PASS < WARN < FAIL.
 
 O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.trip_facts`, validada contra o contrato real de saída. Se houver divergência, o artefato registra `drift_detected: true` — sem interromper a execução.
 
+Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedtripfacts_2128_394a9854.json](./samples/quality-report-refinedtripfacts_2128_394a9854.json).
+
 ### Taxonomia de eventos
 
 #### Eventos do orquestrador
@@ -45,10 +47,10 @@ O relatório final também inclui, em `details.artifacts.column_lineage`, a linh
 | `execution_finished` | Execução concluída com sucesso | `execution_id`, `status` |
 | `execution_aborted` | Qualquer fase falha e interrompe | `execution_id`, `status`, `metadata.phase` |
 | `execution_phase_metrics` | Ao final de toda execução | Duração e status de cada fase em `metadata.phase_metrics` |
-| `quality_report_metrics` | Após geração do relatório | Métricas de volume e qualidade em `metadata` |
+| `quality_report_metrics` | Após geração do relatório | Métricas de volume e qualidade em `metadata`: `finished_trips_read`, `expected_count`, `existing_count`, `facts_derived`, `inserted_rows`, `skipped_rows`, `persisted_facts`, `uncovered_dim_keys`, `loss_rate`, `drift_detected` |
 | `config_load_started` / `config_load_succeeded` | Fase de carregamento de configuração | — |
 | `input_trips_measurement_started` / `input_trips_measurement_succeeded` | Fase de medição de entradas | `finished_trips_read` em `_succeeded` |
-| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Fase de provisionamento | `rows_ensured` em `_succeeded` |
+| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Fase de provisionamento | `rows_ensured`, `expected_count`, `existing_count` em `_succeeded` |
 | `trip_facts_creation_started` / `trip_facts_creation_succeeded` | Fase de criação | `facts_derived`, `inserted_rows`, `skipped_rows` em `_succeeded` |
 | `trip_facts_verification_started` / `trip_facts_verification_succeeded` | Fase de verificação (read-back) | métricas de verificação em `_succeeded` |
 | `data_quality_validation_started` / `data_quality_validation_succeeded` | Fase de validação de qualidade | veredicto dos três checks em `_succeeded` |
@@ -61,6 +63,7 @@ Emitidos pelo serviço antes de levantar exceção (o orquestrador apenas roteia
 | Evento | Quando |
 |---|---|
 | `input_trips_measurement_failed` | Falha de DB na medição de entradas |
+| `dim_time_provisioning_trips_min_max_ts` | Intervalo de timestamps das viagens derivado de `finished_trips` (info de debug; não compõe o relatório de qualidade) |
 | `dim_time_provisioning_failed` | Falha de DB no provisionamento |
 | `trip_facts_creation_failed` | Falha de DB na criação de fatos |
 | `persisted_facts_measurement_failed` | Falha de DB na verificação (read-back) |
@@ -73,6 +76,8 @@ A observabilidade é baseada em logging estruturado: todos os eventos são emiti
 ```
 {service="airflow_tasks"} | json | service_extracted="refinedtripfacts" | event="<evento>"
 ```
+
+O dashboard Grafana `refinedtripfacts` (`observability/grafana/provisioning/dashboards/refinedtripfacts.json`) cobre: saúde de execução, duração por fase, volume e taxas de perda, violações de domínio, cobertura de dim_time e stream de logs. As regras de alerta Loki estão em `observability/loki/rules/fake/refinedtripfacts-alerts.yaml`.
 
 ## Pré-requisitos
 
@@ -117,6 +122,10 @@ Chaves esperadas em `general`:
     "completeness_loss_rate_warn_threshold": 0.01,
     "completeness_loss_rate_fail_threshold": 0.05,
     "avg_speed_kmh_max": 120.0
+  },
+  "storage": {
+    "metadata_bucket": "metadata",
+    "quality_report_folder": "quality-reports"
   }
 }
 ```
@@ -196,6 +205,16 @@ CREATE TABLE refined.dim_time (
 ```
 
 `time_key` formato: `YYYYMMDDHH` no fuso horário `America/Sao_Paulo`. Exemplo: `2026060814` = 8 de junho de 2026 às 14h no horário de São Paulo.
+
+## Instruções para execução em modo local
+
+Crie `dags-dev/refinedtripfacts/.env` com base em `.env.example` preenchendo todos os campos.
+
+Com as tabelas já criadas conforme instruções acima, ajuste a data de teste em `refinedtripfacts-v1.py` e execute:
+
+```bash
+python refinedtripfacts-v1.py
+```
 
 ## Airflow (produção)
 

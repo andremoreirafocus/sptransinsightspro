@@ -1,0 +1,231 @@
+{
+  "summary": {
+    "contract_version": "v1",
+    "pipeline": "refinedtripfacts",
+    "execution_id": "394a9854-dd45-46d6-8ce8-73c655302e97",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "items_failed": 0,
+    "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=18/hour=21/quality-report-refinedtripfacts_2128_394a9854.json",
+    "generated_at_utc": "2026-06-18T21:28:31.583737+00:00",
+    "finished_trips_read": 20,
+    "facts_derived": 20,
+    "inserted_rows": 20,
+    "skipped_rows": 0,
+    "persisted_facts": 20,
+    "uncovered_dim_keys": 0,
+    "loss_rate": 0.0,
+    "drift_detected": false
+  },
+  "details": {
+    "execution_id": "394a9854-dd45-46d6-8ce8-73c655302e97",
+    "status": "PASS",
+    "failure_phase": null,
+    "failure_message": null,
+    "phases": {
+      "input_trips_measurement": {
+        "finished_trips_read": 20
+      },
+      "dim_time_provisioning": {
+        "rows_ensured": 24
+      },
+      "trip_facts_creation": {
+        "facts_derived": 20,
+        "inserted_rows": 20,
+        "skipped_rows": 0
+      },
+      "trip_facts_verification": {
+        "persisted_facts": 20,
+        "negative_duration": 0,
+        "negative_distance": 0,
+        "time_incoherent": 0,
+        "implausible_speed": 0,
+        "uncovered_dim_keys": 0
+      },
+      "data_quality_validation": {
+        "status": "PASS",
+        "loss_rate": 0.0,
+        "persisted_facts": 20,
+        "finished_trips_read": 20,
+        "checks": [
+          {
+            "check": "completeness",
+            "status": "PASS",
+            "finished_trips_read": 20,
+            "persisted_facts": 20,
+            "loss_rate": 0.0,
+            "warn_threshold": 0.01,
+            "fail_threshold": 0.05
+          },
+          {
+            "check": "dim_time_coverage",
+            "status": "PASS",
+            "uncovered_dim_keys": 0
+          },
+          {
+            "check": "value_domain",
+            "status": "PASS",
+            "negative_duration": 0,
+            "negative_distance": 0,
+            "time_incoherent": 0,
+            "implausible_speed": 0,
+            "avg_speed_kmh_max": 120.0
+          }
+        ]
+      }
+    },
+    "artifacts": {
+      "quality_report_path": "metadata/quality-reports/refinedtripfacts/year=2026/month=06/day=18/hour=21/quality-report-refinedtripfacts_2128_394a9854.json",
+      "column_lineage": {
+        "table_name": "trip_facts",
+        "columns": {
+          "trip_id": {
+            "sources": [
+              "finished_trips.trip_id"
+            ],
+            "derivation": "copied",
+            "expected_type": "text"
+          },
+          "vehicle_id": {
+            "sources": [
+              "finished_trips.vehicle_id"
+            ],
+            "derivation": "copied",
+            "expected_type": "integer"
+          },
+          "route_id": {
+            "sources": [
+              "finished_trips.trip_id"
+            ],
+            "derivation": "left(trip_id, length(trip_id) - 2)",
+            "expected_type": "text"
+          },
+          "direction": {
+            "sources": [
+              "finished_trips.trip_id"
+            ],
+            "derivation": "CASE right(trip_id,1) WHEN '0' THEN 1 WHEN '1' THEN 2 END",
+            "expected_type": "smallint"
+          },
+          "started_at": {
+            "sources": [
+              "finished_trips.trip_start_time"
+            ],
+            "derivation": "renamed",
+            "expected_type": "timestamp with time zone"
+          },
+          "ended_at": {
+            "sources": [
+              "finished_trips.trip_end_time"
+            ],
+            "derivation": "renamed",
+            "expected_type": "timestamp with time zone"
+          },
+          "duration_seconds": {
+            "sources": [
+              "finished_trips.duration_seconds"
+            ],
+            "derivation": "copied",
+            "expected_type": "integer"
+          },
+          "duration": {
+            "sources": [
+              "finished_trips.duration_seconds"
+            ],
+            "derivation": "make_interval(secs => duration_seconds)",
+            "expected_type": "interval"
+          },
+          "is_circular": {
+            "sources": [
+              "finished_trips.is_circular"
+            ],
+            "derivation": "copied",
+            "expected_type": "boolean"
+          },
+          "distance_meters": {
+            "sources": [
+              "finished_trips.distance_meters"
+            ],
+            "derivation": "copied",
+            "expected_type": "double precision"
+          },
+          "avg_speed_kmh": {
+            "sources": [
+              "finished_trips.avg_speed_kmh"
+            ],
+            "derivation": "copied",
+            "expected_type": "double precision"
+          },
+          "started_at_time_dim_key": {
+            "sources": [
+              "started_at"
+            ],
+            "derivation": "to_char(started_at AT TIME ZONE 'America/Sao_Paulo','YYYYMMDDHH24')::int",
+            "expected_type": "integer"
+          },
+          "ended_at_time_dim_key": {
+            "sources": [
+              "ended_at"
+            ],
+            "derivation": "to_char(ended_at AT TIME ZONE 'America/Sao_Paulo','YYYYMMDDHH24')::int",
+            "expected_type": "integer"
+          },
+          "logic_date": {
+            "sources": [
+              "finished_trips.logic_date"
+            ],
+            "derivation": "copied",
+            "expected_type": "timestamp with time zone"
+          },
+          "created_at": {
+            "sources": [],
+            "derivation": "column DEFAULT NOW()",
+            "expected_type": "timestamp with time zone"
+          }
+        },
+        "drift_detected": false,
+        "warning": null,
+        "validation": {
+          "expected_columns": [
+            "avg_speed_kmh",
+            "created_at",
+            "direction",
+            "distance_meters",
+            "duration",
+            "duration_seconds",
+            "ended_at",
+            "ended_at_time_dim_key",
+            "is_circular",
+            "logic_date",
+            "route_id",
+            "started_at",
+            "started_at_time_dim_key",
+            "trip_id",
+            "vehicle_id"
+          ],
+          "actual_columns": [
+            "avg_speed_kmh",
+            "created_at",
+            "direction",
+            "distance_meters",
+            "duration",
+            "duration_seconds",
+            "ended_at",
+            "ended_at_time_dim_key",
+            "is_circular",
+            "logic_date",
+            "route_id",
+            "started_at",
+            "started_at_time_dim_key",
+            "trip_id",
+            "vehicle_id"
+          ],
+          "columns_added": [],
+          "columns_removed": [],
+          "columns_type_changed": []
+        }
+      }
+    }
+  }
+}

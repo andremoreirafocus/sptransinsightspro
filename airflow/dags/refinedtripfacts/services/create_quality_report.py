@@ -56,6 +56,8 @@ def create_final_quality_report(
         items_failed=0,
         quality_report_path=report_path,
         finished_trips_read=measurement_result.get("finished_trips_read"),
+        expected_count=dim_time_result.get("expected_count"),
+        existing_count=dim_time_result.get("existing_count"),
         facts_derived=creation_result.get("facts_derived"),
         inserted_rows=creation_result.get("inserted_rows"),
         skipped_rows=creation_result.get("skipped_rows"),
@@ -122,6 +124,8 @@ def create_failure_quality_report(
     extra: Dict[str, Any] = {}
     if measurement_result:
         extra["finished_trips_read"] = measurement_result.get("finished_trips_read")
+    if dim_time_result:
+        extra.update({k: dim_time_result[k] for k in ("rows_ensured", "expected_count", "existing_count") if k in dim_time_result})
     if persisted_metrics:
         extra.update({k: persisted_metrics[k] for k in ("persisted_facts", "uncovered_dim_keys") if k in persisted_metrics})
     if creation_result:
