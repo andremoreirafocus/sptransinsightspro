@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
@@ -10,7 +10,7 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
+def get_recent_positions(config: Dict[str, Any], logic_date_str: str, duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config):
         general = config["general"]
         analysis = general["analysis"]
@@ -39,7 +39,8 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
         positions_table_name,
         connection,
     ) = get_config(config)
-    now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
+    # now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
+    now: datetime = datetime.fromisoformat(logic_date_str).astimezone(ZoneInfo("America/Sao_Paulo"))
     year = now.strftime("%Y")
     month = now.strftime("%m")
     day = now.strftime("%d")

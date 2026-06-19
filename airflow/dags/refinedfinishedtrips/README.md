@@ -278,7 +278,6 @@ DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
-DB_SSLMODE="prefer"
 
 Chaves esperadas em `general`
 ```json

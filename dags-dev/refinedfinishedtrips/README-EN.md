@@ -292,7 +292,6 @@ DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
-DB_SSLMODE="prefer"
 ```
 
 Expected keys in `general`:

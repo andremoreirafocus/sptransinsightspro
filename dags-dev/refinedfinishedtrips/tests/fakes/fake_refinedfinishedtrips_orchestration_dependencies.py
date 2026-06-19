@@ -50,7 +50,7 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 return pipeline_name_or_config
             return {}
 
-        def get_recent_positions(config):
+        def get_recent_positions(config, logic_date_str):
             return cls._default_positions_df()
 
         def validate_positions_quality(config, df):

@@ -116,7 +116,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     )
     tracker.begin("positions_load")
     try:
-        df_recent_positions = deps.get_recent_positions(pipeline_config)
+        df_recent_positions = deps.get_recent_positions(pipeline_config, logic_date_str)
         tracker.finish("positions_load", "success")
     except Exception as exc:
         tracker.finish("positions_load", "failed")
