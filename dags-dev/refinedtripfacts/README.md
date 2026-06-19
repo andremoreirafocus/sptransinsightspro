@@ -47,10 +47,10 @@ Na pasta [samples](./samples) há um exemplo curado manualmente do relatório co
 | `execution_finished` | Execução concluída com sucesso | `execution_id`, `status` |
 | `execution_aborted` | Qualquer fase falha e interrompe | `execution_id`, `status`, `metadata.phase` |
 | `execution_phase_metrics` | Ao final de toda execução | Duração e status de cada fase em `metadata.phase_metrics` |
-| `quality_report_metrics` | Após geração do relatório | Métricas de volume e qualidade em `metadata` |
+| `quality_report_metrics` | Após geração do relatório | Métricas de volume e qualidade em `metadata`: `finished_trips_read`, `expected_count`, `existing_count`, `facts_derived`, `inserted_rows`, `skipped_rows`, `persisted_facts`, `uncovered_dim_keys`, `loss_rate`, `drift_detected` |
 | `config_load_started` / `config_load_succeeded` | Fase de carregamento de configuração | — |
 | `input_trips_measurement_started` / `input_trips_measurement_succeeded` | Fase de medição de entradas | `finished_trips_read` em `_succeeded` |
-| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Fase de provisionamento | `rows_ensured` em `_succeeded` |
+| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Fase de provisionamento | `rows_ensured`, `expected_count`, `existing_count` em `_succeeded` |
 | `trip_facts_creation_started` / `trip_facts_creation_succeeded` | Fase de criação | `facts_derived`, `inserted_rows`, `skipped_rows` em `_succeeded` |
 | `trip_facts_verification_started` / `trip_facts_verification_succeeded` | Fase de verificação (read-back) | métricas de verificação em `_succeeded` |
 | `data_quality_validation_started` / `data_quality_validation_succeeded` | Fase de validação de qualidade | veredicto dos três checks em `_succeeded` |
@@ -63,6 +63,7 @@ Emitidos pelo serviço antes de levantar exceção (o orquestrador apenas roteia
 | Evento | Quando |
 |---|---|
 | `input_trips_measurement_failed` | Falha de DB na medição de entradas |
+| `dim_time_provisioning_trips_min_max_ts` | Intervalo de timestamps das viagens derivado de `finished_trips` (info de debug; não compõe o relatório de qualidade) |
 | `dim_time_provisioning_failed` | Falha de DB no provisionamento |
 | `trip_facts_creation_failed` | Falha de DB na criação de fatos |
 | `persisted_facts_measurement_failed` | Falha de DB na verificação (read-back) |
@@ -75,6 +76,8 @@ A observabilidade é baseada em logging estruturado: todos os eventos são emiti
 ```
 {service="airflow_tasks"} | json | service_extracted="refinedtripfacts" | event="<evento>"
 ```
+
+O dashboard Grafana `refinedtripfacts` (`observability/grafana/provisioning/dashboards/refinedtripfacts.json`) cobre: saúde de execução, duração por fase, volume e taxas de perda, violações de domínio, cobertura de dim_time e stream de logs. As regras de alerta Loki estão em `observability/loki/rules/fake/refinedtripfacts-alerts.yaml`.
 
 ## Pré-requisitos
 

@@ -47,10 +47,10 @@ In the [samples](./samples) folder there is a manually curated example of the co
 | `execution_finished` | Execution completed successfully | `execution_id`, `status` |
 | `execution_aborted` | Any phase fails and stops execution | `execution_id`, `status`, `metadata.phase` |
 | `execution_phase_metrics` | At the end of every execution | Duration and status of each phase in `metadata.phase_metrics` |
-| `quality_report_metrics` | After quality report generation | Volume and quality metrics in `metadata` |
+| `quality_report_metrics` | After quality report generation | Volume and quality metrics in `metadata`: `finished_trips_read`, `expected_count`, `existing_count`, `facts_derived`, `inserted_rows`, `skipped_rows`, `persisted_facts`, `uncovered_dim_keys`, `loss_rate`, `drift_detected` |
 | `config_load_started` / `config_load_succeeded` | Configuration loading phase | — |
 | `input_trips_measurement_started` / `input_trips_measurement_succeeded` | Input measurement phase | `finished_trips_read` on `_succeeded` |
-| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Provisioning phase | `rows_ensured` on `_succeeded` |
+| `dim_time_provisioning_started` / `dim_time_provisioning_succeeded` | Provisioning phase | `rows_ensured`, `expected_count`, `existing_count` on `_succeeded` |
 | `trip_facts_creation_started` / `trip_facts_creation_succeeded` | Creation phase | `facts_derived`, `inserted_rows`, `skipped_rows` on `_succeeded` |
 | `trip_facts_verification_started` / `trip_facts_verification_succeeded` | Verification phase (read-back) | verification metrics on `_succeeded` |
 | `data_quality_validation_started` / `data_quality_validation_succeeded` | Data quality validation phase | verdict of the three checks on `_succeeded` |
@@ -63,6 +63,7 @@ Emitted by the service before raising an exception (the orchestrator only routes
 | Event | When |
 |---|---|
 | `input_trips_measurement_failed` | DB error during input measurement |
+| `dim_time_provisioning_trips_min_max_ts` | Trip timestamp span derived from `finished_trips` (debug info; not included in the quality report) |
 | `dim_time_provisioning_failed` | DB error during provisioning |
 | `trip_facts_creation_failed` | DB error during fact creation |
 | `persisted_facts_measurement_failed` | DB error during read-back verification |
@@ -75,6 +76,8 @@ Observability is based on structured logging: all events are emitted as JSON wit
 ```
 {service="airflow_tasks"} | json | service_extracted="refinedtripfacts" | event="<event>"
 ```
+
+The Grafana dashboard `refinedtripfacts` (`observability/grafana/provisioning/dashboards/refinedtripfacts.json`) covers: execution health, per-phase duration, volume and loss rates, domain violations, dim_time coverage, and log stream. Loki alert rules are in `observability/loki/rules/fake/refinedtripfacts-alerts.yaml`.
 
 ## Prerequisites
 

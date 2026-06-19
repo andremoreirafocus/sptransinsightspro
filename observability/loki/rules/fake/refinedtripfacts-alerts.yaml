@@ -1,0 +1,79 @@
+groups:
+  - name: refinedtripfacts-pipeline-alerts
+    interval: 1m
+    rules:
+      - alert: ExecutionAborted
+        expr: |
+          sum(count_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedtripfacts"
+            | event="execution_aborted"
+            [5m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: refinedtripfacts
+          alertname: execution_aborted
+        annotations:
+          summary: "refinedtripfacts execution aborted"
+          description: "A pipeline execution was aborted in the last 5 minutes. The trip_facts table may be stale or incomplete."
+
+      - alert: NoPipelineExecutionCompleted
+        expr: |
+          absent_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedtripfacts"
+            | event="execution_finished"
+            [1h]
+          )
+        for: 0m
+        labels:
+          severity: critical
+          service: refinedtripfacts
+          alertname: no_pipeline_execution_completed
+        annotations:
+          summary: "refinedtripfacts has not completed any execution in 1 hour"
+          description: "No execution_finished event detected in the last hour. The pipeline may be stuck, failing on every run, or the upstream finished_trips_ready signal has stopped."
+
+      - alert: CompletenessLossRateHigh
+        expr: |
+          max_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedtripfacts"
+            | event="quality_report_metrics"
+            | json v="metadata.loss_rate"
+            | unwrap v
+            [10m]
+          ) > 0.01
+        for: 0m
+        labels:
+          severity: warning
+          service: refinedtripfacts
+          alertname: completeness_loss_rate_high
+        annotations:
+          summary: "refinedtripfacts completeness loss rate above warn threshold"
+          description: "loss_rate exceeded the warn threshold of 1%. Some finished_trips were not persisted as trip_facts. Trip analytics may be incomplete."
+
+      - alert: DriftDetected
+        expr: |
+          sum(count_over_time(
+            {service="airflow_tasks"}
+            | json
+            | service_extracted="refinedtripfacts"
+            | event="quality_report_metrics"
+            | json
+            | metadata_drift_detected="true"
+            [10m]
+          )) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: refinedtripfacts
+          alertname: drift_detected
+        annotations:
+          summary: "refinedtripfacts column lineage drift detected"
+          description: "drift_detected=true in quality_report_metrics in the last 10 minutes. The trip_facts table schema may have diverged from the expected lineage definition."

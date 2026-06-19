@@ -46,8 +46,8 @@ def make_measurement_result(finished_trips_read=100):
     return {"finished_trips_read": finished_trips_read}
 
 
-def make_dim_time_result(rows_ensured=24):
-    return {"rows_ensured": rows_ensured}
+def make_dim_time_result(rows_ensured=24, expected_count=48, existing_count=0):
+    return {"rows_ensured": rows_ensured, "expected_count": expected_count, "existing_count": existing_count}
 
 
 def make_creation_result(facts_derived=100, inserted_rows=100, skipped_rows=0):
@@ -160,6 +160,8 @@ def test_final_report_summary_contains_key_metrics():
     )
     summary = report["summary"]
     assert summary["finished_trips_read"] == 200
+    assert summary["expected_count"] == 48
+    assert summary["existing_count"] == 0
     assert summary["facts_derived"] == 200
     assert summary["inserted_rows"] == 195
     assert summary["skipped_rows"] == 5
@@ -274,6 +276,9 @@ def test_failure_report_preserves_partial_phase_results():
         creation_result=make_creation_result(facts_derived=50, inserted_rows=50, skipped_rows=0),
         write_fn=write,
     )
+    summary = report["summary"]
+    assert summary["expected_count"] == 48
+    assert summary["existing_count"] == 0
     phases = report["details"]["phases"]
     assert phases["input_trips_measurement"]["finished_trips_read"] == 50
     assert phases["dim_time_provisioning"]["rows_ensured"] == 24

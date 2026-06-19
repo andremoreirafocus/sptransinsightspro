@@ -130,7 +130,7 @@ def test_returns_zero_when_all_rows_already_exist():
         ]
     )
     result = provision_dim_time(LOGIC_DATE, CONFIG, engine_factory=factory)
-    assert result == {"rows_ensured": 0}
+    assert result == {"rows_ensured": 0, "expected_count": 24, "existing_count": 24}
     assert len(factory.engine.executed_statements) == 2
 
 
