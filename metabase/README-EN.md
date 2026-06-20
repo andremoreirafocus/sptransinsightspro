@@ -34,7 +34,7 @@ implement it; the PoC files are not edited to track the dashboard.
 ```
 metabase/
   README.md
-  dashboard_queries/   # authoritative Metabase native-question SQL (P0–P10)
+  dashboard_queries/   # authoritative Metabase native-question SQL (P0–P11)
 ```
 
 ### `dashboard_queries/` → panel map
@@ -49,13 +49,16 @@ metabase/
 | `reliability_by_route.sql`                    | P8          | trip **start** |
 | `avg_speed_by_route_and_hour.sql`             | P9          | trip **start** |
 | `route_summary_with_trip_details.sql`         | P10         | trip **start**, joins `trip_details` on `trip_id` |
+| `live_fleet_positions.sql`                    | P11         | live vehicle snapshot; map by `veiculo_lat`/`veiculo_long` |
+| `live_fleet_positions_freshness.sql`          | P11         | live snapshot; companion card with active-vehicle count and freshness |
 
-> **Pending — `refined.latest_positions` panel (P11).** A live fleet-position panel over
-> `refined.latest_positions` is required but **not yet designed**. Its design is owned by
-> `.plans/metabase-dashboard-panel-design.md` and is a prerequisite before the dashboard is
-> implemented; reader access / datasource visibility for `refined.latest_positions` are
-> handled by `.plans/metabase-complementary-implementation_plan_pending.md`. The query file
-> for it lands here once the panel is designed.
+> **P11 — `refined.latest_positions` panel.** The live fleet-position panel over
+> `refined.latest_positions` is already designed in
+> `.plans/metabase-dashboard-panel-design.md`. Reader access / datasource visibility for
+> `refined.latest_positions` are handled by
+> `.plans/metabase-complementary-implementation_plan_pending.md`, and the authoritative query
+> implementations already live at `metabase/dashboard_queries/live_fleet_positions.sql` and
+> `metabase/dashboard_queries/live_fleet_positions_freshness.sql`.
 
 ## Native-question setup notes
 

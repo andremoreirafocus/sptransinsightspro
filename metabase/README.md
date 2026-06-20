@@ -34,7 +34,7 @@ estes arquivos o implementam; os arquivos de PoC não são editados para acompan
 ```
 metabase/
   README.md
-  dashboard_queries/   # SQL autoritativo das perguntas nativas do Metabase (P0–P10)
+  dashboard_queries/   # SQL autoritativo das perguntas nativas do Metabase (P0–P11)
 ```
 
 ### `dashboard_queries/` → mapa de painéis
@@ -49,14 +49,16 @@ metabase/
 | `reliability_by_route.sql`                    | P8          | **início** da viagem |
 | `avg_speed_by_route_and_hour.sql`             | P9          | **início** da viagem |
 | `route_summary_with_trip_details.sql`         | P10         | **início** da viagem, faz join com `trip_details` por `trip_id` |
+| `live_fleet_positions.sql`                    | P11         | snapshot ao vivo de veículos; mapa por `veiculo_lat`/`veiculo_long` |
+| `live_fleet_positions_freshness.sql`          | P11         | snapshot ao vivo; card companheiro com contagem de veículos e freshness |
 
-> **Pendente — painel de `refined.latest_positions` (P11).** Um painel de posição da frota ao
-> vivo sobre `refined.latest_positions` é necessário, mas **ainda não foi desenhado**. Seu
-> design é de responsabilidade de `.plans/metabase-dashboard-panel-design.md` e é pré-requisito
-> antes da implementação do dashboard; o acesso de leitura / visibilidade do datasource para
-> `refined.latest_positions` são tratados em
-> `.plans/metabase-complementary-implementation_plan_pending.md`. O arquivo de query
-> correspondente é adicionado aqui assim que o painel for desenhado.
+> **P11 — painel de `refined.latest_positions`.** O painel de posição da frota ao vivo sobre
+> `refined.latest_positions` já está desenhado em
+> `.plans/metabase-dashboard-panel-design.md`. O acesso de leitura / visibilidade do datasource
+> para `refined.latest_positions` são tratados em
+> `.plans/metabase-complementary-implementation_plan_pending.md`, e as implementações
+> autoritativas já vivem em `metabase/dashboard_queries/live_fleet_positions.sql` e
+> `metabase/dashboard_queries/live_fleet_positions_freshness.sql`.
 
 ## Notas de configuração das perguntas nativas
 
