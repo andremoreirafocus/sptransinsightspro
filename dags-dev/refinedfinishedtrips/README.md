@@ -8,7 +8,7 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 Para cada linha e veículo: 
 - lê as posições instantâneas armazenadas na tabela de posições armazendas sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora, correspondentes a um período de tempo de análise
 - verifica a qualidade dos dados de posição antes de processar as viagens, executando duas verificações:
-  - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado
+  - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado em relação à `logical_date` da execução, e não em relação ao relógio de parede do ambiente
   - **gaps de extração**: valida se não há lacunas significativas entre os timestamps de extração na janela recente
 - em caso de falha nas verificações de qualidade: interrompe o pipeline e salva um relatório de falha no bucket de metadata
 - em caso de aviso nas verificações de qualidade: salva um relatório parcial no bucket de metadata e continua o processamento
@@ -242,7 +242,7 @@ O dashboard está organizado em quatro linhas de métricas e uma linha de logs:
 |---|---|---|---|
 | Vehicle-line processing failed per run | Timeseries | Grupos linha/veículo com falha de processamento por execução; aumento indica degradação de qualidade nos dados upstream | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
 | Trip extraction max position window gap (s) | Timeseries | Maior lacuna em segundos entre posições consecutivas na janela de extração; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
-| Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e o momento da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
+| Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e a `logical_date` da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
 
 **Linha 5 — Logs**
 

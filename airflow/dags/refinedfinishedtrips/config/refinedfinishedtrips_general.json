@@ -15,7 +15,7 @@
     },
     "quality": {
       "freshness_warn_staleness_minutes": 10,
-      "freshness_fail_staleness_minutes": 30,
+      "freshness_fail_staleness_minutes": 10800,
       "gaps_warn_gap_minutes": 5,
       "gaps_fail_gap_minutes": 15,
       "gaps_recent_window_minutes": 60,

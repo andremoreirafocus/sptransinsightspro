@@ -116,7 +116,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     )
     tracker.begin("positions_load")
     try:
-        df_recent_positions = deps.get_recent_positions(pipeline_config, logic_date_str)
+        df_recent_positions = deps.get_recent_positions(pipeline_config, logic_date)
         tracker.finish("positions_load", "success")
     except Exception as exc:
         tracker.finish("positions_load", "failed")
@@ -133,7 +133,11 @@ def extract_trips_for_all_Lines_and_vehicles(
     )
     tracker.begin("positions_quality")
     try:
-        positions_result = deps.validate_positions_quality(pipeline_config, df_recent_positions)
+        positions_result = deps.validate_positions_quality(
+            pipeline_config,
+            df_recent_positions,
+            reference_datetime=logic_date,
+        )
         state.positions_result = positions_result
         if positions_result["status"] == "FAIL":
             failed_notes = "; ".join(

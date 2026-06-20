@@ -10,7 +10,7 @@ Configuration is loaded automatically through `pipeline_configurator`, according
 For each route and vehicle:
 - reads real-time positions stored in the `positions` table under the `sptrans` area of the trusted bucket in the object storage service, partitioned by year, month, day, and hour, for a given analysis time window
 - checks the quality of position data before processing trips by running two validations:
-  - **freshness**: validates whether the most recent vehicle timestamp is within the expected staleness threshold
+  - **freshness**: validates whether the most recent vehicle timestamp is within the expected staleness threshold relative to the execution `logical_date`, not the environment wall-clock time
   - **extraction gaps**: validates whether there are no significant gaps between extraction timestamps in the recent window
 - if quality checks fail: stops the pipeline and saves a quality report to the metadata bucket
 - if quality checks produce a warning: saves a quality report to the metadata bucket and continues processing
@@ -251,7 +251,7 @@ The dashboard is organized in five rows:
 
 | Panel | Type | What it shows | Thresholds |
 |---|---|---|---|
-| Positions freshness lag (s) | Timeseries | Lag in seconds between the most recent vehicle timestamp and the execution time; alert lines at 600 s (warn) and 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
+| Positions freshness lag (s) | Timeseries | Lag in seconds between the most recent vehicle timestamp and the execution `logical_date`; alert lines at 600 s (warn) and 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
 | Max extraction gap (s) | Timeseries | Largest gap in seconds between consecutive extraction cycles in the recent window; alert lines at 300 s (warn) and 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
 
 **Row 5 — Logs**

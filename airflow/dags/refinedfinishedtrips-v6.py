@@ -3,7 +3,6 @@ from refinedfinishedtrips.extract_trips import (
 )
 from refinedfinishedtrips.domain.logger import RefinedFinishedTripsLogger
 from observability.structured_event_logger import get_structured_logger
-from datetime import datetime, timezone
 import os
 import uuid
 import logging
@@ -92,15 +91,22 @@ if _IN_AIRFLOW:
         )
         extract_trips_task
 else:
-    def extract_trips():
+    def extract_trips(logic_date_str):
         extract_trips_for_all_Lines_and_vehicles(
             PIPELINE_NAME,
             correlation_id=str(uuid.uuid4()),
-            logic_date_str=datetime.now(timezone.utc).replace(second=0, microsecond=0).isoformat(),
+            logic_date_str=logic_date_str,
         )
     
     def main():
-        extract_trips()
+        year = 2026
+        month = 6
+        day = 19
+        hour = 21
+        minute = 10
+        test_logic_date = f"{year}-{month:02d}-{day:02d}T{hour:02d}:{minute:02d}:00+00:00"
+        
+        extract_trips(logic_date_str=test_logic_date)
 
     if __name__ == "__main__":
         main()
