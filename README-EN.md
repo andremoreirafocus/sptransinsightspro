@@ -111,6 +111,7 @@ This script:
 - starts the Airflow application layer and runs its bootstrap
 - runs observability stack bootstrap
 - starts the rest of the platform only after bootstrap completes
+- runs Metabase bootstrap (admin, datasource, and timezone)
 
 If you prefer to start the platform manually, the base command remains:
 

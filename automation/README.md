@@ -30,6 +30,7 @@ Sobe a plataforma com bootstrap prévio da infraestrutura e do Airflow para evit
 8. Executa `bootstrap_observability.sh`
 9. Executa `bootstrap_extractloadlivedata.sh`
 10. Sobe o restante da plataforma com `docker compose up -d`
+11. Executa `bootstrap_metabase.sh`
 
 **Uso:**
 ```bash

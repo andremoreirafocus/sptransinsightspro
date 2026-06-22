@@ -34,6 +34,7 @@ Starts the platform with prior infrastructure and Airflow bootstrap to avoid sta
 8. Runs `bootstrap_observability.sh`
 9. Runs `bootstrap_extractloadlivedata.sh`
 10. Starts the rest of the platform with `docker compose up -d`
+11. Runs `bootstrap_metabase.sh`
 
 **Usage:**
 ```bash
