@@ -133,6 +133,31 @@ cd automation
 
 ---
 
+### `bootstrap_metabase.sh`
+
+Ensures both the infrastructure bootstrap **and** the idempotent provisioning of the Metabase application, so the platform comes up from scratch with no manual UI step.
+
+**What it does, in order:**
+1. Waits until `postgres` becomes available
+2. Runs the SQL bootstrap (`004_metabase.sql`): internal DB, internal user, read-only user, and `SELECT` grants on the `refined` schema
+3. Starts the `metabase` service and waits for `GET /api/health`
+4. **Provisions the Metabase application** (idempotent, via `curl` + `jq` against `http://localhost:3001`):
+   - creates the admin user and completes the wizard (`POST /api/setup`) if not yet set up
+   - sets the query timezone in two layers: a reader-role-scoped session default (`ALTER ROLE … IN DATABASE … SET timezone = 'America/Sao_Paulo'`, authoritative for native SQL) and the Metabase **Report Timezone**
+   - ensures the read-only `sptrans_insights` datasource scoped to the `refined` schema (`host=postgres`)
+   - triggers a schema sync
+   - aborts with a non-zero exit on any non-2xx HTTP response; passwords are never logged
+
+**Required environment variables** (besides the Metabase DB/user ones): `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD` (must satisfy Metabase's password policy). Optional with defaults: `METABASE_ADMIN_FIRST_NAME` (`Admin`), `METABASE_ADMIN_LAST_NAME` (`User`), `METABASE_SITE_NAME` (`SPTrans Insights Pro`). Requires `curl` and `jq` on the host.
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_metabase.sh
+```
+
+---
+
 ### `promote_pipeline.py`
 
 Promotes a pipeline from the development environment to production. One of the flags `--check` or `--prod` is required.

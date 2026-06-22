@@ -68,9 +68,11 @@ metabase/
   `refined.dim_time.date_actual`, padrão *Previous 30 days*), `route`, `direction`,
   `is_weekend`, `is_circular` e um número `min_trips` para guarda de baixa amostragem (padrão
   `5`). O comentário no cabeçalho de cada arquivo lista os mapeamentos exatos que ele espera.
-- O **Report Timezone** deve ser `America/Sao_Paulo` para que os painéis de `current_date`/"hoje"
-  (P1–P3, P7) sejam ancorados no dia local de São Paulo, e não em UTC — ver
-  `.plans/metabase-complementary-implementation_plan_pending.md`.
+- O **Report Timezone** (`America/Sao_Paulo`) e o datasource read-only `sptrans_insights`
+  (com escopo no schema `refined`) são **provisionados automaticamente** por
+  `automation/bootstrap_metabase.sh` — não exigem configuração manual. O timezone garante que os
+  painéis de `current_date`/"hoje" (P1–P3, P7) fiquem ancorados no dia local de São Paulo, e não
+  em UTC. Ver `.plans/metabase-complementary-implementation_plan_pending.md`.
 
 ## Relacionados
 

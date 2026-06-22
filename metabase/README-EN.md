@@ -68,9 +68,11 @@ metabase/
   default *Previous 30 days*), `route`, `direction`, `is_weekend`, `is_circular`, and a
   `min_trips` number for low-sample guarding (default `5`). Each file's header comment lists
   the exact mappings it expects.
-- **Report Timezone** must be `America/Sao_Paulo` so `current_date`/"today" panels (P1–P3, P7)
-  anchor on São Paulo local day rather than UTC — see
-  `.plans/metabase-complementary-implementation_plan_pending.md`.
+- The **Report Timezone** (`America/Sao_Paulo`) and the read-only `sptrans_insights` datasource
+  (scoped to the `refined` schema) are **provisioned automatically** by
+  `automation/bootstrap_metabase.sh` — no manual setup is required. The timezone ensures the
+  `current_date`/"today" panels (P1–P3, P7) anchor on the São Paulo local day rather than UTC.
+  See `.plans/metabase-complementary-implementation_plan_pending.md`.
 
 ## Related
 
