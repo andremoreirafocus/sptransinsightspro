@@ -25,19 +25,10 @@ Keeping them here (rather than under `dags-dev/refinedtripfacts/`) means:
 `dags-dev/refinedtripfacts/queries/` holds **non-authoritative, filter-free proof-of-concept
 SQL** that proved the dimensional model can answer every panel. The files here are the
 **authoritative** native questions: they add the Metabase field filters, variables and the
-exact statistics the panels require. Where the two differ, the **design doc**
-(`.plans/metabase-dashboard-panel-design.md`) is the source of truth and these files
-implement it; the PoC files are not edited to track the dashboard.
+exact statistics the panels require. These files are the authoritative implementation of the
+panels; the PoC files are not edited to track the dashboard.
 
-## Layout
-
-```
-metabase/
-  README.md
-  dashboard_queries/   # authoritative Metabase native-question SQL (P0–P11)
-```
-
-### `dashboard_queries/` → panel map
+## `dashboard_queries/` → panel map
 
 | File | Panel(s) | Anchor (date logic) |
 | --- | --- | --- |
@@ -52,12 +43,9 @@ metabase/
 | `live_fleet_positions.sql`                    | P11         | live vehicle snapshot; map by `veiculo_lat`/`veiculo_long` |
 | `live_fleet_positions_freshness.sql`          | P11         | live snapshot; companion card with active-vehicle count and freshness |
 
-> **P11 — `refined.latest_positions` panel.** The live fleet-position panel over
-> `refined.latest_positions` is already designed in
-> `.plans/metabase-dashboard-panel-design.md`. Reader access / datasource visibility for
-> `refined.latest_positions` are handled by
-> `.plans/metabase-complementary-implementation_plan_pending.md`, and the authoritative query
-> implementations already live at `metabase/dashboard_queries/live_fleet_positions.sql` and
+> **P11 — `refined.latest_positions` panel.** The live fleet-position panel reads
+> `refined.latest_positions`; the authoritative query implementations live at
+> `metabase/dashboard_queries/live_fleet_positions.sql` and
 > `metabase/dashboard_queries/live_fleet_positions_freshness.sql`.
 
 ## Native-question setup notes
@@ -68,11 +56,11 @@ metabase/
   default *Previous 30 days*), `route`, `direction`, `is_weekend`, `is_circular`, and a
   `min_trips` number for low-sample guarding (default `5`). Each file's header comment lists
   the exact mappings it expects.
-- The **Report Timezone** (`America/Sao_Paulo`) and the read-only `sptrans_insights` datasource
-  (scoped to the `refined` schema) are **provisioned automatically** by
-  `automation/bootstrap_metabase.sh` — no manual setup is required. The timezone ensures the
-  `current_date`/"today" panels (P1–P3, P7) anchor on the São Paulo local day rather than UTC.
-  See `.plans/metabase-complementary-implementation_plan_pending.md`.
+- The read-only `sptrans_insights` datasource (scoped to the `refined` schema) and the timezone
+  are **provisioned automatically** by `automation/bootstrap_metabase.sh` — no manual setup is
+  required. The reader role's session timezone is set to `America/Sao_Paulo`, so native-SQL
+  `current_date`/"today" panels (P1–P3, P7) anchor on the São Paulo local day rather than UTC;
+  the Metabase **Report Timezone** (also `America/Sao_Paulo`) governs timestamp display.
 
 ## Related
 

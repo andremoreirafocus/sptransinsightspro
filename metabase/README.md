@@ -25,19 +25,11 @@ Mantê-los aqui (em vez de dentro de `dags-dev/refinedtripfacts/`) significa:
 `dags-dev/refinedtripfacts/queries/` contém **SQL de prova de conceito, não autoritativo e sem
 filtros**, que provou que o modelo dimensional consegue responder a todos os painéis. Os
 arquivos aqui são as perguntas nativas **autoritativas**: adicionam os field filters do
-Metabase, as variáveis e as estatísticas exatas que os painéis exigem. Onde os dois divergirem,
-o **documento de design** (`.plans/metabase-dashboard-panel-design.md`) é a fonte da verdade e
-estes arquivos o implementam; os arquivos de PoC não são editados para acompanhar o dashboard.
+Metabase, as variáveis e as estatísticas exatas que os painéis exigem. Estes arquivos são a
+implementação autoritativa dos painéis; os arquivos de PoC não são editados para acompanhar o
+dashboard.
 
-## Layout
-
-```
-metabase/
-  README.md
-  dashboard_queries/   # SQL autoritativo das perguntas nativas do Metabase (P0–P11)
-```
-
-### `dashboard_queries/` → mapa de painéis
+## `dashboard_queries/` → mapa de painéis
 
 | Arquivo | Painel(éis) | Âncora (lógica de data) |
 | --- | --- | --- |
@@ -52,12 +44,9 @@ metabase/
 | `live_fleet_positions.sql`                    | P11         | snapshot ao vivo de veículos; mapa por `veiculo_lat`/`veiculo_long` |
 | `live_fleet_positions_freshness.sql`          | P11         | snapshot ao vivo; card companheiro com contagem de veículos e freshness |
 
-> **P11 — painel de `refined.latest_positions`.** O painel de posição da frota ao vivo sobre
-> `refined.latest_positions` já está desenhado em
-> `.plans/metabase-dashboard-panel-design.md`. O acesso de leitura / visibilidade do datasource
-> para `refined.latest_positions` são tratados em
-> `.plans/metabase-complementary-implementation_plan_pending.md`, e as implementações
-> autoritativas já vivem em `metabase/dashboard_queries/live_fleet_positions.sql` e
+> **P11 — painel de `refined.latest_positions`.** O painel de posição da frota ao vivo lê
+> `refined.latest_positions`; as implementações autoritativas das perguntas vivem em
+> `metabase/dashboard_queries/live_fleet_positions.sql` e
 > `metabase/dashboard_queries/live_fleet_positions_freshness.sql`.
 
 ## Notas de configuração das perguntas nativas
@@ -68,11 +57,12 @@ metabase/
   `refined.dim_time.date_actual`, padrão *Previous 30 days*), `route`, `direction`,
   `is_weekend`, `is_circular` e um número `min_trips` para guarda de baixa amostragem (padrão
   `5`). O comentário no cabeçalho de cada arquivo lista os mapeamentos exatos que ele espera.
-- O **Report Timezone** (`America/Sao_Paulo`) e o datasource read-only `sptrans_insights`
-  (com escopo no schema `refined`) são **provisionados automaticamente** por
-  `automation/bootstrap_metabase.sh` — não exigem configuração manual. O timezone garante que os
-  painéis de `current_date`/"hoje" (P1–P3, P7) fiquem ancorados no dia local de São Paulo, e não
-  em UTC. Ver `.plans/metabase-complementary-implementation_plan_pending.md`.
+- O datasource read-only `sptrans_insights` (com escopo no schema `refined`) e o timezone são
+  **provisionados automaticamente** por `automation/bootstrap_metabase.sh` — não exigem
+  configuração manual. O timezone de sessão do role de leitura é definido como `America/Sao_Paulo`,
+  então o `current_date` do SQL nativo — e os painéis de "hoje" (P1–P3, P7) — ficam ancorados no
+  dia local de São Paulo, e não em UTC; o **Report Timezone** do Metabase (também
+  `America/Sao_Paulo`) controla a exibição de timestamps.
 
 ## Relacionados
 

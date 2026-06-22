@@ -1,7 +1,7 @@
 -- Dashboard query — Panels P1/P2/P3: Today at a glance.
 -- Anchor: trip completion (ended_at_time_dim_key). No parameters.
 -- "today" = current_date, resolved São Paulo-local via the datasource Report Timezone
--- (America/Sao_Paulo). See metabase-complementary-implementation_plan_pending.md.
+-- (America/Sao_Paulo).
 SELECT
     COUNT(*)                      AS trips_completed_today,
     COUNT(DISTINCT tf.route_id)   AS active_routes_today,
