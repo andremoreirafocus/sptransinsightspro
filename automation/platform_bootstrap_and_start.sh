@@ -87,4 +87,9 @@ if ! bash "${SCRIPT_DIR}/bootstrap_metabase.sh"; then
   echo "[WARN] Metabase bootstrap failed. Platform startup completed without Metabase."
 fi
 
+echo "==> Running Metabase dashboard bootstrap..."
+if ! bash "${SCRIPT_DIR}/bootstrap_metabase_dashboard.sh"; then
+  echo "[WARN] Metabase dashboard bootstrap failed. Platform startup completed without the dashboard."
+fi
+
 echo "Platform started with bootstrap completed."

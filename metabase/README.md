@@ -64,6 +64,71 @@ dashboard.
   dia local de São Paulo, e não em UTC; o **Report Timezone** do Metabase (também
   `America/Sao_Paulo`) controla a exibição de timestamps.
 
+## Dashboard SPTrans Insights
+
+O dashboard `SPTrans Insights` é provisionado automaticamente por `automation/bootstrap_metabase_dashboard.sh` — nenhum passo manual de UI é necessário, exceto o auto-refresh descrito abaixo.
+
+### Layout
+
+O dashboard usa a grade de 24 colunas do Metabase e é composto por 14 cards organizados em 4 regiões:
+
+| Região | Cards | Descrição |
+|---|---|---|
+| Coluna esquerda (KPIs) | P0A, P0B, P1, P2, P3, P11B | Escalares empilhados verticalmente |
+| Linha de conteúdo 1 | P4, P9, P5 | Frequência por rota/hora, velocidade, frequência por direção |
+| Linha de conteúdo 2 | P6, P7, P8 | Duração mediana/P95, comparativo histórico, consistência de duração |
+| Linha do mapa | P11A, P10 | Mapa de posições ao vivo + tabela resumo de rotas |
+
+### Filtros globais
+
+5 filtros disponíveis na barra do dashboard:
+
+| Filtro | Tipo | Cards afetados |
+|---|---|---|
+| Date range | `date/all-options` (padrão: últimos 30 dias) | P4, P5, P6, P8, P9, P10 |
+| Route | `string/=` | P4, P5, P6, P7, P8, P9, P10 |
+| Direction | `string/=` | P5, P6 |
+| Weekend | `category` | P4, P5, P6 |
+| Circular | `category` | P4, P5, P6, P8, P9, P10 |
+
+P0A, P0B, P1, P2, P3 e P7 têm janelas fixas e não são afetados pelos filtros globais. P11A e P11B possuem filtros locais de painel (`linha_lt`, `linha_sentido`) não expostos na barra global.
+
+### Capturas de tela
+
+**Metade superior — filtros, KPIs e painéis analíticos**
+
+![Dashboard — metade superior](DashboardHigherPageScreenshot.png)
+
+A captura mostra o dashboard filtrado pela rota `2008-10` nos últimos 30 dias. Na barra de filtros estão ativos **Date range** (Previous 30 Days) e **Route** (2008-10); os filtros Direction, Weekend e Circular estão disponíveis mas sem seleção.
+
+A coluna esquerda exibe os KPIs operacionais em tempo real: data/hora do último batch (`Jun 23, 2026, 6:04 PM`), volume do último batch (`124` viagens), total de viagens concluídas no dia (`21.526`), rotas ativas (`1.128`), veículos que finalizaram viagens no dia (`7.830`) e contagem de veículos ao vivo (`11.197`).
+
+A linha de conteúdo 1 contém: a tabela **Trips per route per hour** (14 linhas para direção 1, horas 9–23), o gráfico de linhas **Average speed by route and hour** (velocidade entre 9 e 14 km/h ao longo do dia) e o gráfico de barras **Frequency by direction** (direção 1 ≈ 44 viagens, direção 2 ≈ 66 viagens).
+
+A linha de conteúdo 2 exibe: **Median and P95 duration** (mediana ≈ 18 min, P95 ≈ 28 min para a rota 2008-10), **Today vs historical baseline** (mediana do dia = 19,6 min; baseline ausente — sem dados de mesmo dia da semana nas 4 semanas anteriores) e **Trip duration consistency by route** (índice de consistência ≈ 0,21 — coeficiente de variação da duração das viagens).
+
+---
+
+**Metade inferior — mapa ao vivo e resumo de rotas**
+
+![Dashboard — metade inferior](DashboardLowerPageScreenshot.png)
+
+À esquerda, o mapa **Live fleet positions** exibe a distribuição dos veículos em operação em tempo real sobre o mapa de São Paulo, com pins azuis concentrados nas regiões de maior densidade de linhas.
+
+À direita, a tabela **Route summary** detalha, por rota e sentido, os terminais de origem e destino (`first_stop_name`, `last_stop_name`), o indicador `is_circular`, o total de viagens do período (`total_trips`), a duração mediana em minutos (`median_duration_minutes`), a velocidade média (`avg_speed_kmh`) e a consistência de duração (`duration_consistency`). A tabela exibe as primeiras 11 de 177 linhas para o período selecionado.
+
+---
+
+### Auto-refresh (passo manual único)
+
+O auto-refresh não pode ser definido via API no Metabase v0.52.9. Após o provisionamento, configurar uma única vez na UI:
+
+1. Abrir o dashboard `SPTrans Insights`
+2. Clicar no ícone de relógio/atualização no canto superior direito
+3. Selecionar **1 minuto**
+
+> Após rodar `bootstrap_metabase_dashboard.sh`, fazer logout e login no Metabase — um simples refresh de página não reflete a nova configuração.
+
 ## Relacionados
 
 - ADR-0012 — Migração do Power BI para o Metabase self-hosted

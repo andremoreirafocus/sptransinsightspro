@@ -62,6 +62,71 @@ panels; the PoC files are not edited to track the dashboard.
   `current_date`/"today" panels (P1–P3, P7) anchor on the São Paulo local day rather than UTC;
   the Metabase **Report Timezone** (also `America/Sao_Paulo`) governs timestamp display.
 
+## SPTrans Insights dashboard
+
+The `SPTrans Insights` dashboard is provisioned automatically by `automation/bootstrap_metabase_dashboard.sh` — no manual UI step is needed, except for the auto-refresh setting described below.
+
+### Layout
+
+The dashboard uses Metabase's 24-column grid and is composed of 14 cards organised into four regions:
+
+| Region | Cards | Description |
+|---|---|---|
+| Left column (KPIs) | P0A, P0B, P1, P2, P3, P11B | Scalars stacked vertically |
+| Content row 1 | P4, P9, P5 | Frequency by route/hour, speed, frequency by direction |
+| Content row 2 | P6, P7, P8 | Median/P95 duration, historical comparison, duration consistency |
+| Map row | P11A, P10 | Live fleet position map + route summary table |
+
+### Global filters
+
+5 filters available in the dashboard filter bar:
+
+| Filter | Type | Affected cards |
+|---|---|---|
+| Date range | `date/all-options` (default: last 30 days) | P4, P5, P6, P8, P9, P10 |
+| Route | `string/=` | P4, P5, P6, P7, P8, P9, P10 |
+| Direction | `string/=` | P5, P6 |
+| Weekend | `category` | P4, P5, P6 |
+| Circular | `category` | P4, P5, P6, P8, P9, P10 |
+
+P0A, P0B, P1, P2, P3, and P7 have fixed time windows and are not affected by global filters. P11A and P11B carry local panel filters (`linha_lt`, `linha_sentido`) that are not exposed in the global filter bar.
+
+### Screenshots
+
+**Upper half — filters, KPIs, and analytics panels**
+
+![Dashboard — upper half](DashboardHigherPageScreenshot.png)
+
+The screenshot shows the dashboard filtered to route `2008-10` over the previous 30 days. The filter bar has **Date range** (Previous 30 Days) and **Route** (2008-10) active; Direction, Weekend, and Circular filters are available but unset.
+
+The left KPI column shows real-time operational figures: last batch timestamp (`Jun 23, 2026, 6:04 PM`), last batch trip volume (`124`), trips finished today (`21,526`), active routes (`1,128`), vehicles that finished trips today (`7,830`), and live vehicle count (`11,197`).
+
+Content row 1 contains: the **Trips per route per hour** table (14 rows for direction 1, hours 9–23), the **Average speed by route and hour** line chart (speed between 9 and 14 km/h across the day), and the **Frequency by direction** bar chart (direction 1 ≈ 44 trips, direction 2 ≈ 66 trips).
+
+Content row 2 shows: **Median and P95 duration** (median ≈ 18 min, P95 ≈ 28 min for route 2008-10), **Today vs historical baseline** (today's median = 19.6 min; baseline absent — no same-weekday data in the prior 4 weeks), and **Trip duration consistency by route** (consistency index ≈ 0.21 — coefficient of variation of trip duration).
+
+---
+
+**Lower half — live map and route summary**
+
+![Dashboard — lower half](DashboardLowerPageScreenshot.png)
+
+On the left, the **Live fleet positions** map shows the real-time distribution of vehicles in operation across São Paulo, with blue pins concentrated in the highest-density bus corridors.
+
+On the right, the **Route summary** table details, per route and direction, the origin and destination terminals (`first_stop_name`, `last_stop_name`), the `is_circular` flag, total trips in the selected period (`total_trips`), median trip duration in minutes (`median_duration_minutes`), average speed (`avg_speed_kmh`), and duration consistency (`duration_consistency`). The table shows the first 11 of 177 rows for the selected period.
+
+---
+
+### Auto-refresh (one-time manual step)
+
+Auto-refresh cannot be set via the API in Metabase v0.52.9. After provisioning, configure it once in the UI:
+
+1. Open the `SPTrans Insights` dashboard
+2. Click the clock/refresh icon in the top-right toolbar
+3. Select **1 minute**
+
+> After running `bootstrap_metabase_dashboard.sh`, log out and log back in to Metabase — a simple page refresh does not pick up the new configuration.
+
 ## Related
 
 - ADR-0012 — Power BI → self-hosted Metabase migration

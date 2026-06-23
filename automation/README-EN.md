@@ -35,6 +35,7 @@ Starts the platform with prior infrastructure and Airflow bootstrap to avoid sta
 9. Runs `bootstrap_extractloadlivedata.sh`
 10. Starts the rest of the platform with `docker compose up -d`
 11. Runs `bootstrap_metabase.sh`
+12. Runs `bootstrap_metabase_dashboard.sh`
 
 **Usage:**
 ```bash
@@ -155,6 +156,29 @@ Ensures both the infrastructure bootstrap **and** the idempotent provisioning of
 ```bash
 cd automation
 ./bootstrap_metabase.sh
+```
+
+---
+
+### `bootstrap_metabase_dashboard.sh`
+
+Idempotently provisions the `SPTrans Insights` dashboard in Metabase, creating the collection, native questions (cards), and the layout with global filters. On a re-run, deletes the existing dashboard before recreating — allowing the script to be run at any time to reapply the configuration.
+
+**What it does, in order:**
+1. Authenticates as admin and retrieves the `sptrans_insights` datasource ID
+2. Creates (or reuses) the `SPTrans Insights Pro` collection
+3. Resolves the field IDs required for field filters
+4. Creates 14 native cards from the SQL files in `metabase/dashboard_queries/`
+5. Creates the dashboard, defines the 5 global filters, and places the dashcards
+6. Sets the latitude and longitude semantic types for the live fleet position map
+7. Prints instructions for manually configuring auto-refresh in the UI
+
+**Required environment variables:** `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`. Optional with defaults: `METABASE_PORT` (`3001`). Requires `curl` and `jq` on the host.
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_metabase_dashboard.sh
 ```
 
 ---
