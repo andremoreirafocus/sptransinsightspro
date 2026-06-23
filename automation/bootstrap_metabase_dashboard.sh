@@ -159,8 +159,9 @@ authenticate() {
   existing="$(metabase_api GET /api/dashboard "${SESSION_ID}" \
     | jq -r --arg n "${DASHBOARD_NAME}" '.[] | select(.name == $n) | .id' | head -n1)"
   if [ -n "${existing}" ]; then
-    echo "Dashboard '${DASHBOARD_NAME}' already exists (id=${existing}); skipping."
-    exit 0
+    echo "    - dashboard '${DASHBOARD_NAME}' exists (id=${existing}); deleting for re-provisioning..."
+    metabase_api DELETE "/api/dashboard/${existing}" "${SESSION_ID}" >/dev/null
+    echo "    - dashboard deleted"
   fi
   echo "==> Dashboard does not exist. Proceeding with provisioning..."
 }
@@ -306,37 +307,38 @@ create_cards() {
   TAGS_P11A="$(jq -n \
     --arg id_lt "${UUID_P11A_LINHA_LT}"      --argjson flt "${FIELD_LINHA_LT}" \
     --arg id_se "${UUID_P11A_LINHA_SENTIDO}" --argjson fse "${FIELD_LINHA_SENTIDO}" \
-    '{linha_lt:      {id:$id_lt,name:"linha_lt",      "display-name":"Linha LT",      type:"dimension",dimension:["field",$flt,null],"widget-type":"string/=",default:null},
-      linha_sentido: {id:$id_se,name:"linha_sentido", "display-name":"Linha sentido", type:"dimension",dimension:["field",$fse,null],"widget-type":"string/=",default:null}}')"
+    '{linha_lt:      {id:$id_lt,name:"linha_lt",      "display-name":"Linha LT",      type:"dimension",dimension:["field",$flt,null],"widget-type":"string/=", default:null},
+      linha_sentido: {id:$id_se,name:"linha_sentido", "display-name":"Linha sentido", type:"dimension",dimension:["field",$fse,null],"widget-type":"category", default:null}}')"
 
   TAGS_P11B="$(jq -n \
     --arg id_lt "${UUID_P11B_LINHA_LT}"      --argjson flt "${FIELD_LINHA_LT}" \
     --arg id_se "${UUID_P11B_LINHA_SENTIDO}" --argjson fse "${FIELD_LINHA_SENTIDO}" \
-    '{linha_lt:      {id:$id_lt,name:"linha_lt",      "display-name":"Linha LT",      type:"dimension",dimension:["field",$flt,null],"widget-type":"string/=",default:null},
-      linha_sentido: {id:$id_se,name:"linha_sentido", "display-name":"Linha sentido", type:"dimension",dimension:["field",$fse,null],"widget-type":"string/=",default:null}}')"
+    '{linha_lt:      {id:$id_lt,name:"linha_lt",      "display-name":"Linha LT",      type:"dimension",dimension:["field",$flt,null],"widget-type":"string/=", default:null},
+      linha_sentido: {id:$id_se,name:"linha_sentido", "display-name":"Linha sentido", type:"dimension",dimension:["field",$fse,null],"widget-type":"category", default:null}}')"
 
-  CARD_P0="$(create_card   "Pipeline freshness"             "table"  "latest_batch_freshness.sql"                  '{}'           '{}')"
-  CARD_P1="$(create_card   "Trips completed today"          "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"trips_completed_today"}')"
-  CARD_P2="$(create_card   "Active routes today"            "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"active_routes_today"}')"
-  CARD_P3="$(create_card   "Active vehicles today"          "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"active_vehicles_today"}')"
+  CARD_P0A="$(create_card  "Latest batch datetime"           "scalar" "latest_batch_freshness.sql"                  '{}'           '{"scalar.field":"latest_batch_ts"}')"
+  CARD_P0B="$(create_card  "Latest batch trip count"         "scalar" "latest_batch_freshness.sql"                  '{}'           '{"scalar.field":"latest_batch_trip_count"}')"
+  CARD_P1="$(create_card   "Trips finished today"          "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"trips_completed_today"}')"
+  CARD_P2="$(create_card   "Active routes for trips finished today"  "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"active_routes_today"}')"
+  CARD_P3="$(create_card   "Vehicles that finished trips today"     "scalar" "today_kpis.sql"                              '{}'           '{"scalar.field":"active_vehicles_today"}')"
   CARD_P4="$(create_card   "Trips per route per hour"       "table"  "frequency_by_route_hour_direction.sql"       "${TAGS_P4}"   '{}')"
   CARD_P5="$(create_card   "Frequency by direction"         "bar"    "frequency_by_route_hour_direction.sql"       "${TAGS_P5}"   '{"graph.dimensions":["direction"],"graph.metrics":["trip_count"]}')"
-  CARD_P6="$(create_card   "Median and P95 duration"        "bar"    "median_and_p95_duration_by_route.sql"        "${TAGS_P6}"   '{"graph.dimensions":["route_id"],"graph.metrics":["median_duration_seconds","p95_duration_seconds"]}')"
+  CARD_P6="$(create_card   "Median and P95 duration"        "bar"    "median_and_p95_duration_by_route.sql"        "${TAGS_P6}"   '{"graph.dimensions":["route_id"],"graph.metrics":["median_duration_minutes","p95_duration_minutes"],"graph.x_axis.scale":"ordinal"}')"
   CARD_P7="$(create_card   "Today vs historical baseline"   "table"  "duration_today_vs_same_weekday_baseline.sql" "${TAGS_P7}"   '{}')"
-  CARD_P8="$(create_card   "Reliability ranking"            "bar"    "reliability_by_route.sql"                    "${TAGS_P8}"   '{"graph.dimensions":["route_id"],"graph.metrics":["reliability_index"],"graph.x_axis.scale":"ordinal"}')"
-  CARD_P9="$(create_card   "Avg speed by route and hour"    "line"   "avg_speed_by_route_and_hour.sql"             "${TAGS_P9}"   '{"graph.dimensions":["hour_of_day"],"graph.metrics":["avg_speed_kmh"]}')"
+  CARD_P8="$(create_card   "Trip duration consistency by route"            "bar"    "reliability_by_route.sql"                    "${TAGS_P8}"   '{"graph.dimensions":["route_id"],"graph.metrics":["reliability_index"],"graph.x_axis.scale":"ordinal"}')"
+  CARD_P9="$(create_card   "Average speed by route and hour"    "line"   "avg_speed_by_route_and_hour.sql"             "${TAGS_P9}"   '{"graph.dimensions":["hour_of_day"],"graph.metrics":["avg_speed_kmh"]}')"
   CARD_P10="$(create_card  "Route summary"                  "table"  "route_summary_with_trip_details.sql"         "${TAGS_P10}"  '{}')"
   CARD_P11A="$(create_card "Live fleet positions"           "map"    "live_fleet_positions.sql"                    "${TAGS_P11A}" '{"map.type":"pin","map.latitude_column":"veiculo_lat","map.longitude_column":"veiculo_long"}')"
-  CARD_P11B="$(create_card "Live fleet count + freshness"   "scalar" "live_fleet_positions_freshness.sql"          "${TAGS_P11B}" '{"scalar.field":"active_vehicle_count"}')"
+  CARD_P11B="$(create_card "Live vehicles count"   "scalar" "live_fleet_positions_freshness.sql"          "${TAGS_P11B}" '{"scalar.field":"active_vehicle_count"}')"
 
-  for var in CARD_P0 CARD_P1 CARD_P2 CARD_P3 CARD_P4 CARD_P5 CARD_P6 CARD_P7 \
+  for var in CARD_P0A CARD_P0B CARD_P1 CARD_P2 CARD_P3 CARD_P4 CARD_P5 CARD_P6 CARD_P7 \
              CARD_P8 CARD_P9 CARD_P10 CARD_P11A CARD_P11B; do
     if ! [[ "${!var}" =~ ^[0-9]+$ ]]; then
       echo "ERROR: card ID not set for '${var}'." >&2
       exit 1
     fi
   done
-  echo "[OK] All 13 cards created"
+  echo "[OK] All 14 cards created"
 }
 
 create_dashboard() {
@@ -359,93 +361,89 @@ create_dashboard() {
       --arg di "${UUID_PARAM_DIRECTION}" \
       --arg we "${UUID_PARAM_IS_WEEKEND}" \
       --arg ci "${UUID_PARAM_IS_CIRCULAR}" \
-      --arg lt "${UUID_PARAM_LINHA_LT}" \
-      --arg se "${UUID_PARAM_LINHA_SENTIDO}" \
-      '{parameters: [
-        {id:$dr, type:"date/all-options", name:"Date range",    slug:"date_range",    default:"past30days", sectionId:"date"},
-        {id:$ro, type:"string/=",         name:"Route",         slug:"route"},
-        {id:$di, type:"string/=",         name:"Direction",     slug:"direction"},
-        {id:$we, type:"category",         name:"Weekend",       slug:"is_weekend"},
-        {id:$ci, type:"category",         name:"Circular",      slug:"is_circular"},
-        {id:$lt, type:"string/=",         name:"Linha LT",      slug:"linha_lt"},
-        {id:$se, type:"string/=",         name:"Linha Sentido", slug:"linha_sentido"}
+      '{width: "full", parameters: [
+        {id:$dr, type:"date/all-options", name:"Date range", slug:"date_range", default:"past30days", sectionId:"date"},
+        {id:$ro, type:"string/=",         name:"Route",      slug:"route"},
+        {id:$di, type:"string/=",         name:"Direction",  slug:"direction"},
+        {id:$we, type:"category",         name:"Weekend",    slug:"is_weekend"},
+        {id:$ci, type:"category",         name:"Circular",   slug:"is_circular"}
       ]}')" >/dev/null
 
   local param_count
   param_count="$(metabase_api GET "/api/dashboard/${DASHBOARD_ID}" "${SESSION_ID}" \
     | jq '.parameters | length')"
-  if [ "${param_count}" != "7" ]; then
-    echo "ERROR: dashboard parameters not persisted (expected 7, got ${param_count})." >&2
+  if [ "${param_count}" != "5" ]; then
+    echo "ERROR: dashboard parameters not persisted (expected 5, got ${param_count})." >&2
     exit 1
   fi
-  echo "[OK] 7 dashboard parameters set"
+  echo "[OK] 5 dashboard parameters set"
 
   echo "==> Placing dashcards..."
 
   local cards_json dashcards_count
   cards_json="$(jq -n \
-    --argjson c0  "${CARD_P0}"   --argjson c1  "${CARD_P1}"  \
-    --argjson c2  "${CARD_P2}"   --argjson c3  "${CARD_P3}"  \
-    --argjson c4  "${CARD_P4}"   --argjson c5  "${CARD_P5}"  \
-    --argjson c6  "${CARD_P6}"   --argjson c7  "${CARD_P7}"  \
-    --argjson c8  "${CARD_P8}"   --argjson c9  "${CARD_P9}"  \
-    --argjson c10 "${CARD_P10}"  \
+    --argjson c0a "${CARD_P0A}"  --argjson c0b "${CARD_P0B}"  \
+    --argjson c1  "${CARD_P1}"   --argjson c2  "${CARD_P2}"   \
+    --argjson c3  "${CARD_P3}"   --argjson c4  "${CARD_P4}"   \
+    --argjson c5  "${CARD_P5}"   --argjson c6  "${CARD_P6}"   \
+    --argjson c7  "${CARD_P7}"   --argjson c8  "${CARD_P8}"   \
+    --argjson c9  "${CARD_P9}"   --argjson c10 "${CARD_P10}"  \
     --argjson c11 "${CARD_P11A}" --argjson c12 "${CARD_P11B}" \
     --arg dr "${UUID_PARAM_DATE_RANGE}" --arg ro "${UUID_PARAM_ROUTE}" \
     --arg di "${UUID_PARAM_DIRECTION}"  --arg we "${UUID_PARAM_IS_WEEKEND}" \
     --arg ci "${UUID_PARAM_IS_CIRCULAR}" \
-    --arg lt "${UUID_PARAM_LINHA_LT}"   --arg se "${UUID_PARAM_LINHA_SENTIDO}" \
     '[
-      {id:-1, card_id:$c0, col:0, row:0,  size_x:24,size_y:4,  parameter_mappings:[]},
-      {id:-2, card_id:$c1, col:0, row:4,  size_x:8, size_y:4,  parameter_mappings:[]},
-      {id:-3, card_id:$c2, col:8, row:4,  size_x:8, size_y:4,  parameter_mappings:[]},
-      {id:-4, card_id:$c3, col:16,row:4,  size_x:8, size_y:4,  parameter_mappings:[]},
-      {id:-5, card_id:$c4, col:0, row:8,  size_x:12,size_y:8,  parameter_mappings:[
+      {id:-14,card_id:$c0a,col:0,  row:0,  size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-15,card_id:$c0b,col:0,  row:2,  size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-2, card_id:$c1, col:0,  row:4,  size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-5, card_id:$c4, col:3,  row:0,  size_x:7,  size_y:6,  parameter_mappings:[
         {card_id:$c4,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
         {card_id:$c4,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
         {card_id:$c4,parameter_id:$di,target:["dimension",["template-tag","direction"]]},
         {card_id:$c4,parameter_id:$we,target:["dimension",["template-tag","is_weekend"]]},
         {card_id:$c4,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-6, card_id:$c5, col:12,row:8,  size_x:12,size_y:8,  parameter_mappings:[
+      {id:-10,card_id:$c9, col:10, row:0,  size_x:7,  size_y:6,  parameter_mappings:[
+        {card_id:$c9,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
+        {card_id:$c9,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
+        {card_id:$c9,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
+      {id:-6, card_id:$c5, col:17, row:0,  size_x:7,  size_y:6,  parameter_mappings:[
         {card_id:$c5,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
         {card_id:$c5,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
         {card_id:$c5,parameter_id:$di,target:["dimension",["template-tag","direction"]]},
         {card_id:$c5,parameter_id:$we,target:["dimension",["template-tag","is_weekend"]]},
         {card_id:$c5,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-7, card_id:$c6, col:0, row:16, size_x:12,size_y:8,  parameter_mappings:[
+      {id:-3, card_id:$c2, col:0,  row:6,  size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-7, card_id:$c6, col:3,  row:6,  size_x:7,  size_y:6,  parameter_mappings:[
         {card_id:$c6,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
         {card_id:$c6,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
         {card_id:$c6,parameter_id:$di,target:["dimension",["template-tag","direction"]]},
         {card_id:$c6,parameter_id:$we,target:["dimension",["template-tag","is_weekend"]]},
         {card_id:$c6,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-8, card_id:$c7, col:12,row:16, size_x:12,size_y:8,  parameter_mappings:[
+      {id:-8, card_id:$c7, col:10, row:6,  size_x:7,  size_y:6,  parameter_mappings:[
         {card_id:$c7,parameter_id:$ro,target:["dimension",["template-tag","route"]]}]},
-      {id:-9, card_id:$c8, col:0, row:24, size_x:12,size_y:8,  parameter_mappings:[
+      {id:-9, card_id:$c8, col:17, row:6,  size_x:7,  size_y:6,  parameter_mappings:[
         {card_id:$c8,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
         {card_id:$c8,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
         {card_id:$c8,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-10,card_id:$c9, col:12,row:24, size_x:12,size_y:8,  parameter_mappings:[
-        {card_id:$c9,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
-        {card_id:$c9,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
-        {card_id:$c9,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-11,card_id:$c10,col:0, row:32, size_x:24,size_y:8,  parameter_mappings:[
+      {id:-4, card_id:$c3, col:0,  row:8,  size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-13,card_id:$c12,col:0,  row:10, size_x:3,  size_y:2,  parameter_mappings:[]},
+      {id:-12,card_id:$c11,col:0,  row:12, size_x:8,  size_y:7,  parameter_mappings:[
+        {card_id:$c11,parameter_id:$ro,target:["dimension",["template-tag","linha_lt"]]},
+        {card_id:$c11,parameter_id:$di,target:["dimension",["template-tag","linha_sentido"]]}]},
+      {id:-11,card_id:$c10,col:8,  row:12, size_x:16, size_y:7,  parameter_mappings:[
         {card_id:$c10,parameter_id:$dr,target:["dimension",["template-tag","date_range"]]},
         {card_id:$c10,parameter_id:$ro,target:["dimension",["template-tag","route"]]},
-        {card_id:$c10,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]},
-      {id:-12,card_id:$c11,col:0, row:40, size_x:16,size_y:12, parameter_mappings:[
-        {card_id:$c11,parameter_id:$lt,target:["dimension",["template-tag","linha_lt"]]},
-        {card_id:$c11,parameter_id:$se,target:["dimension",["template-tag","linha_sentido"]]}]},
-      {id:-13,card_id:$c12,col:16,row:40, size_x:8, size_y:12, parameter_mappings:[]}
+        {card_id:$c10,parameter_id:$ci,target:["dimension",["template-tag","is_circular"]]}]}
     ]')"
 
   dashcards_count="$(metabase_api PUT "/api/dashboard/${DASHBOARD_ID}/cards" "${SESSION_ID}" \
     "$(jq -n --argjson cards "${cards_json}" '{cards: $cards}')" \
     | jq '.cards | length')"
-  if [ "${dashcards_count}" != "13" ]; then
-    echo "ERROR: dashcard placement incomplete (expected 13, got ${dashcards_count})." >&2
+  if [ "${dashcards_count}" != "14" ]; then
+    echo "ERROR: dashcard placement incomplete (expected 14, got ${dashcards_count})." >&2
     exit 1
   fi
-  echo "[OK] Dashboard ready: id=${DASHBOARD_ID}, 13 dashcards placed"
+  echo "[OK] Dashboard ready: id=${DASHBOARD_ID}, 14 dashcards placed"
 }
 
 set_field_metadata() {
@@ -528,8 +526,6 @@ readonly UUID_PARAM_ROUTE="2d8ffbc3-aec2-44ea-9371-cf14f9511da3"
 readonly UUID_PARAM_DIRECTION="87249ffb-cb91-4848-b29b-bae5974aaaa0"
 readonly UUID_PARAM_IS_WEEKEND="6c9021c6-f943-4b4a-9885-b3253d4c45a7"
 readonly UUID_PARAM_IS_CIRCULAR="45474b4f-ccba-4abb-a8d8-02ba2656137f"
-readonly UUID_PARAM_LINHA_LT="9018a7c8-0eaa-4c72-b48c-a849539cd64e"
-readonly UUID_PARAM_LINHA_SENTIDO="a1573872-8ae7-4424-a383-37e1ed599986"
 
 require_env "METABASE_ADMIN_EMAIL"
 require_env "METABASE_ADMIN_PASSWORD"

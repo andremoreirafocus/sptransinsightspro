@@ -48,8 +48,8 @@ today AS (   -- today's median per route
 )
 SELECT
     today.route_id,
-    today.today_median        AS today_median_seconds,
-    baseline.baseline_median  AS baseline_median_seconds,
+    ROUND((today.today_median       / 60.0)::numeric, 1) AS today_median_minutes,
+    ROUND((baseline.baseline_median / 60.0)::numeric, 1) AS baseline_median_minutes,
     ROUND(
         ((today.today_median - baseline.baseline_median)
             / NULLIF(baseline.baseline_median, 0) * 100)::numeric,

@@ -12,9 +12,9 @@ SELECT
     refined.trip_details.last_stop_name,
     refined.trip_details.is_circular,
     COUNT(*)                                                                          AS total_trips,
-    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds)  AS median_duration_seconds,
+    ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) / 60.0)::numeric, 1) AS median_duration_minutes,
     AVG(refined.trip_facts.avg_speed_kmh)                                             AS avg_speed_kmh,
-    STDDEV(refined.trip_facts.duration_seconds) / NULLIF(AVG(refined.trip_facts.duration_seconds), 0) AS reliability_index
+    STDDEV(refined.trip_facts.duration_seconds) / NULLIF(AVG(refined.trip_facts.duration_seconds), 0) AS duration_consistency
 FROM refined.trip_facts
 JOIN refined.trip_details
   ON refined.trip_details.trip_id = refined.trip_facts.trip_id

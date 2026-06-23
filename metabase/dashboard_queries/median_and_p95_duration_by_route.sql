@@ -9,10 +9,8 @@
 --   {{min_trips}}   Number       -> low-sample guard (default 5; percentiles are noisy below it)
 SELECT
     refined.trip_facts.route_id,
-    refined.trip_facts.direction,
-    refined.trip_facts.is_circular,
-    PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) AS median_duration_seconds,
-    PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) AS p95_duration_seconds,
+    ROUND((PERCENTILE_CONT(0.5)  WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) / 60.0)::numeric, 1) AS median_duration_minutes,
+    ROUND((PERCENTILE_CONT(0.95) WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) / 60.0)::numeric, 1) AS p95_duration_minutes,
     COUNT(*) AS trip_count
 FROM refined.trip_facts
 JOIN refined.dim_time
@@ -24,10 +22,7 @@ WHERE 1 = 1
     [[ AND {{route}} ]]
     [[ AND {{is_circular}} ]]
 GROUP BY
-    refined.trip_facts.route_id,
-    refined.trip_facts.direction,
-    refined.trip_facts.is_circular
+    refined.trip_facts.route_id
 [[ HAVING COUNT(*) >= {{min_trips}} ]]
 ORDER BY
-    refined.trip_facts.route_id,
-    refined.trip_facts.direction;
+    refined.trip_facts.route_id;
