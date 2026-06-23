@@ -23,7 +23,7 @@ Para implementar a solução foram adotados os componentes:
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
 - PostgreSQL: utilizado para armazenar a camada refined, proporcionando consultas com baixa latência na camada de visualização.
-- [PowerBI](./powerbi/README.md): utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL.
+- [Metabase](./metabase/README.md): utilizado para implementar a camada de visualização, consumindo dados diretamente da camada refined do PostgreSQL através do datasource read-only `sptrans_insights`. O dashboard SPTrans Insights é provisionado automaticamente, expondo KPIs operacionais, análises de frequência e duração de viagens e o mapa de posições ao vivo da frota.
 - Loki: backend de agregação e consulta de logs estruturados, responsável por indexar streams de logs por labels e disponibilizar consultas LogQL para monitoramento operacional. [Mais informações de Observabilidade](./observability/README.md).
 - Promtail: agente de coleta e envio de logs dos containers Docker para o Loki, realizando descoberta via Docker socket e etapas de parsing para logs JSON. [Mais informações de Observabilidade](./observability/README.md).
 - Grafana: camada de visualização da observabilidade, com datasource Loki e dashboards provisionados para análise de execução, falhas, warnings e métricas operacionais. [Mais informações de Observabilidade](./observability/README.md).
@@ -81,7 +81,7 @@ Esse script:
 - sobe a camada de aplicação do Airflow e executa seu bootstrap
 - executa o bootstrap da stack de observabilidade
 - sobe o restante da plataforma somente após a conclusão do bootstrap
-- executa o bootstrap do Metabase (admin, datasource e timezone)
+- executa o bootstrap do Metabase (admin, datasource e timezone) e o provisionamento automático do dashboard SPTrans Insights
 
 Caso deseje subir a plataforma manualmente, o comando base continua sendo:
 

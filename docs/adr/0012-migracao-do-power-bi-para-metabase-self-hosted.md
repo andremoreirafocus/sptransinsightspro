@@ -58,3 +58,13 @@ Foi descartada neste momento por manter dependência de licenciamento externo e 
 - A equipe passa a assumir responsabilidade direta por operação, atualização e disponibilidade da plataforma de BI.
 - A migração exige esforço de conversão e validação de paridade dos dashboards existentes.
 - Diferenças funcionais entre Power BI e Metabase podem exigir adaptação de modelagem e visualizações em parte dos painéis.
+
+## Status de implementação
+
+Migração concluída. O Metabase é a camada de visualização ativa da plataforma desde 2026-06-23.
+
+- `automation/bootstrap_metabase.sh` — provisiona idempotentemente o admin, o datasource read-only `sptrans_insights` (escopo no schema `refined`) e o timezone de sessão (`America/Sao_Paulo`)
+- `automation/bootstrap_metabase_dashboard.sh` — provisiona idempotentemente o dashboard `SPTrans Insights`: 14 cards nativos, 5 filtros globais (date range, route, direction, weekend, circular) e layout de 4 regiões (coluna de KPIs, 2 linhas de análise, linha do mapa com posições ao vivo)
+- `metabase/dashboard_queries/` — 10 arquivos SQL autoritativos cobrindo os 14 cards; queries escritas com nomes de tabela totalmente qualificados para resolução de field filters
+- `platform_bootstrap_and_start.sh` — integra ambos os scripts de bootstrap com padrão warn-on-fail, sem passo manual
+- `powerbi/` — preservado como referência histórica com aviso de legado nos READMEs; não é mais mantido nem utilizado

@@ -1,3 +1,5 @@
+> **Legacy:** This directory is preserved as a historical reference. The visualization layer has been migrated to [Metabase](../metabase/README-EN.md) (ADR-0012). The Power BI dashboard is no longer maintained or used by the platform.
+
 # SPTrans Insights Dashboard (Power BI)
 
 This directory contains the Power BI report used to visualize the data processed by the pipeline.

@@ -24,7 +24,7 @@ The following components were adopted to implement the solution:
 - DuckDB: used in transformation processes to run SQL queries directly on Parquet tables stored in the trusted layer implemented through MinIO, with excellent performance and without requiring SQL engines such as Presto, therefore reducing infrastructure complexity. It is also used for exploratory analysis through Jupyter.
 - [Jupyter](./jupyter/README-EN.md): used to create notebooks for exploratory data analysis over the trusted layer stored in object storage.
 - PostgreSQL: used to store the refined layer, enabling low-latency queries for the visualization layer.
-- [Power BI](./powerbi/README-EN.md): used to implement the visualization layer because of its flexibility, power, and wide adoption, consuming data directly from the refined layer through PostgreSQL DirectQuery.
+- [Metabase](./metabase/README-EN.md): used to implement the visualization layer, consuming data directly from the refined layer of PostgreSQL through the read-only `sptrans_insights` datasource. The SPTrans Insights dashboard is provisioned automatically, exposing operational KPIs, trip frequency and duration analytics, and the live fleet position map.
 - Loki: structured-log aggregation and query backend, responsible for indexing log streams by labels and enabling LogQL queries for operational monitoring. [More observability information](./observability/README-EN.md).
 - Promtail: log collection and shipping agent that gathers Docker container logs and forwards them to Loki, including parsing stages for structured JSON logs. [More observability information](./observability/README-EN.md).
 - Grafana: observability visualization layer, with Loki datasource and provisioned dashboards for execution analysis, failures, warnings, and operational metrics. [More observability information](./observability/README-EN.md).
@@ -111,7 +111,7 @@ This script:
 - starts the Airflow application layer and runs its bootstrap
 - runs observability stack bootstrap
 - starts the rest of the platform only after bootstrap completes
-- runs Metabase bootstrap (admin, datasource, and timezone)
+- runs Metabase bootstrap (admin, datasource, and timezone) and automatically provisions the SPTrans Insights dashboard
 
 If you prefer to start the platform manually, the base command remains:
 
