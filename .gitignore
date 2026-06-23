@@ -4,7 +4,6 @@ gtfs_files
 live_data_files
 ingest_buffer
 data_quality_report.html
-*.txt
 !requirements.txt
 *.parquet
 # Byte-compiled / optimized / DLL files
