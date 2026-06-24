@@ -2,7 +2,8 @@ This project provides its users with visualizations of the current positions of 
 
 To achieve this, Sptransinsights extracts the positions of all buses in circulation at regular intervals, stores this data, and generates information about each vehicle’s trips on each route. This allows users to gain insights and identify better times to travel.
 
-A complete data quality framework, with configuration-driven validations using JSON Schema and Great Expectations, quarantine of invalid records, and generation of quality reports with both summary and processing details for observability, is applied to the most critical pipelines.
+A complete data quality framework, with configuration-driven validations using JSON Schema and Great Expectations, quarantine of invalid records, active column-level lineage drift detection mapped to alert events, and generation of quality reports with both summary and processing details for observability, is applied to the most critical pipelines.
+
 
 Pipelines and microservices adopt structured observability with JSON logs, centralized collection, and alert rules in the Loki/Grafana/Alertmanager stack.
 

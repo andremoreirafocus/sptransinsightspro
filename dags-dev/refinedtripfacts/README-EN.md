@@ -33,7 +33,7 @@ The pipeline runs three non-aborting data quality checks after persistence:
 
 The overall status is the worst of the three checks: PASS < WARN < FAIL.
 
-The final report also includes, under `details.artifacts.column_lineage`, the declared lineage of columns persisted to `refined.trip_facts`, validated against the real output contract. Any divergence records `drift_detected: true` — without interrupting execution.
+The final report also includes, under `details.artifacts.column_lineage`, the declared lineage of columns persisted to `refined.trip_facts`, validated dynamically against `refined.trip_facts` schema in PostgreSQL. Any mismatch (added/removed columns or mutated data types) marks `drift_detected: true` in the quality report metrics, logging a structured warning event that is captured by the Loki/Alertmanager stack to alert operators of schema mutations without interrupting execution.
 
 In the [samples](./samples) folder there is a manually curated example of the consolidated quality report: [quality-report-refinedtripfacts_2128_394a9854.json](./samples/quality-report-refinedtripfacts_2128_394a9854.json).
 

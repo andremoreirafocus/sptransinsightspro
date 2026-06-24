@@ -33,7 +33,7 @@ O pipeline executa três verificações de qualidade de dados após a persistên
 
 O status final é o pior dos três checks: PASS < WARN < FAIL.
 
-O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.trip_facts`, validada contra o contrato real de saída. Se houver divergência, o artefato registra `drift_detected: true` — sem interromper a execução.
+O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.trip_facts`, validada dinamicamente contra o esquema de `refined.trip_facts` no PostgreSQL. Qualquer divergência (colunas adicionadas/removidas ou tipos de dados alterados) registra `drift_detected: true` nas métricas do relatório de qualidade, gerando um evento de log de alerta estruturado que é capturado pela stack Loki/Alertmanager para notificar operadores sobre alterações de esquema sem interromper a execução.
 
 Na pasta [samples](./samples) há um exemplo curado manualmente do relatório consolidado de qualidade: [quality-report-refinedtripfacts_2128_394a9854.json](./samples/quality-report-refinedtripfacts_2128_394a9854.json).
 

@@ -2,7 +2,8 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
-Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
+Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos, detecção ativa de desvio (drift) de linhagem no nível de coluna mapeada para eventos de alerta, e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
+
 
 Os pipelines e microserviços adotam observabilidade estruturada com logs em JSON, coleta centralizada e regras de alerta na stack Loki/Grafana/Alertmanager.
 

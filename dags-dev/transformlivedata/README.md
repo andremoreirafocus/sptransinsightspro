@@ -37,6 +37,7 @@ O relatório inclui métricas geradas durante a transformação:
 Após a transformação, a tabela é validada com uma suite GX:
 - violações e exceções são registradas
 - linhas inválidas são isoladas e reportadas
+- **Validação Ativa de Desvio de Esquema (Schema Drift):** A suite de validação atua como um gate ativo para desvios de esquema. A expectativa `expect_table_columns_to_match_set` verifica se as colunas de saída correspondem exatamente ao conjunto declarado, detectando adições/remoções de colunas, enquanto `expect_column_values_to_be_of_type` detecta alterações de tipos de dados em colunas críticas. Divergências resultam em falhas de validação, enviando os registros para a quarentena, registrando o drift no relatório de qualidade e gerando alertas/warnings no Loki Ruler.
 
 ### Quarentena
 Registros inválidos oriundos do processo de transformação ou de validação pelo Great Expecttaions são salvos na camada de quarentena.

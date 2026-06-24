@@ -172,11 +172,11 @@ The final report also includes, under `details.artifacts.column_lineage`, the de
 - `avg_speed_kmh`
 - `logic_date`
 
-This lineage is validated against the real output contract of the pipeline.
-If there is any divergence between declared columns and the columns actually produced/persisted, the artifact records:
-- `drift_detected: true`
-- `warning: "lineage drift detected"`
+This lineage is validated against the real output contract of the pipeline. If a drift is identified (e.g., mismatch in columns):
+- `drift_detected: true` is recorded in the lineage payload.
+- `warning: "lineage drift detected"` is added.
 
+**Observability Alert Loop:** The drift is emitted as a metric in structured logs. Promtail forwards this stream to Loki, where alert rules evaluate the log-metric payloads and dispatch warnings via Alertmanager. This ensures upstream changes (e.g., in raw SPTrans APIs) are surfaced immediately without silent failures or pipeline crashes.
 This lineage drift is reported as a governance artifact in the quality report and does not, by itself, interrupt execution.
 
 The `persistence` phase of the final report directly exposes the persistence result, including:

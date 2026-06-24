@@ -42,6 +42,7 @@ The report includes metrics produced during transformation:
 After transformation, the table is validated with a GX suite:
 - violations and exceptions are recorded
 - invalid rows are isolated and reported
+- **Active Schema Drift Validation:** The validation suite acts as an active schema drift validation gate. The expectation `expect_table_columns_to_match_set` checks that output columns align exactly with the declared set, detecting column additions/removals, while `expect_column_values_to_be_of_type` detects data type mutations on critical columns. Mismatches result in validation failures, quarantining the records, registering the drift in the quality report, and generating Loki Ruler warnings/alerts.
 
 ### Quarantine
 

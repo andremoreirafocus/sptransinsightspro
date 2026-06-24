@@ -164,11 +164,11 @@ O relatório final também inclui, em `details.artifacts.column_lineage`, a linh
 - `avg_speed_kmh`
 - `logic_date`
 
-Essa linhagem é validada contra o contrato real de saída da pipeline.
-Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
+Essa linhagem é validada contra o contrato real de saída da pipeline. Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
 - `drift_detected: true`
 - `warning: "lineage drift detected"`
 
+**Loop de Alerta de Observabilidade:** O drift é emitido como uma métrica em logs estruturados. O Promtail encaminha esse fluxo para o Loki, onde as regras de alerta avaliam os payloads de logs e métricas e despacham avisos (warnings) via Alertmanager. Isso garante que mudanças no upstream (ex: nas APIs brutas da SPTrans) sejam identificadas imediatamente, sem falhas silenciosas ou travamento da pipeline.
 Esse drift de lineage é reportado como artefato de governança no relatório de qualidade, sem por si só interromper a execução.
 
 A fase `persistence` do relatório final expõe diretamente o resultado da persistência, incluindo:
