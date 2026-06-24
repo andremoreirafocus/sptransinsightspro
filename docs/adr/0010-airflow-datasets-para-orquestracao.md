@@ -46,6 +46,8 @@ Adotar **Airflow Datasets** para representar dependências orientadas a eventos 
 4. Backfills não devem, por padrão, emitir o mesmo Dataset da DAG principal.
 - Isso evita fan-out involuntário para DAGs downstream durante reprocessamentos históricos.
 
+5. DAGs devem utilizar exclusivamente o `PythonOperator` para invocar as funções das pipelines. O uso de operadores ou hooks nativos do Airflow (`S3Hook`, `PostgresHook`, sensores, etc.) diretamente na lógica das pipelines está fora do escopo desta arquitetura. Todo acesso a infraestrutura é feito pela camada de serviços do projeto, não pelos mecanismos de integração do Airflow. Isso garante que a lógica de negócio permaneça executável em qualquer runtime orientado a eventos — APScheduler, Kafka, ou outro orquestrador — sem modificações.
+
 ### Cadeias de orquestração cobertas
 
 - `gtfs` publica `gtfs://trip_details_ready`

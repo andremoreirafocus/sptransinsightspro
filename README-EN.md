@@ -29,7 +29,7 @@ The following components were adopted to implement the solution:
 - Loki: structured-log aggregation and query backend, responsible for indexing log streams by labels and enabling LogQL queries for operational monitoring. [More observability information](./observability/README-EN.md).
 - Promtail: log collection and shipping agent that gathers Docker container logs and forwards them to Loki, including parsing stages for structured JSON logs. [More observability information](./observability/README-EN.md).
 - Grafana: observability visualization layer, with Loki datasource and provisioned dashboards for execution analysis, failures, warnings, and operational metrics. [More observability information](./observability/README-EN.md).
-- [Airflow](./airflow/README-EN.md): used for orchestration of recurring pipeline processes through multiple DAGs using Python Operator. The production environment for this module is in the `airflow` folder.
+- [Airflow](./airflow/README-EN.md): used for orchestration of recurring pipeline processes through multiple DAGs using exclusively Python Operator. DAGs act as thin orchestration wrappers that invoke business logic through dependency injection, without using Airflow-native hooks or operators. This keeps all pipeline logic executable in plain Python, decoupled from the orchestrator and portable to other event-driven runtimes. The production environment for this module is in the `airflow` folder.
 
 The development environment is located in [dags-dev](./dags-dev/README-EN.md).
 
