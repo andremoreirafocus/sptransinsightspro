@@ -132,7 +132,7 @@ def create_final_quality_report(
         trips_extracted=trips_result.get("trips_extracted"),
         source_sentido_discrepancies=trips_result.get("source_sentido_discrepancies"),
         sanitization_dropped_points=trips_result.get("sanitization_dropped_points"),
-        vehicle_line_groups_processed=trips_result.get("vehicle_line_groups_processed"),
+        circular_trips=trips_result.get("circular_trips"),
         added_rows=persistence_result.get("added_rows"),
         previously_saved_rows=persistence_result.get("previously_saved_rows"),
     )

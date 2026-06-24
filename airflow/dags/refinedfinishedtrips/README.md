@@ -8,14 +8,16 @@ As configurações são carregadas de forma automática via `pipeline_configurat
 Para cada linha e veículo: 
 - lê as posições instantâneas armazenadas na tabela de posições armazendas sptrans no bucket da camada trusted no serviço de object storage, particionados por ano, mes, dia e hora, correspondentes a um período de tempo de análise
 - verifica a qualidade dos dados de posição antes de processar as viagens, executando duas verificações:
-  - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado
+  - **freshness**: valida se o timestamp mais recente dos veículos está dentro do limiar de atualização esperado em relação à `logical_date` da execução, e não em relação ao relógio de parede do ambiente
   - **gaps de extração**: valida se não há lacunas significativas entre os timestamps de extração na janela recente
 - em caso de falha nas verificações de qualidade: interrompe o pipeline e salva um relatório de falha no bucket de metadata
 - em caso de aviso nas verificações de qualidade: salva um relatório parcial no bucket de metadata e continua o processamento
 - calcula as viagens finalizadas durante este período de tempo de análise
-- verifica a qualidade da extração de viagens, executando duas verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
+- verifica a qualidade da extração de viagens, executando três verificações sobre a janela efetiva de extração (medida pelo intervalo entre o primeiro e o último `extracao_ts` do conjunto de dados):
   - **zero trips**: aviso se a janela efetiva de extração exceder o limiar configurado e nenhuma viagem for identificada
   - **low trip count**: aviso se a janela efetiva de extração exceder o limiar configurado e o número de viagens identificadas estiver abaixo do mínimo esperado
+  - **vehicle group failure rate**: aviso se a taxa de falhas de processamento por grupo linha/veículo exceder o limiar configurado; falhas isoladas não interrompem a execução — refletem degradação de qualidade nos dados upstream
+- falhas isoladas na extração de uma combinação linha/veículo são capturadas individualmente: a execução continua para os demais grupos e o total de falhas é registrado na métrica `vehicle_line_processing_failed`
 - em caso de falha durante a fase de extração de viagens: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - salva as viagens finalizadas na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização
 - verifica o resultado da persistência, registrando quantas viagens:
@@ -24,11 +26,23 @@ Para cada linha e veículo:
 - em caso de falha durante a fase de persistência: salva um relatório de falha com os resultados parciais já disponíveis e interrompe a execução
 - ao final de cada execução bem-sucedida, salva um relatório de qualidade completo no bucket de metadata com o status consolidado das três fases (posições, extração de viagens e persistência)
 
+## Integração com Airflow Datasets
+
+**Inlet** — acionado pelo Dataset `sptrans://trusted/transformed_positions_ready` publicado pelo `transformlivedata`. O payload consumido carrega:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
+**Outlet** — após conclusão bem-sucedida, publica o Dataset `sptrans://refined/finished_trips_ready`. O payload emitido carrega:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
+
 ## Algoritmo de extração de viagens
 O algoritmo atual foi desenhado para produzir viagens com maior fidelidade operacional, principalmente em três dimensões centrais para análise:
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 
 Esses campos são especialmente sensíveis a ruídos comuns do dado de posição em produção, como:
 - ônibus parado em terminal antes de iniciar a viagem
@@ -134,17 +148,21 @@ No relatório final, a fase `trip_extraction` expõe métricas operacionais agre
 - `trips_extracted`
 - `source_sentido_discrepancies`
 - `sanitization_dropped_points`
-- `vehicle_line_groups_processed`
 - `input_position_records`
+- `circular_trips`
+- `non_circular_trips`
+- `checks` — resultados das três verificações de qualidade, cada uma com `status` e os campos detalhados da avaliação; a verificação `vehicle_group_failure_rate` inclui `vehicle_line_processing_succeeded`, `vehicle_line_processing_failed` e `vehicle_line_processing_failure_rate`
 
 O relatório final também inclui, em `details.artifacts.column_lineage`, a linhagem declarada das colunas persistidas em `refined.finished_trips`:
 - `trip_id`
 - `vehicle_id`
 - `trip_start_time`
 - `trip_end_time`
-- `duration`
+- `duration_seconds`
 - `is_circular`
-- `average_speed`
+- `distance_meters`
+- `avg_speed_kmh`
+- `logic_date`
 
 Essa linhagem é validada contra o contrato real de saída da pipeline.
 Se houver divergência entre as colunas declaradas e as colunas efetivamente produzidas/persistidas, o artefato registra:
@@ -191,7 +209,7 @@ O dashboard está em [`observability/grafana/provisioning/dashboards/refinedfini
 
 ![Dashboard refinedfinishedtrips](refinedfinishedtrips_dashboard.png)
 
-O dashboard está organizado em cinco linhas:
+O dashboard está organizado em quatro linhas de métricas e uma linha de logs:
 
 **Linha 1 — Saúde operacional**
 
@@ -202,28 +220,29 @@ O dashboard está organizado em cinco linhas:
 | Aborted (last 1h) | Stat (vermelho se ≥ 1) | Total de execuções abortadas na última hora | `execution_aborted` — `count_over_time [1h]` |
 | Execution duration (s) | Timeseries | Duração média por fase: `total`, `trip_extraction`, `positions_load`, `positions_quality`, `persistence`, `quality_report`, `config_load` | `execution_phase_metrics` — `metadata.phase_metrics.<fase>.duration_seconds` via `avg_over_time [5m]` |
 
-**Linha 2 — Volume de viagens**
+**Linha 2 — Resultado e volume**
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Trips added per run | Timeseries | Viagens novas inseridas por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
-| Trips extracted per run | Timeseries | Viagens detectadas pelo algoritmo por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.trips_extracted` |
+| Trips added per run | Timeseries | Métrica principal: viagens novas inseridas na camada refined por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.added_rows` |
+| Trips extracted per run | Timeseries | Viagens detectadas pelo algoritmo por execução, com decomposição em `circular_trips` e `non_circular_trips` para verificação visual da composição | `quality_report_metrics` — `metadata.trips_extracted`; `trip_extraction_completed` — `metadata.circular_trips`, `metadata.non_circular_trips` |
 | Positions loaded per run | Timeseries | Volume de posições lidas do object storage por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.positions_in_time_window_count` |
 
-**Linha 3 — Qualidade da extração**
+**Linha 3 — Qualidade do processamento**
 
 | Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Vehicle-line groups processed | Timeseries | Grupos linha/veículo processados por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.vehicle_line_groups_processed` |
-| Sentido discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado e o sentido da fonte por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
+| Vehicle-line processing succeeded per run | Timeseries | Grupos linha/veículo processados com sucesso por execução | `trip_extraction_completed` — `metadata.vehicle_line_processing_succeeded` |
+| Trip direction discrepancies per run | Timeseries | Discrepâncias entre o sentido derivado espacialmente e o sentido da fonte por execução; comparável diretamente com o volume de viagens extraídas na linha acima | `quality_report_metrics` (status=SUCCEEDED) — `metadata.source_sentido_discrepancies` |
 | Position sanitization drops per run | Timeseries | Posições descartadas pela sanitização espacial por execução | `quality_report_metrics` (status=SUCCEEDED) — `metadata.sanitization_dropped_points` |
 
-**Linha 4 — Freshness dos dados de posição**
+**Linha 4 — Falhas e freshness**
 
-| Painel | Tipo | O que mostra | Limiares |
+| Painel | Tipo | O que mostra | Evento Loki / campo |
 |---|---|---|---|
-| Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e o momento da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
-| Max extraction gap (s) | Timeseries | Maior lacuna em segundos entre ciclos consecutivos de extração na janela recente; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
+| Vehicle-line processing failed per run | Timeseries | Grupos linha/veículo com falha de processamento por execução; aumento indica degradação de qualidade nos dados upstream | `trip_extraction_completed` — `metadata.vehicle_line_processing_failed` |
+| Trip extraction max position window gap (s) | Timeseries | Maior lacuna em segundos entre posições consecutivas na janela de extração; linha de alerta em 300 s (warn) e 900 s (fail) | `recent_gaps_evaluation` — `metadata.max_gap_minutes × 60` |
+| Positions freshness lag (s) | Timeseries | Defasagem em segundos entre o timestamp mais recente dos veículos e a `logical_date` da execução; linha de alerta em 600 s (warn) e 1800 s (fail) | `freshness_evaluation` — `metadata.observed_lag_minutes × 60` |
 
 **Linha 5 — Logs**
 
@@ -259,7 +278,6 @@ DB_PORT=<PORT>
 DB_DATABASE=<dbname>
 DB_USER=<user>
 DB_PASSWORD=<password>
-DB_SSLMODE="prefer"
 
 Chaves esperadas em `general`
 ```json
@@ -284,7 +302,8 @@ Chaves esperadas em `general`
     "gaps_fail_gap_minutes": 15,
     "gaps_recent_window_minutes": 60,
     "trips_effective_window_threshold_minutes": 60,
-    "trips_min_trips_threshold": 5
+    "trips_min_trips_threshold": 5,
+    "vehicle_line_processing_failure_rate_threshold": 0.05
   },
 }
 ```
@@ -322,9 +341,11 @@ CREATE TABLE refined.finished_trips (
     vehicle_id INTEGER,
     trip_start_time TIMESTAMPTZ NOT NULL,
     trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
+    duration_seconds INTEGER,
     is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
+    distance_meters DOUBLE PRECISION,
+    avg_speed_kmh DOUBLE PRECISION,
+    logic_date TIMESTAMPTZ,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 

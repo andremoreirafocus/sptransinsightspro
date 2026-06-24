@@ -1,6 +1,8 @@
 import logging
 import os
 
+from observability.structured_event_logger import get_structured_logger
+from transformlivedata.domain.logger import TransformLivedataLogger
 from transformlivedata.orchestration_dependencies import (
     get_transformlivedata_orchestration_dependencies,
 )
@@ -52,13 +54,21 @@ if _IN_AIRFLOW:
     def _transform_positions_task(outlet_events, **context):
         logical_date = context["dag_run"].logical_date
         logical_date_string = logical_date.isoformat()
+        logger = TransformLivedataLogger(
+            get_structured_logger(
+                service=PIPELINE_NAME,
+                component="orchestrator",
+                logger_name=__name__,
+            )
+        )
         transform_positions(logical_date_string)
         outlet_events[TRANSFORMED_POSITIONS_READY_SIGNAL].extra = {
-            "correlation_id": logical_date_string
+            "logical_date_string": logical_date_string
         }
-        logging.getLogger(__name__).info(
-            "Dataset outlet event published: correlation_id=%s",
-            logical_date_string,
+        logger.info(
+            event="dataset_outlet_published",
+            message="Dataset outlet event published: sptrans://trusted/transformed_positions_ready",
+            metadata={"correlation_id": logical_date_string},
         )
 
     with DAG(

@@ -4,26 +4,37 @@ import sys
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, TextIO
 
-from src.observability.structured_event_logger import (
+from observability.structured_event_logger import (
     StructuredEventLogger,
     get_structured_logger,
 )
 
 
 class JsonLineFormatter(logging.Formatter):
-    def __init__(self, service: str) -> None:
+    def __init__(self, service: str, _json_loads=json.loads) -> None:
         super().__init__()
         self._service = service
+        self._json_loads = _json_loads
 
     def format(self, record: logging.LogRecord) -> str:
         message = record.getMessage()
 
         try:
-            parsed = json.loads(message)
+            parsed = self._json_loads(message)
             if isinstance(parsed, dict):
                 return message
-        except Exception:
+        except json.JSONDecodeError:
             pass
+        except Exception as e:
+            payload = {
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "level": "ERROR",
+                "service": self._service,
+                "component": record.name,
+                "event": "log_formatter_error",
+                "message": f"JsonLineFormatter failed to process log record: {e}",
+            }
+            return json.dumps(payload, ensure_ascii=False, default=str)
 
         payload = {
             "timestamp": datetime.now(timezone.utc).isoformat(),

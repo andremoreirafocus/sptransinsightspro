@@ -6,7 +6,7 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 
 ## Como usar
 
-- Cada ADR é imutável após aceito. Se uma decisão for revisada, um novo ADR supersede o anterior (marcar o antigo como `Supersedido por ADR-XXXX`).
+- Cada ADR é imutável após aceito. Se uma decisão for revisada, um novo ADR substitui o anterior (marcar o antigo como `Substituído por ADR-XXXX`).
 - Para propor uma nova decisão, crie um arquivo seguindo o padrão `NNNN-titulo-em-kebab-case.md` com status `Proposto`, seguindo a estrutura dos ADRs existentes.
 - Numere sequencialmente a partir do próximo número disponível.
 
@@ -24,6 +24,8 @@ O objetivo não é justificar escolhas depois do fato, mas registrar o raciocín
 | [ADR-0006](./0006-validacao-orientada-a-configuracao.md) | Validação orientada a configuração (JSON Schema + Great Expectations) | Aceito |
 | [ADR-0007](./0007-injecao-de-dependencia-para-testabilidade.md) | Injeção de dependência como estratégia de testabilidade | Aceito |
 | [ADR-0008](./0008-workflow-de-promocao-de-pipelines.md) | Workflow de promoção de pipelines (dags-dev → airflow/dags) | Aceito |
-| [ADR-0009](./0009-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Aceito |
+| [ADR-0009](./0009-alertservice.md) | Design do alertservice (webhook, alertas cumulativos, SQLite) | Deprecado (substituído por ADR-0011) |
 | [ADR-0010](./0010-airflow-datasets-para-orquestracao.md) | Airflow Datasets para orquestração orientada a eventos | Proposto |
 | [ADR-0011](./0011-logging-estruturado-com-contrato-canonico-e-transporte-desacoplado.md) | Logging estruturado com contrato canônico e transporte desacoplado | Aceito |
+| [ADR-0012](./0012-migracao-do-power-bi-para-metabase-self-hosted.md) | Migração do Power BI para Metabase self-hosted | Aceito |
+| [ADR-0013](./0013-refinedtripfacts-modelo-dimensional-para-analytics-operacional.md) | Pipeline `refinedtripfacts` e modelo dimensional para analytics operacional | Aceito |

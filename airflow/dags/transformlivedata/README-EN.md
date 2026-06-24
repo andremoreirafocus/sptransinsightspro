@@ -252,6 +252,10 @@ In Airflow, configuration and credentials are managed through Variables and Conn
 Before executing the DAG in Airflow, the `to_be_processed.raw` table must already exist as described above.
 Starting from `transformlivedata-v10.py`, the transformation task publishes the Airflow Dataset `sptrans://trusted/transformed_positions_ready` after successful completion.
 This makes the orchestration dependency explicit for downstream pipelines, improves data freshness for consumers, and reduces maintenance needs by removing cron-coupled schedules.
+The event payload carries the key `logical_date_string` with the UTC execution timestamp in ISO 8601 format:
+```json
+{"logical_date_string": "2026-06-08T15:00:00+00:00"}
+```
 
 ## Local execution instructions
 

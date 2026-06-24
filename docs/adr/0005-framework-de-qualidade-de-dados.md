@@ -3,6 +3,8 @@
 **Data:** 2026-04-15  
 **Status:** Aceito
 
+> **Nota:** o `alertservice` foi deprecado ([ADR-0009](./0009-alertservice.md)). As partes deste ADR que se referem ao `alertservice` (entrega do relatório de qualidade via webhook para notificação) não devem ser consideradas: essa notificação foi substituída pela stack de observabilidade ([ADR-0011](./0011-logging-estruturado-com-contrato-canonico-e-transporte-desacoplado.md)) — Loki Ruler sobre os logs estruturados + Alertmanager. As demais decisões deste ADR permanecem válidas.
+
 ## Contexto
 
 O pipeline `transformlivedata` processa dados de posição de ônibus extraídos de uma API externa (SPTrans) que está fora do controle do projeto. Características do dado:

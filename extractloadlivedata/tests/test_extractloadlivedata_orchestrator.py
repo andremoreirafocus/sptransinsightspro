@@ -302,8 +302,9 @@ def test_execution_report_failure_emits_enriched_final_failure(caplog):
     with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
         extractloadlivedata(config=config, services=services)
 
-    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
+    assert payload["status"] == "WITH_FAILURES"
     metadata = payload["metadata"]
     assert "execution_seconds" in metadata
     assert "items_total" in metadata
@@ -332,8 +333,9 @@ def test_execution_report_failure_emits_failed_phases(caplog):
     with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
         extractloadlivedata(config=config, services=services)
 
-    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
+    assert payload["status"] == "WITH_FAILURES"
     metadata = payload["metadata"]
     assert metadata["failed_phases"] == ["positions_download"]
 
@@ -349,7 +351,7 @@ def test_alert_rule_scenario_success_without_retries_no_warning_or_failure(caplo
         extractloadlivedata(config=config, services=services)
 
     completed = _find_event_payload(caplog, "execution_completed")
-    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    failed = _find_event_payload(caplog, "execution_aborted")
     assert completed is not None
     assert failed is None
     assert completed["service"] == "extractloadlivedata"
@@ -382,7 +384,7 @@ def test_alert_rule_scenario_success_with_retries_triggers_warning_context(caplo
         extractloadlivedata(config=config, services=services)
 
     completed = _find_event_payload(caplog, "execution_completed")
-    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    failed = _find_event_payload(caplog, "execution_aborted")
     assert completed is not None
     assert failed is None
     assert completed["service"] == "extractloadlivedata"
@@ -409,14 +411,15 @@ def test_alert_rule_scenario_non_recoverable_failure_triggers_failure_context(ca
         extractloadlivedata(config=config, services=services)
 
     completed = _find_event_payload(caplog, "execution_completed")
-    failed = _find_event_payload(caplog, "execution_failed_non_recoverable")
-    assert completed is None
-    assert failed is not None
-    assert failed["service"] == "extractloadlivedata"
-    assert "execution_id" in failed and failed["execution_id"]
-    assert failed["metadata"]["items_failed"] > 0
+    aborted = _find_event_payload(caplog, "execution_aborted")
+    assert completed is not None
+    assert aborted is None
+    assert completed["status"] == "WITH_FAILURES"
+    assert completed["service"] == "extractloadlivedata"
+    assert "execution_id" in completed and completed["execution_id"]
+    assert completed["metadata"]["items_failed"] > 0
     # Alert rule expectation:
-    # - service_failed should trigger (failure event exists)
+    # - service_failed should trigger (execution_completed WITH_FAILURES exists)
 
 
 # ── Phase metrics: local_save and object_storage_save ────────────────────────
@@ -456,8 +459,9 @@ def test_phase_metrics_local_save_fails_on_local_ingest_buffer_save_error(caplog
     with caplog.at_level(logging.INFO, logger="src.extractloadlivedata"):
         extractloadlivedata(config=config, services=services)
 
-    payload = _find_event_payload(caplog, "execution_failed_non_recoverable")
+    payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
+    assert payload["status"] == "WITH_FAILURES"
     phase_metrics = payload["metadata"]["phase_metrics"]
     assert phase_metrics["local_save"]["attempted"] == 1
     assert phase_metrics["local_save"]["failed"] == 1
@@ -550,3 +554,48 @@ def test_pending_notifications_count_one_with_one_pending_file(caplog):
     payload = _find_event_payload(caplog, "execution_completed")
     assert payload is not None
     assert payload["metadata"]["pending_ingest_notifications_count"] == 1
+
+
+def test_config_validation_failure_emits_execution_aborted(caplog):
+    call_log = []
+    services = _build_services(call_log, pending_list=[])
+    config = {}  # missing NOTIFICATION_ENGINE and INGEST_BUFFER_PATH
+    with caplog.at_level(logging.ERROR, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    aborted = _find_event_payload(caplog, "execution_aborted")
+    assert aborted is not None
+    assert aborted["metadata"]["failed_phases"] == ["config_validation"]
+    assert "error_type" in aborted["metadata"]
+    assert call_log == []
+
+
+def test_handle_failure_logs_critical_for_severe_phases(caplog):
+    call_log = []
+
+    def extract_raises(_config, with_metrics=False):
+        call_log.append("extract_buses_positions_with_retries")
+        raise PositionsDownloadError("download failed")
+
+    services = _build_services(call_log, pending_list=[])
+    services = replace(services, extract_buses_positions_with_retries=extract_raises)
+    config = {
+        "INGEST_BUFFER_PATH": "/tmp/ingest",
+        "NOTIFICATION_ENGINE": "processing_requests",
+    }
+    with caplog.at_level(logging.DEBUG, logger="src.extractloadlivedata"):
+        extractloadlivedata(config=config, services=services)
+
+    critical_phase_failures = []
+    for record in caplog.records:
+        if record.levelno != logging.CRITICAL:
+            continue
+        try:
+            payload = json.loads(record.message)
+        except Exception:
+            continue
+        if payload.get("event") == "phase_failure_recorded":
+            critical_phase_failures.append(payload)
+
+    assert len(critical_phase_failures) >= 1
+    assert critical_phase_failures[0]["metadata"]["failure_phase"] == "positions_download"

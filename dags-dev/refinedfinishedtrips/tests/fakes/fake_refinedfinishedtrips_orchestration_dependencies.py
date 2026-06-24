@@ -13,6 +13,7 @@ _BASE_TS = datetime(2026, 4, 14, 10, 0, 0, tzinfo=timezone.utc)
 @dataclass
 class OrchestrationCallRecorder:
     save_calls: list = field(default_factory=list)
+    positions_quality_calls: list = field(default_factory=list)
     failure_report_calls: list = field(default_factory=list)
     final_report_calls: list = field(default_factory=list)
 
@@ -50,10 +51,11 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 return pipeline_name_or_config
             return {}
 
-        def get_recent_positions(config):
+        def get_recent_positions(config, logic_date):
             return cls._default_positions_df()
 
-        def validate_positions_quality(config, df):
+        def validate_positions_quality(config, df, reference_datetime):
+            recorder.positions_quality_calls.append({"reference_datetime": reference_datetime, "row_count": len(df)})
             if positions_status == "FAIL":
                 return {
                     "status": "FAIL",
@@ -94,12 +96,12 @@ class FakeRefinedFinishedTripsOrchestrationDependencies:
                 "source_sentido_discrepancies": metrics.get("total_source_sentido_discrepancies", 0),
                 "sanitization_dropped_points": metrics.get("total_input_position_sanitization_drops", 0),
                 "input_position_records": metrics.get("total_input_position_records", len(df)),
-                "vehicle_line_groups_processed": metrics.get("vehicle_line_groups_processed", 0),
+                "vehicle_line_processing_succeeded": metrics.get("vehicle_line_processing_succeeded", 0),
                 "checks": [],
             }
 
-        def save_finished_trips_to_db(config, trips):
-            recorder.save_calls.append(trips)
+        def save_finished_trips_to_db(config, trips, *, logic_date=None):
+            recorder.save_calls.append({"trips": trips, "logic_date": logic_date})
             if save_trips_raises is not None:
                 raise save_trips_raises
             return {"added_rows": len(trips), "previously_saved_rows": 0}

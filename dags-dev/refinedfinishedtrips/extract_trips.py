@@ -34,7 +34,9 @@ def _build_column_lineage() -> Dict[str, Any]:
 def extract_trips_for_all_Lines_and_vehicles(
     pipeline_name: str,
     deps: RefinedFinishedTripsOrchestrationDependencies | None = None,
-    correlation_id: str | None = None,
+    *,
+    correlation_id: str,
+    logic_date_str: str,
 ) -> None:
     def create_execution_aborted_log_record(message: str, phase: str) -> None:
         structured_logger.error(
@@ -60,7 +62,8 @@ def extract_trips_for_all_Lines_and_vehicles(
     structured_logger = RefinedFinishedTripsLogger(
         get_structured_logger(service="refinedfinishedtrips", component="orchestrator", logger_name=__name__)
     )
-    effective_correlation_id = correlation_id if correlation_id is not None else execution_id
+    effective_correlation_id = correlation_id
+    logic_date: datetime = datetime.fromisoformat(logic_date_str)
     state = PipelineTaskRunState(
         execution_id=execution_id,
         correlation_id=effective_correlation_id,
@@ -113,7 +116,7 @@ def extract_trips_for_all_Lines_and_vehicles(
     )
     tracker.begin("positions_load")
     try:
-        df_recent_positions = deps.get_recent_positions(pipeline_config)
+        df_recent_positions = deps.get_recent_positions(pipeline_config, logic_date)
         tracker.finish("positions_load", "success")
     except Exception as exc:
         tracker.finish("positions_load", "failed")
@@ -130,7 +133,11 @@ def extract_trips_for_all_Lines_and_vehicles(
     )
     tracker.begin("positions_quality")
     try:
-        positions_result = deps.validate_positions_quality(pipeline_config, df_recent_positions)
+        positions_result = deps.validate_positions_quality(
+            pipeline_config,
+            df_recent_positions,
+            reference_datetime=logic_date,
+        )
         state.positions_result = positions_result
         if positions_result["status"] == "FAIL":
             failed_notes = "; ".join(
@@ -166,7 +173,7 @@ def extract_trips_for_all_Lines_and_vehicles(
         raise
     tracker.begin("persistence")
     try:
-        save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips)
+        save_result = deps.save_finished_trips_to_db(pipeline_config, all_finished_trips, logic_date=logic_date)
         persistence_result = {"status": "PASS", **save_result}
         state.persistence_result = persistence_result
         tracker.finish("persistence", "success")

@@ -4,6 +4,10 @@ import logging
 import pytest
 
 from src.observability.process_structured_logger import get_structured_logger
+from src.observability.structured_event_logger import (
+    clear_execution_context,
+    set_execution_context,
+)
 
 
 def test_get_structured_logger_requires_non_empty_service_and_component() -> None:
@@ -73,4 +77,18 @@ def test_emit_outputs_json_with_canonical_required_fields(
     assert decoded["metadata"] == {"env": "dev", "records": 5}
 
     assert payload == decoded
+
+
+def test_execution_id_resolved_from_context() -> None:
+    logger = get_structured_logger(
+        service="extractloadlivedata",
+        component="scheduler",
+        logger_name="tests.structured.context",
+    )
+    set_execution_context("exec-123")
+    try:
+        payload = logger.info(event="tick", message="scheduled run")
+    finally:
+        clear_execution_context()
+    assert payload["execution_id"] == "exec-123"
 

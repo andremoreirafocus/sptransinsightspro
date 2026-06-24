@@ -23,6 +23,7 @@ def _pos(
     is_circular: bool = False,
     veiculo_lat: float = -23.5,
     veiculo_long: float = -46.6,
+    trip_linear_distance: float = 10000.0,
 ):
     return {
         "distance_to_first_stop": distance_to_first_stop,
@@ -34,6 +35,7 @@ def _pos(
         "is_circular": is_circular,
         "veiculo_lat": veiculo_lat,
         "veiculo_long": veiculo_long,
+        "trip_linear_distance": trip_linear_distance,
     }
 
 
@@ -137,12 +139,14 @@ def test_extract_raw_trips_metadata_one_complete_trip_last_to_first():
 
 def test_extract_raw_trips_metadata_two_consecutive_trips():
     position_records = [
-        _pos(50, 3000, offset_seconds=0, linha_sentido=1),       # at first stop
-        _pos(500, 2000, offset_seconds=60, linha_sentido=1),     # departed → trip 1 start at index 0
-        _pos(2000, 60, offset_seconds=120, linha_sentido=1),     # arrived at last stop → trip 1 end
-        _pos(2800, 80, offset_seconds=180, linha_sentido=2),     # still at last stop (dwell)
-        _pos(2000, 500, offset_seconds=240, linha_sentido=2),    # departed → trip 2 start at index 3
-        _pos(60, 2000, offset_seconds=300, linha_sentido=2),     # arrived at first stop → trip 2 end
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),       # at first stop → trip 1 start
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),     # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),   # mid-route
+        _pos(2000, 60, offset_seconds=180, linha_sentido=1),     # arrived at last stop → trip 1 end
+        _pos(2800, 80, offset_seconds=240, linha_sentido=2),     # dwell at last stop → trip 2 start
+        _pos(2000, 500, offset_seconds=300, linha_sentido=2),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=360, linha_sentido=2),   # mid-route
+        _pos(60, 2000, offset_seconds=420, linha_sentido=2),     # arrived at first stop → trip 2 end
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 2
@@ -156,12 +160,71 @@ def test_extract_raw_trips_metadata_dwell_time_excluded_from_trip_start():
         _pos(30, 3000, offset_seconds=0, linha_sentido=1),      # dwell record 1
         _pos(60, 3100, offset_seconds=60, linha_sentido=1),     # dwell record 2
         _pos(80, 3200, offset_seconds=120, linha_sentido=1),    # dwell record 3 — last in zone
-        _pos(500, 2500, offset_seconds=180, linha_sentido=1),   # departed
-        _pos(2500, 60, offset_seconds=240, linha_sentido=1),    # arrived at last stop
+        _pos(500, 2500, offset_seconds=180, linha_sentido=1),   # departed → BETWEEN_STOPS
+        _pos(1200, 1500, offset_seconds=240, linha_sentido=1),  # mid-route
+        _pos(2500, 60, offset_seconds=300, linha_sentido=1),    # arrived at last stop
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
     assert result[0]["start_position_index"] == 2
+
+
+def test_extract_raw_trips_metadata_mid_route_start_first_arrival_discarded_second_emitted():
+    # Bus enters window between stops — first_incomplete_trip_already_handled starts False.
+    # The first complete traversal (mid-route → last stop → first stop) is discarded.
+    # Only the second traversal (first stop → last stop) is emitted.
+    position_records = [
+        _pos(800, 1200, offset_seconds=0, linha_sentido=2),    # between stops (mid-route)
+        _pos(900, 900, offset_seconds=60, linha_sentido=2),    # between stops
+        _pos(2500, 60, offset_seconds=120, linha_sentido=2),   # arrived at last stop
+        _pos(2800, 80, offset_seconds=180, linha_sentido=2),   # dwell at last stop
+        _pos(2000, 500, offset_seconds=240, linha_sentido=2),  # departed
+        _pos(1200, 1200, offset_seconds=300, linha_sentido=2), # mid-route
+        _pos(60, 2500, offset_seconds=360, linha_sentido=2),   # arrived at first stop (discarded)
+        _pos(80, 2800, offset_seconds=420, linha_sentido=1),   # dwell at first stop
+        _pos(500, 2000, offset_seconds=480, linha_sentido=1),  # departed
+        _pos(2000, 60, offset_seconds=540, linha_sentido=1),   # arrived at last stop (emitted)
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 1
+    assert result[0]["start_position_index"] == 7
+    assert result[0]["end_position_index"] == 9
+
+
+def test_extract_raw_trips_metadata_direct_stop_to_stop_jump_discards_transit():
+    # Bus is at first stop, then teleports directly to last stop (no BETWEEN_STOPS record).
+    # The transit attempt is silently discarded; detection continues from the new terminal.
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),    # at first stop → departure
+        _pos(3000, 60, offset_seconds=60, linha_sentido=2),   # directly at last stop (jump)
+        _pos(2800, 80, offset_seconds=120, linha_sentido=2),  # dwell at last stop
+        _pos(2000, 500, offset_seconds=180, linha_sentido=2), # departed
+        _pos(60, 2000, offset_seconds=240, linha_sentido=2),  # arrived at first stop
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 2
+    assert result[0]["start_position_index"] == 2
+    assert result[0]["end_position_index"] == 4
+
+
+def test_extract_raw_trips_metadata_bus_turned_back_mid_route():
+    # Bus departs first stop, goes between stops, then returns to first stop (turned back).
+    # That transit attempt is discarded; the bus re-departs and completes a valid trip.
+    position_records = [
+        _pos(50, 3000, offset_seconds=0, linha_sentido=1),    # at first stop → departure
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),  # between stops
+        _pos(60, 3000, offset_seconds=120, linha_sentido=1),  # turned back — at first stop again
+        _pos(80, 3200, offset_seconds=180, linha_sentido=1),  # dwell at first stop
+        _pos(500, 2000, offset_seconds=240, linha_sentido=1), # re-departed
+        _pos(2000, 60, offset_seconds=300, linha_sentido=1),  # arrived at last stop
+    ]
+    result = extract_raw_trips_metadata(position_records, THRESHOLD)
+    assert len(result) == 1
+    assert result[0]["sentido"] == 1
+    assert result[0]["start_position_index"] == 3
+    assert result[0]["end_position_index"] == 5
 
 
 def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
@@ -182,8 +245,9 @@ def test_extract_raw_trips_metadata_circular_route_closes_on_terminal_return():
 def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_source_sentido_discrepancy():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # at first stop, wrong sentido
-        _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed
-        _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # arrived — last record sentido=2, derived=1
+        _pos(500, 2000, offset_seconds=60, linha_sentido=2),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=2),  # mid-route
+        _pos(2000, 60, offset_seconds=180, linha_sentido=2),    # arrived — sentido=2, derived=1
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
@@ -194,8 +258,9 @@ def test_extract_raw_trips_metadata_divergent_linha_sentido_sets_source_sentido_
 def test_extract_raw_trips_metadata_boundary_sentido_flip_does_not_warn():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=2),      # boundary at departure
-        _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # in motion
-        _pos(2000, 60, offset_seconds=120, linha_sentido=2),    # boundary at arrival
+        _pos(500, 2000, offset_seconds=60, linha_sentido=1),    # departed → BETWEEN_STOPS
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),  # mid-route
+        _pos(2000, 60, offset_seconds=180, linha_sentido=2),    # boundary at arrival
     ]
     result = extract_raw_trips_metadata(position_records, THRESHOLD)
     assert len(result) == 1
@@ -331,49 +396,207 @@ def test_extract_raw_trips_metadata_circular_noisy_direction_flip_without_moveme
 # --- generate_trips_table ---
 
 
-def test_generate_trips_table_tuple_has_seven_fields():
+def test_generate_trips_table_tuple_has_all_required_fields():
     start_ts = BASE_TS
     end_ts = BASE_TS + timedelta(seconds=3600)
     position_records = [
-        {"veiculo_ts": start_ts, "is_circular": False},
-        {"veiculo_ts": end_ts, "is_circular": False},
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert len(result) == 1
-    assert len(result[0]) == 7
+    assert len(result[0]) == 8
 
 
 def test_generate_trips_table_trip_id_from_linha_and_derived_sentido():
     position_records = [
-        {"veiculo_ts": BASE_TS, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 2}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert result[0][0] == "1234-10-1"
 
 
-def test_generate_trips_table_duration_equals_end_minus_start():
+def test_generate_trips_table_duration_seconds_equals_end_minus_start():
     start_ts = BASE_TS
     end_ts = BASE_TS + timedelta(seconds=3600)
     position_records = [
-        {"veiculo_ts": start_ts, "is_circular": False},
-        {"veiculo_ts": end_ts, "is_circular": False},
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
-    assert result[0][4] == end_ts - start_ts
+    assert result[0][4] == int((end_ts - start_ts).total_seconds())
 
 
-def test_generate_trips_table_average_speed_always_zero():
+def test_generate_trips_table_avg_speed_kmh_computed_from_distance_and_duration():
+    distance_m = 10000.0
+    duration_s = 3600
     position_records = [
-        {"veiculo_ts": BASE_TS, "is_circular": False},
-        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert abs(result[0][7] - (distance_m / duration_s * 3.6)) < 1e-9
+
+
+def test_generate_trips_table_duration_seconds_is_int():
+    start_ts = BASE_TS
+    end_ts = BASE_TS + timedelta(seconds=3600)
+    position_records = [
+        {"veiculo_ts": start_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": end_ts, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert type(result[0][4]) is int
+
+
+def test_non_circular_distance_meters_from_trip_linear_distance():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 15000.0},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 15000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][6] == 15000.0
+
+
+def test_null_trip_linear_distance_raises_value_error():
+    import pytest
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": None},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": None},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    with pytest.raises(ValueError):
+        generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+
+def test_missing_trip_linear_distance_key_raises_value_error():
+    import pytest
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    with pytest.raises(ValueError):
+        generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+
+def test_circular_distance_meters_is_haversine_between_start_and_end():
+    from math import radians, sin, cos, atan2, sqrt
+    lat1, lon1 = -23.5, -46.6
+    lat2, lon2 = -23.6, -46.7
+    R = 6371000
+    phi1, phi2 = radians(lat1), radians(lat2)
+    d_phi = radians(lat2 - lat1)
+    d_lam = radians(lon2 - lon1)
+    a = sin(d_phi / 2) ** 2 + cos(phi1) * cos(phi2) * sin(d_lam / 2) ** 2
+    expected = R * 2 * atan2(sqrt(a), sqrt(1 - a))
+
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=60), "is_circular": True, "veiculo_lat": -23.55, "veiculo_long": -46.65},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 2, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert abs(result[0][6] - expected) < 1.0
+
+
+def test_circular_distance_meters_is_zero_for_same_point():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": -23.5, "veiculo_long": -46.6},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": -23.5, "veiculo_long": -46.6},
     ]
     trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
     result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
     assert result[0][6] == 0.0
+
+
+def test_circular_distance_does_not_accumulate_intermediate_samples():
+    lat1, lon1 = -23.5, -46.6
+    lat2, lon2 = -23.6, -46.7
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=1000), "is_circular": True, "veiculo_lat": -23.55, "veiculo_long": -46.65},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=2000), "is_circular": True, "veiculo_lat": -23.58, "veiculo_long": -46.68},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 3, "sentido": 1}]
+    result_with_intermediates = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+
+    position_records_direct = [
+        {"veiculo_ts": BASE_TS, "is_circular": True, "veiculo_lat": lat1, "veiculo_long": lon1},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=3600), "is_circular": True, "veiculo_lat": lat2, "veiculo_long": lon2},
+    ]
+    trips_metadata_direct = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result_direct = generate_trips_table(position_records_direct, trips_metadata_direct, LINHA_LT, VEICULO_ID)
+
+    assert result_with_intermediates[0][6] == result_direct[0][6]
+
+
+def test_avg_speed_kmh_computed_correctly_from_distance_and_duration():
+    distance_m = 18000.0
+    duration_s = 3600
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    expected = distance_m / duration_s * 3.6
+    assert abs(result[0][7] - expected) < 1e-9
+
+
+def test_avg_speed_kmh_is_zero_when_duration_seconds_is_zero():
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][7] == 0.0
+
+
+def test_avg_speed_kmh_is_zero_when_duration_seconds_is_negative():
+    position_records = [
+        {"veiculo_ts": BASE_TS + timedelta(seconds=10), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": 10000.0},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result[0][7] == 0.0
+
+
+def test_trip_exceeding_max_speed_is_rejected():
+    # 16771m in 360s → 167 km/h → must be filtered out (vehicle reassignment scenario)
+    distance_m = 16771.0
+    duration_s = 360
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert result == []
+
+
+def test_trip_at_max_speed_boundary_is_accepted():
+    # exactly 80 km/h → accepted
+    distance_m = 16000.0
+    duration_s = int(distance_m / (80.0 / 3.6))
+    position_records = [
+        {"veiculo_ts": BASE_TS, "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+        {"veiculo_ts": BASE_TS + timedelta(seconds=duration_s), "is_circular": False, "veiculo_lat": -23.5, "veiculo_long": -46.6, "trip_linear_distance": distance_m},
+    ]
+    trips_metadata = [{"start_position_index": 0, "end_position_index": 1, "sentido": 1}]
+    result = generate_trips_table(position_records, trips_metadata, LINHA_LT, VEICULO_ID)
+    assert len(result) == 1
 
 
 # --- extract_trips_per_line_per_vehicle ---
@@ -407,10 +630,11 @@ def test_extract_trips_per_vehicle_one_complete_trip_detected():
     position_records = [
         _pos(50, 3000, offset_seconds=0, linha_sentido=1),
         _pos(500, 2000, offset_seconds=60, linha_sentido=1),
-        _pos(2000, 60, offset_seconds=120, linha_sentido=1),
+        _pos(1200, 1200, offset_seconds=120, linha_sentido=1),
+        _pos(2000, 60, offset_seconds=3600, linha_sentido=1),
     ]
     trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(
-        position_records, 0, 2, LINHA_LT, VEICULO_ID, THRESHOLD
+        position_records, 0, 3, LINHA_LT, VEICULO_ID, THRESHOLD
     )
     assert len(trips) == 1
     assert trips[0][0] == "1234-10-0"
@@ -424,7 +648,7 @@ def test_extract_trips_per_vehicle_returns_drop_count_when_sanitization_drops_po
         _pos(3000, 50, offset_seconds=60, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
         _pos(500, 2000, offset_seconds=120, linha_sentido=1, veiculo_lat=-23.461000, veiculo_long=-46.688000),
         _pos(1200, 1000, offset_seconds=180, linha_sentido=1, veiculo_lat=-23.480000, veiculo_long=-46.690000),
-        _pos(2000, 60, offset_seconds=240, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
+        _pos(2000, 60, offset_seconds=3600, linha_sentido=1, veiculo_lat=-23.526252, veiculo_long=-46.667517),
     ]
 
     trips, mismatches, dropped_points = extract_trips_per_line_per_vehicle(

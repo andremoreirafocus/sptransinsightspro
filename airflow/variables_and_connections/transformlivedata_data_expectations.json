@@ -35,7 +35,8 @@
                         "last_stop_lat",
                         "last_stop_lon",
                         "distance_to_first_stop",
-                        "distance_to_last_stop"
+                        "distance_to_last_stop",
+                        "trip_linear_distance"
                     ]
                 },
                 "meta": {
@@ -111,6 +112,17 @@
                 }
             },
             {
+                "expectation_type": "expect_column_values_to_be_of_type",
+                "kwargs": {
+                    "column": "trip_linear_distance",
+                    "type_": "float"
+                },
+                "meta": {
+                    "rule_type": "column_data_types",
+                    "phase": "transformed"
+                }
+            },
+            {
                 "expectation_type": "expect_column_values_to_be_between",
                 "kwargs": {
                     "column": "distance_to_first_stop",
@@ -125,6 +137,17 @@
                 "expectation_type": "expect_column_values_to_be_between",
                 "kwargs": {
                     "column": "distance_to_last_stop",
+                    "min_value": 0
+                },
+                "meta": {
+                    "rule_type": "distances_non_negative",
+                    "phase": "transformed"
+                }
+            },
+            {
+                "expectation_type": "expect_column_values_to_be_between",
+                "kwargs": {
+                    "column": "trip_linear_distance",
                     "min_value": 0
                 },
                 "meta": {

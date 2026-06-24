@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict, Optional
 from zoneinfo import ZoneInfo
 
@@ -10,7 +10,7 @@ from observability.structured_event_logger import get_structured_logger
 structured_logger = get_structured_logger(logger_name=__name__)
 
 
-def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = None) -> pd.DataFrame:
+def get_recent_positions(config: Dict[str, Any], logic_date: datetime, duckdb_client: Optional[Any] = None) -> pd.DataFrame:
     def get_config(config):
         general = config["general"]
         analysis = general["analysis"]
@@ -39,11 +39,11 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
         positions_table_name,
         connection,
     ) = get_config(config)
-    now = datetime.now(timezone.utc).astimezone(ZoneInfo("America/Sao_Paulo"))
-    year = now.strftime("%Y")
-    month = now.strftime("%m")
-    day = now.strftime("%d")
-    current_hour = int(now.strftime("%H"))
+    logic_date_sp = logic_date.astimezone(ZoneInfo("America/Sao_Paulo"))
+    year = logic_date_sp.strftime("%Y")
+    month = logic_date_sp.strftime("%m")
+    day = logic_date_sp.strftime("%d")
+    current_hour = int(logic_date_sp.strftime("%H"))
     min_hour = current_hour - hours_interval
     if min_hour < 0:
         min_hour = 0
@@ -61,7 +61,8 @@ def get_recent_positions(config: Dict[str, Any], duckdb_client: Optional[Any] = 
             SELECT
                 veiculo_ts, linha_lt, veiculo_id, linha_sentido, is_circular, extracao_ts,
                 veiculo_lat, veiculo_long,
-                distance_to_first_stop, distance_to_last_stop
+                distance_to_first_stop, distance_to_last_stop,
+                trip_linear_distance
             FROM read_parquet('{s3_path}', hive_partitioning = true)
             WHERE hour::INTEGER >= {min_hour} AND hour::INTEGER <= {current_hour}
             ORDER BY linha_lt, veiculo_id, veiculo_ts ASC;

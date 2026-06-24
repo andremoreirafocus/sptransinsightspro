@@ -3,6 +3,8 @@
 **Date:** 2026-04-15  
 **Status:** Accepted
 
+> **Note:** `alertservice` has been deprecated ([ADR-0009](./0009-alertservice-design-EN.md)). The parts of this ADR that refer to `alertservice` (quality-report delivery via webhook for notification) should not be considered: that notification has been replaced by the observability stack ([ADR-0011](./0011-structured-logging-with-canonical-contract-and-decoupled-transport-EN.md)) — Loki Ruler over the structured logs + Alertmanager. All other decisions in this ADR remain valid.
+
 ## Context
 
 The `transformlivedata` pipeline processes bus-position data extracted from an external API, SPTrans, which is outside the project’s control. Data characteristics:

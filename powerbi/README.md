@@ -1,3 +1,5 @@
+> **Legado:** Este diretório está preservado como referência histórica. A camada de visualização foi migrada para o [Metabase](../metabase/README.md) (ADR-0012). O dashboard Power BI não é mais mantido nem utilizado na plataforma.
+
 # 📊 Painel de Insights SPTrans (Power BI)
 
 Este diretório contém o relatório do Power BI utilizado para visualizar os dados processados no pipeline. 

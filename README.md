@@ -2,7 +2,8 @@ Este projeto proporciona aos seus usuários visualizações sobre as posições 
 
 Para isto, o Sptransinsights, em intervalos regulares, extrai as posições de todos os ônibus em circulação em cada momento, armazenando estes dados para gerar informações sobre as viagens de cada veículo de cada linha e, assim, proporcionar insights aos seus usuários, permitindo que identifiquem os melhores momentos para fazerem suas viagens.
 
-Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
+Um framework completo de qualidade de dados, com validações orientadas a configuração (JSON Schema e Great Expectations), quarentena de registros inválidos, detecção ativa de desvio (drift) de linhagem no nível de coluna mapeada para eventos de alerta, e geração de relatório de qualidade com resumo e detalhes do processamento proporcionando informações de observabilidade é aplicado nos pipelines mais críticos.
+
 
 Os pipelines e microserviços adotam observabilidade estruturada com logs em JSON, coleta centralizada e regras de alerta na stack Loki/Grafana/Alertmanager.
 
@@ -23,11 +24,11 @@ Para implementar a solução foram adotados os componentes:
 - DuckDB: utilizado nos processos de transformação para fazer queries SQL diretamente nas tabelas armazenadas em formato Parquet na camada trusted, implementada através do Minio, com excelente performance, e sem requerer a implementação de motores SQL como o Presto, assim reduzindo a complexidade da infraestrutura. Utilizado também para análise exploratória de dados com intermédio do Jupyter.
 - [Jupyter](./jupyter/README.md): usado para criar notebooks com a finalidade de viabilizar a exploração de dados na camada trusted armazenada no object storage.
 - PostgreSQL: utilizado para armazenar a camada refined, proporcionando consultas com baixa latência na camada de visualização.
-- [PowerBI](./powerbi/README.md): utilizado para implementar a camada de visualização devido a sua flexibilidade, poder e larga adoção, consumindo dados diretamente da camada refined através do recurso de direct query ao PostgreSQL.
+- [Metabase](./metabase/README.md): utilizado para implementar a camada de visualização, consumindo dados diretamente da camada refined do PostgreSQL através do datasource read-only `sptrans_insights`. O dashboard SPTrans Insights é provisionado automaticamente, expondo KPIs operacionais, análises de frequência e duração de viagens e o mapa de posições ao vivo da frota.
 - Loki: backend de agregação e consulta de logs estruturados, responsável por indexar streams de logs por labels e disponibilizar consultas LogQL para monitoramento operacional. [Mais informações de Observabilidade](./observability/README.md).
 - Promtail: agente de coleta e envio de logs dos containers Docker para o Loki, realizando descoberta via Docker socket e etapas de parsing para logs JSON. [Mais informações de Observabilidade](./observability/README.md).
 - Grafana: camada de visualização da observabilidade, com datasource Loki e dashboards provisionados para análise de execução, falhas, warnings e métricas operacionais. [Mais informações de Observabilidade](./observability/README.md).
-- [Airflow](./airflow/README.md): para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando o Python Operator. O ambiente de produção para este módulo se encontra na pasta airflow. 
+- [Airflow](./airflow/README.md): para orquestração de processos recorrentes do pipeline através de diversas DAGs utilizando exclusivamente o Python Operator. As DAGs atuam como wrappers finas de orquestração, invocando a lógica de negócio por injeção de dependências, sem usar hooks ou operadores nativos do Airflow. Isso mantém toda a lógica de pipeline executável em Python puro, desacoplada do orquestrador e portável para outros runtimes orientados a eventos. O ambiente de produção para este módulo se encontra na pasta airflow. 
 O ambiente de desenvolvimento se encontra na pasta [dags-dev](./dags-dev/README.md)
 Detalhes sobre as DAGs:
     - [DAG gtfs](./dags-dev/gtfs/README.md): processo composto de 3 etapas principais, com checagem de qualidade ao longo do fluxo, geração de um relatório consolidado por execução e publicação de um Airflow Dataset ao final de uma execução bem sucedida para disparar a sincronização downstream para a camada refined.   
@@ -41,6 +42,7 @@ Detalhes sobre as DAGs:
     - [DAG orchestratetransform](./dags-dev/orchestratetransform/README.md): processo de identificação de dados de posição dos ônibus pendentes de processamento e que dispara a DAG de transformação.
     - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md): processo de transformação para criação das viagens finalizadas na camada refined a partir dos dados enriquecidos da camada trusted, com checagens de qualidade sobre posições, extração e persistência, além de geração de relatório consolidado.
         - A partir da versão 6 desta pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness das viagens finalizadas calculadas na camada refined, que passam a ser atualizadas logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
+    - [DAG refinedtripfacts](./dags-dev/refinedtripfacts/README.md): processo de construção da tabela fato analítica `refined.trip_facts` a partir das viagens finalizadas produzidas pelo `refinedfinishedtrips`, derivando atributos analíticos para suporte a métricas operacionais avançadas em Metabase. Disparada pelo Dataset `finished_trips_ready` emitido pelo `refinedfinishedtrips`.
     - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README.md): processo de carga dos detalhes de viagens canônicos da camada trusted para a camada refined, com adaptação leve para consumo da camada de visualização, especialmente em linhas circulares. Esta DAG é iniciada assim que a DAG gtfs é finalizada com sucesso através do uso do mecanismo datasets do Airflow.
     - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README.md): processo de transformação para criação dos dados de última posição de cada ônibus na camada refined a partir dos dados da camada trusted. A partir da versão 4 deste pipeline, a DAG no Airflow deixa de depender de agendamento por cron e passa a ser disparada por um Airflow Dataset emitido pelo pipeline `transformlivedata`, o que maximiza o freshness da tabela `refined.latest_positions`, que passa a ser atualizada logo após a publicação bem sucedida dos dados transformados, e simplifica a manutenção ao remover o acoplamento entre cron schedules upstream e downstream.
 
@@ -52,7 +54,9 @@ O diagrama abaixo complementa a descrição das DAGs mostrando a orquestração 
 - `gtfs` publica o Dataset `gtfs://trip_details_ready`
 - `refinedsynctripdetails` é disparada por esse Dataset, ou seja, é executado automaticamente após a conclusão com sucesso do pipeline gtfs
 - `transformlivedata` publica o Dataset `sptrans://trusted/transformed_positions_ready`
-- `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset , ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+- `refinedfinishedtrips` e `updatelatestpositions` são disparadas por esse Dataset, ou seja, são executados automaticamente após a conclusão com sucesso do pipeline transformlivedata
+- `refinedfinishedtrips` publica o Dataset `sptrans://refined/finished_trips_ready`
+- `refinedtripfacts` é disparada por esse Dataset, ou seja, é executada automaticamente após a conclusão com sucesso do pipeline refinedfinishedtrips
 
 ## Configuração
 O arquivo `.env` na raiz do projeto contém todas as variáveis de ambiente necessárias para o funcionamento da infraestrutura (MinIO, Airflow, extractloadlivedata), conforme o template de configuração disponível em `.env.example`.
@@ -78,6 +82,7 @@ Esse script:
 - sobe a camada de aplicação do Airflow e executa seu bootstrap
 - executa o bootstrap da stack de observabilidade
 - sobe o restante da plataforma somente após a conclusão do bootstrap
+- executa o bootstrap do Metabase (admin, datasource e timezone) e o provisionamento automático do dashboard SPTrans Insights
 
 Caso deseje subir a plataforma manualmente, o comando base continua sendo:
 
@@ -89,9 +94,10 @@ Caso deseje iniciar serviços específicos:
 ```shell
 docker compose up -d minio
 docker compose up -d postgres
-docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
+docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
 docker compose up -d jupyter
+docker compose up -d metabase
 docker compose up -d loki promtail grafana alertmanager
 ```
 
@@ -100,6 +106,7 @@ Porém será necessário seguir as instruções abaixo, executando alguns comand
 - [gtfs](./dags-dev/gtfs/README.md)
 - [transformlivedata](./dags-dev/transformlivedata/README.md)
 - [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README.md)
+- [refinedtripfacts](./dags-dev/refinedtripfacts/README.md)
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README.md)
 - [extractloadlivedata](./extractloadlivedata/README.md)
 
@@ -113,6 +120,9 @@ Porém será necessário seguir as instruções abaixo, executando alguns comand
 
  Jupyter:
  http://localhost:8888/
+
+ Metabase:
+ http://localhost:3001/
 
  Loki (readiness):
  http://localhost:3100/ready

@@ -34,6 +34,8 @@ Starts the platform with prior infrastructure and Airflow bootstrap to avoid sta
 8. Runs `bootstrap_observability.sh`
 9. Runs `bootstrap_extractloadlivedata.sh`
 10. Starts the rest of the platform with `docker compose up -d`
+11. Runs `bootstrap_metabase.sh`
+12. Runs `bootstrap_metabase_dashboard.sh`
 
 **Usage:**
 ```bash
@@ -133,57 +135,126 @@ cd automation
 
 ---
 
-### `promote_pipeline.py`
+### `bootstrap_metabase.sh`
 
-Promotes a pipeline from the development environment to production.
+Ensures both the infrastructure bootstrap **and** the idempotent provisioning of the Metabase application, so the platform comes up from scratch with no manual UI step.
 
 **What it does, in order:**
+1. Waits until `postgres` becomes available
+2. Runs the SQL bootstrap (`004_metabase.sql`): internal DB, internal user, read-only user, and `SELECT` grants on the `refined` schema
+3. Starts the `metabase` service and waits for `GET /api/health`
+4. **Provisions the Metabase application** (idempotent, via `curl` + `jq` against `http://localhost:3001`):
+   - creates the admin user and completes the wizard (`POST /api/setup`) if not yet set up
+   - sets the query timezone in two layers: a reader-role-scoped session default (`ALTER ROLE … IN DATABASE … SET timezone = 'America/Sao_Paulo'`, authoritative for native SQL) and the Metabase **Report Timezone**
+   - ensures the read-only `sptrans_insights` datasource scoped to the `refined` schema (`host=postgres`)
+   - triggers a schema sync
+   - aborts with a non-zero exit on any non-2xx HTTP response; passwords are never logged
+
+**Required environment variables** (besides the Metabase DB/user ones): `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD` (must satisfy Metabase's password policy). Optional with defaults: `METABASE_ADMIN_FIRST_NAME` (`Admin`), `METABASE_ADMIN_LAST_NAME` (`User`), `METABASE_SITE_NAME` (`SPTrans Insights Pro`). Requires `curl` and `jq` on the host.
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_metabase.sh
+```
+
+---
+
+### `bootstrap_metabase_dashboard.sh`
+
+Idempotently provisions the `SPTrans Insights` dashboard in Metabase, creating the collection, native questions (cards), and the layout with global filters. On a re-run, deletes the existing dashboard before recreating — allowing the script to be run at any time to reapply the configuration.
+
+**What it does, in order:**
+1. Authenticates as admin and retrieves the `sptrans_insights` datasource ID
+2. Creates (or reuses) the `SPTrans Insights Pro` collection
+3. Resolves the field IDs required for field filters
+4. Creates 14 native cards from the SQL files in `metabase/dashboard_queries/`
+5. Creates the dashboard, defines the 5 global filters, and places the dashcards
+6. Sets the latitude and longitude semantic types for the live fleet position map
+7. Prints instructions for manually configuring auto-refresh in the UI
+
+**Required environment variables:** `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`. Optional with defaults: `METABASE_PORT` (`3001`). Requires `curl` and `jq` on the host.
+
+**Usage:**
+```bash
+cd automation
+./bootstrap_metabase_dashboard.sh
+```
+
+---
+
+### `promote_pipeline.py`
+
+Promotes a pipeline from the development environment to production. One of the flags `--check` or `--prod` is required.
+
+**Flags**
+- `--check`: runs validations only (lint, SAST, tests, type-check). No sync.
+- `--prod`: runs validations and syncs to production.
+
+**What it does, in order (both flags):**
 1. Checks whether the pipeline folder exists in `dags-dev/`
 2. Runs lint with `ruff` on the pipeline folder
 3. Runs SAST with `bandit` at high severity on the pipeline folder
-4. Runs type checking with `mypy` on the pipeline folder
-5. Runs unit tests if the `tests/` folder exists
+4. Runs unit tests if the `tests/` folder exists
+5. Runs type checking with `mypy` on the pipeline folder
+
+**With `--prod` only:**
 6. Synchronizes the pipeline folder to `airflow/dags/<pipeline>`, excluding `__pycache__`, `.pytest_cache`, and `tests/`
 7. Synchronizes the shared modules `infra`, `quality`, `observability`, and `pipeline_configurator`
 
 **Usage:**
 ```bash
 cd dags-dev
-python3 ../automation/promote_pipeline.py <pipeline_name>
+python3 ../automation/promote_pipeline.py <pipeline_name> --check
+python3 ../automation/promote_pipeline.py <pipeline_name> --prod
 ```
 
 **Examples:**
 ```bash
-python3 ../automation/promote_pipeline.py transformlivedata
-python3 ../automation/promote_pipeline.py gtfs
-python3 ../automation/promote_pipeline.py updatelatestpositions
+# Validate only
+python3 ../automation/promote_pipeline.py transformlivedata --check
+python3 ../automation/promote_pipeline.py gtfs --check
+
+# Validate and promote to production
+python3 ../automation/promote_pipeline.py transformlivedata --prod
+python3 ../automation/promote_pipeline.py gtfs --prod
 ```
 
 ---
 
 ### `deploy_service.py`
 
-Builds and redeploys a Docker microservice.
+Builds and redeploys a Docker microservice. One of the flags `--check` or `--prod` is required.
 
-**What it does, in order:**
+**Flags**
+- `--check`: runs validations only (lint, SAST, tests, type-check). No build or deploy.
+- `--prod`: runs validations, build, and deploy.
+
+**What it does, in order (both flags):**
 1. Checks whether the service folder exists
 2. Runs lint with `ruff` on the service folder
 3. Runs SAST with `bandit` at high severity on the service folder
-4. Runs type checking with `mypy` on the service folder
-5. Runs unit tests if the `tests/` folder exists
+4. Runs unit tests if the `tests/` folder exists
+5. Runs type checking with `mypy` on the service folder
+
+**With `--prod` only:**
 6. Runs `docker compose build <service>`
 7. Runs `docker compose up -d <service>`
 
 **Usage:**
 ```bash
 cd automation
-python3 deploy_service.py <docker_compose_service_name> <service_folder>
+python3 deploy_service.py <docker_compose_service_name> <service_folder> --check
+python3 deploy_service.py <docker_compose_service_name> <service_folder> --prod
 ```
 
 **Examples:**
 ```bash
-python3 deploy_service.py extractloadlivedata extractloadlivedata
-python3 deploy_service.py alertservice alertservice
+# Validate only
+python3 deploy_service.py extractloadlivedata extractloadlivedata --check
+
+# Validate and deploy
+python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
 ```
 
 ---
@@ -222,5 +293,5 @@ dags-dev/<pipeline>  ->  promote_pipeline.py  ->  airflow/dags/<pipeline>
 
 1. Develop and test the pipeline in `dags-dev/<pipeline>/`
 2. Make sure `pytest <pipeline>/tests/` passes locally
-3. Run `promote_pipeline.py <pipeline>` to promote it to production
-4. The script validates, synchronizes, and updates shared modules automatically
+3. Run `promote_pipeline.py <pipeline> --check` to validate
+4. Run `promote_pipeline.py <pipeline> --prod` to promote to production

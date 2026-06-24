@@ -4,16 +4,32 @@ groups:
     rules:
       - alert: ServiceFailed
         expr: |
-          sum by (execution_id) (
-            count_over_time(
-              {service="extractloadlivedata"}
-              | json
-              | execution_id!=""
-              | label_format execution_id="{{.execution_id}}"
-              | event="execution_failed_non_recoverable"
-              [5m]
-            )
-          ) > 0
+          (
+            sum by (execution_id) (
+              count_over_time(
+                {service="extractloadlivedata"}
+                | json
+                | execution_id!=""
+                | label_format execution_id="{{.execution_id}}"
+                | event="execution_aborted"
+                [5m]
+              )
+            ) > 0
+          )
+          or
+          (
+            sum by (execution_id) (
+              count_over_time(
+                {service="extractloadlivedata"}
+                | json
+                | execution_id!=""
+                | label_format execution_id="{{.execution_id}}"
+                | event="execution_completed"
+                | status="WITH_FAILURES"
+                [5m]
+              )
+            ) > 0
+          )
         for: 0m
         labels:
           severity: critical
@@ -21,7 +37,7 @@ groups:
           alertname: service_failed
         annotations:
           summary: "extractloadlivedata execution failed"
-          description: "Detected at least one execution_failed_non_recoverable event in the last 5 minutes."
+          description: "Detected execution_aborted or execution_completed WITH_FAILURES in the last 5 minutes."
 
       - alert: ServiceWarningThreshold
         expr: |

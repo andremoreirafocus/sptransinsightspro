@@ -16,14 +16,15 @@ EVENT_STATUS_SUCCEEDED: Final = "SUCCEEDED"
 EVENT_STATUS_FAILED: Final = "FAILED"
 EVENT_STATUS_RETRY: Final = "RETRY"
 EVENT_STATUS_SKIPPED: Final = "SKIPPED"
+EVENT_STATUS_WITH_FAILURES: Final = "WITH_FAILURES"
 
 _OrchestratorEvent: TypeAlias = Literal[
     # Execution lifecycle
     "execution_started",
     "execution_completed",
     "execution_metrics_final",
-    "execution_failed_non_recoverable",
-    "execution_summary_emitted",
+    "execution_aborted",
+    "phase_failure_recorded",
     # Configuration
     "config_validation_started",
     "config_validation_succeeded",

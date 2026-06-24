@@ -5,6 +5,7 @@ O desenvolvimento é feito em uma pasta dag-dev que contem cada um dos subprojet
 As configurações são carregadas de forma automática via `pipeline_configurator`, de acordo com o ambiente de execução, seja produção (Airflow) ou desenvolvimento local.
 
 ## O que este subprojeto faz
+- Acionado pelo Dataset `sptrans://trusted/transformed_positions_ready` publicado pelo `transformlivedata`; consome o payload com a chave `logical_date_string` (timestamp UTC ISO 8601) para correlação de observabilidade
 - Lê as posições instantâneas mais recentes armazenadas na camada trusted do serviço de object storage
 - Avalia a freshness dos dados lidos em relação ao momento atual, emitindo eventos de observabilidade com o lag observado
 - Salva os dados na camada refined implementada no banco de dados analítico de baixa latência, para consumo da camada de visualização

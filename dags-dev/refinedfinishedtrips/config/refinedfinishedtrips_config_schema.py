@@ -31,6 +31,7 @@ class QualityConfig(BaseModel):
     gaps_recent_window_minutes: int
     trips_effective_window_threshold_minutes: int
     trips_min_trips_threshold: int
+    vehicle_line_processing_failure_rate_threshold: float
 
 
 class TripDetectionConfig(BaseModel):

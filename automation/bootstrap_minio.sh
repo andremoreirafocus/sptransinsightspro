@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/wait_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 SERVICE_NAME="minio"
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
@@ -39,7 +41,7 @@ wait_for_minio() {
 }
 
 get_minio_network() {
-  docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+  ${DOCKER} inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
     "${SERVICE_NAME}" | head -n1
 }
 
@@ -47,7 +49,7 @@ run_mc() {
   local network_name="$1"
   shift
 
-  docker run --rm \
+  ${DOCKER} run --rm \
     --network "${network_name}" \
     -e "MC_HOST_local=http://${MINIO_ROOT_USER}:${MINIO_ROOT_PASSWORD}@minio:9000" \
     "${MC_IMAGE}" "$@"

@@ -27,6 +27,7 @@ def make_valid_general():
             "gaps_recent_window_minutes": 60,
             "trips_effective_window_threshold_minutes": 60,
             "trips_min_trips_threshold": 5,
+            "vehicle_line_processing_failure_rate_threshold": 0.05,
         },
         "trip_detection": {"stop_proximity_threshold_meters": 100},
     }

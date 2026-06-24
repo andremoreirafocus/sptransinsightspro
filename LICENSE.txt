@@ -1,0 +1,2 @@
+Copyright © 2026 [Andre Moreira]
+Code is made available under the PolyForm Noncommercial License 1.0.0. All data, charts, and written insights are licensed under CC BY-NC 4.0. You may not use this project for commercial purposes. Please credit SPTrans Insights Pro when sharing.

@@ -6,6 +6,8 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 ENV_FILE="${PROJECT_ROOT}/.env"
 # shellcheck disable=SC1091
 source "${SCRIPT_DIR}/wait_helpers.sh"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 WAIT_TIMEOUT_SECONDS="${WAIT_TIMEOUT_SECONDS:-120}"
 WAIT_INTERVAL_SECONDS="${WAIT_INTERVAL_SECONDS:-2}"
@@ -27,7 +29,7 @@ wait_for_postgres_service() {
     "service '${service_name}' to accept connections" \
     "${WAIT_TIMEOUT_SECONDS}" \
     "${WAIT_INTERVAL_SECONDS}" \
-    docker compose exec -T "${service_name}" pg_isready -U "${db_user}" -d postgres
+    ${DOCKER_COMPOSE} exec -T "${service_name}" pg_isready -U "${db_user}" -d postgres
 }
 
 wait_for_http_service() {
@@ -47,7 +49,7 @@ AIRFLOW_POSTGRES_USER="${AIRFLOW_DB_USER:-airflow}"
 POSTGRES_USER_NAME="${POSTGRES_DB_USER:-postgres}"
 
 echo "==> Starting infrastructure services..."
-docker compose up -d airflow_postgres postgres minio
+${DOCKER_COMPOSE} up -d airflow_postgres postgres minio
 
 wait_for_postgres_service "airflow_postgres" "${AIRFLOW_POSTGRES_USER}"
 wait_for_postgres_service "postgres" "${POSTGRES_USER_NAME}"
@@ -63,7 +65,7 @@ echo "==> Running analytical database bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_postgres.sh"
 
 echo "==> Starting Airflow application services..."
-docker compose up -d airflow_webserver airflow_scheduler
+${DOCKER_COMPOSE} up -d airflow_webserver airflow_scheduler
 
 echo "==> Running Airflow application bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_airflow_app.sh"
@@ -78,6 +80,16 @@ echo "==> Running extractloadlivedata bootstrap..."
 bash "${SCRIPT_DIR}/bootstrap_extractloadlivedata.sh"
 
 echo "==> Starting the remaining platform services..."
-docker compose up -d
+${DOCKER_COMPOSE} up -d
+
+echo "==> Running Metabase bootstrap..."
+if ! bash "${SCRIPT_DIR}/bootstrap_metabase.sh"; then
+  echo "[WARN] Metabase bootstrap failed. Platform startup completed without Metabase."
+fi
+
+echo "==> Running Metabase dashboard bootstrap..."
+if ! bash "${SCRIPT_DIR}/bootstrap_metabase_dashboard.sh"; then
+  echo "[WARN] Metabase dashboard bootstrap failed. Platform startup completed without the dashboard."
+fi
 
 echo "Platform started with bootstrap completed."

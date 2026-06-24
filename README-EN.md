@@ -2,7 +2,8 @@ This project provides its users with visualizations of the current positions of 
 
 To achieve this, Sptransinsights extracts the positions of all buses in circulation at regular intervals, stores this data, and generates information about each vehicle’s trips on each route. This allows users to gain insights and identify better times to travel.
 
-A complete data quality framework, with configuration-driven validations using JSON Schema and Great Expectations, quarantine of invalid records, and generation of quality reports with both summary and processing details for observability, is applied to the most critical pipelines.
+A complete data quality framework, with configuration-driven validations using JSON Schema and Great Expectations, quarantine of invalid records, active column-level lineage drift detection mapped to alert events, and generation of quality reports with both summary and processing details for observability, is applied to the most critical pipelines.
+
 
 Pipelines and microservices adopt structured observability with JSON logs, centralized collection, and alert rules in the Loki/Grafana/Alertmanager stack.
 
@@ -24,11 +25,11 @@ The following components were adopted to implement the solution:
 - DuckDB: used in transformation processes to run SQL queries directly on Parquet tables stored in the trusted layer implemented through MinIO, with excellent performance and without requiring SQL engines such as Presto, therefore reducing infrastructure complexity. It is also used for exploratory analysis through Jupyter.
 - [Jupyter](./jupyter/README-EN.md): used to create notebooks for exploratory data analysis over the trusted layer stored in object storage.
 - PostgreSQL: used to store the refined layer, enabling low-latency queries for the visualization layer.
-- [Power BI](./powerbi/README-EN.md): used to implement the visualization layer because of its flexibility, power, and wide adoption, consuming data directly from the refined layer through PostgreSQL DirectQuery.
+- [Metabase](./metabase/README-EN.md): used to implement the visualization layer, consuming data directly from the refined layer of PostgreSQL through the read-only `sptrans_insights` datasource. The SPTrans Insights dashboard is provisioned automatically, exposing operational KPIs, trip frequency and duration analytics, and the live fleet position map.
 - Loki: structured-log aggregation and query backend, responsible for indexing log streams by labels and enabling LogQL queries for operational monitoring. [More observability information](./observability/README-EN.md).
 - Promtail: log collection and shipping agent that gathers Docker container logs and forwards them to Loki, including parsing stages for structured JSON logs. [More observability information](./observability/README-EN.md).
 - Grafana: observability visualization layer, with Loki datasource and provisioned dashboards for execution analysis, failures, warnings, and operational metrics. [More observability information](./observability/README-EN.md).
-- [Airflow](./airflow/README-EN.md): used for orchestration of recurring pipeline processes through multiple DAGs using Python Operator. The production environment for this module is in the `airflow` folder.
+- [Airflow](./airflow/README-EN.md): used for orchestration of recurring pipeline processes through multiple DAGs using exclusively Python Operator. DAGs act as thin orchestration wrappers that invoke business logic through dependency injection, without using Airflow-native hooks or operators. This keeps all pipeline logic executable in plain Python, decoupled from the orchestrator and portable to other event-driven runtimes. The production environment for this module is in the `airflow` folder.
 
 The development environment is located in [dags-dev](./dags-dev/README-EN.md).
 
@@ -44,6 +45,7 @@ Details about the DAGs:
 - [DAG orchestratetransform](./dags-dev/orchestratetransform/README-EN.md): identifies bus position data pending processing and triggers the transformation DAG.
 - [DAG refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README-EN.md): transforms trusted enriched data into completed trips in the refined layer, with quality checks over positions, extraction, and persistence, plus consolidated reporting.
   - Since version 6 of this pipeline, the Airflow DAG no longer depends on a cron schedule and is instead triggered by an Airflow Dataset emitted by the `transformlivedata` pipeline. This maximizes freshness of the completed trips calculated in the refined layer, updating them immediately after successful publication of transformed data, and simplifies maintenance by removing coupling between upstream and downstream cron schedules.
+- [DAG refinedtripfacts](./dags-dev/refinedtripfacts/README-EN.md): builds the analytical fact table `refined.trip_facts` from the finished trips produced by `refinedfinishedtrips`, deriving analytical attributes to support advanced operational metrics in Metabase. Triggered by the `finished_trips_ready` Dataset emitted by `refinedfinishedtrips`.
 - [DAG refinedsynctripdetails](./dags-dev/refinedsynctripdetails/README-EN.md): loads canonical trip details from the trusted layer into the refined layer, with light adaptation for the visualization layer, especially for circular routes. This DAG starts as soon as `gtfs` finishes successfully through Airflow Datasets.
 - [DAG updatelatestpositions](./dags-dev/updatelatestpositions/README-EN.md): transforms trusted data into latest-position data for each bus in the refined layer. Since version 4 of this pipeline, the Airflow DAG no longer depends on a cron schedule and is instead triggered by an Airflow Dataset emitted by `transformlivedata`, maximizing freshness of `refined.latest_positions`, which is updated immediately after successful publication of transformed data, and simplifying maintenance by removing coupling between upstream and downstream cron schedules.
 
@@ -57,6 +59,8 @@ The diagram below complements the DAG descriptions by showing the event-driven o
 - `refinedsynctripdetails` is triggered by that Dataset, which means it runs automatically after successful completion of the `gtfs` pipeline
 - `transformlivedata` publishes the Dataset `sptrans://trusted/transformed_positions_ready`
 - `refinedfinishedtrips` and `updatelatestpositions` are triggered by that Dataset, which means they run automatically after successful completion of the `transformlivedata` pipeline
+- `refinedfinishedtrips` publishes the Dataset `sptrans://refined/finished_trips_ready`
+- `refinedtripfacts` is triggered by that Dataset, which means it runs automatically after successful completion of the `refinedfinishedtrips` pipeline
 
 ### Local Centralised Log Stack (Loki + Promtail + Grafana + Alertmanager)
 
@@ -90,6 +94,7 @@ After starting the project following the instructions below, you must then execu
 - [gtfs](./dags-dev/gtfs/README-EN.md)
 - [transformlivedata](./dags-dev/transformlivedata/README-EN.md)
 - [refinedfinishedtrips](./dags-dev/refinedfinishedtrips/README-EN.md)
+- [refinedtripfacts](./dags-dev/refinedtripfacts/README-EN.md)
 - [updatelatestpositions](./dags-dev/updatelatestpositions/README-EN.md)
 - [extractloadlivedata](./extractloadlivedata/README-EN.md)
 
@@ -107,6 +112,7 @@ This script:
 - starts the Airflow application layer and runs its bootstrap
 - runs observability stack bootstrap
 - starts the rest of the platform only after bootstrap completes
+- runs Metabase bootstrap (admin, datasource, and timezone) and automatically provisions the SPTrans Insights dashboard
 
 If you prefer to start the platform manually, the base command remains:
 
@@ -119,9 +125,10 @@ If you want to start only specific services:
 ```shell
 docker compose up -d minio
 docker compose up -d postgres
-docker compose up -d postgres_airflow airflow_webserver airflow_scheduler
+docker compose up -d airflow_postgres airflow_webserver airflow_scheduler
 docker compose up -d extractloadlivedata
 docker compose up -d jupyter
+docker compose up -d metabase
 docker compose up -d loki promtail grafana alertmanager
 ```
 
@@ -135,6 +142,9 @@ Airflow:
 
 Jupyter:
 `http://localhost:8888/`
+
+Metabase:
+`http://localhost:3001/`
 
 Loki (readiness):
 `http://localhost:3100/ready`

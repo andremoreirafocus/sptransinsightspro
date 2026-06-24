@@ -8,7 +8,7 @@ from os_command_helper import run_command
 from deploy_helpers import run_code_validations
 
 
-def promote_pipeline(pipeline_name):
+def promote_pipeline(pipeline_name, run_sync):
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     dev_dir = os.path.join(project_root, "dags-dev")
     prod_dir = os.path.join(project_root, "airflow", "dags")
@@ -34,98 +34,96 @@ def promote_pipeline(pipeline_name):
     if not os.path.isdir(pipeline_dev_path):
         print(f"❌ Pipeline folder '{pipeline_name}' not found in dags-dev/")
         sys.exit(1)
-    print(f"🚀 Promoting pipeline: {pipeline_name}")
+    if run_sync:
+        print(f"🚀 Promoting pipeline: {pipeline_name}")
+    else:
+        print(f"🔍 Validating pipeline: {pipeline_name}")
     # 2. Validation (Linting + SAST + Tests)
     test_dir = os.path.join(pipeline_dev_path, "tests")
     has_tests = os.path.isdir(test_dir)
-    total_steps = (3 if has_tests else 2) + 3
+    total_steps = (4 if has_tests else 3) + (2 if run_sync else 0)
     steps_consumed = run_code_validations(
         pipeline_dev_path, pipeline_name, step_offset=1, total_steps=total_steps
     )
-    # 3. Type checking (mypy)
-    mypy_step = steps_consumed + 1
-    print(f"Step {mypy_step}/{total_steps}: Running mypy for {pipeline_name}...")
-    run_command(
-        [sys.executable, "-m", "mypy", "--exclude", "tests", pipeline_dev_path],
-        f"Type checking (mypy) failed for {pipeline_name}!",
-    )
-    print("✅ Type checking Passed.")
-    # 4. Atomic Sync Folder
-    sync_step = steps_consumed + 2
-    print(
-        f"Step {sync_step}/{total_steps}: Syncing folder '{pipeline_name}' to production..."
-    )
-    os.makedirs(pipeline_prod_path, exist_ok=True)
-    run_command(
-        [
-            "rsync",
-            "-av",
-            "--delete",
-            *rsync_excludes,
-            f"{pipeline_dev_path}/",
-            f"{pipeline_prod_path}/",
-        ],
-        "Folder sync failed!",
-    )
-    dag_entry_points = glob.glob(
-        os.path.join(dev_dir, f"{pipeline_name}-v*.py")
-    )
-    for dag_file in dag_entry_points:
-        dest = os.path.join(prod_dir, os.path.basename(dag_file))
-        shutil.copy2(dag_file, dest)
-        print(f"  Copied DAG entry point: {os.path.basename(dag_file)}")
-    print(
-        f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality, observability and pipeline_configurator files..."
-    )
-    os.makedirs(infra_prod_path, exist_ok=True)
-    run_command(
-        [
-            "rsync",
-            "-av",
-            "--delete",
-            *rsync_excludes,
-            f"{infra_dev_path}/",
-            f"{infra_prod_path}/",
-        ],
-        "Infra sync failed!",
-    )
-    os.makedirs(quality_prod_path, exist_ok=True)
-    run_command(
-        [
-            "rsync",
-            "-av",
-            "--delete",
-            *rsync_excludes,
-            f"{quality_dev_path}/",
-            f"{quality_prod_path}/",
-        ],
-        "quality sync failed!",
-    )
-    os.makedirs(observability_prod_path, exist_ok=True)
-    run_command(
-        [
-            "rsync",
-            "-av",
-            "--delete",
-            *rsync_excludes,
-            f"{observability_dev_path}/",
-            f"{observability_prod_path}/",
-        ],
-        "observability sync failed!",
-    )
-    os.makedirs(pipeline_configurator_prod_path, exist_ok=True)
-    run_command(
-        [
-            "rsync",
-            "-av",
-            "--delete",
-            *rsync_excludes,
-            f"{pipeline_configurator_dev_path}/",
-            f"{pipeline_configurator_prod_path}/",
-        ],
-        "pipeline_configurator sync failed!",
-    )
-    print(f"\n✅ Pipeline '{pipeline_name}' promoted successfully to production!")
+    if run_sync:
+        # 3. Atomic Sync Folder
+        sync_step = steps_consumed + 1
+        print(
+            f"Step {sync_step}/{total_steps}: Syncing folder '{pipeline_name}' to production..."
+        )
+        os.makedirs(pipeline_prod_path, exist_ok=True)
+        run_command(
+            [
+                "rsync",
+                "-av",
+                "--delete",
+                *rsync_excludes,
+                f"{pipeline_dev_path}/",
+                f"{pipeline_prod_path}/",
+            ],
+            "Folder sync failed!",
+        )
+        dag_entry_points = glob.glob(
+            os.path.join(dev_dir, f"{pipeline_name}-v*.py")
+        )
+        for dag_file in dag_entry_points:
+            dest = os.path.join(prod_dir, os.path.basename(dag_file))
+            shutil.copy2(dag_file, dest)
+            print(f"  Copied DAG entry point: {os.path.basename(dag_file)}")
+        print(
+            f"Step {sync_step + 1}/{total_steps}: Syncing shared infra, quality, observability and pipeline_configurator files..."
+        )
+        os.makedirs(infra_prod_path, exist_ok=True)
+        run_command(
+            [
+                "rsync",
+                "-av",
+                "--delete",
+                *rsync_excludes,
+                f"{infra_dev_path}/",
+                f"{infra_prod_path}/",
+            ],
+            "Infra sync failed!",
+        )
+        os.makedirs(quality_prod_path, exist_ok=True)
+        run_command(
+            [
+                "rsync",
+                "-av",
+                "--delete",
+                *rsync_excludes,
+                f"{quality_dev_path}/",
+                f"{quality_prod_path}/",
+            ],
+            "quality sync failed!",
+        )
+        os.makedirs(observability_prod_path, exist_ok=True)
+        run_command(
+            [
+                "rsync",
+                "-av",
+                "--delete",
+                *rsync_excludes,
+                f"{observability_dev_path}/",
+                f"{observability_prod_path}/",
+            ],
+            "observability sync failed!",
+        )
+        os.makedirs(pipeline_configurator_prod_path, exist_ok=True)
+        run_command(
+            [
+                "rsync",
+                "-av",
+                "--delete",
+                *rsync_excludes,
+                f"{pipeline_configurator_dev_path}/",
+                f"{pipeline_configurator_prod_path}/",
+            ],
+            "pipeline_configurator sync failed!",
+        )
+        print(f"\n✅ Pipeline '{pipeline_name}' promoted successfully to production!")
+    else:
+        print(f"\n✅ Pipeline '{pipeline_name}' passed all validations.")
 
 
 if __name__ == "__main__":
@@ -135,6 +133,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "pipeline_name", help="The name of the pipeline folder (e.g. transformlivedata)"
     )
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument(
+        "--check",
+        action="store_true",
+        help="Run validations only (lint, SAST, tests, type-check). No sync.",
+    )
+    mode_group.add_argument(
+        "--prod",
+        action="store_true",
+        help="Run validations and sync to production.",
+    )
     args = parser.parse_args()
 
-    promote_pipeline(args.pipeline_name)
+    promote_pipeline(args.pipeline_name, run_sync=args.prod)

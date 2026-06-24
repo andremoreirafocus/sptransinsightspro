@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 SQL_ROOT="${PROJECT_ROOT}/database/bootstrap"
 ENV_FILE="${PROJECT_ROOT}/.env"
+# shellcheck disable=SC1091
+source "${SCRIPT_DIR}/docker_helper.sh"
 
 SERVICE_NAME="airflow_postgres"
 
@@ -18,7 +20,7 @@ load_env_file() {
 }
 
 docker_compose_exec() {
-  docker compose exec -T "${SERVICE_NAME}" "$@"
+  ${DOCKER_COMPOSE} exec -T "${SERVICE_NAME}" "$@"
 }
 
 run_sql_file() {

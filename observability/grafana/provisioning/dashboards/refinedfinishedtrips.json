@@ -265,6 +265,20 @@
           "legendFormat": "trips_extracted",
           "queryType": "range",
           "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"trip_extraction_completed\" | json v=\"metadata.circular_trips\" | unwrap v [5m]))",
+          "legendFormat": "circular_trips",
+          "queryType": "range",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"trip_extraction_completed\" | json v=\"metadata.non_circular_trips\" | unwrap v [5m]))",
+          "legendFormat": "non_circular_trips",
+          "queryType": "range",
+          "refId": "C"
         }
       ],
       "title": "Trips extracted per run",
@@ -375,7 +389,7 @@
           "refId": "A"
         }
       ],
-      "title": "Sentido discrepancies per run",
+      "title": "Trip direction discrepancies per run",
       "type": "timeseries"
     },
     {
@@ -427,7 +441,7 @@
         },
         "overrides": [
           {
-            "matcher": { "id": "byName", "options": "groups" },
+            "matcher": { "id": "byName", "options": "succeeded" },
             "properties": [{ "id": "color", "value": { "fixedColor": "purple", "mode": "fixed" } }]
           }
         ]
@@ -441,13 +455,49 @@
       "targets": [
         {
           "datasource": { "type": "loki", "uid": "${datasource}" },
-          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"quality_report_metrics\" | status=\"SUCCEEDED\" | json v=\"metadata.vehicle_line_groups_processed\" | unwrap v [5m]))",
-          "legendFormat": "groups",
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"trip_extraction_completed\" | json v=\"metadata.vehicle_line_processing_succeeded\" | unwrap v [5m]))",
+          "legendFormat": "succeeded",
           "queryType": "range",
           "refId": "A"
         }
       ],
-      "title": "Vehicle-line groups processed per run",
+      "title": "Vehicle-line processing succeeded per run",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "${datasource}" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "failed" },
+            "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }]
+          }
+        ]
+      },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 24 },
+      "id": 15,
+      "options": {
+        "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "${datasource}" },
+          "expr": "avg(last_over_time({service=\"airflow_tasks\"} | json | service_extracted=\"refinedfinishedtrips\" | event=\"trip_extraction_completed\" | json v=\"metadata.vehicle_line_processing_failed\" | unwrap v [5m]))",
+          "legendFormat": "failed",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Vehicle-line processing failed per run",
       "type": "timeseries"
     },
     {
@@ -473,7 +523,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 24 },
       "id": 13,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -514,7 +564,7 @@
         },
         "overrides": []
       },
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 24 },
       "id": 14,
       "options": {
         "legend": { "calcs": ["mean", "last"], "displayMode": "list", "placement": "bottom" },
@@ -529,12 +579,12 @@
           "refId": "A"
         }
       ],
-      "title": "Max extraction gap (s)",
+      "title": "Trip extraction max position window gap (s)",
       "type": "timeseries"
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 40 },
       "id": 11,
       "options": {
         "dedupStrategy": "none",
@@ -559,7 +609,7 @@
     },
     {
       "datasource": { "type": "loki", "uid": "${datasource}" },
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 40 },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 48 },
       "id": 12,
       "options": {
         "dedupStrategy": "none",
@@ -607,5 +657,5 @@
   "timezone": "browser",
   "title": "refinedfinishedtrips",
   "uid": "refinedfinishedtrips",
-  "version": 1
+  "version": 8
 }

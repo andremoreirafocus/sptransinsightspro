@@ -1,4 +1,6 @@
 import logging
+import sys
+import traceback
 from typing import Iterable
 
 from observability.structured_event_logger import StructuredEventLogger
@@ -70,8 +72,17 @@ class _ThirdPartyToStructuredHandler(logging.Handler):
                     status="FAILED",
                     metadata=metadata,
                 )
-        except Exception:
-            return
+        except Exception as e:
+            try:
+                self.structured_logger.error(
+                    event="third_party_log_bridge_error",
+                    message=f"Failed to forward third-party log record: {e}",
+                    execution_id=self.execution_id,
+                    correlation_id=self.correlation_id,
+                    metadata={"origin_logger": record.name},
+                )
+            except Exception:
+                print(traceback.format_exc(), file=sys.stderr)
 
 
 def configure_third_party_log_bridge(

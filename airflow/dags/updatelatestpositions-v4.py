@@ -148,13 +148,14 @@ if _IN_AIRFLOW:
         "max_active_runs": 1,
         "email_on_failure": False,
         "email_on_retry": False,
-        "retries": 3,
+        "retries": 0,
     }
 
     def update_latest_positions_airflow_wrapper(triggering_dataset_events):
         events = triggering_dataset_events.get(TRANSFORMED_POSITIONS_READY_SIGNAL.uri, [])
         raw_payload = events[0].extra if events else {}
-        correlation_id = raw_payload.get("correlation_id") if raw_payload else None
+        logical_date_string = raw_payload.get("logical_date_string") if raw_payload else None
+        correlation_id = logical_date_string
         logger = UpdateLatestPositionsLogger(
             get_structured_logger(
                 service=PIPELINE_NAME,

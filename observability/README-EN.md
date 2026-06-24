@@ -66,6 +66,12 @@ Rules currently configured for `refinedfinishedtrips`:
 - `PositionFreshnessHigh` (`severity=warning`): fires when `observed_lag_minutes` exceeds the warn threshold of 10 minutes — pipeline continues but data quality may be degraded.
 - `ExtractionGapHigh` (`severity=warning`): fires when `max_gap_minutes` exceeds the warn threshold of 5 minutes — early signal before the pipeline starts aborting.
 
+Rules currently configured for `refinedtripfacts`:
+- `ExecutionAborted` (`severity=critical`): fires on `execution_aborted`.
+- `NoPipelineExecutionCompleted` (`severity=critical`): fires when no `execution_finished` is detected in 1 hour.
+- `CompletenessLossRateHigh` (`severity=warning`): fires when `loss_rate` exceeds 1% in the last 10 minutes.
+- `DriftDetected` (`severity=warning`): fires when `drift_detected=true` in the `quality_report_metrics` event.
+
 Email configuration used by Alertmanager:
 - `ALERTMANAGER_SMTP_HOST`
 - `ALERTMANAGER_SMTP_PORT`
@@ -122,6 +128,7 @@ Dashboards are provisioned automatically from `grafana/provisioning/dashboards/`
 | extractloadlivedata | `extractloadlivedata.json` | Executions, errors, warnings, execution time per phase, log stream |
 | transformlivedata | `transformlivedata.json` | Executions, duration per phase, acceptance rate, raw record volume, rejected records by reason, log stream |
 | refinedfinishedtrips | `refinedfinishedtrips.json` | Executions, duration per phase, trips added, trips detected, positions loaded, extraction quality, position data freshness, log stream |
+| refinedtripfacts | `refinedtripfacts.json` | Executions, duration per phase, volume and loss rates, domain violations, dim_time coverage, log stream |
 
 Dashboard screenshots are in each pipeline's README, alongside the full panel inventory and Loki queries:
 
@@ -129,6 +136,7 @@ Dashboard screenshots are in each pipeline's README, alongside the full panel in
 - [transformlivedata](../dags-dev/transformlivedata/README.md#dashboard-grafana) — executions, duration per phase, acceptance rate, record volume
 - [refinedfinishedtrips](../dags-dev/refinedfinishedtrips/README.md#dashboard-grafana) — executions, trip volume, extraction quality, position data freshness
 - [gtfs](../dags-dev/gtfs/README.md#dashboard-grafana) — executions, duration per phase, trip_details row count, extracted files
+- [refinedtripfacts](../dags-dev/refinedtripfacts/README.md#observabilidade-stack-loki--grafana) — executions, volume and loss rates, domain violations, dim_time coverage
 
 After editing a dashboard JSON, bump its `version` field and reload without restarting Grafana:
 
@@ -157,6 +165,11 @@ observability/
         extractloadlivedata.json     # extractloadlivedata dashboard
         transformlivedata.json       # transformlivedata dashboard
         refinedfinishedtrips.json    # refinedfinishedtrips dashboard
+        refinedtripfacts.json        # refinedtripfacts dashboard
+  loki/
+    rules/
+      fake/
+        refinedtripfacts-alerts.yaml  # refinedtripfacts alert rules
 ```
 
 ## Local URLs

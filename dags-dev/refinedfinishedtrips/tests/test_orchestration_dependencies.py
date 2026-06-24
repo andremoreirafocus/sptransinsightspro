@@ -39,8 +39,8 @@ def test_deps_has_all_expected_fields():
 
 def test_deps_stores_callables_correctly():
     sentinel = object()
-    deps = _make_deps(get_recent_positions=lambda c: sentinel)
-    assert deps.get_recent_positions(None) is sentinel
+    deps = _make_deps(get_recent_positions=lambda c, logic_date_str: sentinel)
+    assert deps.get_recent_positions(None, "2026-04-14T10:00:00+00:00") is sentinel
 
 
 def test_get_refinedfinishedtrips_orchestration_dependencies_returns_instance():

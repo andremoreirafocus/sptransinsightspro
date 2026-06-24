@@ -9,10 +9,12 @@ CREATE TABLE IF NOT EXISTS refined.finished_trips (
     trip_id TEXT,
     vehicle_id INTEGER,
     trip_start_time TIMESTAMPTZ NOT NULL,
-    trip_end_time TIMESTAMPTZ,
-    duration INTERVAL,
+    trip_end_time TIMESTAMPTZ NOT NULL,
+    duration_seconds INTEGER,
     is_circular BOOLEAN,
-    average_speed DOUBLE PRECISION,
+    distance_meters DOUBLE PRECISION,
+    avg_speed_kmh DOUBLE PRECISION,
+    logic_date TIMESTAMPTZ,
     PRIMARY KEY (trip_start_time, vehicle_id, trip_id)
 ) PARTITION BY RANGE (trip_start_time);
 

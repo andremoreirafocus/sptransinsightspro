@@ -5,7 +5,6 @@ from quality.reporting import (
     build_quality_summary,
     create_failure_quality_report,
     save_quality_report,
-    save_and_notify_quality_report,
 )
 
 
@@ -331,6 +330,28 @@ def test_failure_report_extra_fields_merged_into_summary():
 # --- save_quality_report ---
 
 
+def _make_report(status="PASS"):
+    return {
+        "summary": {
+            "contract_version": "v1",
+            "pipeline": "gtfs",
+            "execution_id": "exec-1",
+            "status": status,
+            "acceptance_rate": 1.0,
+            "items_failed": 0,
+            "quality_report_path": "meta/quality-reports/gtfs/report.json",
+            "failure_phase": None,
+            "failure_message": None,
+            "generated_at_utc": "2026-04-17T14:10:00+00:00",
+        },
+        "details": {},
+    }
+
+
+def _make_connection():
+    return {"endpoint": "localhost", "access_key": "key", "secret_key": "secret"}
+
+
 def test_save_quality_report_calls_write_fn_once():
     calls = []
 
@@ -378,118 +399,3 @@ def test_save_quality_report_buffer_is_valid_json():
     assert parsed["summary"]["status"] == "PASS"
 
 
-# --- save_and_notify_quality_report ---
-
-
-def _make_report(status="PASS"):
-    return {
-        "summary": {
-            "contract_version": "v1",
-            "pipeline": "gtfs",
-            "execution_id": "exec-1",
-            "status": status,
-            "acceptance_rate": 1.0,
-            "items_failed": 0,
-            "quality_report_path": "meta/quality-reports/gtfs/report.json",
-            "failure_phase": None,
-            "failure_message": None,
-            "generated_at_utc": "2026-04-17T14:10:00+00:00",
-        },
-        "details": {},
-    }
-
-
-def _make_connection():
-    return {"endpoint": "localhost", "access_key": "key", "secret_key": "secret"}
-
-
-def test_save_and_notify_calls_write_fn_once():
-    calls = []
-
-    def fake_write(connection_data, buffer, bucket_name, object_name):
-        calls.append((bucket_name, object_name))
-
-    save_and_notify_quality_report(
-        report=_make_report(),
-        path="meta-bucket/quality-reports/gtfs/report.json",
-        connection_data=_make_connection(),
-        webhook_url="disabled",
-        write_fn=fake_write,
-    )
-    assert len(calls) == 1
-
-
-def test_save_and_notify_splits_path_into_bucket_and_object():
-    calls = []
-
-    def fake_write(connection_data, buffer, bucket_name, object_name):
-        calls.append((bucket_name, object_name))
-
-    save_and_notify_quality_report(
-        report=_make_report(),
-        path="my-bucket/folder/sub/report.json",
-        connection_data=_make_connection(),
-        webhook_url="disabled",
-        write_fn=fake_write,
-    )
-    assert calls[0][0] == "my-bucket"
-    assert calls[0][1] == "folder/sub/report.json"
-
-
-def test_save_and_notify_write_fn_receives_valid_json():
-    received = []
-
-    def fake_write(connection_data, buffer, bucket_name, object_name):
-        received.append(buffer)
-
-    save_and_notify_quality_report(
-        report=_make_report(),
-        path="bucket/report.json",
-        connection_data=_make_connection(),
-        webhook_url="disabled",
-        write_fn=fake_write,
-    )
-    parsed = json.loads(received[0].decode("utf-8"))
-    assert parsed["summary"]["status"] == "PASS"
-
-
-def test_save_and_notify_skips_webhook_when_disabled():
-    calls = []
-
-    def fake_write(connection_data, buffer, bucket_name, object_name):
-        calls.append(True)
-
-    save_and_notify_quality_report(
-        report=_make_report(),
-        path="bucket/report.json",
-        connection_data=_make_connection(),
-        webhook_url="disabled",
-        write_fn=fake_write,
-    )
-    assert len(calls) == 1
-
-
-def test_save_and_notify_swallows_webhook_failure(caplog):
-    import logging
-
-    def fake_write(connection_data, buffer, bucket_name, object_name):
-        pass
-
-    def failing_send_webhook(summary, webhook_url, **kwargs):
-        raise RuntimeError("connection refused")
-
-    import quality.reporting as reporting_module
-    original = reporting_module.send_webhook
-    reporting_module.send_webhook = failing_send_webhook
-    try:
-        with caplog.at_level(logging.WARNING, logger="quality.reporting"):
-            save_and_notify_quality_report(
-                report=_make_report(),
-                path="bucket/report.json",
-                connection_data=_make_connection(),
-                webhook_url="http://fake-webhook/notify",
-                write_fn=fake_write,
-            )
-        assert any("webhook" in msg.lower() for msg in caplog.messages)
-    finally:
-        reporting_module.send_webhook = original

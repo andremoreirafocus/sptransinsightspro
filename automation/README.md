@@ -30,6 +30,8 @@ Sobe a plataforma com bootstrap prévio da infraestrutura e do Airflow para evit
 8. Executa `bootstrap_observability.sh`
 9. Executa `bootstrap_extractloadlivedata.sh`
 10. Sobe o restante da plataforma com `docker compose up -d`
+11. Executa `bootstrap_metabase.sh`
+12. Executa `bootstrap_metabase_dashboard.sh`
 
 **Uso:**
 ```bash
@@ -124,55 +126,122 @@ cd automation
 
 ---
 
-### `promote_pipeline.py`
-Promove uma pipeline do ambiente de desenvolvimento para produção.
+### `bootstrap_metabase.sh`
+Garante o bootstrap de infraestrutura **e** o provisionamento da aplicação Metabase, de forma idempotente, para que a plataforma suba do zero sem nenhum passo manual de UI.
 
 **O que faz, em ordem:**
+1. Aguarda o `postgres` ficar disponível
+2. Executa o bootstrap SQL (`004_metabase.sql`): DB interno, usuário interno, usuário read-only e grants de `SELECT` no schema `refined`
+3. Sobe o serviço `metabase` e aguarda o `GET /api/health`
+4. **Provisiona a aplicação Metabase** (idempotente, via `curl` + `jq` contra `http://localhost:3001`):
+   - cria o usuário admin e conclui o wizard (`POST /api/setup`), se ainda não configurado
+   - define o timezone das consultas em duas camadas: default da sessão escopado ao role reader (`ALTER ROLE … IN DATABASE … SET timezone = 'America/Sao_Paulo'`, autoritativo para o SQL nativo) e o **Report Timezone** do Metabase
+   - garante o datasource read-only `sptrans_insights` com escopo no schema `refined` (`host=postgres`)
+   - dispara o sync de schema
+   - aborta com código não-zero em qualquer resposta HTTP não-2xx; senhas nunca são logadas
+
+**Variáveis de ambiente exigidas** (além das de DB/usuários do Metabase): `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD` (deve atender à política de senha do Metabase). Opcionais com default: `METABASE_ADMIN_FIRST_NAME` (`Admin`), `METABASE_ADMIN_LAST_NAME` (`User`), `METABASE_SITE_NAME` (`SPTrans Insights Pro`). Requer `curl` e `jq` no host.
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_metabase.sh
+```
+
+---
+
+### `bootstrap_metabase_dashboard.sh`
+Provisiona o dashboard `SPTrans Insights` no Metabase de forma idempotente, criando a coleção, as perguntas nativas (cards) e o layout com filtros globais. Numa re-execução, remove o dashboard existente antes de recriar — permitindo que o script seja rodado a qualquer momento para reaplicar a configuração.
+
+**O que faz, em ordem:**
+1. Autentica como admin e obtém o ID do datasource `sptrans_insights`
+2. Cria (ou reutiliza) a coleção `SPTrans Insights Pro`
+3. Resolve os IDs de campo necessários para os field filters
+4. Cria 14 cards nativos a partir dos SQLs em `metabase/dashboard_queries/`
+5. Cria o dashboard, define os 5 filtros globais e posiciona os dashcards
+6. Define os semantic types de latitude e longitude para o mapa de posições ao vivo
+7. Imprime instruções para configurar o auto-refresh manualmente na UI
+
+**Variáveis de ambiente exigidas:** `METABASE_ADMIN_EMAIL`, `METABASE_ADMIN_PASSWORD`. Opcionais com default: `METABASE_PORT` (`3001`). Requer `curl` e `jq` no host.
+
+**Uso:**
+```bash
+cd automation
+./bootstrap_metabase_dashboard.sh
+```
+
+---
+
+### `promote_pipeline.py`
+Promove uma pipeline do ambiente de desenvolvimento para produção. Requer obrigatoriamente uma das flags `--check` ou `--prod`.
+
+**Flags**
+- `--check`: executa apenas as validações (lint, SAST, testes, type checking). Sem sincronização.
+- `--prod`: executa as validações e sincroniza para produção.
+
+**O que faz, em ordem (ambas as flags):**
 1. Verifica se a pasta da pipeline existe em `dags-dev/`
 2. Executa lint com `ruff` na pasta da pipeline
 3. Executa SAST com `bandit` (alta severidade) na pasta da pipeline
-4. Executa type checking com `mypy` na pasta da pipeline
-5. Executa os testes unitários (se a pasta `tests/` existir)
-6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>` excluindo `__pycache__`, `.pytest_cache` e `tests/`
+4. Executa os testes unitários (se a pasta `tests/` existir)
+5. Executa type checking com `mypy` na pasta da pipeline
+
+**Apenas com `--prod`:**
+6. Sincroniza a pasta da pipeline para `airflow/dags/<pipeline>`, excluindo `__pycache__`, `.pytest_cache` e `tests/`
 7. Sincroniza os módulos compartilhados `infra`, `quality`, `observability` e `pipeline_configurator`
 
 **Uso:**
 ```bash
 cd dags-dev
-python3 ../automation/promote_pipeline.py <nome_da_pipeline>
+python3 ../automation/promote_pipeline.py <nome_da_pipeline> --check
+python3 ../automation/promote_pipeline.py <nome_da_pipeline> --prod
 ```
 
 **Exemplos:**
 ```bash
-python3 ../automation/promote_pipeline.py transformlivedata
-python3 ../automation/promote_pipeline.py gtfs
-python3 ../automation/promote_pipeline.py updatelatestpositions
+# Apenas validar
+python3 ../automation/promote_pipeline.py transformlivedata --check
+python3 ../automation/promote_pipeline.py gtfs --check
+
+# Validar e promover para produção
+python3 ../automation/promote_pipeline.py transformlivedata --prod
+python3 ../automation/promote_pipeline.py gtfs --prod
 ```
 
 ---
 
 ### `deploy_service.py`
-Realiza o build e redeploy de um microserviço Docker.
+Realiza o build e redeploy de um microserviço Docker. Requer obrigatoriamente uma das flags `--check` ou `--prod`.
 
-**O que faz, em ordem:**
+**Flags**
+- `--check`: executa apenas as validações (lint, SAST, testes, type checking). Sem build ou deploy.
+- `--prod`: executa as validações, build e deploy.
+
+**O que faz, em ordem (ambas as flags):**
 1. Verifica se a pasta do serviço existe
 2. Executa lint com `ruff` na pasta do serviço
 3. Executa SAST com `bandit` (alta severidade) na pasta do serviço
-4. Executa type checking com `mypy` na pasta do serviço
-5. Executa os testes unitários (se a pasta `tests/` existir)
+4. Executa os testes unitários (se a pasta `tests/` existir)
+5. Executa type checking com `mypy` na pasta do serviço
+
+**Apenas com `--prod`:**
 6. Executa `docker compose build <serviço>`
 7. Executa `docker compose up -d <serviço>`
 
 **Uso:**
 ```bash
 cd automation
-python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico>
+python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico> --check
+python3 deploy_service.py <nome_no_docker_compose> <pasta_do_servico> --prod
 ```
 
 **Exemplos:**
 ```bash
-python3 deploy_service.py extractloadlivedata extractloadlivedata
-python3 deploy_service.py alertservice alertservice
+# Apenas validar
+python3 deploy_service.py extractloadlivedata extractloadlivedata --check
+
+# Validar e fazer deploy
+python3 deploy_service.py extractloadlivedata extractloadlivedata --prod
 ```
 
 ---
@@ -208,5 +277,5 @@ dags-dev/<pipeline>  →  promote_pipeline.py  →  airflow/dags/<pipeline>
 
 1. Desenvolver e testar a pipeline em `dags-dev/<pipeline>/`
 2. Garantir que `pytest <pipeline>/tests/` passa localmente
-3. Executar `promote_pipeline.py <pipeline>` para promover para produção
-4. O script valida, sincroniza e atualiza os módulos compartilhados automaticamente
+3. Executar `promote_pipeline.py <pipeline> --check` para validar
+4. Executar `promote_pipeline.py <pipeline> --prod` para promover para produção
