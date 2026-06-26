@@ -282,11 +282,9 @@ create_cards() {
     --arg id_dr "${UUID_P8_DATE_RANGE}" --argjson fdr "${FIELD_DATE_ACTUAL}" \
     --arg id_ro "${UUID_P8_ROUTE}"       --argjson fro "${FIELD_ROUTE_ID}" \
     --arg id_ci "${UUID_P8_IS_CIRCULAR}" --argjson fci "${FIELD_IS_CIRCULAR_FACTS}" \
-    --arg id_mt "${UUID_P8_MIN_TRIPS}" \
     '{date_range:  {id:$id_dr,name:"date_range",  "display-name":"Date range",type:"dimension",dimension:["field",$fdr,null],"widget-type":"date/all-options",default:null},
       route:       {id:$id_ro,name:"route",       "display-name":"Route",     type:"dimension",dimension:["field",$fro,null],"widget-type":"string/=",        default:null},
-      is_circular: {id:$id_ci,name:"is_circular", "display-name":"Circular",  type:"dimension",dimension:["field",$fci,null],"widget-type":"category",        default:null},
-      min_trips:   {id:$id_mt,name:"min_trips",   "display-name":"Min trips", type:"number",   default:"5"}}')"
+      is_circular: {id:$id_ci,name:"is_circular", "display-name":"Circular",  type:"dimension",dimension:["field",$fci,null],"widget-type":"category",        default:null}}')"
 
   TAGS_P9="$(jq -n \
     --arg id_dr "${UUID_P9_DATE_RANGE}" --argjson fdr "${FIELD_DATE_ACTUAL}" \
@@ -325,8 +323,8 @@ create_cards() {
   CARD_P5="$(create_card   "Frequency by direction"         "bar"    "frequency_by_route_hour_direction.sql"       "${TAGS_P5}"   '{"graph.dimensions":["direction"],"graph.metrics":["trip_count"]}')"
   CARD_P6="$(create_card   "Median and P95 duration"        "bar"    "median_and_p95_duration_by_route.sql"        "${TAGS_P6}"   '{"graph.dimensions":["route_id"],"graph.metrics":["median_duration_minutes","p95_duration_minutes"],"graph.x_axis.scale":"ordinal"}')"
   CARD_P7="$(create_card   "Today vs historical baseline"   "table"  "duration_today_vs_same_weekday_baseline.sql" "${TAGS_P7}"   '{}')"
-  CARD_P8="$(create_card   "Trip duration consistency by route"            "bar"    "reliability_by_route.sql"                    "${TAGS_P8}"   '{"graph.dimensions":["route_id"],"graph.metrics":["reliability_index"],"graph.x_axis.scale":"ordinal"}')"
-  CARD_P9="$(create_card   "Average speed by route and hour"    "line"   "avg_speed_by_route_and_hour.sql"             "${TAGS_P9}"   '{"graph.dimensions":["hour_of_day"],"graph.metrics":["avg_speed_kmh"]}')"
+  CARD_P8="$(create_card   "Trip duration per hour"         "line"   "duration_by_hour.sql"                        "${TAGS_P8}"   '{"graph.dimensions":["hour_of_day"],"graph.metrics":["avg_duration_minutes"]}')"
+  CARD_P9="$(create_card   "Average speed by hour"          "line"   "avg_speed_by_route_and_hour.sql"             "${TAGS_P9}"   '{"graph.dimensions":["hour_of_day"],"graph.metrics":["avg_speed_kmh"]}')"
   CARD_P10="$(create_card  "Route summary"                  "table"  "route_summary_with_trip_details.sql"         "${TAGS_P10}"  '{}')"
   CARD_P11A="$(create_card "Live fleet positions"           "map"    "live_fleet_positions.sql"                    "${TAGS_P11A}" '{"map.type":"pin","map.latitude_column":"veiculo_lat","map.longitude_column":"veiculo_long"}')"
   CARD_P11B="$(create_card "Live vehicles count"   "scalar" "live_fleet_positions_freshness.sql"          "${TAGS_P11B}" '{"scalar.field":"active_vehicle_count"}')"
@@ -508,7 +506,6 @@ readonly UUID_P7_ROUTE="f1c8e9c0-88f2-477d-ad08-4a5d5f3405f6"
 readonly UUID_P8_DATE_RANGE="3785a4cc-8bbe-42b6-88bb-0c301fa9d3ac"
 readonly UUID_P8_ROUTE="b60a0d67-83f7-4d85-a970-7275a291c592"
 readonly UUID_P8_IS_CIRCULAR="d2f4096c-a4a7-4222-a02e-e02190cae361"
-readonly UUID_P8_MIN_TRIPS="1e5b3360-2b03-4fb7-9feb-44cf286c933f"
 readonly UUID_P9_DATE_RANGE="b7956da6-89d2-4e73-9834-7a2ef06183d4"
 readonly UUID_P9_ROUTE="09135d46-c216-4c8c-8bfb-34056f55ee34"
 readonly UUID_P9_IS_CIRCULAR="61164632-2098-4774-a715-134e9d2c68bd"

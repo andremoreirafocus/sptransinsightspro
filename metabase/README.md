@@ -38,7 +38,7 @@ dashboard.
 | `frequency_by_route_hour_direction.sql`       | P4, P5      | **início** da viagem (`started_at_time_dim_key`) |
 | `median_and_p95_duration_by_route.sql`        | P6          | **início** da viagem |
 | `duration_today_vs_same_weekday_baseline.sql` | P7          | **início** da viagem, janela fixa de 4 semanas do mesmo dia da semana |
-| `reliability_by_route.sql`                    | P8          | **início** da viagem |
+| `duration_by_hour.sql`                        | P8          | **início** da viagem; duração média por hora do dia |
 | `avg_speed_by_route_and_hour.sql`             | P9          | **início** da viagem |
 | `route_summary_with_trip_details.sql`         | P10         | **início** da viagem, faz join com `trip_details` por `trip_id` |
 | `live_fleet_positions.sql`                    | P11         | snapshot ao vivo de veículos; mapa por `veiculo_lat`/`veiculo_long` |

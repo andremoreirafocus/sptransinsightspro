@@ -37,7 +37,7 @@ panels; the PoC files are not edited to track the dashboard.
 | `frequency_by_route_hour_direction.sql`       | P4, P5      | trip **start** (`started_at_time_dim_key`) |
 | `median_and_p95_duration_by_route.sql`        | P6          | trip **start** |
 | `duration_today_vs_same_weekday_baseline.sql` | P7          | trip **start**, fixed 4-week same-weekday window |
-| `reliability_by_route.sql`                    | P8          | trip **start** |
+| `duration_by_hour.sql`                        | P8          | trip **start**; average duration by hour of day |
 | `avg_speed_by_route_and_hour.sql`             | P9          | trip **start** |
 | `route_summary_with_trip_details.sql`         | P10         | trip **start**, joins `trip_details` on `trip_id` |
 | `live_fleet_positions.sql`                    | P11         | live vehicle snapshot; map by `veiculo_lat`/`veiculo_long` |
