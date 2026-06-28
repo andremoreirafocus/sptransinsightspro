@@ -14,7 +14,7 @@ SELECT
     COUNT(*)                                                                          AS total_trips,
     ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY refined.trip_facts.duration_seconds) / 60.0)::numeric, 1) AS median_duration_minutes,
     AVG(refined.trip_facts.avg_speed_kmh)                                             AS avg_speed_kmh,
-    STDDEV(refined.trip_facts.duration_seconds) / NULLIF(AVG(refined.trip_facts.duration_seconds), 0) AS duration_consistency
+    ROUND((AVG(refined.trip_facts.duration_seconds) / 60.0)::numeric, 1)              AS avg_duration_minutes
 FROM refined.trip_facts
 JOIN refined.trip_details
   ON refined.trip_details.trip_id = refined.trip_facts.trip_id

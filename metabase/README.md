@@ -115,7 +115,7 @@ A linha de conteúdo 2 exibe: **Median and P95 duration** (mediana ≈ 18 min, P
 
 À esquerda, o mapa **Live fleet positions** exibe a distribuição dos veículos em operação em tempo real sobre o mapa de São Paulo, com pins azuis concentrados nas regiões de maior densidade de linhas.
 
-À direita, a tabela **Route summary** detalha, por rota e sentido, os terminais de origem e destino (`first_stop_name`, `last_stop_name`), o indicador `is_circular`, o total de viagens do período (`total_trips`), a duração mediana em minutos (`median_duration_minutes`), a velocidade média (`avg_speed_kmh`) e a consistência de duração (`duration_consistency`). A tabela exibe as primeiras 11 de 177 linhas para o período selecionado.
+À direita, a tabela **Route summary** detalha, por rota e sentido, os terminais de origem e destino (`first_stop_name`, `last_stop_name`), o indicador `is_circular`, o total de viagens do período (`total_trips`), a duração mediana em minutos (`median_duration_minutes`), a velocidade média (`avg_speed_kmh`) e a duração média em minutos (`avg_duration_minutes`). A tabela exibe as primeiras 11 de 177 linhas para o período selecionado.
 
 ---
 

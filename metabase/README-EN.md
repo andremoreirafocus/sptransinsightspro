@@ -113,7 +113,7 @@ Content row 2 shows: **Median and P95 duration** (median ≈ 18 min, P95 ≈ 28 
 
 On the left, the **Live fleet positions** map shows the real-time distribution of vehicles in operation across São Paulo, with blue pins concentrated in the highest-density bus corridors.
 
-On the right, the **Route summary** table details, per route and direction, the origin and destination terminals (`first_stop_name`, `last_stop_name`), the `is_circular` flag, total trips in the selected period (`total_trips`), median trip duration in minutes (`median_duration_minutes`), average speed (`avg_speed_kmh`), and duration consistency (`duration_consistency`). The table shows the first 11 of 177 rows for the selected period.
+On the right, the **Route summary** table details, per route and direction, the origin and destination terminals (`first_stop_name`, `last_stop_name`), the `is_circular` flag, total trips in the selected period (`total_trips`), median trip duration in minutes (`median_duration_minutes`), average speed (`avg_speed_kmh`), and average trip duration in minutes (`avg_duration_minutes`). The table shows the first 11 of 177 rows for the selected period.
 
 ---
 
